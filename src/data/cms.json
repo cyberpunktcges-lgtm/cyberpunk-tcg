@@ -233,5 +233,70 @@
       "status": "CONFIRMADO",
       "image": "/images/wallpapers/Dogtown.png"
     }
+  ],
+  "forumUrl": "https://foro.cyberpunktcg.es",
+  "altArtCards": [
+    {
+      "id": "CP-003",
+      "slug": "adam-smasher-metal-over-meat",
+      "name": "Adam Smasher // Metal Over Meat",
+      "faction": "CORPO",
+      "badge": "ARTE ALTERNATIVO // FOIL #01",
+      "artist": "Edición Especial Arasaka",
+      "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/adam-smasher-metal-over-meat.webp",
+      "githubUrl": "https://github.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/blob/main/adam-smasher-metal-over-meat.webp"
+    },
+    {
+      "id": "CP-007",
+      "slug": "alt-cunningham-mother-of-daemons",
+      "name": "Alt Cunningham // Mother Of Daemons",
+      "faction": "NETRUNNER",
+      "badge": "ARTE ALTERNATIVO // FOIL #02",
+      "artist": "Edición Especial Blackwall",
+      "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/alt-cunningham-mother-of-daemons.webp",
+      "githubUrl": "https://github.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/blob/main/alt-cunningham-mother-of-daemons.webp"
+    },
+    {
+      "id": "C-02",
+      "slug": "lucy-kushinada-fresh-beginnings",
+      "name": "Lucy Kushinada // Fresh Beginnings",
+      "faction": "NETRUNNER",
+      "badge": "ARTE ALTERNATIVO // FOIL #03",
+      "artist": "Edición Especial Edgerunners",
+      "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/lucy-kushinada-fresh-beginnings.webp",
+      "githubUrl": "https://github.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/blob/main/lucy-kushinada-fresh-beginnings.webp"
+    }
+  ],
+  "pastTournaments": [
+    {
+      "id": "HIST-01",
+      "name": "Torneo Inaugural Welcome to Night City — Club Ertai Ávila",
+      "date": "02 NOV 2026",
+      "location": "Ávila // Club Ertai",
+      "players": "32 Jugadores",
+      "winner": "@Alt_Prime",
+      "winningDeck": "Soulkiller Beyond Blackwall",
+      "winningFaction": "NETRUNNER",
+      "score": "5-0 (Invicto)",
+      "runnerUp": "@Kurogane_HQ (Arasaka Vengeance Protocol)",
+      "thirdPlace": "@ChromeSkulls (Maelstrom Cyberpsycho Blitz)",
+      "summary": "Final de infarto entre Netrunner Overclock y Arasaka Control decidida en el quinto turno por incursión directa con Alt Cunningham.",
+      "featuredCardImg": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/alt-cunningham-soulkiller-architect.webp"
+    },
+    {
+      "id": "HIST-02",
+      "name": "Open Nocturno Cyberpulse #00 — Discord España",
+      "date": "25 OCT 2026",
+      "location": "Online // Servidor Oficial",
+      "players": "48 Jugadores",
+      "winner": "@ChromeSkulls",
+      "winningDeck": "Maelstrom Cyberpsycho Blitz",
+      "winningFaction": "BANDAS",
+      "score": "6-1",
+      "runnerUp": "@ZeroCool_2077 (Lucy Deep Dive)",
+      "thirdPlace": "@Exec_Vance (Militech Heavy Armor)",
+      "summary": "El agresivo mazo de Royce y Dum Dum sorprendió al metajuego cerrando partidas antes del cuarto turno.",
+      "featuredCardImg": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/royce-psycho-on-the-edge.webp"
+    }
   ]
 }

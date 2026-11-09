@@ -1,5 +1,6 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import { isRequestAuthenticated } from '../../utils/auth.js';
 
 export const prerender = false;
 
@@ -30,17 +31,37 @@ export async function GET() {
 }
 
 export async function POST({ request }) {
+  if (!isRequestAuthenticated(request)) {
+    return new Response(
+      JSON.stringify({ ok: false, error: 'No autorizado. Inicia sesión como administrador.' }),
+      { status: 401, headers: { 'Content-Type': 'application/json' } }
+    );
+  }
+
   try {
     const body = await request.json();
     const cms = await readCmsData();
 
-    const { action, section, item, id, heroArticle } = body;
+    const { action, section, item, id, heroArticle, altArtCards, forumUrl } = body;
 
     if (action === 'update_hero' && heroArticle) {
       cms.heroArticle = { ...cms.heroArticle, ...heroArticle };
-    } else if (action === 'create' && section && Array.isArray(cms[section])) {
+    } else if (action === 'update_alt_art' && Array.isArray(altArtCards)) {
+      cms.altArtCards = altArtCards.slice(0, 3);
+    } else if (action === 'update_forum_url' && typeof forumUrl === 'string') {
+      cms.forumUrl = forumUrl.trim();
+    } else if (action === 'create' && section) {
+      if (!Array.isArray(cms[section])) {
+        cms[section] = [];
+      }
       const prefix =
-        section === 'news' ? 'NEWS-' : section === 'decks' ? 'DECK-' : 'TOUR-';
+        section === 'news'
+          ? 'NEWS-'
+          : section === 'decks'
+            ? 'DECK-'
+            : section === 'pastTournaments'
+              ? 'HIST-'
+              : 'TOUR-';
       const newItem = {
         ...item,
         id: item.id || `${prefix}${Date.now().toString().slice(-4)}`

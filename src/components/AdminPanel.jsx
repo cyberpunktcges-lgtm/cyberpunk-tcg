@@ -13,7 +13,12 @@ import {
   ArrowLeft,
   CheckCircle2,
   Search,
-  Sparkles
+  Sparkles,
+  Lock,
+  LogOut,
+  ShieldAlert,
+  User,
+  KeyRound
 } from 'lucide-react';
 
 const CYBER_CLIP =
@@ -30,7 +35,13 @@ const LOCAL_WALLPAPERS = [
   '/images/wallpapers/Downtown.png'
 ];
 
-export default function AdminPanel({ initialCms, initialCards }) {
+export default function AdminPanel({ initialAuth = false, initialCms = {}, initialCards = [] }) {
+  const [isAuthenticated, setIsAuthenticated] = useState(initialAuth);
+  const [loginUser, setLoginUser] = useState('');
+  const [loginPass, setLoginPass] = useState('');
+  const [loginError, setLoginError] = useState('');
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
+
   const [cms, setCms] = useState(initialCms);
   const [cards, setCards] = useState(initialCards || []);
   const [activeTab, setActiveTab] = useState('news');
@@ -52,7 +63,7 @@ export default function AdminPanel({ initialCms, initialCards }) {
   });
 
   // Estado formulario Hero
-  const [heroForm, setHeroForm] = useState(initialCms.heroArticle);
+  const [heroForm, setHeroForm] = useState(initialCms?.heroArticle || {});
 
   // Estado formulario Torneos
   const [editingTourId, setEditingTourId] = useState(null);
@@ -81,6 +92,70 @@ export default function AdminPanel({ initialCms, initialCards }) {
     description: '',
     cards: []
   });
+
+  // Estado 3 Cartas de Arte Alternativo (Inicio)
+  const [altArtForm, setAltArtForm] = useState(
+    initialCms?.altArtCards?.length === 3
+      ? initialCms.altArtCards
+      : [
+          {
+            slot: 1,
+            cardId: 'CP-018',
+            name: 'ALT CUNNINGHAM',
+            faction: 'NETRUNNER',
+            badge: 'ARTE ALTERNATIVO // EDICIÓN COLECCIONISTA',
+            artist: 'ARCHIVO OFICIAL NIGHT CITY',
+            image:
+              'https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/alt-cunningham.png'
+          },
+          {
+            slot: 2,
+            cardId: 'CP-003',
+            name: 'ADAM SMASHER',
+            faction: 'SOLO',
+            badge: 'ARTE ALTERNATIVO // FULL ART FOIL',
+            artist: 'ARASAKA SECURITY ARCHIVE',
+            image:
+              'https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/adam-smasher.png'
+          },
+          {
+            slot: 3,
+            cardId: 'CP-070',
+            name: 'JOHNNY SILVERHAND',
+            faction: 'ROCKERBOY',
+            badge: 'ARTE ALTERNATIVO // LEYENDA DE AFTERLIFE',
+            artist: 'SAMURAI TOUR 2023',
+            image:
+              'https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/johnny-silverhand.png'
+          }
+        ]
+  );
+  const [activeAltSlot, setActiveAltSlot] = useState(0);
+  const [cardSearchAlt, setCardSearchAlt] = useState('');
+
+  // Estado Histórico de Torneos (Resultados y Mazos Ganadores)
+  const [editingHistId, setEditingHistId] = useState(null);
+  const [cardSearchHist, setCardSearchHist] = useState('');
+  const [histForm, setHistForm] = useState({
+    name: '',
+    date: '',
+    location: 'Discord Oficial // Online',
+    playersCount: '32 Edgerunners',
+    winner: '',
+    winningDeck: '',
+    faction: 'NETRUNNER',
+    score: '6 - 0',
+    runnerUp: '',
+    thirdPlace: '',
+    featuredCardImg:
+      'https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/alt-cunningham.png',
+    summary: ''
+  });
+
+  // Estado URL Foro Discourse
+  const [forumUrlInput, setForumUrlInput] = useState(
+    initialCms?.forumUrl || 'https://foro.cyberpunktcg.es'
+  );
 
   const showToast = (msg) => {
     setStatusMessage(msg);
@@ -218,6 +293,74 @@ export default function AdminPanel({ initialCms, initialCards }) {
     });
   };
 
+  // Guardar las 3 Cartas de Arte Alternativo de Inicio
+  const handleSaveAltArt = async (e) => {
+    e.preventDefault();
+    const ok = await apiCall({ action: 'update_alt_art', altArtCards: altArtForm });
+    if (ok) {
+      showToast('Las 3 Cartas de Arte Alternativo de Inicio han sido actualizadas');
+    }
+  };
+
+  const handleSelectCardForAltSlot = (ghCard) => {
+    setAltArtForm((prev) =>
+      prev.map((item, idx) =>
+        idx === activeAltSlot
+          ? {
+              ...item,
+              cardId: ghCard.id,
+              name: ghCard.name,
+              faction: ghCard.faction,
+              image: ghCard.image
+            }
+          : item
+      )
+    );
+    showToast(`Carta "${ghCard.name}" asignada al Slot #${activeAltSlot + 1}`);
+  };
+
+  // Guardar Histórico de Torneo (Resultado + Mazo Ganador)
+  const handleSaveHistTournament = async (e) => {
+    e.preventDefault();
+    if (!histForm.name.trim() || !histForm.winner.trim()) return;
+    const action = editingHistId ? 'update' : 'create';
+    const item = editingHistId ? { ...histForm, id: editingHistId } : histForm;
+    const ok = await apiCall({ action, section: 'pastTournaments', item });
+    if (ok) {
+      showToast(
+        editingHistId
+          ? 'Registro histórico de torneo actualizado'
+          : 'Resultado de torneo añadido al Histórico'
+      );
+      setEditingHistId(null);
+      setHistForm({
+        name: '',
+        date: '',
+        location: 'Discord Oficial // Online',
+        playersCount: '32 Edgerunners',
+        winner: '',
+        winningDeck: '',
+        faction: 'NETRUNNER',
+        score: '6 - 0',
+        runnerUp: '',
+        thirdPlace: '',
+        featuredCardImg:
+          'https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/alt-cunningham.png',
+        summary: ''
+      });
+    }
+  };
+
+  // Guardar URL del Foro Discourse
+  const handleSaveForumUrl = async (e) => {
+    e.preventDefault();
+    if (!forumUrlInput.trim()) return;
+    const ok = await apiCall({ action: 'update_forum_url', forumUrl: forumUrlInput.trim() });
+    if (ok) {
+      showToast('URL del Foro Discourse actualizada correctamente');
+    }
+  };
+
   // Sincronizar Cartas desde GitHub
   const handleSyncGithubCards = async () => {
     setIsSyncing(true);
@@ -235,6 +378,64 @@ export default function AdminPanel({ initialCms, initialCards }) {
     }
   };
 
+  const handleLogin = async (e) => {
+    e.preventDefault();
+    setLoginError('');
+    setIsLoggingIn(true);
+    try {
+      const res = await fetch('/api/auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'login',
+          username: loginUser.trim(),
+          password: loginPass
+        })
+      });
+      const json = await res.json();
+      if (!res.ok || !json.ok) {
+        setLoginError(json.error || 'Credenciales incorrectas');
+        setIsLoggingIn(false);
+        return;
+      }
+
+      // Cargar datos del CMS y Cartas una vez autenticado
+      const [cmsRes, cardsRes] = await Promise.all([
+        fetch('/api/cms'),
+        fetch('/api/cards')
+      ]);
+      const cmsJson = await cmsRes.json();
+      const cardsJson = await cardsRes.json();
+
+      setCms(cmsJson);
+      setHeroForm(cmsJson?.heroArticle || {});
+      if (cmsJson?.altArtCards?.length === 3) {
+        setAltArtForm(cmsJson.altArtCards);
+      }
+      if (cmsJson?.forumUrl) {
+        setForumUrlInput(cmsJson.forumUrl);
+      }
+      setCards(cardsJson?.cards || []);
+      setIsAuthenticated(true);
+      setLoginPass('');
+    } catch (err) {
+      setLoginError('Error de conexión con el servidor de autenticación');
+    } finally {
+      setIsLoggingIn(false);
+    }
+  };
+
+  const handleLogout = async () => {
+    await fetch('/api/auth', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'logout' })
+    });
+    setIsAuthenticated(false);
+    setLoginUser('');
+    setLoginPass('');
+  };
+
   const filteredDeckPickerCards = cards
     .filter(
       (c) =>
@@ -242,6 +443,149 @@ export default function AdminPanel({ initialCms, initialCards }) {
         c.slug.toLowerCase().includes(cardSearchDeck.toLowerCase())
     )
     .slice(0, 12);
+
+  const filteredAltPickerCards = cards
+    .filter(
+      (c) =>
+        c.name.toLowerCase().includes(cardSearchAlt.toLowerCase()) ||
+        c.slug.toLowerCase().includes(cardSearchAlt.toLowerCase())
+    )
+    .slice(0, 18);
+
+  const filteredHistPickerCards = cards
+    .filter(
+      (c) =>
+        c.name.toLowerCase().includes(cardSearchHist.toLowerCase()) ||
+        c.slug.toLowerCase().includes(cardSearchHist.toLowerCase())
+    )
+    .slice(0, 12);
+
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-screen bg-[#070a10] text-white font-sans flex flex-col justify-between relative overflow-hidden rounded-none">
+        {/* Rejilla Técnica Cyberpulse */}
+        <div
+          className="pointer-events-none fixed inset-0 z-0 opacity-15"
+          style={{
+            backgroundImage:
+              'linear-gradient(to right, rgba(0, 240, 255, 0.09) 1px, transparent 1px), linear-gradient(to bottom, rgba(252, 238, 10, 0.06) 1px, transparent 1px)',
+            backgroundSize: '48px 48px'
+          }}
+        />
+
+        {/* Barra superior */}
+        <header className="relative z-10 border-b border-gray-800 bg-[#000000]">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
+            <a
+              href="/"
+              style={{ clipPath: CYBER_CLIP }}
+              className="flex items-center shrink-0 bg-[#FCEE0A] border border-[#FCEE0A] overflow-hidden rounded-none"
+            >
+              <img
+                src="/images/logo-cyberpunk-tcg-españa.jpg"
+                alt="Cyberpunk TCG España"
+                className="h-12 w-auto object-contain block"
+              />
+            </a>
+            <a
+              href="/"
+              style={{ clipPath: CYBER_CLIP }}
+              className="px-4 py-2.5 bg-[#070a10] border border-[#00F0FF] text-[#00F0FF] hover:bg-[#00F0FF] hover:text-[#070a10] font-mono font-bold text-xs uppercase tracking-wider flex items-center gap-2 transition-all rounded-none"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              <span>VOLVER AL PORTAL PÚBLICO</span>
+            </a>
+          </div>
+        </header>
+
+        {/* Formulario de Acceso Restringido NetWatch */}
+        <main className="relative z-10 flex-1 flex items-center justify-center p-4">
+          <div
+            style={{ clipPath: CYBER_CLIP }}
+            className="w-full max-w-md bg-[#000000] border-2 border-[#FCEE0A] shadow-[0_0_40px_rgba(252,238,10,0.2)] p-7 space-y-6 rounded-none"
+          >
+            <div className="border-b border-gray-800 pb-4 flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 bg-[#FCEE0A] text-[#070a10]">
+                  <Lock className="w-5 h-5" />
+                </div>
+                <div>
+                  <span className="text-[10px] font-mono text-[#00F0FF] uppercase tracking-widest block">
+                    NETWATCH SECURITY // NIVEL 5
+                  </span>
+                  <h1 className="text-lg font-black uppercase tracking-wider text-white">
+                    ACCESO AL <span className="text-[#FCEE0A]">BACKEND CMS</span>
+                  </h1>
+                </div>
+              </div>
+            </div>
+
+            {loginError && (
+              <div
+                style={{ clipPath: CYBER_CLIP }}
+                className="bg-[#FF003C]/15 border border-[#FF003C] p-3 flex items-center gap-2.5 text-xs font-mono text-[#FF003C]"
+              >
+                <ShieldAlert className="w-4 h-4 shrink-0" />
+                <span>{loginError}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleLogin} className="space-y-4">
+              <div>
+                <label className="block text-xs font-mono text-gray-400 uppercase mb-1.5">
+                  USUARIO ADMINISTRADOR
+                </label>
+                <div className="relative">
+                  <User className="w-4 h-4 text-[#FCEE0A] absolute left-3 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    required
+                    autoComplete="username"
+                    value={loginUser}
+                    onChange={(e) => setLoginUser(e.target.value)}
+                    placeholder="Introduce tu usuario..."
+                    className="w-full bg-[#070a10] border border-gray-800 focus:border-[#00F0FF] pl-10 pr-3 py-2.5 text-sm font-mono text-white focus:outline-none rounded-none"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-mono text-gray-400 uppercase mb-1.5">
+                  CLAVE DE ACCESO (PASSWORD)
+                </label>
+                <div className="relative">
+                  <KeyRound className="w-4 h-4 text-[#FCEE0A] absolute left-3 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="password"
+                    required
+                    autoComplete="current-password"
+                    value={loginPass}
+                    onChange={(e) => setLoginPass(e.target.value)}
+                    placeholder="••••••••••••"
+                    className="w-full bg-[#070a10] border border-gray-800 focus:border-[#00F0FF] pl-10 pr-3 py-2.5 text-sm font-mono text-white focus:outline-none rounded-none"
+                  />
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                disabled={isLoggingIn}
+                style={{ clipPath: CYBER_CLIP }}
+                className="w-full py-3.5 bg-[#FCEE0A] text-[#070a10] hover:bg-[#00F0FF] font-mono font-black text-xs uppercase tracking-widest flex items-center justify-center gap-2 cursor-pointer transition-colors rounded-none mt-2"
+              >
+                <Lock className="w-4 h-4" />
+                <span>{isLoggingIn ? 'VERIFICANDO CREDENCIALES...' : 'AUTENTICAR Y ENTRAR AL CMS'}</span>
+              </button>
+            </form>
+          </div>
+        </main>
+
+        <footer className="relative z-10 border-t border-gray-800 bg-[#000000] py-4 text-center text-[11px] font-mono text-gray-500">
+          SISTEMA PROTEGIDO // CYBERPUNK TCG ESPAÑA
+        </footer>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#070a10] text-white font-sans rounded-none">
@@ -273,14 +617,26 @@ export default function AdminPanel({ initialCms, initialCards }) {
             </div>
           </div>
 
-          <a
-            href="/"
-            style={{ clipPath: CYBER_CLIP }}
-            className="px-4 py-2.5 bg-[#070a10] border border-[#00F0FF] text-[#00F0FF] hover:bg-[#00F0FF] hover:text-[#070a10] font-mono font-bold text-xs uppercase tracking-wider flex items-center gap-2 transition-all rounded-none"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            <span>VOLVER AL PORTAL PÚBLICO</span>
-          </a>
+          <div className="flex items-center gap-3">
+            <a
+              href="/"
+              style={{ clipPath: CYBER_CLIP }}
+              className="px-4 py-2.5 bg-[#070a10] border border-[#00F0FF] text-[#00F0FF] hover:bg-[#00F0FF] hover:text-[#070a10] font-mono font-bold text-xs uppercase tracking-wider flex items-center gap-2 transition-all rounded-none"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              <span className="hidden sm:inline">VOLVER AL PORTAL</span>
+            </a>
+
+            <button
+              type="button"
+              onClick={handleLogout}
+              style={{ clipPath: CYBER_CLIP }}
+              className="px-4 py-2.5 bg-[#FF003C] text-white hover:bg-[#FCEE0A] hover:text-[#070a10] font-mono font-black text-xs uppercase tracking-wider flex items-center gap-2 cursor-pointer transition-all rounded-none"
+            >
+              <LogOut className="w-4 h-4" />
+              <span>CERRAR SESIÓN</span>
+            </button>
+          </div>
         </div>
       </header>
 
@@ -301,9 +657,16 @@ export default function AdminPanel({ initialCms, initialCards }) {
           {[
             { id: 'news', label: `NOTICIAS (${cms.news?.length || 0})`, icon: Newspaper },
             { id: 'hero', label: 'NOTICIA DESTACADA (HERO)', icon: Sparkles },
+            { id: 'altArt', label: 'ARTE ALTERNATIVO (3)', icon: Sparkles },
             { id: 'decks', label: `MAZOS (${cms.decks?.length || 0})`, icon: Layers },
             { id: 'tournaments', label: `TORNEOS (${cms.tournaments?.length || 0})`, icon: Trophy },
-            { id: 'cards', label: `CARTAS GITHUB (${cards.length})`, icon: Database }
+            {
+              id: 'history',
+              label: `HISTÓRICO TORNEOS (${cms.pastTournaments?.length || 0})`,
+              icon: Trophy
+            },
+            { id: 'cards', label: `CARTAS GITHUB (${cards.length})`, icon: Database },
+            { id: 'settings', label: 'FORO DISCOURSE', icon: Terminal }
           ].map((tab) => {
             const Icon = tab.icon;
             const active = activeTab === tab.id;
@@ -1060,6 +1423,572 @@ export default function AdminPanel({ initialCms, initialCards }) {
               ))}
             </div>
           </div>
+        )}
+
+        {/* ===============================================================
+            TAB 6: 3 CARTAS DE ARTE ALTERNATIVO EN PORTADA (INICIO)
+           =============================================================== */}
+        {activeTab === 'altArt' && (
+          <form onSubmit={handleSaveAltArt} className="space-y-8">
+            <div
+              style={{ clipPath: CYBER_CLIP }}
+              className="bg-[#000000] border border-gray-800 p-6 sm:p-8 space-y-6 rounded-none"
+            >
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-800 pb-4">
+                <div>
+                  <span className="text-[10px] font-mono text-[#00F0FF] uppercase tracking-widest block">
+                    VITRINA DE COLECCIONISTA // PORTADA INICIO
+                  </span>
+                  <h2 className="text-xl font-black uppercase text-white">
+                    GESTIÓN DE LAS <span className="text-[#FCEE0A]">3 CARTAS DE ARTE ALTERNATIVO</span>
+                  </h2>
+                  <p className="text-xs font-mono text-gray-400 mt-1">
+                    Selecciona cada uno de los 3 slots y haz clic en cualquier carta del catálogo GitHub inferior o introduce una URL de imagen personalizada.
+                  </p>
+                </div>
+
+                <button
+                  type="submit"
+                  style={{ clipPath: CYBER_CLIP }}
+                  className="px-6 py-3.5 bg-[#FCEE0A] text-[#070a10] font-mono font-black text-xs uppercase tracking-widest hover:bg-[#00F0FF] flex items-center gap-2 cursor-pointer shrink-0"
+                >
+                  <Save className="w-4 h-4" />
+                  <span>PUBLICAR LAS 3 CARTAS EN PORTADA</span>
+                </button>
+              </div>
+
+              {/* Los 3 Slots de Arte Alternativo */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                {altArtForm.map((slotItem, idx) => {
+                  const isSelected = activeAltSlot === idx;
+                  return (
+                    <div
+                      key={idx}
+                      onClick={() => setActiveAltSlot(idx)}
+                      style={{ clipPath: CYBER_CLIP }}
+                      className={`p-5 border transition-all cursor-pointer space-y-4 ${
+                        isSelected
+                          ? 'bg-[#070a10] border-2 border-[#FCEE0A] shadow-[0_0_25px_rgba(252,238,10,0.2)]'
+                          : 'bg-[#070a10]/60 border-gray-800 hover:border-[#00F0FF]'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between border-b border-gray-800 pb-2.5">
+                        <span className="text-xs font-mono font-black uppercase text-[#FCEE0A]">
+                          SLOT ARTE ALTERNATIVO #0{idx + 1}
+                        </span>
+                        <span
+                          className={`px-2 py-0.5 text-[10px] font-mono font-bold uppercase ${
+                            isSelected
+                              ? 'bg-[#FCEE0A] text-[#070a10]'
+                              : 'bg-gray-900 text-gray-400'
+                          }`}
+                        >
+                          {isSelected ? 'ACTIVO PARA ELEGIR' : 'PULSA PARA EDITAR'}
+                        </span>
+                      </div>
+
+                      <div className="h-56 bg-[#000000] border border-gray-800 flex items-center justify-center p-2">
+                        <img
+                          src={slotItem.image}
+                          alt={slotItem.name}
+                          className="max-h-full max-w-full object-contain"
+                        />
+                      </div>
+
+                      <div className="space-y-3">
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <label className="block text-[10px] font-mono text-gray-400 uppercase mb-1">
+                              ID CARTA
+                            </label>
+                            <input
+                              type="text"
+                              value={slotItem.cardId || ''}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                setAltArtForm((prev) =>
+                                  prev.map((it, i) => (i === idx ? { ...it, cardId: val } : it))
+                                );
+                              }}
+                              className="w-full bg-[#000000] border border-gray-800 px-2.5 py-1.5 text-xs font-mono text-[#FCEE0A]"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[10px] font-mono text-gray-400 uppercase mb-1">
+                              FACCIÓN
+                            </label>
+                            <input
+                              type="text"
+                              value={slotItem.faction || ''}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                setAltArtForm((prev) =>
+                                  prev.map((it, i) => (i === idx ? { ...it, faction: val } : it))
+                                );
+                              }}
+                              className="w-full bg-[#000000] border border-gray-800 px-2.5 py-1.5 text-xs font-mono text-[#00F0FF]"
+                            />
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="block text-[10px] font-mono text-gray-400 uppercase mb-1">
+                            NOMBRE DE LA CARTA
+                          </label>
+                          <input
+                            type="text"
+                            value={slotItem.name || ''}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setAltArtForm((prev) =>
+                                prev.map((it, i) => (i === idx ? { ...it, name: val } : it))
+                              );
+                            }}
+                            className="w-full bg-[#000000] border border-gray-800 px-2.5 py-1.5 text-xs font-bold text-white"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-[10px] font-mono text-gray-400 uppercase mb-1">
+                            ETIQUETA DE EDICIÓN ESPECIAL
+                          </label>
+                          <input
+                            type="text"
+                            value={slotItem.badge || ''}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setAltArtForm((prev) =>
+                                prev.map((it, i) => (i === idx ? { ...it, badge: val } : it))
+                              );
+                            }}
+                            className="w-full bg-[#000000] border border-gray-800 px-2.5 py-1.5 text-xs font-mono text-white"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-[10px] font-mono text-gray-400 uppercase mb-1">
+                            ARTISTA / COLECCIÓN
+                          </label>
+                          <input
+                            type="text"
+                            value={slotItem.artist || ''}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setAltArtForm((prev) =>
+                                prev.map((it, i) => (i === idx ? { ...it, artist: val } : it))
+                              );
+                            }}
+                            className="w-full bg-[#000000] border border-gray-800 px-2.5 py-1.5 text-xs font-mono text-gray-300"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-[10px] font-mono text-gray-400 uppercase mb-1">
+                            URL DE LA IMAGEN (GITHUB O LOCAL)
+                          </label>
+                          <input
+                            type="text"
+                            value={slotItem.image || ''}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setAltArtForm((prev) =>
+                                prev.map((it, i) => (i === idx ? { ...it, image: val } : it))
+                              );
+                            }}
+                            className="w-full bg-[#000000] border border-gray-800 px-2.5 py-1.5 text-[11px] font-mono text-gray-400"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Selector Visual Rápido desde el Repositorio GitHub */}
+              <div className="border-t border-gray-800 pt-6 space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div>
+                    <h3 className="text-sm font-mono font-bold uppercase text-[#00F0FF]">
+                      SELECTOR RÁPIDO DE CARTAS PARA EL SLOT #0{activeAltSlot + 1}
+                    </h3>
+                    <p className="text-xs font-mono text-gray-400">
+                      Haz clic sobre una carta para asignarla automáticamente al Slot #0
+                      {activeAltSlot + 1} seleccionado arriba.
+                    </p>
+                  </div>
+
+                  <div className="relative w-full sm:w-72">
+                    <Search className="w-4 h-4 text-[#00F0FF] absolute left-3 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="text"
+                      value={cardSearchAlt}
+                      onChange={(e) => setCardSearchAlt(e.target.value)}
+                      placeholder="Buscar carta por nombre..."
+                      className="w-full bg-[#070a10] border border-gray-800 pl-9 pr-3 py-2 text-xs font-mono text-white"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3 max-h-80 overflow-y-auto p-2 bg-[#070a10] border border-gray-800">
+                  {filteredAltPickerCards.map((c) => (
+                    <button
+                      key={c.id}
+                      type="button"
+                      onClick={() => handleSelectCardForAltSlot(c)}
+                      className="bg-[#000000] border border-gray-800 hover:border-[#FCEE0A] p-2 text-left transition-all cursor-pointer group"
+                    >
+                      <img
+                        src={c.image}
+                        alt={c.name}
+                        loading="lazy"
+                        className="w-full h-28 object-cover object-top mb-1.5"
+                      />
+                      <span className="text-[9px] font-mono text-[#FCEE0A] block">{c.id}</span>
+                      <p className="text-[10px] font-bold text-white truncate group-hover:text-[#00F0FF]">
+                        {c.name}
+                      </p>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </form>
+        )}
+
+        {/* ===============================================================
+            TAB 7: HISTÓRICO DE TORNEOS (RESULTADOS Y MAZOS GANADORES)
+           =============================================================== */}
+        {activeTab === 'history' && (
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+            <form
+              onSubmit={handleSaveHistTournament}
+              style={{ clipPath: CYBER_CLIP }}
+              className="lg:col-span-5 bg-[#000000] border border-gray-800 p-6 space-y-4 rounded-none"
+            >
+              <div className="flex items-center justify-between border-b border-gray-800 pb-3">
+                <h2 className="text-base font-black uppercase text-[#FCEE0A] font-mono">
+                  {editingHistId
+                    ? `EDITANDO HISTÓRICO // ${editingHistId}`
+                    : 'AÑADIR TORNEO FINALIZADO AL HISTÓRICO'}
+                </h2>
+                {editingHistId && (
+                  <button
+                    type="button"
+                    onClick={() => setEditingHistId(null)}
+                    className="text-xs font-mono text-[#FF003C] underline cursor-pointer"
+                  >
+                    Cancelar
+                  </button>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-xs font-mono text-gray-400 uppercase mb-1">
+                  Nombre del Torneo Finalizado *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={histForm.name}
+                  onChange={(e) => setHistForm({ ...histForm, name: e.target.value })}
+                  placeholder="Ej: Night City Open #02 - Madrid"
+                  className="w-full bg-[#070a10] border border-gray-800 px-3 py-2 text-sm text-white"
+                />
+              </div>
+
+              <div className="grid grid-cols-3 gap-2">
+                <div>
+                  <label className="block text-xs font-mono text-gray-400 uppercase mb-1">
+                    Fecha
+                  </label>
+                  <input
+                    type="text"
+                    value={histForm.date}
+                    onChange={(e) => setHistForm({ ...histForm, date: e.target.value })}
+                    placeholder="14 ENE 2026"
+                    className="w-full bg-[#070a10] border border-gray-800 px-2.5 py-2 text-xs font-mono text-white"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-mono text-gray-400 uppercase mb-1">
+                    Sede / Ubicación
+                  </label>
+                  <input
+                    type="text"
+                    value={histForm.location}
+                    onChange={(e) => setHistForm({ ...histForm, location: e.target.value })}
+                    className="w-full bg-[#070a10] border border-gray-800 px-2.5 py-2 text-xs font-mono text-white"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-mono text-gray-400 uppercase mb-1">
+                    Participantes
+                  </label>
+                  <input
+                    type="text"
+                    value={histForm.playersCount}
+                    onChange={(e) => setHistForm({ ...histForm, playersCount: e.target.value })}
+                    placeholder="64 Edgerunners"
+                    className="w-full bg-[#070a10] border border-gray-800 px-2.5 py-2 text-xs font-mono text-white"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-mono text-[#FCEE0A] uppercase mb-1">
+                    Campeón (1º Puesto) *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={histForm.winner}
+                    onChange={(e) => setHistForm({ ...histForm, winner: e.target.value })}
+                    placeholder="Nick del Ganador"
+                    className="w-full bg-[#070a10] border border-gray-800 px-3 py-2 text-xs font-mono text-white"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-mono text-[#00F0FF] uppercase mb-1">
+                    Mazo Ganador *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={histForm.winningDeck}
+                    onChange={(e) => setHistForm({ ...histForm, winningDeck: e.target.value })}
+                    placeholder="Ej: Blackwall Lockdown v4"
+                    className="w-full bg-[#070a10] border border-gray-800 px-3 py-2 text-xs font-mono text-white"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-mono text-gray-400 uppercase mb-1">
+                    Facción Ganadora
+                  </label>
+                  <input
+                    type="text"
+                    value={histForm.faction}
+                    onChange={(e) => setHistForm({ ...histForm, faction: e.target.value })}
+                    placeholder="NETRUNNER / SOLO / ROCKERBOY"
+                    className="w-full bg-[#070a10] border border-gray-800 px-3 py-2 text-xs font-mono text-white"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-mono text-gray-400 uppercase mb-1">
+                    Récord / Resultado
+                  </label>
+                  <input
+                    type="text"
+                    value={histForm.score}
+                    onChange={(e) => setHistForm({ ...histForm, score: e.target.value })}
+                    placeholder="7 - 0 (Invicto)"
+                    className="w-full bg-[#070a10] border border-gray-800 px-3 py-2 text-xs font-mono text-white"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-mono text-gray-400 uppercase mb-1">
+                    Finalista (2º Puesto)
+                  </label>
+                  <input
+                    type="text"
+                    value={histForm.runnerUp}
+                    onChange={(e) => setHistForm({ ...histForm, runnerUp: e.target.value })}
+                    placeholder="Jugador (Mazo)"
+                    className="w-full bg-[#070a10] border border-gray-800 px-3 py-2 text-xs font-mono text-white"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-mono text-gray-400 uppercase mb-1">
+                    Semifinalista (3º Puesto)
+                  </label>
+                  <input
+                    type="text"
+                    value={histForm.thirdPlace}
+                    onChange={(e) => setHistForm({ ...histForm, thirdPlace: e.target.value })}
+                    placeholder="Jugador (Mazo)"
+                    className="w-full bg-[#070a10] border border-gray-800 px-3 py-2 text-xs font-mono text-white"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-mono text-gray-400 uppercase mb-1">
+                  Crónica / Resumen del Torneo y Mazo Ganador
+                </label>
+                <textarea
+                  rows={3}
+                  value={histForm.summary}
+                  onChange={(e) => setHistForm({ ...histForm, summary: e.target.value })}
+                  placeholder="Resumen de la final, cartas clave del mazo ganador..."
+                  className="w-full bg-[#070a10] border border-gray-800 px-3 py-2 text-xs text-white"
+                />
+              </div>
+
+              {/* Carta Insignia del Mazo Ganador */}
+              <div className="border-t border-gray-800 pt-3 space-y-2">
+                <label className="block text-xs font-mono text-[#00F0FF] uppercase">
+                  Carta Insignia del Mazo Ganador
+                </label>
+                <input
+                  type="text"
+                  value={cardSearchHist}
+                  onChange={(e) => setCardSearchHist(e.target.value)}
+                  placeholder="Buscar carta insignia en GitHub..."
+                  className="w-full bg-[#070a10] border border-gray-800 px-3 py-1.5 text-xs font-mono text-white"
+                />
+                <div className="grid grid-cols-4 gap-2 max-h-36 overflow-y-auto p-1.5 bg-[#070a10] border border-gray-800">
+                  {filteredHistPickerCards.map((c) => (
+                    <button
+                      key={c.id}
+                      type="button"
+                      onClick={() => setHistForm({ ...histForm, featuredCardImg: c.image })}
+                      className={`p-1 border text-left cursor-pointer ${
+                        histForm.featuredCardImg === c.image
+                          ? 'border-[#FCEE0A] bg-[#FCEE0A]/10'
+                          : 'border-gray-800 bg-[#000000]'
+                      }`}
+                    >
+                      <img
+                        src={c.image}
+                        alt={c.name}
+                        className="w-full h-16 object-cover object-top"
+                      />
+                      <p className="text-[9px] font-mono text-white truncate mt-1">{c.name}</p>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                style={{ clipPath: CYBER_CLIP }}
+                className="w-full py-3.5 bg-[#FCEE0A] text-[#070a10] font-mono font-black text-xs uppercase tracking-widest cursor-pointer flex items-center justify-center gap-2"
+              >
+                <Save className="w-4 h-4" />
+                <span>
+                  {editingHistId
+                    ? 'ACTUALIZAR HISTÓRICO DE TORNEO'
+                    : 'GUARDAR RESULTADO EN HISTÓRICO'}
+                </span>
+              </button>
+            </form>
+
+            <div className="lg:col-span-7 space-y-4">
+              <h3 className="text-sm font-mono font-bold uppercase text-[#00F0FF]">
+                HISTÓRICO DE TORNEOS REGISTRADOS ({cms.pastTournaments?.length || 0})
+              </h3>
+              <div className="space-y-3">
+                {(cms.pastTournaments || []).map((pt) => (
+                  <div
+                    key={pt.id}
+                    style={{ clipPath: CYBER_CLIP }}
+                    className="bg-[#000000] border border-gray-800 p-4 flex items-center justify-between gap-4"
+                  >
+                    <div className="flex items-center gap-4 min-w-0">
+                      {pt.featuredCardImg && (
+                        <img
+                          src={pt.featuredCardImg}
+                          alt={pt.winningDeck}
+                          className="w-14 h-20 object-contain bg-[#070a10] border border-gray-800 p-1 shrink-0"
+                        />
+                      )}
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2 text-[10px] font-mono">
+                          <span className="px-2 py-0.5 bg-[#FCEE0A] text-[#070a10] font-black">
+                            CAMPEÓN: {pt.winner}
+                          </span>
+                          <span className="text-[#00F0FF] font-bold">{pt.winningDeck}</span>
+                          <span className="text-gray-400">
+                            • {pt.date} ({pt.location})
+                          </span>
+                        </div>
+                        <h4 className="text-base font-black text-white uppercase mt-1 truncate">
+                          {pt.name}
+                        </h4>
+                        <p className="text-xs font-mono text-gray-400 truncate">
+                          Récord: {pt.score} | 2º: {pt.runnerUp} | 3º: {pt.thirdPlace}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditingHistId(pt.id);
+                          setHistForm({ ...pt });
+                        }}
+                        className="p-2 bg-[#070a10] border border-gray-800 hover:border-[#00F0FF] text-[#00F0FF] cursor-pointer"
+                      >
+                        <Edit3 className="w-4 h-4" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          handleDelete('pastTournaments', pt.id, 'Registro histórico')
+                        }
+                        className="p-2 bg-[#070a10] border border-gray-800 hover:border-[#FF003C] text-[#FF003C] cursor-pointer"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ===============================================================
+            TAB 8: CONFIGURACIÓN DEL ENLACE AL FORO DISCOURSE
+           =============================================================== */}
+        {activeTab === 'settings' && (
+          <form
+            onSubmit={handleSaveForumUrl}
+            style={{ clipPath: CYBER_CLIP }}
+            className="bg-[#000000] border border-gray-800 p-6 sm:p-8 max-w-2xl space-y-5 rounded-none"
+          >
+            <div className="border-b border-gray-800 pb-4">
+              <span className="text-[10px] font-mono text-[#00F0FF] uppercase tracking-widest block">
+                ENLACE EXTERNO EN BARRA DE NAVEGACIÓN
+              </span>
+              <h2 className="text-xl font-black uppercase text-white">
+                CONFIGURACIÓN DEL <span className="text-[#FCEE0A]">FORO DISCOURSE</span>
+              </h2>
+              <p className="text-xs font-mono text-gray-400 mt-1">
+                El botón &quot;FORO&quot; del menú superior abrirá directamente esta dirección en una pestaña nueva.
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-xs font-mono text-gray-400 uppercase mb-1.5">
+                URL DEL FORO DISCOURSE
+              </label>
+              <input
+                type="url"
+                required
+                value={forumUrlInput}
+                onChange={(e) => setForumUrlInput(e.target.value)}
+                placeholder="https://tu-foro-discourse.com"
+                className="w-full bg-[#070a10] border border-gray-800 focus:border-[#00F0FF] px-4 py-3 text-sm font-mono text-white"
+              />
+            </div>
+
+            <button
+              type="submit"
+              style={{ clipPath: CYBER_CLIP }}
+              className="px-6 py-3.5 bg-[#FCEE0A] text-[#070a10] hover:bg-[#00F0FF] font-mono font-black text-xs uppercase tracking-widest flex items-center gap-2 cursor-pointer"
+            >
+              <Save className="w-4 h-4" />
+              <span>GUARDAR URL DEL FORO</span>
+            </button>
+          </form>
         )}
       </main>
     </div>

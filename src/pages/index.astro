@@ -20,9 +20,14 @@ const cardsData = JSON.parse(cardsRaw);
 		<link rel="icon" href="/favicon.ico" />
 		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
 		<meta name="generator" content={Astro.generator} />
-		<title>Cyberpunk TCG España // Portal Oficial</title>
+		<title>Cyberpunk TCG España // Inicio</title>
 	</head>
 	<body class="bg-[#070a10] text-white antialiased rounded-none">
-		<CyberpunkPortal client:load initialCms={cmsData} initialCards={cardsData} />
+		<CyberpunkPortal
+			client:load
+			currentPage="inicio"
+			initialCms={cmsData}
+			initialCards={cardsData}
+		/>
 	</body>
 </html>

@@ -1,5 +1,6 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import { isRequestAuthenticated } from '../../utils/auth.js';
 
 export const prerender = false;
 
@@ -106,7 +107,14 @@ export async function GET({ url }) {
   }
 }
 
-export async function POST() {
+export async function POST({ request }) {
+  if (!isRequestAuthenticated(request)) {
+    return new Response(
+      JSON.stringify({ ok: false, error: 'No autorizado. Inicia sesión como administrador.' }),
+      { status: 401, headers: { 'Content-Type': 'application/json' } }
+    );
+  }
+
   try {
     const res = await fetch(GITHUB_API_URL, {
       headers: {
