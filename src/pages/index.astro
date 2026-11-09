@@ -1,0 +1,18 @@
+---
+import '../styles/global.css';
+import CyberpunkPortal from '../components/CyberpunkPortal.jsx';
+---
+
+<html lang="es">
+	<head>
+		<meta charset="utf-8" />
+		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+		<link rel="icon" href="/favicon.ico" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<meta name="generator" content={Astro.generator} />
+		<title>Cyberpunk TCG // Portal Netrunner & Corpo</title>
+	</head>
+	<body class="bg-[#0b0f19] text-slate-100 antialiased">
+		<CyberpunkPortal client:load />
+	</body>
+</html>
