@@ -1,0 +1,237 @@
+{
+  "heroArticle": {
+    "id": "NC-2077-01",
+    "tag": "NOTICIA DESTACADA // META REPORT",
+    "faction": "ARASAKA vs DEEPNET",
+    "title": "PROTOCOLO SOULKILLER: ALT CUNNINGHAM Y LUCY DOMINAN EL REGIONAL DE NIGHT CITY",
+    "excerpt": "El nuevo ciclo competitivo fusiona la agresividad de los Netrunners de Kabuki con el blindaje pesado de Corporate Plaza. Analizamos los porcentajes de victoria y las cartas clave que están definiendo la Temporada 01.",
+    "author": "ZeroCool_2077",
+    "role": "Analista Jefe // Cyberpulse eSports",
+    "date": "09 NOV 2026",
+    "readTime": "6 MIN LECTURA",
+    "views": "24.6K",
+    "wallpaper": "/images/wallpapers/cyberpunk-hero.jpg",
+    "featuredCardImg": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/alt-cunningham-soulkiller-architect.webp",
+    "stats": [
+      { "label": "WINRATE NETRUNNER", "value": "54.2%", "color": "text-[#00F0FF]" },
+      { "label": "PICKRATE SOULKILLER", "value": "78.9%", "color": "text-[#FCEE0A]" },
+      { "label": "NIVEL DE AMENAZA", "value": "CRÍTICO", "color": "text-[#FF003C]" }
+    ]
+  },
+  "news": [
+    {
+      "id": "NEWS-01",
+      "category": "SPOILER EXPANSIÓN",
+      "faction": "NETRUNNER",
+      "title": "Lucy Kushinada: Nueva Carta Legendaria de Infiltración Profunda",
+      "excerpt": "Desglosamos las habilidades de desconexión neuronal de Lucy y su sinergia con consolas de alta memoria en mazos de control.",
+      "author": "Nyx_Runner",
+      "date": "HACE 2 HORAS",
+      "readTime": "4 MIN",
+      "views": "12.4K",
+      "image": "/images/wallpapers/Japantown.png"
+    },
+    {
+      "id": "NEWS-02",
+      "category": "ESTRATEGIA CORPO",
+      "faction": "CORPO",
+      "title": "Fortaleza Corporate Plaza: Cómo Goro Takemura y Adam Smasher Bloquean el Rush",
+      "excerpt": "Guía táctica para proteger tus servidores centrales utilizando guardaespaldas cibernéticos y barreras ICE de coste eficiente.",
+      "author": "Exec_Vance",
+      "date": "HACE 5 HORAS",
+      "readTime": "8 MIN",
+      "views": "9.8K",
+      "image": "/images/wallpapers/Corporate Plaza.png"
+    },
+    {
+      "id": "NEWS-03",
+      "category": "TORNEO CYBERPULSE",
+      "faction": "BANDAS",
+      "title": "Caos en Dogtown: Los Mazos Maelstrom de Royce y Dum Dum Rompen el Meta",
+      "excerpt": "Con un estilo ultra agresivo de implantes ópticos y daño directo, la facción Maelstrom sorprende en el clasificatorio.",
+      "author": "DataHound",
+      "date": "AYER",
+      "readTime": "10 MIN",
+      "views": "18.2K",
+      "image": "/images/wallpapers/Dogtown.png"
+    },
+    {
+      "id": "NEWS-04",
+      "category": "GUÍA COMPETITIVA",
+      "faction": "NETRUNNER",
+      "title": "Economía de Eddies en Kabuki: Optimiza tu Mazo para Turnos Decisivos",
+      "excerpt": "Aprende a calcular la ventana exacta de incursión sin quedar expuesto a contraataques letales de la corporación.",
+      "author": "GhostInShell",
+      "date": "HACE 2 DÍAS",
+      "readTime": "7 MIN",
+      "views": "15.1K",
+      "image": "/images/wallpapers/Kabuki.png"
+    }
+  ],
+  "decks": [
+    {
+      "id": "DECK-01",
+      "rank": "#01",
+      "name": "Soulkiller Beyond Blackwall",
+      "archetype": "NETRUNNER // OVERCLOCK COMBO",
+      "tier": "TIER S",
+      "winrate": "65.4%",
+      "pilot": "Alt_Prime",
+      "bannerWallpaper": "/images/wallpapers/Night_City_3840x2160.png",
+      "description": "Domina la subred combinando la arquitectura letal de Alt Cunningham con la velocidad de infiltración de Lucy Kushinada.",
+      "cards": [
+        {
+          "id": "C-01",
+          "name": "Alt Cunningham // Soulkiller Architect",
+          "type": "LÍDER NETRUNNER // IA",
+          "cost": "7 EDDIES",
+          "power": "9 FUERZA",
+          "rarity": "LEGENDARIA",
+          "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/alt-cunningham-soulkiller-architect.webp",
+          "ability": "Al entrar en la red, desactiva hasta 2 barreras ICE corporativas y roba 2 programas."
+        },
+        {
+          "id": "C-02",
+          "name": "Lucy Kushinada // Fresh Beginnings",
+          "type": "OPERADORA // DEEP DIVER",
+          "cost": "4 EDDIES",
+          "power": "6 FUERZA",
+          "rarity": "ÉPICA",
+          "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/lucy-kushinada-fresh-beginnings.webp",
+          "ability": "Sigilo óptico: Evita el primer daño neuronal en cada incursión al servidor central."
+        },
+        {
+          "id": "C-03",
+          "name": "Alt Cunningham // Mother Of Daemons",
+          "type": "IA TRASCENDENTE // RED",
+          "cost": "6 EDDIES",
+          "power": "8 FUERZA",
+          "rarity": "LEGENDARIA",
+          "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/alt-cunningham-mother-of-daemons.webp",
+          "ability": "Despliega daemons automáticos que reducen el coste de todos tus hackeos en 2 Eddies."
+        }
+      ]
+    },
+    {
+      "id": "DECK-02",
+      "rank": "#02",
+      "name": "Maelstrom Cyberpsycho Blitz",
+      "archetype": "BANDAS // AGGRO OVERDRIVE",
+      "tier": "TIER S",
+      "winrate": "62.1%",
+      "pilot": "ChromeSkulls",
+      "bannerWallpaper": "/images/wallpapers/Pacifica.png",
+      "description": "Presión implacable desde el turno 1 con Royce y Dum Dum sobrecargando implantes militares para demoler defensas.",
+      "cards": [
+        {
+          "id": "C-04",
+          "name": "Royce // Psycho On The Edge",
+          "type": "JEFE MAELSTROM // EXOTRAJE",
+          "cost": "6 EDDIES",
+          "power": "8 FUERZA",
+          "rarity": "LEGENDARIA",
+          "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/royce-psycho-on-the-edge.webp",
+          "ability": "Frenesí de Cromo: Gana +3 de ataque por cada implante cibernético equipado."
+        },
+        {
+          "id": "C-05",
+          "name": "Dum Dum // Maelstrom Triggerman",
+          "type": "ARTILLERO // CIBERPSICOSIS",
+          "cost": "3 EDDIES",
+          "power": "5 FUERZA",
+          "rarity": "RARA",
+          "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/dum-dum-maelstrom-triggerman.webp",
+          "ability": "Disparo en ráfaga: Inflige 2 de daño a dos unidades enemigas al desplegarse."
+        },
+        {
+          "id": "C-06",
+          "name": "Caliber // Totentanz's Top Dog",
+          "type": "EJECUTOR MAELSTROM",
+          "cost": "4 EDDIES",
+          "power": "6 FUERZA",
+          "rarity": "ÉPICA",
+          "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/caliber-totentanz-s-top-dog.webp",
+          "ability": "Otorga +2 de ataque a todos los aliados Maelstrom en tu línea frontal."
+        }
+      ]
+    },
+    {
+      "id": "DECK-03",
+      "rank": "#03",
+      "name": "Arasaka Vengeance Protocol",
+      "archetype": "CORPO // CONTROL & COUNTER",
+      "tier": "TIER A",
+      "winrate": "59.7%",
+      "pilot": "Kurogane_HQ",
+      "bannerWallpaper": "/images/wallpapers/Downtown.png",
+      "description": "Muro defensivo liderado por Adam Smasher, Yorinobu y Goro Takemura que castiga cada intento de incursión.",
+      "cards": [
+        {
+          "id": "C-07",
+          "name": "Adam Smasher // Ender Of Legends",
+          "type": "BORG COMPLETO // ARASAKA",
+          "cost": "8 EDDIES",
+          "power": "10 FUERZA",
+          "rarity": "LEGENDARIA",
+          "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/adam-smasher-ender-of-legends.webp",
+          "ability": "Aniquilación Total: Destruye inmediatamente cualquier unidad enemiga dañada al entrar en combate."
+        },
+        {
+          "id": "C-08",
+          "name": "Goro Takemura // Vengeful Bodyguard",
+          "type": "COMANDANTE CORPO // GUARDIA",
+          "cost": "5 EDDIES",
+          "power": "8 FUERZA",
+          "rarity": "LEGENDARIA",
+          "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/goro-takemura-vengeful-bodyguard.webp",
+          "ability": "Guardia Leal: Intercepta cualquier ataque dirigido a tus servidores de agenda."
+        },
+        {
+          "id": "C-09",
+          "name": "Yorinobu Arasaka // Steel Dragon",
+          "type": "EJECUTIVO SUPREMO // CORPO",
+          "cost": "6 EDDIES",
+          "power": "7 FUERZA",
+          "rarity": "LEGENDARIA",
+          "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/yorinobu-arasaka-steel-dragon.webp",
+          "ability": "Toma el control de los recursos corporativos generando +3 Eddies al inicio de tu turno."
+        }
+      ]
+    }
+  ],
+  "tournaments": [
+    {
+      "id": "TOUR-01",
+      "name": "Open Nacional Cyberpunk TCG España #01",
+      "date": "22 NOV 2026 • 17:00 CET",
+      "location": "Madrid // Online Discord Hub",
+      "format": "Constructed Estándar (BO3)",
+      "prizePool": "500€ + Tapete Exclusivo Soulkiller",
+      "players": "64 / 64 Inscritos",
+      "status": "INSCRIPCIONES ABIERTAS",
+      "image": "/images/wallpapers/Night_City_3840x2160.png"
+    },
+    {
+      "id": "TOUR-02",
+      "name": "Copa Arasaka Corporate Plaza",
+      "date": "29 NOV 2026 • 18:00 CET",
+      "location": "Barcelona // Tienda Oficial",
+      "format": "Suizo 5 Rondas + Top 8",
+      "prizePool": "Caja de Sobres + Promos Foil",
+      "players": "28 / 32 Inscritos",
+      "status": "ÚLTIMAS PLAZAS",
+      "image": "/images/wallpapers/Corporate Plaza.png"
+    },
+    {
+      "id": "TOUR-03",
+      "name": "Clasificatorio Regional Dogtown Black Market",
+      "date": "06 DIC 2026 • 16:30 CET",
+      "location": "Valencia & Streaming Twitch",
+      "format": "Eliminación Directa",
+      "prizePool": "Invitación Europeo + 300€",
+      "players": "42 / 64 Inscritos",
+      "status": "CONFIRMADO",
+      "image": "/images/wallpapers/Dogtown.png"
+    }
+  ]
+}

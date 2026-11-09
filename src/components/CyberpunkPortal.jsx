@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
   Terminal,
-  Cpu,
   Layers,
   Trophy,
   Newspaper,
@@ -9,7 +9,6 @@ import {
   Menu,
   X,
   Zap,
-  Shield,
   ChevronRight,
   Flame,
   Eye,
@@ -17,243 +16,232 @@ import {
   Database,
   Radio,
   Activity,
-  Lock,
+  Crosshair,
+  Swords,
   Sparkles,
+  MessageSquare,
+  Settings,
   ExternalLink,
-  BarChart3
+  Calendar,
+  MapPin,
+  Users
 } from 'lucide-react';
 
-const heroArticle = {
-  id: 'NC-2077-01',
-  category: 'META REPORT // CORPO & NETRUNNER',
-  faction: 'Arasaka / DeepNet',
-  title: 'Protocolo Blackwall: Cómo el nuevo ICE de Arasaka está redefiniendo el Meta Competitivo',
-  excerpt:
-    'Analizamos el impacto del ciclo "Subred Fantasma" en los torneos regionales de Night City. Los mazos de control corporativo alcanzan un 58% de efectividad frente a los agresivos rigs de desconexión neuronal.',
-  author: 'ZeroCool_99',
-  role: 'Analista Jefe de la Red',
-  date: '09 NOV 2026',
-  readTime: '7 min lectura',
-  views: '14.8K',
-  threatLevel: 'CRÍTICO // NIVEL 5',
-  highlights: [
-    'Incremento del +18% en barajas de bloqueo de subrutinas',
-    'Nuevos rompehielos sigilosos para facciones Anarquistas',
-    'Guía completa de side-deck para el Regional de Neo-Tokyo'
-  ]
-};
+const CYBER_CLIP =
+  'polygon(0 0, calc(100% - 15px) 0, 100% 15px, 100% 100%, 15px 100%, 0 calc(100% - 15px))';
 
-const recentArticles = [
-  {
-    id: 'ART-01',
-    category: 'SPOILER EXPANSIÓN',
-    faction: 'Netrunner',
-    title: 'Exclusiva: "Sobrecarga Sináptica", el evento legendario que destruye servidores remotos',
-    excerpt:
-      'Revelamos las estadísticas y el coste de memoria de la carta más esperada del set Cyber-Genesis.',
-    author: 'Nyx_Runner',
-    date: 'Hace 3 horas',
-    readTime: '4 min',
-    views: '8.2K',
-    tagColor: 'text-[#0dfceb] border-[#0dfceb]/40 bg-[#0dfceb]/10'
-  },
-  {
-    id: 'ART-02',
-    category: 'ESTRATEGIA CORPO',
-    faction: 'Corpo',
-    title: 'Arquitectura de Servidores Impenetrables: Economía de Créditos en Turnos 1-3',
-    excerpt:
-      'Aprende a gestionar tu reserva de bit-créditos sin ceder presión de agendas frente a mazos Rush.',
-    author: 'Exec_Vance',
-    date: 'Hace 8 horas',
-    readTime: '9 min',
-    views: '6.5K',
-    tagColor: 'text-rose-400 border-rose-500/40 bg-rose-500/10'
-  },
-  {
-    id: 'ART-03',
-    category: 'TORNEOS // CIRCUIT',
-    faction: 'Global',
-    title: 'Resumen del Night City Championship: Top 8 Barajas y Estadísticas de Facciones',
-    excerpt:
-      'Más de 512 jugadores se enfrentaron en la red. Revisa el desglose completo de enfrentamientos y ratios de conversión.',
-    author: 'DataHound',
-    date: 'Ayer',
-    readTime: '12 min',
-    views: '19.4K',
-    tagColor: 'text-amber-300 border-amber-400/40 bg-amber-400/10'
-  },
-  {
-    id: 'ART-04',
-    category: 'GUÍA DE INICIO',
-    faction: 'Netrunner',
-    title: 'De Novato a Leyenda del Ciberespacio: Cómo construir tu primer Rig de Infiltración',
-    excerpt:
-      'Todo lo que necesitas saber sobre unidades de memoria (MU), consolas, programas de desencriptación y gestión de daño cerebral.',
-    author: 'GhostInShell',
-    date: 'Hace 2 días',
-    readTime: '6 min',
-    views: '11.1K',
-    tagColor: 'text-[#0dfceb] border-[#0dfceb]/40 bg-[#0dfceb]/10'
-  }
-];
+/**
+ * Botón Cyberpulse:
+ * Fondo amarillo (#FCEE0A), texto negro (#070a10), esquina biselada con clip-path
+ * y efecto glitch rápido al pasar el ratón con Framer Motion + capas cromáticas (#FF003C / #00F0FF).
+ */
+function CyberpulseButton({
+  children,
+  onClick,
+  variant = 'primary',
+  icon: Icon,
+  className = ''
+}) {
+  const [isHovered, setIsHovered] = useState(false);
+  const isPrimary = variant === 'primary';
 
-const topDecks = [
-  {
-    id: 'DECK-01',
-    name: 'Arasaka Black-ICE Fortress',
-    type: 'CORPO // CONTROL',
-    tier: 'TIER S',
-    winrate: '64.2%',
-    popularity: '22.5%',
-    pilot: 'Kurogane_HQ',
-    cost: '4,200 ¢',
-    accent: 'rose',
-    coreCards: ['Muro de Fuego Mk.IV', 'Directiva Letal', 'Bóveda Neural']
-  },
-  {
-    id: 'DECK-02',
-    name: 'Phantom Overclock (Stealth Rig)',
-    type: 'NETRUNNER // AGGRO-COMBO',
-    tier: 'TIER S',
-    winrate: '61.8%',
-    popularity: '19.8%',
-    pilot: 'Sombra_01',
-    cost: '3,850 ¢',
-    accent: 'cyan',
-    coreCards: ['Daemon Fantasma', 'Inyección SQL-Zero', 'Consola Ono-Sendai']
-  },
-  {
-    id: 'DECK-03',
-    name: 'Militech Orbital Scorched',
-    type: 'CORPO // MIDRANGE TAG',
-    tier: 'TIER A',
-    winrate: '57.4%',
-    popularity: '15.1%',
-    pilot: 'TacticalValkyrie',
-    cost: '3,600 ¢',
-    accent: 'rose',
-    coreCards: ['Rastreo Satelital', 'Respuesta Armada', 'Red de Peaje']
-  },
-  {
-    id: 'DECK-04',
-    name: 'Virus Krash & Mill Protocol',
-    type: 'NETRUNNER // DISRUPTION',
-    tier: 'TIER A',
-    winrate: '55.9%',
-    popularity: '12.4%',
-    pilot: 'AcidBurn_X',
-    cost: '2,950 ¢',
-    accent: 'cyan',
-    coreCards: ['Parásito Polimórfico', 'Sobrecarga de Caché', 'Implante Reflejo']
-  }
-];
+  return (
+    <motion.button
+      type="button"
+      onClick={onClick}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+      whileHover={{
+        scale: 1.03,
+        x: [0, -3, 3, -2, 2, 0],
+        y: [0, 1, -1, 1, 0],
+        transition: { duration: 0.22 }
+      }}
+      whileTap={{ scale: 0.97 }}
+      style={{ clipPath: CYBER_CLIP }}
+      className={`relative group rounded-none font-mono font-black uppercase tracking-widest text-xs sm:text-sm px-6 py-3.5 cursor-pointer select-none overflow-hidden transition-shadow duration-200 ${
+        isPrimary
+          ? 'bg-[#FCEE0A] text-[#070a10] hover:shadow-[0_0_25px_rgba(252,238,10,0.75)]'
+          : 'bg-[#070a10] text-[#00F0FF] border border-[#00F0FF] hover:bg-[#00F0FF]/15 hover:shadow-[0_0_25px_rgba(0,240,255,0.65)]'
+      } ${className}`}
+    >
+      <span
+        aria-hidden="true"
+        className={`pointer-events-none absolute inset-0 bg-[#FF003C] mix-blend-screen transition-opacity duration-150 ${
+          isHovered ? 'opacity-30 translate-x-[2px] -translate-y-[1px]' : 'opacity-0'
+        }`}
+      />
+      <span
+        aria-hidden="true"
+        className={`pointer-events-none absolute inset-0 bg-[#00F0FF] mix-blend-screen transition-opacity duration-150 ${
+          isHovered ? 'opacity-30 -translate-x-[2px] translate-y-[1px]' : 'opacity-0'
+        }`}
+      />
+      <span
+        aria-hidden="true"
+        className={`pointer-events-none absolute bottom-0 right-0 w-4 h-1 ${
+          isPrimary ? 'bg-[#FF003C]' : 'bg-[#FCEE0A]'
+        }`}
+      />
+      <span className="relative z-10 flex items-center justify-center gap-2">
+        <span>{children}</span>
+        {Icon && <Icon className="w-4 h-4 stroke-[2.5]" />}
+      </span>
+    </motion.button>
+  );
+}
 
-export default function CyberpunkPortal() {
+export default function CyberpunkPortal({ initialCms = {}, initialCards = [] }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [selectedFaction, setSelectedFaction] = useState('ALL');
-  const [searchQuery, setSearchQuery] = useState('');
 
+  // Datos dinámicos cargados desde el Backend CMS (src/data/cms.json)
+  const heroArticle = initialCms.heroArticle || {};
+  const recentArticles = initialCms.news || [];
+  const topDecks = initialCms.decks || [];
+  const tournaments = initialCms.tournaments || [];
+  const allCards = initialCards || [];
+
+  // Estados de filtrado de Noticias
+  const [selectedFaction, setSelectedFaction] = useState('TODOS');
+
+  // Estados del Buscador de Base de Cartas (GitHub: cyberpunk-tcg-cartas)
+  const [cardSearchQuery, setCardSearchQuery] = useState('');
+  const [cardFactionFilter, setCardFactionFilter] = useState('TODOS');
+  const [visibleCardsCount, setVisibleCardsCount] = useState(18);
+  const [modalCard, setModalCard] = useState(null);
+
+  // Estados de Top Mazos
+  const [activeDeckIndex, setActiveDeckIndex] = useState(0);
+  const [selectedCard, setSelectedCard] = useState(
+    topDecks[0]?.cards?.[0] || null
+  );
+
+  // Menú superior en el orden exacto solicitado
   const navItems = [
-    { name: 'Inicio', icon: Terminal, active: true, badge: null },
-    { name: 'Base de Cartas', icon: Database, active: false, badge: '1,240' },
-    { name: 'Meta & Mazos', icon: Layers, active: false, badge: 'LIVE' },
-    { name: 'Torneos', icon: Trophy, active: false, badge: null },
-    { name: 'Noticias', icon: Newspaper, active: false, badge: null }
+    { name: 'Inicio', href: '#inicio', icon: Terminal, active: true, badge: null },
+    { name: 'Noticias', href: '#noticias', icon: Newspaper, active: false, badge: null },
+    { name: 'Base de Cartas', href: '#base-de-cartas', icon: Database, active: false, badge: `${allCards.length}` },
+    { name: 'Mazos', href: '#mazos', icon: Layers, active: false, badge: 'META' },
+    { name: 'Torneos', href: '#torneos', icon: Trophy, active: false, badge: 'LIVE' },
+    { name: 'Foro', href: '#foro', icon: MessageSquare, active: false, badge: null }
   ];
 
+  // Filtrado de Noticias
   const filteredArticles = recentArticles.filter((article) => {
+    return selectedFaction === 'TODOS' || article.faction === selectedFaction;
+  });
+
+  // Filtrado en tiempo real de las 151 cartas del GitHub (cyberpunktcges-lgtm/cyberpunk-tcg-cartas)
+  const filteredDatabaseCards = allCards.filter((card) => {
     const matchesFaction =
-      selectedFaction === 'ALL' ||
-      article.faction.toUpperCase() === selectedFaction;
+      cardFactionFilter === 'TODOS' || card.faction === cardFactionFilter;
+    const q = cardSearchQuery.trim().toLowerCase();
     const matchesSearch =
-      article.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      article.excerpt.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      article.category.toLowerCase().includes(searchQuery.toLowerCase());
+      !q ||
+      card.name.toLowerCase().includes(q) ||
+      card.slug.toLowerCase().includes(q) ||
+      card.id.toLowerCase().includes(q) ||
+      card.faction.toLowerCase().includes(q);
     return matchesFaction && matchesSearch;
   });
 
+  // Resultados rápidos para el buscador de la cabecera
+  const quickHeaderResults =
+    cardSearchQuery.trim().length > 0
+      ? filteredDatabaseCards.slice(0, 6)
+      : [];
+
+  const activeDeck = topDecks[activeDeckIndex] || topDecks[0];
+
+  const handleSelectDeck = (index) => {
+    setActiveDeckIndex(index);
+    if (topDecks[index]?.cards?.length > 0) {
+      setSelectedCard(topDecks[index].cards[0]);
+    }
+  };
+
   return (
-    <div className="min-h-screen bg-[#0b0f19] text-slate-100 font-sans selection:bg-[#0dfceb] selection:text-[#0b0f19] relative overflow-x-hidden">
-      {/* Ambient Cyberpunk Grid & Glow Overlays */}
+    <div className="min-h-screen bg-[#070a10] text-white font-sans selection:bg-[#FCEE0A] selection:text-[#000000] relative overflow-x-hidden rounded-none">
+      {/* Rejilla Técnica de Fondo Cyberpulse */}
       <div
-        className="pointer-events-none fixed inset-0 z-0 opacity-20"
+        className="pointer-events-none fixed inset-0 z-0 opacity-15"
         style={{
           backgroundImage:
-            'linear-gradient(to right, rgba(13, 252, 235, 0.08) 1px, transparent 1px), linear-gradient(to bottom, rgba(13, 252, 235, 0.08) 1px, transparent 1px)',
-          backgroundSize: '40px 40px'
+            'linear-gradient(to right, rgba(0, 240, 255, 0.09) 1px, transparent 1px), linear-gradient(to bottom, rgba(252, 238, 10, 0.06) 1px, transparent 1px)',
+          backgroundSize: '48px 48px'
         }}
       />
-      <div className="pointer-events-none fixed -top-40 -left-40 w-96 h-96 bg-[#0dfceb]/10 rounded-full blur-[120px] z-0" />
-      <div className="pointer-events-none fixed top-1/3 -right-40 w-96 h-96 bg-rose-600/10 rounded-full blur-[140px] z-0" />
 
-      {/* Top System Telemetry Bar */}
-      <div className="relative z-20 border-b border-[#0dfceb]/20 bg-[#070a11]/90 backdrop-blur-md text-xs">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-9 flex items-center justify-between">
+      {/* Barra Superior de Telemetría + Acceso al Backend CMS */}
+      <div className="relative z-40 border-b border-gray-800 bg-[#000000] text-xs font-mono">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-10 flex items-center justify-between">
           <div className="flex items-center space-x-4">
-            <span className="flex items-center gap-1.5 text-[#0dfceb] font-mono tracking-wider">
-              <Radio className="w-3.5 h-3.5 animate-pulse" />
-              NET-STATUS: ONLINE
+            <span className="flex items-center gap-1.5 text-[#FCEE0A] font-bold tracking-widest">
+              <Radio className="w-3.5 h-3.5 text-[#FF003C] animate-pulse" />
+              CYBERPUNK TCG ESPAÑA // NET-OS
             </span>
-            <span className="hidden sm:inline text-slate-600">|</span>
-            <span className="hidden sm:flex items-center gap-1.5 text-slate-400 font-mono">
-              <Activity className="w-3.5 h-3.5 text-[#0dfceb]" />
-              SERVIDOR: NIGHT-CITY-NODE-04
+            <span className="hidden sm:inline text-gray-700">|</span>
+            <span className="hidden sm:flex items-center gap-1.5 text-gray-300">
+              <Activity className="w-3.5 h-3.5 text-[#00F0FF]" />
+              CARTAS GITHUB SINCRONIZADAS: <strong className="text-[#00F0FF]">{allCards.length}</strong>
             </span>
           </div>
-          <div className="flex items-center space-x-4 font-mono">
-            <span className="hidden md:inline text-slate-400">
-              TEMPORADA 04: <strong className="text-[#0dfceb]">SUBRED FANTASMA</strong>
-            </span>
-            <span className="px-2 py-0.5 rounded bg-rose-500/15 border border-rose-500/40 text-rose-400 text-[10px] tracking-widest uppercase">
-              CORPO ALERT LVL 5
-            </span>
+
+          <div className="flex items-center space-x-3">
+            <a
+              href="/admin"
+              style={{ clipPath: CYBER_CLIP }}
+              className="px-3 py-1 bg-[#FCEE0A] text-[#070a10] hover:bg-[#00F0FF] font-mono font-black text-[11px] tracking-wider uppercase flex items-center gap-1.5 transition-colors rounded-none"
+            >
+              <Settings className="w-3.5 h-3.5" />
+              <span>PANEL BACKEND // ADMIN</span>
+            </a>
           </div>
         </div>
       </div>
 
-      {/* Main Header / Navigation */}
-      <header className="sticky top-0 z-30 border-b border-[#0dfceb]/25 bg-[#0b0f19]/90 backdrop-blur-xl">
+      {/* Header Principal */}
+      <header className="sticky top-0 z-40 border-b border-gray-800 bg-[#070a10]/95 backdrop-blur-md">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-20">
-            {/* Brand Logo */}
-            <div className="flex items-center gap-3">
-              <div className="w-11 h-11 rounded-lg bg-[#0dfceb]/10 border border-[#0dfceb] flex items-center justify-center shadow-[0_0_15px_rgba(13,252,235,0.35)]">
-                <Cpu className="w-6 h-6 text-[#0dfceb]" />
-              </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="text-xl font-black tracking-wider text-white uppercase">
-                    CYBER<span className="text-[#0dfceb]">NEXUS</span>
-                  </span>
-                  <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-[#0dfceb]/15 text-[#0dfceb] border border-[#0dfceb]/40">
-                    TCG v2.4
-                  </span>
-                </div>
-                <p className="text-[11px] font-mono text-slate-400 tracking-widest uppercase">
-                  Portal Netrunner // Corpo
-                </p>
-              </div>
-            </div>
+          <div className="flex items-center justify-between h-20 gap-3">
+            {/* Logo e Identidad (Arriba a la izquierda) */}
+            <a
+              href="#inicio"
+              style={{ clipPath: CYBER_CLIP }}
+              className="flex items-center shrink-0 bg-[#FCEE0A] border border-[#FCEE0A] hover:border-[#00F0FF] shadow-[0_0_20px_rgba(252,238,10,0.35)] hover:shadow-[0_0_25px_rgba(0,240,255,0.55)] transition-all duration-200 overflow-hidden rounded-none"
+            >
+              <img
+                src="/images/logo-cyberpunk-tcg-españa.jpg"
+                alt="Cyberpunk TCG España"
+                className="h-12 sm:h-14 w-auto object-contain block"
+              />
+            </a>
 
-            {/* Desktop Menu Links */}
-            <nav className="hidden lg:flex items-center space-x-1">
+            {/* Navegación Desktop (6 apartados en el orden solicitado) */}
+            <nav className="hidden lg:flex items-center space-x-1.5">
               {navItems.map((item) => {
                 const Icon = item.icon;
                 return (
                   <a
                     key={item.name}
-                    href={`#${item.name.toLowerCase().replace(/\s+/g, '-')}`}
-                    className={`group flex items-center gap-2 px-3.5 py-2 rounded-md text-sm font-medium transition-all duration-200 ${
+                    href={item.href}
+                    style={{ clipPath: CYBER_CLIP }}
+                    className={`group flex items-center gap-1.5 px-3 py-2 text-[11px] xl:text-xs font-mono font-bold tracking-wider uppercase whitespace-nowrap transition-all duration-200 rounded-none border ${
                       item.active
-                        ? 'bg-[#0dfceb]/15 text-[#0dfceb] border border-[#0dfceb]/50 shadow-[0_0_12px_rgba(13,252,235,0.2)]'
-                        : 'text-slate-300 hover:text-[#0dfceb] hover:bg-slate-800/60 border border-transparent'
+                        ? 'bg-[#FCEE0A] text-[#070a10] border-[#FCEE0A] shadow-[0_0_15px_rgba(252,238,10,0.45)]'
+                        : 'bg-[#000000]/70 text-gray-200 border-gray-800 hover:border-[#00F0FF] hover:text-[#00F0FF] hover:shadow-[0_0_15px_rgba(0,240,255,0.35)]'
                     }`}
                   >
-                    <Icon className="w-4 h-4" />
+                    <Icon className="w-3.5 h-3.5 shrink-0" />
                     <span>{item.name}</span>
                     {item.badge && (
-                      <span className="ml-1 px-1.5 py-0.2 text-[10px] font-mono rounded bg-[#0dfceb]/20 text-[#0dfceb]">
+                      <span
+                        className={`ml-0.5 px-1.5 py-0.5 text-[9px] font-mono font-black rounded-none ${
+                          item.active
+                            ? 'bg-[#070a10] text-[#FCEE0A]'
+                            : 'bg-[#FF003C] text-white'
+                        }`}
+                      >
                         {item.badge}
                       </span>
                     )}
@@ -262,30 +250,82 @@ export default function CyberpunkPortal() {
               })}
             </nav>
 
-            {/* Search & Action CTA */}
-            <div className="hidden sm:flex items-center gap-3">
-              <div className="relative">
-                <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+            {/* Buscador Rápido de Cartas en Cabecera */}
+            <div className="hidden sm:flex items-center gap-3 relative">
+              <div
+                style={{ clipPath: CYBER_CLIP }}
+                className="relative bg-[#000000] border border-gray-800 focus-within:border-[#00F0FF] focus-within:shadow-[0_0_15px_rgba(0,240,255,0.4)] transition-all rounded-none"
+              >
+                <Search className="w-4 h-4 text-[#FCEE0A] absolute left-3 top-1/2 -translate-y-1/2" />
                 <input
                   type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Buscar carta, mazo o artículo..."
-                  className="w-56 xl:w-64 pl-9 pr-3 py-1.5 text-sm bg-slate-900/90 border border-slate-700/80 rounded-md text-slate-100 placeholder-slate-500 focus:outline-none focus:border-[#0dfceb] focus:ring-1 focus:ring-[#0dfceb] transition-all font-mono"
+                  value={cardSearchQuery}
+                  onChange={(e) => setCardSearchQuery(e.target.value)}
+                  placeholder="BUSCAR CARTA..."
+                  className="w-44 xl:w-56 pl-9 pr-7 py-2 text-xs font-mono bg-transparent text-white placeholder-gray-500 focus:outline-none rounded-none"
                 />
+                {cardSearchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setCardSearchQuery('')}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-[#FF003C] cursor-pointer"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
               </div>
-              <button className="px-4 py-2 rounded-md bg-[#0dfceb] text-[#0b0f19] font-bold text-xs uppercase tracking-wider hover:bg-[#0dfceb]/90 transition-all shadow-[0_0_20px_rgba(13,252,235,0.4)] flex items-center gap-1.5 cursor-pointer">
-                <Zap className="w-3.5 h-3.5 fill-current" />
-                <span>Conectar Rig</span>
-              </button>
+
+              {/* Desplegable instantáneo con las cartas encontradas al buscar arriba */}
+              {quickHeaderResults.length > 0 && (
+                <div
+                  style={{ clipPath: CYBER_CLIP }}
+                  className="absolute top-14 right-0 w-80 bg-[#000000] border border-[#00F0FF] shadow-[0_0_30px_rgba(0,240,255,0.5)] p-3 z-50 space-y-2"
+                >
+                  <div className="flex items-center justify-between text-[10px] font-mono text-[#FCEE0A] border-b border-gray-800 pb-1.5">
+                    <span>CARTAS ENCONTRADAS ({filteredDatabaseCards.length})</span>
+                    <a
+                      href="#base-de-cartas"
+                      className="text-[#00F0FF] underline"
+                    >
+                      Ver todas
+                    </a>
+                  </div>
+                  <div className="space-y-1.5 max-h-72 overflow-y-auto">
+                    {quickHeaderResults.map((card) => (
+                      <button
+                        key={card.id}
+                        type="button"
+                        onClick={() => setModalCard(card)}
+                        className="w-full flex items-center gap-3 p-1.5 bg-[#070a10] hover:bg-[#FCEE0A]/15 border border-gray-800 hover:border-[#FCEE0A] text-left transition-all cursor-pointer"
+                      >
+                        <img
+                          src={card.image}
+                          alt={card.name}
+                          className="w-10 h-14 object-cover object-top shrink-0 border border-gray-800"
+                        />
+                        <div className="min-w-0">
+                          <span className="text-[10px] font-mono text-[#00F0FF] block">
+                            {card.id} // {card.faction}
+                          </span>
+                          <p className="text-xs font-black text-white uppercase truncate">
+                            {card.name}
+                          </p>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
 
-            {/* Mobile Hamburger Button */}
+            {/* Botón Menú Móvil */}
             <div className="flex lg:hidden">
               <button
+                type="button"
                 onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-                aria-label="Abrir menú de navegación"
-                className="p-2 rounded-md text-slate-300 hover:text-[#0dfceb] hover:bg-slate-800/70 border border-slate-700/70"
+                style={{ clipPath: CYBER_CLIP }}
+                aria-label="Abrir menú"
+                className="p-2.5 bg-[#000000] text-[#FCEE0A] border border-gray-800 hover:border-[#FCEE0A] rounded-none"
               >
                 {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
               </button>
@@ -293,30 +333,36 @@ export default function CyberpunkPortal() {
           </div>
         </div>
 
-        {/* Mobile Navigation Drawer */}
+        {/* Drawer Móvil */}
         {mobileMenuOpen && (
-          <div className="lg:hidden border-t border-[#0dfceb]/20 bg-[#0b0f19]/95 px-4 pt-3 pb-5 space-y-3">
-            <div className="relative mb-3">
-              <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+          <div className="lg:hidden border-t border-gray-800 bg-[#000000] px-4 pt-3 pb-6 space-y-3">
+            <div
+              style={{ clipPath: CYBER_CLIP }}
+              className="relative bg-[#070a10] border border-gray-800 rounded-none"
+            >
+              <Search className="w-4 h-4 text-[#FCEE0A] absolute left-3 top-1/2 -translate-y-1/2" />
               <input
                 type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Buscar en la subred..."
-                className="w-full pl-9 pr-3 py-2 text-sm bg-slate-900 border border-slate-700 rounded-md text-slate-100 placeholder-slate-500 focus:outline-none focus:border-[#0dfceb]"
+                value={cardSearchQuery}
+                onChange={(e) => setCardSearchQuery(e.target.value)}
+                placeholder="BUSCAR CARTA EN GITHUB..."
+                className="w-full pl-9 pr-3 py-2.5 text-xs font-mono bg-transparent text-white placeholder-gray-500 focus:outline-none rounded-none"
               />
             </div>
-            <div className="grid grid-cols-1 gap-1.5">
+
+            <div className="grid grid-cols-1 gap-2">
               {navItems.map((item) => {
                 const Icon = item.icon;
                 return (
                   <a
                     key={item.name}
-                    href={`#${item.name.toLowerCase().replace(/\s+/g, '-')}`}
-                    className={`flex items-center justify-between px-3 py-2.5 rounded-md text-sm font-medium ${
+                    href={item.href}
+                    onClick={() => setMobileMenuOpen(false)}
+                    style={{ clipPath: CYBER_CLIP }}
+                    className={`flex items-center justify-between px-4 py-3 text-xs font-mono font-bold uppercase border rounded-none ${
                       item.active
-                        ? 'bg-[#0dfceb]/15 text-[#0dfceb] border border-[#0dfceb]/40'
-                        : 'text-slate-300 hover:bg-slate-800/60'
+                        ? 'bg-[#FCEE0A] text-[#070a10] border-[#FCEE0A]'
+                        : 'bg-[#070a10] text-gray-200 border-gray-800 hover:border-[#00F0FF]'
                     }`}
                   >
                     <span className="flex items-center gap-2.5">
@@ -324,7 +370,7 @@ export default function CyberpunkPortal() {
                       {item.name}
                     </span>
                     {item.badge && (
-                      <span className="px-2 py-0.5 text-[10px] font-mono rounded bg-[#0dfceb]/20 text-[#0dfceb]">
+                      <span className="px-2 py-0.5 text-[10px] bg-[#FF003C] text-white font-black rounded-none">
                         {item.badge}
                       </span>
                     )}
@@ -336,341 +382,794 @@ export default function CyberpunkPortal() {
         )}
       </header>
 
-      {/* Main Content Container */}
-      <main className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-12">
-        {/* HERO ARTICLE SECTION */}
-        <section aria-labelledby="hero-heading" className="relative">
-          <div className="relative rounded-xl overflow-hidden border border-[#0dfceb]/40 bg-gradient-to-br from-slate-900/95 via-[#0b0f19] to-slate-950 shadow-[0_0_35px_rgba(13,252,235,0.12)]">
-            {/* Top HUD Accent Bar */}
-            <div className="h-1 w-full bg-gradient-to-r from-[#0dfceb] via-cyan-400 to-rose-500" />
+      {/* =====================================================================
+          MODAL VISOR DE CARTA EN GRANDE (CUANDO EL USUARIO SELECCIONA UNA CARTA)
+         ===================================================================== */}
+      <AnimatePresence>
+        {modalCard && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setModalCard(null)}
+            className="fixed inset-0 z-50 bg-[#000000]/85 backdrop-blur-md flex items-center justify-center p-4"
+          >
+            <motion.div
+              initial={{ scale: 0.9, y: 20 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.9, y: 20 }}
+              onClick={(e) => e.stopPropagation()}
+              style={{ clipPath: CYBER_CLIP }}
+              className="max-w-lg w-full bg-[#070a10] border-2 border-[#FCEE0A] shadow-[0_0_45px_rgba(252,238,10,0.45)] p-6 space-y-4 relative rounded-none"
+            >
+              <div className="flex items-center justify-between border-b border-gray-800 pb-3">
+                <div>
+                  <span className="text-xs font-mono text-[#00F0FF] uppercase block">
+                    ARCHIVO GITHUB // {modalCard.id} • {modalCard.faction}
+                  </span>
+                  <h3 className="text-xl font-black text-white uppercase">
+                    {modalCard.name}
+                  </h3>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setModalCard(null)}
+                  style={{ clipPath: CYBER_CLIP }}
+                  className="p-2 bg-[#FF003C] text-white hover:bg-[#FCEE0A] hover:text-[#070a10] cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
 
-            <div className="p-6 sm:p-8 lg:p-10 grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
-              {/* Left Column: Hero Article Info */}
-              <div className="lg:col-span-8 space-y-5">
-                <div className="flex flex-wrap items-center gap-2.5">
-                  <span className="px-3 py-1 rounded text-xs font-mono font-bold uppercase tracking-wider bg-[#0dfceb] text-[#0b0f19] shadow-[0_0_12px_rgba(13,252,235,0.5)]">
-                    {heroArticle.category}
+              <div className="bg-[#000000] border border-gray-800 p-3 flex items-center justify-center">
+                <img
+                  src={modalCard.image}
+                  alt={modalCard.name}
+                  className="max-h-[460px] w-auto object-contain"
+                />
+              </div>
+
+              <div className="flex items-center justify-between text-xs font-mono text-gray-400 pt-1">
+                <span>Archivo: {modalCard.fileName}</span>
+                <a
+                  href={modalCard.githubUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-[#FCEE0A] hover:text-[#00F0FF] flex items-center gap-1 font-bold"
+                >
+                  <span>Ver en GitHub</span>
+                  <ExternalLink className="w-3.5 h-3.5" />
+                </a>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* =====================================================================
+          1. HERO SECTION CON WALLPAPER LOCAL Y TARJETA DE NOTICIA DESTACADA
+         ===================================================================== */}
+      <section id="inicio" aria-labelledby="hero-heading" className="relative border-b border-gray-800">
+        <div className="relative min-h-[600px] lg:min-h-[660px] flex items-center overflow-hidden">
+          <img
+            src={heroArticle.wallpaper}
+            alt="Night City Cyberpunk 2077 Wallpaper"
+            className="absolute inset-0 w-full h-full object-cover object-center scale-105 filter contrast-110"
+          />
+          <div className="absolute inset-0 bg-gradient-to-r from-[#070a10] via-[#070a10]/90 to-[#070a10]/40" />
+          <div className="absolute inset-0 bg-gradient-to-t from-[#070a10] via-[#070a10]/45 to-[#000000]/75" />
+
+          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-[#FCEE0A] via-[#FF003C] to-[#00F0FF]" />
+
+          <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 lg:py-16 w-full">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
+              <motion.div
+                initial={{ opacity: 0, y: 24 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5 }}
+                style={{ clipPath: CYBER_CLIP }}
+                className="lg:col-span-8 bg-[#070a10]/85 backdrop-blur-md border border-gray-800 hover:border-[#FCEE0A] hover:shadow-[0_0_35px_rgba(252,238,10,0.3)] transition-all duration-300 p-6 sm:p-8 lg:p-10 space-y-6 rounded-none relative"
+              >
+                <div className="absolute top-0 left-0 bottom-0 w-1.5 bg-[#FCEE0A]" />
+
+                <div className="flex flex-wrap items-center gap-3">
+                  <span
+                    style={{ clipPath: CYBER_CLIP }}
+                    className="px-3.5 py-1 bg-[#FCEE0A] text-[#070a10] font-mono font-black text-xs uppercase tracking-widest rounded-none"
+                  >
+                    {heroArticle.tag}
                   </span>
-                  <span className="px-2.5 py-1 rounded text-xs font-mono text-rose-400 bg-rose-500/10 border border-rose-500/30 flex items-center gap-1.5">
-                    <Shield className="w-3.5 h-3.5" />
-                    {heroArticle.threatLevel}
+                  <span
+                    style={{ clipPath: CYBER_CLIP }}
+                    className="px-3 py-1 bg-[#FF003C]/20 border border-[#FF003C] text-[#FF003C] font-mono font-bold text-xs uppercase tracking-wider flex items-center gap-1.5 rounded-none"
+                  >
+                    <Crosshair className="w-3.5 h-3.5" />
+                    {heroArticle.faction}
                   </span>
-                  <span className="text-xs font-mono text-slate-400">
-                    ID: {heroArticle.id}
+                  <span className="text-xs font-mono text-[#00F0FF] ml-auto">
+                    ID // {heroArticle.id}
                   </span>
                 </div>
 
                 <h1
                   id="hero-heading"
-                  className="text-2xl sm:text-4xl lg:text-5xl font-black tracking-tight text-white leading-tight"
+                  className="text-2xl sm:text-4xl lg:text-5xl font-black tracking-tight text-white uppercase leading-[1.08]"
                 >
                   {heroArticle.title}
                 </h1>
 
-                <p className="text-slate-300 text-base sm:text-lg leading-relaxed max-w-3xl">
+                <p className="text-gray-200 text-base sm:text-lg leading-relaxed">
                   {heroArticle.excerpt}
                 </p>
 
-                {/* Key Highlights */}
-                <div className="pt-1 grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  {heroArticle.highlights.map((item, idx) => (
-                    <div
-                      key={idx}
-                      className="p-3 rounded-lg bg-slate-900/80 border border-slate-800 hover:border-[#0dfceb]/40 transition-colors flex items-start gap-2"
-                    >
-                      <Sparkles className="w-4 h-4 text-[#0dfceb] shrink-0 mt-0.5" />
-                      <span className="text-xs text-slate-300 leading-snug">{item}</span>
-                    </div>
-                  ))}
-                </div>
+                {heroArticle.stats && (
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
+                    {heroArticle.stats.map((stat) => (
+                      <div
+                        key={stat.label}
+                        style={{ clipPath: CYBER_CLIP }}
+                        className="bg-[#000000]/80 border border-gray-800 p-3.5 rounded-none"
+                      >
+                        <p className="text-[10px] font-mono text-gray-400 uppercase tracking-widest">
+                          {stat.label}
+                        </p>
+                        <p className={`text-xl font-mono font-black mt-0.5 ${stat.color}`}>
+                          {stat.value}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                )}
 
-                {/* Author & Meta Footer */}
-                <div className="pt-4 border-t border-slate-800/80 flex flex-wrap items-center justify-between gap-4">
-                  <div className="flex items-center gap-4 text-xs font-mono text-slate-400">
-                    <div className="flex items-center gap-2">
-                      <div className="w-8 h-8 rounded-full bg-[#0dfceb]/20 border border-[#0dfceb] flex items-center justify-center text-[#0dfceb] font-bold">
+                <div className="pt-5 border-t border-gray-800 flex flex-wrap items-center justify-between gap-4">
+                  <div className="flex items-center gap-4 text-xs font-mono text-gray-300">
+                    <div className="flex items-center gap-2.5">
+                      <div
+                        style={{ clipPath: CYBER_CLIP }}
+                        className="w-9 h-9 bg-[#00F0FF]/20 border border-[#00F0FF] text-[#00F0FF] font-black flex items-center justify-center rounded-none"
+                      >
                         ZC
                       </div>
                       <div>
-                        <p className="text-slate-200 font-semibold">{heroArticle.author}</p>
-                        <p className="text-[11px] text-slate-400">{heroArticle.role}</p>
+                        <p className="text-white font-bold">{heroArticle.author}</p>
+                        <p className="text-[11px] text-gray-400">{heroArticle.role}</p>
                       </div>
                     </div>
-                    <span className="hidden sm:inline text-slate-700">|</span>
-                    <span className="flex items-center gap-1">
-                      <Clock className="w-3.5 h-3.5 text-[#0dfceb]" />
+                    <span className="hidden sm:inline text-gray-700">|</span>
+                    <span className="flex items-center gap-1 text-gray-300">
+                      <Clock className="w-3.5 h-3.5 text-[#FCEE0A]" />
                       {heroArticle.readTime}
                     </span>
-                    <span className="flex items-center gap-1">
-                      <Eye className="w-3.5 h-3.5 text-[#0dfceb]" />
-                      {heroArticle.views} lecturas
+                    <span className="flex items-center gap-1 text-gray-300">
+                      <Eye className="w-3.5 h-3.5 text-[#00F0FF]" />
+                      {heroArticle.views}
                     </span>
                   </div>
 
-                  <div className="flex items-center gap-3">
-                    <button className="px-5 py-2.5 rounded-md bg-[#0dfceb] text-[#0b0f19] font-bold text-xs sm:text-sm uppercase tracking-wider hover:bg-[#0dfceb]/90 transition-all shadow-[0_0_20px_rgba(13,252,235,0.35)] flex items-center gap-2 cursor-pointer">
-                      <span>Leer Informe Completo</span>
-                      <ChevronRight className="w-4 h-4" />
-                    </button>
+                  <div className="flex flex-wrap items-center gap-3">
+                    <a href="#base-de-cartas">
+                      <CyberpulseButton variant="primary" icon={ChevronRight}>
+                        EXPLORAR BASE DE CARTAS
+                      </CyberpulseButton>
+                    </a>
                   </div>
                 </div>
-              </div>
+              </motion.div>
 
-              {/* Right Column: Interactive Cyber-Card Preview / Telemetry Box */}
-              <div className="lg:col-span-4">
-                <div className="relative rounded-xl bg-[#070a12] border border-[#0dfceb]/50 p-5 shadow-[0_0_25px_rgba(13,252,235,0.15)] space-y-4">
-                  <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-                    <span className="text-xs font-mono uppercase tracking-widest text-[#0dfceb] flex items-center gap-1.5">
-                      <Lock className="w-3.5 h-3.5" />
-                      CARTA DESTACADA DEL META
-                    </span>
-                    <span className="px-2 py-0.5 text-[10px] font-mono bg-rose-500/20 text-rose-300 rounded border border-rose-500/40">
-                      CORPO // ICE
-                    </span>
-                  </div>
-
-                  {/* Simulated Card Frame */}
-                  <div className="rounded-lg bg-gradient-to-b from-slate-900 via-[#0d1526] to-slate-950 border border-[#0dfceb]/30 p-4 space-y-3 relative overflow-hidden">
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm font-black text-white tracking-wide">
-                        PROTOCOLO BLACKWALL v4
-                      </span>
-                      <span className="w-7 h-7 rounded-full bg-[#0dfceb]/20 border border-[#0dfceb] text-[#0dfceb] font-mono text-xs font-bold flex items-center justify-center">
-                        8¢
-                      </span>
-                    </div>
-
-                    <div className="h-28 rounded bg-gradient-to-r from-[#0b0f19] via-cyan-950/60 to-rose-950/50 border border-slate-800 flex flex-col items-center justify-center p-3 text-center relative">
-                      <Cpu className="w-10 h-10 text-[#0dfceb] mb-1.5 opacity-90" />
-                      <span className="text-[11px] font-mono text-[#0dfceb] tracking-widest uppercase">
-                        [ BARRERA // IA CUÁNTICA ]
-                      </span>
-                    </div>
-
-                    <div className="space-y-1.5 text-xs font-mono text-slate-300 bg-slate-950/80 p-3 rounded border border-slate-800/90">
-                      <p className="flex items-start gap-1.5">
-                        <span className="text-[#0dfceb]">↳</span>
-                        <span>Inflige 2 de daño neuronal si el Runner no tiene enlaces activos.</span>
-                      </p>
-                      <p className="flex items-start gap-1.5">
-                        <span className="text-[#0dfceb]">↳</span>
-                        <span>Termina la incursión inmediatamente y bloquea 1 MU.</span>
-                      </p>
-                    </div>
-
-                    <div className="flex items-center justify-between text-[11px] font-mono text-slate-400 pt-1">
-                      <span>FUERZA: <strong className="text-white">6</strong></span>
-                      <span>INFLUENCIA: <strong className="text-[#0dfceb]">●●●●○</strong></span>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center justify-between text-xs font-mono text-slate-400 pt-1">
-                    <span>Ratio de inclusión:</span>
-                    <span className="text-[#0dfceb] font-bold">84.6% en Mazos Corpo</span>
-                  </div>
+              {/* Columna Derecha Hero: Carta MVP */}
+              <motion.div
+                initial={{ opacity: 0, x: 24 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ duration: 0.5, delay: 0.15 }}
+                whileHover={{ scale: 1.02 }}
+                style={{ clipPath: CYBER_CLIP }}
+                className="lg:col-span-4 bg-[#070a10]/90 backdrop-blur-md border border-gray-800 hover:border-[#00F0FF] hover:shadow-[0_0_30px_rgba(0,240,255,0.45)] transition-all duration-300 p-5 space-y-4 rounded-none"
+              >
+                <div className="flex items-center justify-between border-b border-gray-800 pb-3">
+                  <span className="text-xs font-mono font-bold uppercase tracking-widest text-[#FCEE0A] flex items-center gap-1.5">
+                    <Sparkles className="w-4 h-4 text-[#FCEE0A]" />
+                    CARTA MVP // TEMPORADA 01
+                  </span>
+                  <span
+                    style={{ clipPath: CYBER_CLIP }}
+                    className="px-2 py-0.5 text-[10px] font-mono font-black bg-[#00F0FF] text-[#070a10] rounded-none"
+                  >
+                    TIER S+
+                  </span>
                 </div>
-              </div>
+
+                <div
+                  style={{ clipPath: CYBER_CLIP }}
+                  className="relative h-80 w-full overflow-hidden border border-gray-800 bg-[#000000] rounded-none group"
+                >
+                  <img
+                    src={heroArticle.featuredCardImg}
+                    alt="Alt Cunningham Soulkiller Architect"
+                    className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-500"
+                  />
+                </div>
+              </motion.div>
             </div>
           </div>
-        </section>
+        </div>
+      </section>
 
-        {/* MAIN GRID: RECENT ARTICLES (LEFT 8 COLS) & TOP DECKS (RIGHT 4 COLS) */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-          {/* RECENT ARTICLES SECTION */}
-          <section className="lg:col-span-8 space-y-6" aria-labelledby="recent-articles-heading">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-4">
-              <div className="flex items-center gap-2.5">
-                <Newspaper className="w-5 h-5 text-[#0dfceb]" />
-                <h2
-                  id="recent-articles-heading"
-                  className="text-xl sm:text-2xl font-black tracking-wide uppercase text-white"
-                >
-                  Transmisiones Recientes
-                </h2>
+      {/* Contenedor Principal del Portal */}
+      <main className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-14 space-y-24">
+        {/* =====================================================================
+            2. GRID DE NOTICIAS (GESTIONADO DESDE /admin)
+           ===================================================================== */}
+        <section id="noticias" aria-labelledby="news-heading" className="space-y-8">
+          <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-gray-800 pb-5">
+            <div>
+              <div className="flex items-center gap-2 text-xs font-mono text-[#00F0FF] uppercase tracking-widest mb-1">
+                <Newspaper className="w-4 h-4 text-[#FCEE0A]" />
+                <span>FEED DE INFORMACIÓN // NIGHT CITY NET</span>
               </div>
-
-              {/* Faction Filter Pills */}
-              <div className="flex items-center gap-1.5 font-mono text-xs">
-                {['ALL', 'NETRUNNER', 'CORPO'].map((faction) => (
-                  <button
-                    key={faction}
-                    onClick={() => setSelectedFaction(faction)}
-                    className={`px-3 py-1.5 rounded border transition-all cursor-pointer ${
-                      selectedFaction === faction
-                        ? 'bg-[#0dfceb] text-[#0b0f19] border-[#0dfceb] font-bold shadow-[0_0_10px_rgba(13,252,235,0.3)]'
-                        : 'bg-slate-900/80 text-slate-400 border-slate-800 hover:border-[#0dfceb]/40 hover:text-slate-200'
-                    }`}
-                  >
-                    {faction === 'ALL' ? 'TODOS' : faction}
-                  </button>
-                ))}
-              </div>
+              <h2
+                id="news-heading"
+                className="text-2xl sm:text-4xl font-black uppercase tracking-tight text-white"
+              >
+                ÚLTIMAS <span className="text-[#FCEE0A]">NOTICIAS</span>
+              </h2>
             </div>
 
-            {/* Articles List */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-              {filteredArticles.map((article) => (
-                <article
-                  key={article.id}
-                  className="group rounded-xl bg-slate-900/60 border border-slate-800/90 hover:border-[#0dfceb]/60 p-5 flex flex-col justify-between transition-all duration-200 hover:shadow-[0_0_20px_rgba(13,252,235,0.1)]"
+            <div className="flex flex-wrap items-center gap-2 font-mono text-xs">
+              {['TODOS', 'NETRUNNER', 'CORPO', 'BANDAS', 'MERCENARIO'].map((faction) => (
+                <button
+                  key={faction}
+                  type="button"
+                  onClick={() => setSelectedFaction(faction)}
+                  style={{ clipPath: CYBER_CLIP }}
+                  className={`px-4 py-2 font-bold uppercase tracking-wider border transition-all cursor-pointer rounded-none ${
+                    selectedFaction === faction
+                      ? 'bg-[#FCEE0A] text-[#070a10] border-[#FCEE0A] shadow-[0_0_18px_rgba(252,238,10,0.5)]'
+                      : 'bg-[#000000] text-gray-300 border-gray-800 hover:border-[#00F0FF] hover:text-[#00F0FF] hover:shadow-[0_0_15px_rgba(0,240,255,0.35)]'
+                  }`}
                 >
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between gap-2">
-                      <span
-                        className={`px-2.5 py-0.5 text-[10px] font-mono font-semibold uppercase rounded border ${article.tagColor}`}
-                      >
-                        {article.category}
-                      </span>
-                      <span className="text-[11px] font-mono text-slate-500">
-                        {article.date}
-                      </span>
+                  {faction}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            {filteredArticles.map((article, idx) => (
+              <motion.article
+                key={article.id}
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.35, delay: idx * 0.06 }}
+                whileHover={{ y: -6 }}
+                style={{ clipPath: CYBER_CLIP }}
+                className="group bg-[#000000] border border-gray-800 hover:border-[#00F0FF] hover:shadow-[0_0_25px_rgba(0,240,255,0.4)] transition-all duration-300 flex flex-col justify-between overflow-hidden rounded-none"
+              >
+                <div>
+                  <div className="relative h-44 w-full overflow-hidden border-b border-gray-800">
+                    <img
+                      src={article.image}
+                      alt={article.title}
+                      className="w-full h-full object-cover object-center group-hover:scale-110 transition-transform duration-500"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-[#000000] via-[#000000]/30 to-transparent" />
+                    <span
+                      style={{ clipPath: CYBER_CLIP }}
+                      className="absolute top-3 left-3 px-2.5 py-1 text-[10px] font-mono font-black uppercase tracking-wider bg-[#FCEE0A] text-[#070a10] rounded-none"
+                    >
+                      {article.category}
+                    </span>
+                    <span className="absolute bottom-2 right-3 text-[10px] font-mono text-gray-300 bg-[#070a10]/90 px-2 py-0.5 border border-gray-800">
+                      {article.faction}
+                    </span>
+                  </div>
+
+                  <div className="p-5 space-y-3">
+                    <div className="flex items-center justify-between text-[11px] font-mono text-gray-400">
+                      <span>@{article.author}</span>
+                      <span>{article.date}</span>
                     </div>
 
-                    <h3 className="text-lg font-bold text-white group-hover:text-[#0dfceb] transition-colors leading-snug">
+                    <h3 className="text-base font-black text-white uppercase leading-snug group-hover:text-[#FCEE0A] transition-colors">
                       {article.title}
                     </h3>
 
-                    <p className="text-sm text-slate-400 leading-relaxed">
+                    <p className="text-xs text-gray-300 leading-relaxed">
                       {article.excerpt}
                     </p>
                   </div>
+                </div>
 
-                  <div className="pt-4 mt-5 border-t border-slate-800/80 flex items-center justify-between text-xs font-mono text-slate-400">
-                    <span className="text-slate-300 font-medium">@{article.author}</span>
-                    <div className="flex items-center gap-3">
-                      <span className="flex items-center gap-1">
-                        <Clock className="w-3.5 h-3.5 text-[#0dfceb]" />
-                        {article.readTime}
+                <div className="px-5 py-3.5 border-t border-gray-800 bg-[#070a10] flex items-center justify-between text-[11px] font-mono">
+                  <span className="flex items-center gap-1 text-gray-400">
+                    <Clock className="w-3.5 h-3.5 text-[#00F0FF]" />
+                    {article.readTime}
+                  </span>
+                  <span className="flex items-center gap-1 font-bold text-[#FCEE0A] group-hover:text-[#00F0FF] transition-colors uppercase">
+                    <span>LEER MÁS</span>
+                    <ChevronRight className="w-3.5 h-3.5" />
+                  </span>
+                </div>
+              </motion.article>
+            ))}
+          </div>
+        </section>
+
+        {/* =====================================================================
+            3. BASE DE CARTAS (CONECTADA A GITHUB: cyberpunk-tcg-cartas)
+           ===================================================================== */}
+        <section id="base-de-cartas" aria-labelledby="cards-db-heading" className="space-y-8">
+          <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6 border-b border-gray-800 pb-6">
+            <div>
+              <div className="flex items-center gap-2 text-xs font-mono text-[#FCEE0A] uppercase tracking-widest mb-1">
+                <Database className="w-4 h-4 text-[#00F0FF]" />
+                <span>
+                  REPOSITORIO OFICIAL // GITHUB.COM/CYBERPUNKTCGES-LGTM/CYBERPUNK-TCG-CARTAS
+                </span>
+              </div>
+              <h2
+                id="cards-db-heading"
+                className="text-2xl sm:text-4xl font-black uppercase tracking-tight text-white"
+              >
+                BASE DE <span className="text-[#00F0FF]">CARTAS</span>{' '}
+                <span className="text-lg font-mono text-[#FCEE0A]">
+                  ({filteredDatabaseCards.length} / {allCards.length})
+                </span>
+              </h2>
+            </div>
+
+            {/* Buscador Principal de Cartas */}
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full lg:w-auto">
+              <div
+                style={{ clipPath: CYBER_CLIP }}
+                className="relative bg-[#000000] border-2 border-[#FCEE0A] shadow-[0_0_20px_rgba(252,238,10,0.25)] focus-within:border-[#00F0FF] focus-within:shadow-[0_0_25px_rgba(0,240,255,0.45)] transition-all flex-1 sm:w-80 rounded-none"
+              >
+                <Search className="w-4 h-4 text-[#FCEE0A] absolute left-3.5 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  value={cardSearchQuery}
+                  onChange={(e) => {
+                    setCardSearchQuery(e.target.value);
+                    setVisibleCardsCount(18);
+                  }}
+                  placeholder="Escribe el nombre de la carta (ej: Smasher, Lucy, Arasaka)..."
+                  className="w-full pl-10 pr-8 py-3 text-xs font-mono bg-transparent text-white placeholder-gray-400 focus:outline-none rounded-none"
+                />
+                {cardSearchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setCardSearchQuery('')}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-[#FF003C] cursor-pointer"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Filtros de Facción de la Base de Cartas */}
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div className="flex flex-wrap items-center gap-2 font-mono text-xs">
+              {['TODOS', 'CORPO', 'NETRUNNER', 'BANDAS', 'MERCENARIO'].map((fac) => (
+                <button
+                  key={fac}
+                  type="button"
+                  onClick={() => {
+                    setCardFactionFilter(fac);
+                    setVisibleCardsCount(18);
+                  }}
+                  style={{ clipPath: CYBER_CLIP }}
+                  className={`px-4 py-2 font-bold uppercase tracking-wider border transition-all cursor-pointer rounded-none ${
+                    cardFactionFilter === fac
+                      ? 'bg-[#00F0FF] text-[#070a10] border-[#00F0FF] shadow-[0_0_18px_rgba(0,240,255,0.5)]'
+                      : 'bg-[#000000] text-gray-300 border-gray-800 hover:border-[#FCEE0A] hover:text-[#FCEE0A]'
+                  }`}
+                >
+                  {fac}
+                </button>
+              ))}
+            </div>
+
+            <span className="text-xs font-mono text-gray-400">
+              Haz clic en cualquier carta para abrir el escáner en alta resolución
+            </span>
+          </div>
+
+          {/* Grid de Cartas Buscadas */}
+          {filteredDatabaseCards.length === 0 ? (
+            <div
+              style={{ clipPath: CYBER_CLIP }}
+              className="bg-[#000000] border border-gray-800 p-12 text-center space-y-3"
+            >
+              <p className="text-lg font-mono font-bold text-[#FF003C] uppercase">
+                NO SE ENCONTRARON CARTAS PARA "{cardSearchQuery}"
+              </p>
+              <button
+                type="button"
+                onClick={() => {
+                  setCardSearchQuery('');
+                  setCardFactionFilter('TODOS');
+                }}
+                style={{ clipPath: CYBER_CLIP }}
+                className="px-4 py-2 bg-[#FCEE0A] text-[#070a10] font-mono font-black text-xs uppercase cursor-pointer"
+              >
+                MOSTRAR LAS {allCards.length} CARTAS
+              </button>
+            </div>
+          ) : (
+            <>
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-5">
+                {filteredDatabaseCards.slice(0, visibleCardsCount).map((card) => (
+                  <motion.div
+                    key={card.id}
+                    onClick={() => setModalCard(card)}
+                    whileHover={{
+                      scale: 1.05,
+                      y: -6,
+                      boxShadow: '0 0 25px rgba(0, 240, 255, 0.6)'
+                    }}
+                    transition={{ type: 'spring', stiffness: 320, damping: 20 }}
+                    style={{ clipPath: CYBER_CLIP }}
+                    className="group cursor-pointer bg-[#000000] border border-gray-800 hover:border-[#00F0FF] overflow-hidden flex flex-col justify-between rounded-none"
+                  >
+                    <div className="relative aspect-[3/4.2] w-full bg-[#070a10] overflow-hidden border-b border-gray-800">
+                      <img
+                        src={card.image}
+                        alt={card.name}
+                        loading="lazy"
+                        className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-300"
+                      />
+                    </div>
+                    <div className="p-3 bg-[#000000]">
+                      <div className="flex items-center justify-between text-[10px] font-mono text-gray-400">
+                        <span className="text-[#FCEE0A] font-bold">{card.id}</span>
+                        <span className="text-[#00F0FF]">{card.faction}</span>
+                      </div>
+                      <h3 className="text-xs font-black text-white uppercase truncate mt-1 group-hover:text-[#FCEE0A] transition-colors">
+                        {card.name}
+                      </h3>
+                    </div>
+                  </motion.div>
+                ))}
+              </div>
+
+              {visibleCardsCount < filteredDatabaseCards.length && (
+                <div className="flex justify-center pt-4">
+                  <CyberpulseButton
+                    variant="primary"
+                    icon={Database}
+                    onClick={() => setVisibleCardsCount((prev) => prev + 24)}
+                  >
+                    CARGAR MÁS CARTAS ({filteredDatabaseCards.length - visibleCardsCount} RESTANTES)
+                  </CyberpulseButton>
+                </div>
+              )}
+            </>
+          )}
+        </section>
+
+        {/* =====================================================================
+            4. MAZOS COMPETITIVOS (CON FRAMER MOTION Y GESTIÓN EN BACKEND)
+           ===================================================================== */}
+        {activeDeck && (
+          <section id="mazos" aria-labelledby="decks-heading" className="space-y-8">
+            <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-gray-800 pb-5">
+              <div>
+                <div className="flex items-center gap-2 text-xs font-mono text-[#FF003C] uppercase tracking-widest mb-1">
+                  <Flame className="w-4 h-4 text-[#FF003C]" />
+                  <span>BASE DE DATOS COMPETITIVA // TIER S & A</span>
+                </div>
+                <h2
+                  id="decks-heading"
+                  className="text-2xl sm:text-4xl font-black uppercase tracking-tight text-white"
+                >
+                  TOP <span className="text-[#00F0FF]">MAZOS DEL META</span>
+                </h2>
+              </div>
+
+              <div className="flex flex-wrap gap-3">
+                {topDecks.map((deck, idx) => {
+                  const isSelected = idx === activeDeckIndex;
+                  return (
+                    <button
+                      key={deck.id}
+                      type="button"
+                      onClick={() => handleSelectDeck(idx)}
+                      style={{ clipPath: CYBER_CLIP }}
+                      className={`px-4 py-2.5 font-mono text-xs font-black uppercase tracking-wider border transition-all cursor-pointer rounded-none flex items-center gap-2 ${
+                        isSelected
+                          ? 'bg-[#FCEE0A] text-[#070a10] border-[#FCEE0A] shadow-[0_0_20px_rgba(252,238,10,0.55)]'
+                          : 'bg-[#000000] text-gray-200 border-gray-800 hover:border-[#00F0FF] hover:text-[#00F0FF] hover:shadow-[0_0_15px_rgba(0,240,255,0.4)]'
+                      }`}
+                    >
+                      <span>{deck.rank}</span>
+                      <span>{deck.name}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+              <div className="lg:col-span-8 space-y-6">
+                <div
+                  style={{ clipPath: CYBER_CLIP }}
+                  className="relative overflow-hidden border border-gray-800 bg-[#000000] p-6 sm:p-8 rounded-none"
+                >
+                  <img
+                    src={activeDeck.bannerWallpaper}
+                    alt={activeDeck.name}
+                    className="absolute inset-0 w-full h-full object-cover object-center opacity-35"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-r from-[#000000] via-[#070a10]/90 to-transparent" />
+
+                  <div className="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2.5">
+                        <span
+                          style={{ clipPath: CYBER_CLIP }}
+                          className="px-2.5 py-0.5 bg-[#FCEE0A] text-[#070a10] font-mono font-black text-xs rounded-none"
+                        >
+                          {activeDeck.rank} // {activeDeck.tier}
+                        </span>
+                        <span className="text-xs font-mono font-bold text-[#00F0FF] uppercase tracking-wider">
+                          {activeDeck.archetype}
+                        </span>
+                      </div>
+                      <h3 className="text-2xl sm:text-3xl font-black text-white uppercase">
+                        {activeDeck.name}
+                      </h3>
+                      <p className="text-sm text-gray-200 max-w-2xl">
+                        {activeDeck.description}
+                      </p>
+                    </div>
+
+                    <div
+                      style={{ clipPath: CYBER_CLIP }}
+                      className="bg-[#070a10]/90 border border-gray-800 px-5 py-3 text-right font-mono shrink-0 rounded-none"
+                    >
+                      <span className="text-[10px] text-gray-400 uppercase block">
+                        WINRATE CONFIRMADO
                       </span>
-                      <span className="flex items-center gap-1">
-                        <Eye className="w-3.5 h-3.5 text-slate-500" />
-                        {article.views}
+                      <span className="text-2xl font-black text-[#FCEE0A]">
+                        {activeDeck.winrate}
+                      </span>
+                      <span className="text-[11px] text-[#00F0FF] block">
+                        PILOTO: @{activeDeck.pilot}
                       </span>
                     </div>
                   </div>
-                </article>
-              ))}
-            </div>
-          </section>
+                </div>
 
-          {/* TOP DECKS SIDEBAR SECTION */}
-          <aside className="lg:col-span-4 space-y-6" aria-labelledby="top-decks-heading">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-4">
-              <div className="flex items-center gap-2.5">
-                <Flame className="w-5 h-5 text-[#0dfceb]" />
-                <h2
-                  id="top-decks-heading"
-                  className="text-xl font-black tracking-wide uppercase text-white"
-                >
-                  Top Decks // Meta
-                </h2>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+                  {activeDeck.cards?.map((card) => {
+                    const isActiveCard = selectedCard?.id === card.id;
+                    return (
+                      <motion.div
+                        key={card.id}
+                        onClick={() => setSelectedCard(card)}
+                        whileHover={{
+                          scale: 1.05,
+                          y: -8,
+                          boxShadow: '0 0 28px rgba(0, 240, 255, 0.65)'
+                        }}
+                        whileTap={{ scale: 0.98 }}
+                        transition={{ type: 'spring', stiffness: 320, damping: 20 }}
+                        style={{ clipPath: CYBER_CLIP }}
+                        className={`group cursor-pointer bg-[#000000] border transition-colors duration-200 flex flex-col justify-between overflow-hidden rounded-none ${
+                          isActiveCard
+                            ? 'border-[#FCEE0A] shadow-[0_0_24px_rgba(252,238,10,0.45)]'
+                            : 'border-gray-800 hover:border-[#00F0FF]'
+                        }`}
+                      >
+                        <div className="relative h-64 w-full overflow-hidden bg-[#070a10] border-b border-gray-800">
+                          <img
+                            src={card.image}
+                            alt={card.name}
+                            className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-500"
+                          />
+                        </div>
+
+                        <div className="p-4 space-y-2">
+                          <h4 className="text-sm font-black text-white uppercase group-hover:text-[#FCEE0A] transition-colors leading-snug">
+                            {card.name}
+                          </h4>
+                          <p className="text-xs text-gray-300 leading-relaxed line-clamp-3">
+                            {card.ability}
+                          </p>
+                        </div>
+                      </motion.div>
+                    );
+                  })}
+                </div>
               </div>
-              <span className="px-2 py-0.5 text-[10px] font-mono rounded bg-[#0dfceb]/15 text-[#0dfceb] border border-[#0dfceb]/30">
-                PATCH 2.4
-              </span>
-            </div>
 
-            <div className="space-y-4">
-              {topDecks.map((deck, index) => (
-                <div
-                  key={deck.id}
-                  className="rounded-xl bg-slate-900/75 border border-slate-800 hover:border-[#0dfceb]/50 p-4 transition-all duration-200 space-y-3"
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-mono font-bold text-[#0dfceb]">
-                          #0{index + 1}
+              <aside className="lg:col-span-4">
+                <AnimatePresence mode="wait">
+                  {selectedCard && (
+                    <motion.div
+                      key={selectedCard.id}
+                      initial={{ opacity: 0, x: 15 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      exit={{ opacity: 0, x: -15 }}
+                      transition={{ duration: 0.25 }}
+                      style={{ clipPath: CYBER_CLIP }}
+                      className="bg-[#000000] border border-gray-800 hover:border-[#FCEE0A] hover:shadow-[0_0_28px_rgba(252,238,10,0.35)] transition-all duration-300 p-6 space-y-5 rounded-none"
+                    >
+                      <div className="flex items-center justify-between border-b border-gray-800 pb-3">
+                        <span className="text-xs font-mono font-bold uppercase text-[#00F0FF] flex items-center gap-1.5">
+                          <Swords className="w-4 h-4 text-[#FF003C]" />
+                          ESCÁNER DE CARTA // {selectedCard.id}
                         </span>
-                        <span
-                          className={`text-[10px] font-mono px-2 py-0.5 rounded border ${
-                            deck.accent === 'rose'
-                              ? 'text-rose-300 bg-rose-500/10 border-rose-500/30'
-                              : 'text-[#0dfceb] bg-[#0dfceb]/10 border-[#0dfceb]/30'
-                          }`}
-                        >
-                          {deck.type}
+                        <span className="text-xs font-mono font-black text-[#FCEE0A]">
+                          {selectedCard.rarity}
                         </span>
                       </div>
-                      <h3 className="text-base font-bold text-white mt-1">
-                        {deck.name}
-                      </h3>
-                    </div>
 
-                    <div className="text-right font-mono">
-                      <span className="inline-block px-2 py-0.5 text-xs font-black rounded bg-[#0dfceb] text-[#0b0f19]">
-                        {deck.tier}
-                      </span>
-                      <p className="text-xs text-emerald-400 font-bold mt-1">
-                        {deck.winrate} WR
+                      <div
+                        style={{ clipPath: CYBER_CLIP }}
+                        className="relative h-80 w-full overflow-hidden border border-gray-800 bg-[#070a10] rounded-none"
+                      >
+                        <img
+                          src={selectedCard.image}
+                          alt={selectedCard.name}
+                          className="w-full h-full object-contain"
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <span className="text-[11px] font-mono text-[#00F0FF] uppercase tracking-wider block">
+                          {selectedCard.type}
+                        </span>
+                        <h3 className="text-xl font-black text-white uppercase">
+                          {selectedCard.name}
+                        </h3>
+                        <p className="text-sm text-gray-200 leading-relaxed bg-[#070a10] p-3.5 border border-gray-800">
+                          {selectedCard.ability}
+                        </p>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </aside>
+            </div>
+          </section>
+        )}
+
+        {/* =====================================================================
+            5. TORNEOS COMPETITIVOS (GESTIONADOS DESDE EL BACKEND /admin)
+           ===================================================================== */}
+        <section id="torneos" aria-labelledby="tournaments-heading" className="space-y-8">
+          <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 border-b border-gray-800 pb-5">
+            <div>
+              <div className="flex items-center gap-2 text-xs font-mono text-[#00F0FF] uppercase tracking-widest mb-1">
+                <Trophy className="w-4 h-4 text-[#FCEE0A]" />
+                <span>CIRCUITO COMPETITIVO OFICIAL // ESPAÑA</span>
+              </div>
+              <h2
+                id="tournaments-heading"
+                className="text-2xl sm:text-4xl font-black uppercase tracking-tight text-white"
+              >
+                CALENDARIO DE <span className="text-[#FCEE0A]">TORNEOS</span>
+              </h2>
+            </div>
+
+            <a
+              href="/admin"
+              style={{ clipPath: CYBER_CLIP }}
+              className="px-4 py-2.5 bg-[#000000] border border-gray-800 hover:border-[#FCEE0A] text-[#FCEE0A] font-mono text-xs font-bold uppercase tracking-wider rounded-none"
+            >
+              + GESTIONAR TORNEOS EN BACKEND
+            </a>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {tournaments.map((tour) => (
+              <div
+                key={tour.id}
+                style={{ clipPath: CYBER_CLIP }}
+                className="group bg-[#000000] border border-gray-800 hover:border-[#FCEE0A] hover:shadow-[0_0_25px_rgba(252,238,10,0.35)] transition-all duration-300 flex flex-col justify-between overflow-hidden rounded-none"
+              >
+                <div>
+                  <div className="relative h-40 w-full overflow-hidden border-b border-gray-800">
+                    <img
+                      src={tour.image || '/images/wallpapers/Night_City_3840x2160.png'}
+                      alt={tour.name}
+                      className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-500"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-[#000000] via-[#000000]/40 to-transparent" />
+                    <span
+                      style={{ clipPath: CYBER_CLIP }}
+                      className="absolute top-3 left-3 px-2.5 py-1 bg-[#FF003C] text-white font-mono font-black text-[10px] uppercase tracking-wider"
+                    >
+                      {tour.status}
+                    </span>
+                  </div>
+
+                  <div className="p-5 space-y-3">
+                    <h3 className="text-lg font-black text-white uppercase group-hover:text-[#FCEE0A] transition-colors">
+                      {tour.name}
+                    </h3>
+
+                    <div className="space-y-1.5 text-xs font-mono text-gray-300">
+                      <p className="flex items-center gap-2">
+                        <Calendar className="w-3.5 h-3.5 text-[#FCEE0A]" />
+                        <span>{tour.date}</span>
+                      </p>
+                      <p className="flex items-center gap-2">
+                        <MapPin className="w-3.5 h-3.5 text-[#00F0FF]" />
+                        <span>{tour.location}</span>
+                      </p>
+                      <p className="flex items-center gap-2">
+                        <Users className="w-3.5 h-3.5 text-[#FF003C]" />
+                        <span>{tour.players} • {tour.format}</span>
                       </p>
                     </div>
                   </div>
-
-                  {/* Core cards chips */}
-                  <div className="flex flex-wrap gap-1.5 pt-1">
-                    {deck.coreCards.map((card) => (
-                      <span
-                        key={card}
-                        className="text-[11px] font-mono px-2 py-0.5 rounded bg-[#0b0f19] text-slate-300 border border-slate-800"
-                      >
-                        {card}
-                      </span>
-                    ))}
-                  </div>
-
-                  {/* Deck Footer Info */}
-                  <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between text-xs font-mono text-slate-400">
-                    <span>
-                      Piloto: <strong className="text-slate-200">{deck.pilot}</strong>
-                    </span>
-                    <span className="flex items-center gap-1 text-[#0dfceb] hover:underline cursor-pointer">
-                      <span>Ver Lista ({deck.cost})</span>
-                      <ExternalLink className="w-3 h-3" />
-                    </span>
-                  </div>
                 </div>
-              ))}
-            </div>
 
-            {/* Meta Telemetry Summary Box */}
-            <div className="rounded-xl bg-gradient-to-br from-slate-900 to-[#070a12] border border-[#0dfceb]/30 p-4 space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-mono uppercase text-[#0dfceb] flex items-center gap-1.5">
-                  <BarChart3 className="w-4 h-4" />
-                  BALANCE DE FACCIONES
-                </span>
-                <span className="text-[11px] font-mono text-slate-400">Últimos 7 días</span>
-              </div>
-              <div className="space-y-2 text-xs font-mono">
-                <div className="flex justify-between">
-                  <span className="text-[#0dfceb]">NETRUNNER (Infiltración)</span>
-                  <span className="text-white font-bold">51.2%</span>
-                </div>
-                <div className="w-full h-2 rounded-full bg-slate-800 overflow-hidden flex">
-                  <div className="bg-[#0dfceb] h-full" style={{ width: '51.2%' }} />
-                  <div className="bg-rose-500 h-full" style={{ width: '48.8%' }} />
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-rose-400">CORPO (Defensa ICE)</span>
-                  <span className="text-white font-bold">48.8%</span>
+                <div className="p-4 border-t border-gray-800 bg-[#070a10] flex items-center justify-between text-xs font-mono">
+                  <span className="text-[#00F0FF] font-bold truncate">
+                    Premios: {tour.prizePool}
+                  </span>
                 </div>
               </div>
+            ))}
+          </div>
+        </section>
+
+        {/* =====================================================================
+            6. FORO DE LA COMUNIDAD (#foro)
+           ===================================================================== */}
+        <section id="foro" aria-labelledby="forum-heading" className="space-y-6">
+          <div
+            style={{ clipPath: CYBER_CLIP }}
+            className="bg-[#000000] border border-gray-800 p-8 flex flex-col md:flex-row items-center justify-between gap-6"
+          >
+            <div className="space-y-2">
+              <div className="flex items-center gap-2 text-xs font-mono text-[#00F0FF] uppercase tracking-widest">
+                <MessageSquare className="w-4 h-4 text-[#FCEE0A]" />
+                <span>SUBRED DE DISCUSIÓN // COMUNIDAD ESPAÑA</span>
+              </div>
+              <h2
+                id="forum-heading"
+                className="text-2xl sm:text-3xl font-black uppercase text-white"
+              >
+                FORO TÁCTICO & <span className="text-[#FCEE0A]">INTERCAMBIO DE CARTAS</span>
+              </h2>
+              <p className="text-sm text-gray-300 max-w-2xl">
+                Comparte tus listas de mazos, resuelve dudas de reglas del reglamento oficial y
+                organiza partidas con otros jugadores de Cyberpunk TCG España.
+              </p>
             </div>
-          </aside>
-        </div>
+
+            <CyberpulseButton variant="primary" icon={MessageSquare}>
+              ENTRAR AL FORO
+            </CyberpulseButton>
+          </div>
+        </section>
       </main>
 
-      {/* Footer */}
-      <footer className="relative z-10 border-t border-[#0dfceb]/20 bg-[#070a11] mt-16 py-8">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs font-mono text-slate-500">
-          <div className="flex items-center gap-2">
-            <Cpu className="w-4 h-4 text-[#0dfceb]" />
-            <span className="text-slate-300 font-bold">CYBERNEXUS TCG</span>
-            <span>// FASE 1 — PORTAL NETRUNNER & CORPO</span>
+      {/* Footer Geométrico Cyberpulse + Cyberpunk 2077 */}
+      <footer className="relative z-10 border-t border-gray-800 bg-[#000000] mt-16 py-10">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs font-mono text-gray-400">
+          <div className="flex items-center gap-3">
+            <img
+              src="/images/logo-cyberpunk-tcg-españa.jpg"
+              alt="Cyberpunk TCG España"
+              className="h-9 w-auto object-contain"
+            />
+            <span className="text-white font-bold uppercase">
+              CYBERPUNK TCG ESPAÑA // PORTAL & BACKEND CMS
+            </span>
           </div>
-          <div>
-            <span>CONEXIÓN CIFRADA [SSL-2077] • PALETA #0b0f19 / #0dfceb</span>
+          <div className="flex items-center gap-4">
+            <a href="/admin" className="text-[#FCEE0A] hover:underline font-bold">
+              PANEL ADMIN (/admin)
+            </a>
+            <span>•</span>
+            <span>{allCards.length} CARTAS GITHUB</span>
           </div>
         </div>
       </footer>

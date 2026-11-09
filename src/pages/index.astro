@@ -1,6 +1,16 @@
 ---
+import fs from 'node:fs/promises';
+import path from 'node:path';
 import '../styles/global.css';
 import CyberpunkPortal from '../components/CyberpunkPortal.jsx';
+
+export const prerender = false;
+
+const cmsRaw = await fs.readFile(path.resolve(process.cwd(), 'src/data/cms.json'), 'utf-8');
+const cardsRaw = await fs.readFile(path.resolve(process.cwd(), 'src/data/cards.json'), 'utf-8');
+
+const cmsData = JSON.parse(cmsRaw);
+const cardsData = JSON.parse(cardsRaw);
 ---
 
 <html lang="es">
@@ -10,9 +20,9 @@ import CyberpunkPortal from '../components/CyberpunkPortal.jsx';
 		<link rel="icon" href="/favicon.ico" />
 		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
 		<meta name="generator" content={Astro.generator} />
-		<title>Cyberpunk TCG // Portal Netrunner & Corpo</title>
+		<title>Cyberpunk TCG España // Portal Oficial</title>
 	</head>
-	<body class="bg-[#0b0f19] text-slate-100 antialiased">
-		<CyberpunkPortal client:load />
+	<body class="bg-[#070a10] text-white antialiased rounded-none">
+		<CyberpunkPortal client:load initialCms={cmsData} initialCards={cardsData} />
 	</body>
 </html>

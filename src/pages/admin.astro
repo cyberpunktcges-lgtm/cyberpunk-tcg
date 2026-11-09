@@ -1,0 +1,27 @@
+---
+import fs from 'node:fs/promises';
+import path from 'node:path';
+import '../styles/global.css';
+import AdminPanel from '../components/AdminPanel.jsx';
+
+export const prerender = false;
+
+const cmsRaw = await fs.readFile(path.resolve(process.cwd(), 'src/data/cms.json'), 'utf-8');
+const cardsRaw = await fs.readFile(path.resolve(process.cwd(), 'src/data/cards.json'), 'utf-8');
+
+const cmsData = JSON.parse(cmsRaw);
+const cardsData = JSON.parse(cardsRaw);
+---
+
+<html lang="es">
+	<head>
+		<meta charset="utf-8" />
+		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+		<link rel="icon" href="/favicon.ico" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<title>Backend Admin // Cyberpunk TCG España</title>
+	</head>
+	<body class="bg-[#070a10] text-white antialiased rounded-none">
+		<AdminPanel client:load initialCms={cmsData} initialCards={cardsData} />
+	</body>
+</html>

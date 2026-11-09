@@ -1,1 +1,50 @@
 @import "tailwindcss";
+
+@layer utilities {
+  .clip-cyber {
+    clip-path: polygon(
+      0 0,
+      calc(100% - 15px) 0,
+      100% 15px,
+      100% 100%,
+      15px 100%,
+      0 calc(100% - 15px)
+    );
+  }
+
+  .clip-cyber-sm {
+    clip-path: polygon(
+      0 0,
+      calc(100% - 10px) 0,
+      100% 10px,
+      100% 100%,
+      10px 100%,
+      0 calc(100% - 10px)
+    );
+  }
+}
+
+@keyframes cyber-glitch {
+  0% {
+    transform: translate(0, 0) skewX(0deg);
+  }
+  20% {
+    transform: translate(-3px, 1px) skewX(-6deg);
+  }
+  40% {
+    transform: translate(3px, -1px) skewX(6deg);
+  }
+  60% {
+    transform: translate(-2px, -1px) skewX(-3deg);
+  }
+  80% {
+    transform: translate(2px, 1px) skewX(3deg);
+  }
+  100% {
+    transform: translate(0, 0) skewX(0deg);
+  }
+}
+
+.hover-glitch:hover {
+  animation: cyber-glitch 0.22s cubic-bezier(0.25, 0.46, 0.45, 0.94) both;
+}
