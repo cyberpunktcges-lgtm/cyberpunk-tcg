@@ -1,7 +1,13 @@
 # ESTADO DEL PROYECTO — Portal Cyberpunk TCG España (Arquitectura Multipágina + Deckbuilder + CMS Protegido)
 
 **Fecha de actualización:** 10 de Noviembre de 2026  
-**Estado general:** ✅ Arquitectura multipágina implementada, Constructor de Mazos integrado, Vitrina de 3 Cartas de Arte Alternativo, Histórico de Torneos y Autenticación en `/admin`.
+**Estado general:** ✅ Diseño visual Cyberpulse multipágina (Mac) fusionado con éxito con el motor y base de datos de cartas/noticias (`src/data/cards.json` y `src/data/cms.json`), Constructor de Mazos integrado, Vitrina de 3 Cartas de Arte Alternativo, Histórico de Torneos y Autenticación en `/admin`.
+
+---
+
+## 0. Fusión de Entornos (Mac + Oficina)
+- **Fusión Completada:** Se ha integrado el trabajo visual y la arquitectura multipágina desarrollada en el Mac con el motor de datos remoto (`src/data/cards.json` con las 151 cartas sincronizadas de GitHub y `src/data/cms.json` con las noticias, mazos, torneos, cartas de arte alternativo e histórico de torneos).
+- **Dependencias Verificadas:** `npm install` ejecutado y validado sin conflictos.
 
 ---
 
