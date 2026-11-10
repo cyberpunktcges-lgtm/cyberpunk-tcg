@@ -1,34 +1,68 @@
 {
   "heroArticle": {
     "id": "NC-2077-01",
-    "tag": "NOTICIA DESTACADA // META REPORT",
-    "faction": "ARASAKA vs DEEPNET",
-    "title": "PROTOCOLO SOULKILLER: ALT CUNNINGHAM Y LUCY DOMINAN EL REGIONAL DE NIGHT CITY",
-    "excerpt": "El nuevo ciclo competitivo fusiona la agresividad de los Netrunners de Kabuki con el blindaje pesado de Corporate Plaza. Analizamos los porcentajes de victoria y las cartas clave que están definiendo la Temporada 01.",
-    "author": "ZeroCool_2077",
-    "role": "Analista Jefe // Cyberpulse eSports",
-    "date": "09 NOV 2026",
-    "readTime": "6 MIN LECTURA",
-    "views": "24.6K",
-    "wallpaper": "/images/wallpapers/cyberpunk-hero.jpg",
+    "tag": "NOTICIA DESTACADA",
+    "faction": "NORMATIVA OFICIAL",
+    "title": "10 REGLAS QUE DEBES CONOCER ANTES DE COMPETIR EN CYBERPUNK TCG",
+    "excerpt": "¡Atención, Netrunners! Con la llegada de los primeros torneos locales y regionales, es vital actualizar el Sistema Operativo con las 10 normativas oficiales de juego competitivo para evitar penalizaciones.",
+    "content": "<p><strong>¡Atención, Netrunners! 🚨</strong></p><p>Con la llegada de los primeros torneos locales y regionales, es vital que todos tengamos el Sistema Operativo actualizado con las normativas de juego competitivo oficial.</p><p>Para evitar sustos o que un juez os descalifique por un tecnicismo, aquí tenéis las <strong>10 reglas fundamentales</strong> que debéis conocer antes de sentaros en la mesa a competir:</p><ol><li><strong>Debes tener 17 años o más para jugar:</strong> Al estar basado en la propiedad intelectual del videojuego Cyberpunk 2077, que tiene una calificación por edades de +17 debido a sus temáticas para adultos, el juego de cartas mantiene esa misma restricción.</li><li><strong>El banquillo (sideboard) es de 7 cartas:</strong> Cuando uses el banquillo entre partidas, debes meter y sacar exactamente la misma cantidad de cartas. No está permitido meter el banquillo entero al mazo principal para jugar con 47 cartas (y así evitar estrategias de deckeo). Si un juez ve que has metido más cartas de las que has sacado, supondrá la pérdida de la partida (<em>game loss</em>).</li><li><strong>Es obligatorio usar fundas en eventos competitivos:</strong> A partir de torneos regionales es estrictamente obligatorio. No obstante, se recomienda usarlas siempre, porque los bordes de las cartas de Cyberpunk se dañan y marcan con mucha facilidad.</li><li><strong>Puedes ser penalizado por los errores de tu rival si tu mesa es confusa:</strong> El juego tiene una disposición de mesa (<em>board state</em>) estándar recomendada. Puedes colocar tus cartas de forma diferente si ambos lo tenéis claro, pero si colocas tu cementerio y tu zona de destierro de una forma tan rara que confundes a tu rival y le provocas un error, un juez podría penalizarte a ti.</li><li><strong>Solo el juez principal (head judge) puede darte una partida por perdida:</strong> En grandes eventos competitivos, si un juez te penaliza con un <em>game loss</em>, estás en tu derecho de pedir que lo revise el juez principal, ya que es el único autorizado para aplicar esa sanción.</li><li><strong>El contenido generado por IA está completamente prohibido:</strong> El juego fomenta y valora el trabajo de los ilustradores reales. Por tanto, se prohíbe el uso de inteligencia artificial para miniaturas, overlays de streams o cualquier material promocional de los torneos.</li><li><strong>Las Leyendas deben llevar fundas diferentes:</strong> Tus Leyendas no pueden tener el mismo color de funda que tu mazo principal (<em>Main Deck</em>). Esto evita que se mezclen accidentalmente en el mazo y permite identificarlas sin esfuerzo al darles la vuelta en tu zona de juego.</li><li><strong>Los empates pactados están permitidos bajo condiciones:</strong> Puedes pactar un empate con tu rival fijándote solo en la tabla de clasificación. Sin embargo, no podéis mirar las cartas, ver los mazos ni sacar información del juego antes de decidirlo.</li><li><strong>El perdedor elige quién empieza DESPUÉS de usar el banquillo:</strong> En la segunda o tercera partida, el jugador que perdió la partida anterior decide si va primero o segundo, pero lo hace después de que ambos usen el banquillo. Esto le da una ventaja táctica al saber cómo banquillear según si le tocará salir o responder.</li><li><strong>La elección de tu Leyenda no puede ser al azar:</strong> Está prohibido usar dados para decidir qué Leyenda revelas; debes elegirla a tu propia discreción. Esto es importante para evitar que algunos jugadores marquen las fundas de sus Leyendas y usen el azar como excusa para jugar de forma fraudulenta.</li></ol>",
+    "author": "mon81",
+    "role": "Analista Jefe // CEO",
+    "date": "10 NOV 2026",
+    "readTime": "3 MIN LECTURA",
+    "viewsCount": 1,
+    "views": "1 VISITA",
+    "category": "REGLAMENTO OFICIAL",
+    "keywords": "#Torneos #Jueces #Banquillo",
+    "extraLabel": "FORMATO / SET",
+    "extraValue": "SET 01 // NIGHT CITY",
+    "wallpaper": "/images/uploads/1794327987393-david-arroyo-preview05.jpg",
     "featuredCardImg": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/alt-cunningham-soulkiller-architect.webp",
     "stats": [
-      { "label": "WINRATE NETRUNNER", "value": "54.2%", "color": "text-[#00F0FF]" },
-      { "label": "PICKRATE SOULKILLER", "value": "78.9%", "color": "text-[#FCEE0A]" },
-      { "label": "NIVEL DE AMENAZA", "value": "CRÍTICO", "color": "text-[#FF003C]" }
+      {
+        "label": "CATEGORÍA",
+        "value": "REGLAMENTO OFICIAL",
+        "color": "text-[#00F0FF]"
+      },
+      {
+        "label": "PALABRAS CLAVE",
+        "value": "#Torneos #Jueces #Banquillo",
+        "color": "text-[#FCEE0A]"
+      },
+      {
+        "label": "FORMATO / SET",
+        "value": "SET 01 // NIGHT CITY",
+        "color": "text-[#FF003C]"
+      }
     ]
   },
   "news": [
+    {
+      "title": "Anunciamos Cyberpunk TCG: Holophone",
+      "category": "SPOILER",
+      "faction": "NETRUNNER",
+      "excerpt": "Hoy tenemos un anuncio muy emocionante que compartir con todos vosotros.\n\nEl equipo de The WeirdCo Narrative ha estado trabajando muy de cerca con CD PROJEKT RED en algo verdaderamente único.",
+      "content": "<p>Hoy tenemos un anuncio muy emocionante que compartir con todos vosotros.</p>\n\n<p>El equipo de The WeirdCo Narrative ha estado trabajando muy de cerca con CD PROJEKT RED en algo verdaderamente único.\n</p>\n\n<p>Cyberpunk TCG : Holophone es una nueva experiencia narrativa que te sumerge en el corazón de Night City.\n</p>\n\n<p>Este nuevo tráiler te ofrece un primer vistazo a lo que Holophone tiene para ofrecer:</p>\n\n<p><a href=\"https://vimeo.com/1232977324/c8acb17269?fl=pl&fe=cm\" target=\"_blank\">Cyberpunk Holophone</a></p>\n\n<p>¡Tiene buena pinta! Seguiremos de cerca esta noticia a ver de que va esta actualización.</p>",
+      "author": "mon81",
+      "date": "HOY",
+      "readTime": "1 MIN",
+      "views": "0 VISITAS",
+      "image": "/images/uploads/1794334017199-marina-nasenkova-3a7f6ae4-2d07-4bx-892f-355312140ee1.jpg",
+      "id": "NEWS-5956",
+      "viewsCount": 0
+    },
     {
       "id": "NEWS-01",
       "category": "SPOILER EXPANSIÓN",
       "faction": "NETRUNNER",
       "title": "Lucy Kushinada: Nueva Carta Legendaria de Infiltración Profunda",
       "excerpt": "Desglosamos las habilidades de desconexión neuronal de Lucy y su sinergia con consolas de alta memoria en mazos de control.",
+      "content": "<p>La nueva carta legendaria de <strong>Lucy Kushinada</strong> llega en <em>Welcome to Night City</em> para revolucionar los arquetipos de infiltración y control de subred.</p><h2>Claves Tácticas de Lucy Kushinada</h2><ul><li><strong>Sigilo Óptico Nativo:</strong> Ignora la primera barrera ICE corporativa en cada turno de incursión.</li><li><strong>Sinergia con Alt Cunningham:</strong> Reduce en 2 Eddies el coste de programas de desactivación neuronal.</li><li><strong>Recuperación de Memoria:</strong> Al desconectarse con éxito, permite reciclar un daemon del archivo al mazo.</li></ul><blockquote>«En la Red profunda no gana quien golpea más fuerte, sino quien desaparece antes de que el rastreo termine.»</blockquote>",
       "author": "Nyx_Runner",
       "date": "HACE 2 HORAS",
       "readTime": "4 MIN",
-      "views": "12.4K",
+      "viewsCount": 1,
+      "views": "1 VISITA",
       "image": "/images/wallpapers/Japantown.png"
     },
     {
@@ -37,10 +71,12 @@
       "faction": "CORPO",
       "title": "Fortaleza Corporate Plaza: Cómo Goro Takemura y Adam Smasher Bloquean el Rush",
       "excerpt": "Guía táctica para proteger tus servidores centrales utilizando guardaespaldas cibernéticos y barreras ICE de coste eficiente.",
+      "content": "<p>El metajuego actual exige una defensa implacable durante los primeros cuatro turnos frente a las listas agresivas de bandas.</p><h2>Pilares de la Defensa Corporativa</h2><ol><li><strong>Goro Takemura en turno 2:</strong> Intercepta cualquier incursión directa protegiendo al Ejecutivo principal.</li><li><strong>Barreras ICE escalonadas:</strong> Obliga al rival a gastar todos sus Eddies antes de llegar al servidor central.</li><li><strong>Remate con Adam Smasher:</strong> Limpia la mesa enemiga cuando el oponente se queda sin recursos en mano.</li></ol>",
       "author": "Exec_Vance",
       "date": "HACE 5 HORAS",
       "readTime": "8 MIN",
-      "views": "9.8K",
+      "viewsCount": 0,
+      "views": "0 VISITAS",
       "image": "/images/wallpapers/Corporate Plaza.png"
     },
     {
@@ -49,10 +85,12 @@
       "faction": "BANDAS",
       "title": "Caos en Dogtown: Los Mazos Maelstrom de Royce y Dum Dum Rompen el Meta",
       "excerpt": "Con un estilo ultra agresivo de implantes ópticos y daño directo, la facción Maelstrom sorprende en el clasificatorio.",
+      "content": "<p>Las listas <strong>Maelstrom</strong> comandadas por <em>Royce</em> y <em>Dum Dum</em> han protagonizado la gran sorpresa de la semana en los torneos clasificatorios.</p><h3>Ventajas del Arquetipo Maelstrom</h3><ul><li><strong>Presión desde el turno 1:</strong> Despliegue masivo de unidades de bajo coste potenciadas con cromo militar.</li><li><strong>Reciclaje de implantes:</strong> Cada unidad destruida transfiere sus mejoras cibernéticas al siguiente atacante.</li></ul>",
       "author": "DataHound",
       "date": "AYER",
       "readTime": "10 MIN",
-      "views": "18.2K",
+      "viewsCount": 0,
+      "views": "0 VISITAS",
       "image": "/images/wallpapers/Dogtown.png"
     },
     {
@@ -61,10 +99,12 @@
       "faction": "NETRUNNER",
       "title": "Economía de Eddies en Kabuki: Optimiza tu Mazo para Turnos Decisivos",
       "excerpt": "Aprende a calcular la ventana exacta de incursión sin quedar expuesto a contraataques letales de la corporación.",
+      "content": "<p>Uno de los errores más habituales al empezar a competir en <strong>Cyberpunk TCG</strong> es vaciar la reserva de Eddies antes de la fase de reacción del rival.</p><ul><li>Mantén siempre al menos <strong>2 Eddies</strong> abiertos para cortafuegos de emergencia.</li><li>Utiliza contratos de Fixer en los turnos impares para acelerar tu curva de recursos.</li></ul>",
       "author": "GhostInShell",
       "date": "HACE 2 DÍAS",
       "readTime": "7 MIN",
-      "views": "15.1K",
+      "viewsCount": 0,
+      "views": "0 VISITAS",
       "image": "/images/wallpapers/Kabuki.png"
     }
   ],
@@ -237,34 +277,46 @@
   "forumUrl": "https://foro.cyberpunktcg.es",
   "altArtCards": [
     {
-      "id": "CP-003",
-      "slug": "adam-smasher-metal-over-meat",
-      "name": "Adam Smasher // Metal Over Meat",
+      "id": "CP-054",
+      "cardId": "",
+      "slug": "johnny-silverhand-never-stop-fighting",
+      "name": "Johnny Silverhand // Never Stop Fighting",
+      "cardType": "MERC // ROCKER // SAMURAI",
+      "faction": "MERCENARIO",
+      "edition": "",
+      "artist": "",
+      "collection": "Welcome to Night City (Set 01)",
+      "badge": "TOP #01 BEST SELLER // CARDMARKET",
+      "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/johnny-silverhand-never-stop-fighting.webp",
+      "githubUrl": "https://github.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/blob/main/johnny-silverhand-never-stop-fighting.webp"
+    },
+    {
+      "id": "CP-130",
+      "cardId": "#138",
+      "slug": "towerfall",
+      "name": "Towerfall",
+      "cardType": "PROGRAM // BRAINDANCE",
+      "faction": "MERCENARIO",
+      "edition": "Epic Rare",
+      "artist": "Dardo Studios",
+      "collection": "Welcome to Night City (Set 01)",
+      "badge": "TOP #02 BEST SELLER // CARDMARKET",
+      "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/towerfall.webp",
+      "githubUrl": "https://github.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/blob/main/towerfall.webp"
+    },
+    {
+      "id": "CP-149",
+      "cardId": "",
+      "slug": "yorinobu-arasaka-steel-dragon",
+      "name": "Yorinobu Arasaka // Steel Dragon",
+      "cardType": "",
       "faction": "CORPO",
-      "badge": "ARTE ALTERNATIVO // FOIL #01",
-      "artist": "Edición Especial Arasaka",
-      "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/adam-smasher-metal-over-meat.webp",
-      "githubUrl": "https://github.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/blob/main/adam-smasher-metal-over-meat.webp"
-    },
-    {
-      "id": "CP-007",
-      "slug": "alt-cunningham-mother-of-daemons",
-      "name": "Alt Cunningham // Mother Of Daemons",
-      "faction": "NETRUNNER",
-      "badge": "ARTE ALTERNATIVO // FOIL #02",
-      "artist": "Edición Especial Blackwall",
-      "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/alt-cunningham-mother-of-daemons.webp",
-      "githubUrl": "https://github.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/blob/main/alt-cunningham-mother-of-daemons.webp"
-    },
-    {
-      "id": "C-02",
-      "slug": "lucy-kushinada-fresh-beginnings",
-      "name": "Lucy Kushinada // Fresh Beginnings",
-      "faction": "NETRUNNER",
-      "badge": "ARTE ALTERNATIVO // FOIL #03",
-      "artist": "Edición Especial Edgerunners",
-      "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/lucy-kushinada-fresh-beginnings.webp",
-      "githubUrl": "https://github.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/blob/main/lucy-kushinada-fresh-beginnings.webp"
+      "edition": "",
+      "artist": "",
+      "collection": "Welcome to Night City (Set 01)",
+      "badge": "TOP #03 BEST SELLER // CARDMARKET",
+      "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/yorinobu-arasaka-steel-dragon.webp",
+      "githubUrl": "https://github.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/blob/main/yorinobu-arasaka-steel-dragon.webp"
     }
   ],
   "pastTournaments": [

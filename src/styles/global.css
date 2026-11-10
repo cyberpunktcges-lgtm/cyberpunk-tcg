@@ -48,3 +48,113 @@
 .hover-glitch:hover {
   animation: cyber-glitch 0.22s cubic-bezier(0.25, 0.46, 0.45, 0.94) both;
 }
+
+/* Estilos enriquecidos para el contenido HTML de Noticias (estilo WordPress / Elementor) */
+.cyber-article-content {
+  color: #e5e7eb;
+  line-height: 1.75;
+  font-size: 0.975rem;
+}
+
+.cyber-article-content p {
+  margin-bottom: 1rem;
+}
+
+.cyber-article-content h1,
+.cyber-article-content h2,
+.cyber-article-content h3,
+.cyber-article-content h4 {
+  color: #ffffff;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  margin-top: 1.5rem;
+  margin-bottom: 0.75rem;
+  padding-left: 0.75rem;
+  border-left: 3px solid #fcee0a;
+}
+
+.cyber-article-content h2 {
+  font-size: 1.35rem;
+  color: #fcee0a;
+}
+
+.cyber-article-content h3 {
+  font-size: 1.15rem;
+  color: #00f0ff;
+  border-left-color: #00f0ff;
+}
+
+.cyber-article-content ul {
+  list-style-type: disc;
+  padding-left: 1.5rem;
+  margin-bottom: 1.25rem;
+}
+
+.cyber-article-content ul li {
+  margin-bottom: 0.5rem;
+}
+
+.cyber-article-content ul li::marker {
+  color: #fcee0a;
+}
+
+.cyber-article-content ol {
+  list-style-type: decimal;
+  padding-left: 1.5rem;
+  margin-bottom: 1.25rem;
+}
+
+.cyber-article-content ol li {
+  margin-bottom: 0.75rem;
+  padding-left: 0.25rem;
+}
+
+.cyber-article-content ol li::marker {
+  color: #00f0ff;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-weight: 900;
+}
+
+.cyber-article-content strong,
+.cyber-article-content b {
+  color: #fcee0a;
+  font-weight: 800;
+}
+
+.cyber-article-content em,
+.cyber-article-content i {
+  color: #00f0ff;
+}
+
+.cyber-article-content blockquote {
+  background: #000000;
+  border-left: 4px solid #ff003c;
+  padding: 0.9rem 1.15rem;
+  margin: 1.25rem 0;
+  font-style: italic;
+  color: #f3f4f6;
+}
+
+.cyber-article-content a {
+  color: #00f0ff;
+  text-decoration: underline;
+  font-weight: 700;
+}
+
+.cyber-article-content a:hover {
+  color: #fcee0a;
+}
+
+.cyber-article-content img {
+  max-width: 100%;
+  height: auto;
+  border: 1px solid #1f2937;
+  margin: 1.25rem 0;
+}
+
+.cyber-article-content hr {
+  border: 0;
+  border-top: 1px solid #1f2937;
+  margin: 1.5rem 0;
+}

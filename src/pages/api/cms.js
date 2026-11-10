@@ -31,21 +31,60 @@ export async function GET() {
 }
 
 export async function POST({ request }) {
-  if (!isRequestAuthenticated(request)) {
-    return new Response(
-      JSON.stringify({ ok: false, error: 'No autorizado. Inicia sesión como administrador.' }),
-      { status: 401, headers: { 'Content-Type': 'application/json' } }
-    );
-  }
-
   try {
     const body = await request.json();
+    const { action, section, item, id, heroArticle, altArtCards, forumUrl, articleId, isHero } =
+      body;
+
+    // Acción pública: contabilizar visita real a una noticia cuando un lector la abre
+    if (action === 'increment_view') {
+      const cms = await readCmsData();
+
+      if (isHero || (articleId && cms.heroArticle?.id === articleId)) {
+        const current = Number(cms.heroArticle.viewsCount) || 0;
+        const next = current + 1;
+        cms.heroArticle.viewsCount = next;
+        cms.heroArticle.views = `${next} ${next === 1 ? 'VISITA' : 'VISITAS'}`;
+      } else if (articleId && Array.isArray(cms.news)) {
+        cms.news = cms.news.map((n) => {
+          if (n.id === articleId) {
+            const current = Number(n.viewsCount) || 0;
+            const next = current + 1;
+            return {
+              ...n,
+              viewsCount: next,
+              views: `${next} ${next === 1 ? 'VISITA' : 'VISITAS'}`
+            };
+          }
+          return n;
+        });
+      }
+
+      await writeCmsData(cms);
+      return new Response(JSON.stringify({ ok: true, data: cms }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+
+    // Todas las demás acciones de edición requieren sesión de administrador
+    if (!isRequestAuthenticated(request)) {
+      return new Response(
+        JSON.stringify({ ok: false, error: 'No autorizado. Inicia sesión como administrador.' }),
+        { status: 401, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+
     const cms = await readCmsData();
 
-    const { action, section, item, id, heroArticle, altArtCards, forumUrl } = body;
-
     if (action === 'update_hero' && heroArticle) {
-      cms.heroArticle = { ...cms.heroArticle, ...heroArticle };
+      const currentCount = Number(cms.heroArticle?.viewsCount) || 0;
+      cms.heroArticle = {
+        ...cms.heroArticle,
+        ...heroArticle,
+        viewsCount: currentCount,
+        views: `${currentCount} ${currentCount === 1 ? 'VISITA' : 'VISITAS'}`
+      };
     } else if (action === 'update_alt_art' && Array.isArray(altArtCards)) {
       cms.altArtCards = altArtCards.slice(0, 3);
     } else if (action === 'update_forum_url' && typeof forumUrl === 'string') {
@@ -64,7 +103,8 @@ export async function POST({ request }) {
               : 'TOUR-';
       const newItem = {
         ...item,
-        id: item.id || `${prefix}${Date.now().toString().slice(-4)}`
+        id: item.id || `${prefix}${Date.now().toString().slice(-4)}`,
+        ...(section === 'news' ? { viewsCount: 0, views: '0 VISITAS' } : {})
       };
       cms[section] = [newItem, ...cms[section]];
     } else if (action === 'update' && section && Array.isArray(cms[section])) {

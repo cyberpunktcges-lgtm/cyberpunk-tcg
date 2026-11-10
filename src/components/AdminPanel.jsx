@@ -18,8 +18,11 @@ import {
   LogOut,
   ShieldAlert,
   User,
-  KeyRound
+  KeyRound,
+  Upload,
+  Image as ImageIcon
 } from 'lucide-react';
+import { resolveCardFromGithubUrl, enrichCardObject } from '../utils/cardMetadata.js';
 
 const CYBER_CLIP =
   'polygon(0 0, calc(100% - 15px) 0, 100% 15px, 100% 100%, 15px 100%, 0 calc(100% - 15px))';
@@ -35,6 +38,406 @@ const LOCAL_WALLPAPERS = [
   '/images/wallpapers/Downtown.png'
 ];
 
+function ImageUploadField({
+  label = 'IMAGEN',
+  value = '',
+  onChange,
+  uploadedFiles = [],
+  onUploadSuccess,
+  showToast,
+  compact = false
+}) {
+  const [isUploading, setIsUploading] = useState(false);
+
+  const handleFileChange = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const res = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData
+      });
+      const json = await res.json();
+
+      if (res.ok && json.ok && json.url) {
+        onChange(json.url);
+        if (onUploadSuccess && json.files) {
+          onUploadSuccess(json.files);
+        }
+        if (showToast) {
+          showToast(`Imagen subida: ${json.fileName}`);
+        }
+      } else if (showToast) {
+        showToast(json.error || 'Error al subir la imagen');
+      }
+    } catch (err) {
+      if (showToast) {
+        showToast('Error de red al subir el archivo');
+      }
+    } finally {
+      setIsUploading(false);
+      e.target.value = '';
+    }
+  };
+
+  const allOptions = Array.from(new Set([...(uploadedFiles || []), ...LOCAL_WALLPAPERS]));
+
+  return (
+    <div className="space-y-2 text-xs font-mono">
+      <div className="flex items-center justify-between gap-2">
+        <label className="block text-gray-400 uppercase">{label}</label>
+        <label
+          style={{ clipPath: CYBER_CLIP }}
+          className={`px-3 py-1.5 font-mono font-black text-[10px] uppercase tracking-wider flex items-center gap-1.5 cursor-pointer transition-all shrink-0 ${
+            isUploading
+              ? 'bg-gray-800 text-gray-400'
+              : 'bg-[#00F0FF] text-[#070a10] hover:bg-[#FCEE0A]'
+          }`}
+        >
+          <Upload className="w-3.5 h-3.5" />
+          <span>{isUploading ? 'SUBIENDO...' : 'EXAMINAR ARCHIVO...'}</span>
+          <input
+            type="file"
+            accept="image/*"
+            onChange={handleFileChange}
+            disabled={isUploading}
+            className="hidden"
+          />
+        </label>
+      </div>
+
+      {!compact && (
+        <select
+          value={allOptions.includes(value) ? value : ''}
+          onChange={(e) => {
+            if (e.target.value) onChange(e.target.value);
+          }}
+          className="w-full bg-[#070a10] border border-gray-800 focus:border-[#00F0FF] px-3 py-2 text-white"
+        >
+          <option value="">-- Elegir imagen de la biblioteca o subida --</option>
+          {uploadedFiles.length > 0 && (
+            <optgroup label="ARCHIVOS SUBIDOS POR TI">
+              {uploadedFiles.map((upUrl) => (
+                <option key={upUrl} value={upUrl}>
+                  {upUrl.replace('/images/uploads/', '📁 ')}
+                </option>
+              ))}
+            </optgroup>
+          )}
+          <optgroup label="WALLPAPERS POR DEFECTO">
+            {LOCAL_WALLPAPERS.map((wp) => (
+              <option key={wp} value={wp}>
+                {wp.replace('/images/wallpapers/', '🌆 ')}
+              </option>
+            ))}
+          </optgroup>
+        </select>
+      )}
+
+      <div className="flex items-center gap-2">
+        <input
+          type="text"
+          value={value || ''}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder="Ruta del archivo subido o URL externa..."
+          className="flex-1 bg-[#070a10] border border-gray-800 focus:border-[#00F0FF] px-3 py-2 text-white text-[11px]"
+        />
+        {value && (
+          <img
+            src={value}
+            alt="Previsualización"
+            className="w-12 h-9 object-cover border border-[#FCEE0A]/60 bg-[#000000] shrink-0"
+          />
+        )}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Calcula automáticamente el tiempo de lectura estimado dividiendo el total de palabras
+ * (sin etiquetas HTML) entre 200 palabras por minuto (velocidad media de lectura).
+ */
+function calculateReadingTime(excerptText = '', contentText = '', suffix = 'MIN') {
+  const combined = `${excerptText || ''} ${contentText || ''}`
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (!combined) return `1 ${suffix}`;
+  const words = combined.split(' ').filter(Boolean).length;
+  const minutes = Math.max(1, Math.ceil(words / 200));
+  return `${minutes} ${suffix}`;
+}
+
+/**
+ * Editor de Noticias enriquecido con barra de herramientas HTML (estilo WordPress / Elementor),
+ * separación de Entradilla corta (2-3 líneas antes del Read More) + Cuerpo HTML completo
+ * y pestaña de Vista Previa en Vivo.
+ */
+function HtmlArticleEditor({
+  excerpt = '',
+  content = '',
+  onChangeExcerpt,
+  onChangeContent,
+  onUploadSuccess,
+  showToast
+}) {
+  const [previewMode, setPreviewMode] = useState(false);
+  const [isUploadingInline, setIsUploadingInline] = useState(false);
+  const textareaRef = React.useRef(null);
+
+  const insertHtmlSnippet = (before, after = '', placeholder = '') => {
+    const el = textareaRef.current;
+    const current = content || '';
+    if (!el) {
+      onChangeContent(`${current}\n${before}${placeholder}${after}`);
+      return;
+    }
+
+    const start = el.selectionStart ?? current.length;
+    const end = el.selectionEnd ?? current.length;
+    const selected = current.slice(start, end) || placeholder;
+    const nextText =
+      current.slice(0, start) + before + selected + after + current.slice(end);
+
+    onChangeContent(nextText);
+
+    setTimeout(() => {
+      el.focus();
+      const cursorPos = start + before.length + selected.length + after.length;
+      el.setSelectionRange(cursorPos, cursorPos);
+    }, 10);
+  };
+
+  const handleInlineImageUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setIsUploadingInline(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      const res = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData
+      });
+      const json = await res.json();
+      if (res.ok && json.ok && json.url) {
+        insertHtmlSnippet(`\n<img src="${json.url}" alt="${file.name}" />\n`, '', '');
+        if (onUploadSuccess && json.files) onUploadSuccess(json.files);
+        if (showToast) showToast('Imagen insertada en el cuerpo de la noticia');
+      }
+    } catch {
+      if (showToast) showToast('Error al subir imagen para el artículo');
+    } finally {
+      setIsUploadingInline(false);
+      e.target.value = '';
+    }
+  };
+
+  return (
+    <div className="space-y-4 text-xs font-mono border-t border-b border-gray-800 py-4">
+      {/* 1. Entradilla corta (2-3 líneas antes del botón Read More) */}
+      <div>
+        <div className="flex items-center justify-between mb-1">
+          <label className="text-[#FCEE0A] font-bold uppercase">
+            1. ENTRADILLA CORTA (2-3 LÍNEAS ANTES DEL &quot;LEER MÁS / READ MORE&quot;) *
+          </label>
+          <span className="text-[10px] text-gray-500">
+            {(excerpt || '').length} caracteres
+          </span>
+        </div>
+        <textarea
+          rows="2"
+          required
+          value={excerpt || ''}
+          onChange={(e) => onChangeExcerpt(e.target.value)}
+          placeholder="Escribe aquí las 2 o 3 líneas de resumen que se verán en la tarjeta antes de que el usuario pulse 'Leer Más'..."
+          className="w-full bg-[#070a10] border border-gray-800 focus:border-[#FCEE0A] px-3 py-2 text-white focus:outline-none"
+        />
+      </div>
+
+      {/* 2. Cuerpo completo de la noticia con barra de herramientas HTML estilo WordPress/Elementor */}
+      <div className="space-y-2">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <label className="text-[#00F0FF] font-bold uppercase">
+            2. CUERPO COMPLETO DE LA NOTICIA (ETIQUETAS HTML / LISTAS / FORMATO)
+          </label>
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={() => setPreviewMode(false)}
+              className={`px-2.5 py-1 text-[10px] font-bold uppercase border cursor-pointer ${
+                !previewMode
+                  ? 'bg-[#FCEE0A] text-[#070a10] border-[#FCEE0A]'
+                  : 'bg-[#070a10] text-gray-400 border-gray-800'
+              }`}
+            >
+              EDITOR HTML
+            </button>
+            <button
+              type="button"
+              onClick={() => setPreviewMode(true)}
+              className={`px-2.5 py-1 text-[10px] font-bold uppercase border cursor-pointer ${
+                previewMode
+                  ? 'bg-[#00F0FF] text-[#070a10] border-[#00F0FF]'
+                  : 'bg-[#070a10] text-gray-400 border-gray-800'
+              }`}
+            >
+              VISTA PREVIA
+            </button>
+          </div>
+        </div>
+
+        {/* Barra de botones rápidos HTML estilo WordPress */}
+        {!previewMode && (
+          <div className="flex flex-wrap items-center gap-1.5 bg-[#070a10] border border-gray-800 p-2">
+            <button
+              type="button"
+              onClick={() => insertHtmlSnippet('<strong>', '</strong>', 'texto en negrita')}
+              className="px-2 py-1 bg-[#000000] border border-gray-700 hover:border-[#FCEE0A] text-white font-black cursor-pointer"
+              title="Negrita (<strong>)"
+            >
+              B
+            </button>
+            <button
+              type="button"
+              onClick={() => insertHtmlSnippet('<em>', '</em>', 'texto en cursiva')}
+              className="px-2 py-1 bg-[#000000] border border-gray-700 hover:border-[#FCEE0A] text-[#00F0FF] italic cursor-pointer"
+              title="Cursiva (<em>)"
+            >
+              I
+            </button>
+            <button
+              type="button"
+              onClick={() => insertHtmlSnippet('\n<h2>', '</h2>\n', 'TÍTULO DE SECCIÓN')}
+              className="px-2 py-1 bg-[#000000] border border-gray-700 hover:border-[#FCEE0A] text-[#FCEE0A] font-bold cursor-pointer"
+              title="Subtítulo grande (<h2>)"
+            >
+              H2
+            </button>
+            <button
+              type="button"
+              onClick={() => insertHtmlSnippet('\n<h3>', '</h3>\n', 'Subtítulo secundario')}
+              className="px-2 py-1 bg-[#000000] border border-gray-700 hover:border-[#FCEE0A] text-[#00F0FF] font-bold cursor-pointer"
+              title="Subtítulo mediano (<h3>)"
+            >
+              H3
+            </button>
+            <button
+              type="button"
+              onClick={() => insertHtmlSnippet('\n<p>', '</p>\n', 'Nuevo párrafo de texto...')}
+              className="px-2 py-1 bg-[#000000] border border-gray-700 hover:border-[#FCEE0A] text-gray-200 cursor-pointer"
+              title="Párrafo (<p>)"
+            >
+              Párrafo
+            </button>
+            <button
+              type="button"
+              onClick={() =>
+                insertHtmlSnippet(
+                  '\n<ul>\n  <li><strong>Punto 1:</strong> ',
+                  '</li>\n  <li><strong>Punto 2:</strong> Detalle...</li>\n</ul>\n',
+                  'Detalle...'
+                )
+              }
+              className="px-2.5 py-1 bg-[#000000] border border-[#FCEE0A]/60 hover:border-[#FCEE0A] text-[#FCEE0A] font-bold cursor-pointer"
+              title="Lista con viñetas (<ul><li>)"
+            >
+              • Lista (ul)
+            </button>
+            <button
+              type="button"
+              onClick={() =>
+                insertHtmlSnippet(
+                  '\n<ol>\n  <li><strong>1:</strong> ',
+                  '</li>\n  <li><strong>2:</strong> Segundo punto...</li>\n</ol>\n',
+                  'Primer punto...'
+                )
+              }
+              className="px-2.5 py-1 bg-[#000000] border border-[#00F0FF]/60 hover:border-[#00F0FF] text-[#00F0FF] font-bold cursor-pointer"
+              title="Lista numerada (<ol><li>)"
+            >
+              1. Lista Num. (ol)
+            </button>
+            <button
+              type="button"
+              onClick={() =>
+                insertHtmlSnippet('  <li><strong>Título:</strong> ', '</li>\n', 'Texto del punto...')
+              }
+              className="px-2 py-1 bg-[#000000] border border-gray-700 hover:border-[#FCEE0A] text-white cursor-pointer"
+              title="Añadir elemento de lista (<li>)"
+            >
+              + &lt;li&gt;
+            </button>
+            <button
+              type="button"
+              onClick={() =>
+                insertHtmlSnippet('\n<blockquote>«', '»</blockquote>\n', 'Cita destacada...')
+              }
+              className="px-2 py-1 bg-[#000000] border border-gray-700 hover:border-[#FF003C] text-[#FF003C] cursor-pointer"
+              title="Cita (<blockquote>)"
+            >
+              ❝ Cita
+            </button>
+            <button
+              type="button"
+              onClick={() =>
+                insertHtmlSnippet('<a href="https://" target="_blank">', '</a>', 'Texto del enlace')
+              }
+              className="px-2 py-1 bg-[#000000] border border-gray-700 hover:border-[#00F0FF] text-[#00F0FF] cursor-pointer"
+              title="Enlace (<a>)"
+            >
+              🔗 Enlace
+            </button>
+            <label
+              className="px-2.5 py-1 bg-[#00F0FF] text-[#070a10] hover:bg-[#FCEE0A] font-black cursor-pointer flex items-center gap-1"
+              title="Subir imagen desde tu equipo e insertarla en la noticia"
+            >
+              <Upload className="w-3 h-3" />
+              <span>{isUploadingInline ? 'Subiendo...' : 'Insertar Imagen'}</span>
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handleInlineImageUpload}
+                disabled={isUploadingInline}
+                className="hidden"
+              />
+            </label>
+          </div>
+        )}
+
+        {!previewMode ? (
+          <textarea
+            ref={textareaRef}
+            rows="9"
+            value={content || ''}
+            onChange={(e) => onChangeContent(e.target.value)}
+            placeholder="Escribe el artículo completo aquí. Puedes usar los botones de arriba o etiquetas HTML (<p>, <h2>, <ul>, <ol>, <li>, <strong>, <blockquote>, <img>)..."
+            className="w-full bg-[#070a10] border border-gray-800 focus:border-[#00F0FF] px-3 py-2.5 text-white font-mono text-xs leading-relaxed focus:outline-none"
+          />
+        ) : (
+          <div className="bg-[#070a10] border border-[#00F0FF] p-5 max-h-96 overflow-y-auto space-y-3">
+            <span className="text-[10px] font-mono text-[#00F0FF] uppercase block border-b border-gray-800 pb-1">
+              VISTA PREVIA DE LA NOTICIA COMPLETA (AL PULSAR &quot;LEER MÁS&quot;):
+            </span>
+            <div
+              className="cyber-article-content"
+              dangerouslySetInnerHTML={{
+                __html: content || `<p>${excerpt || 'Sin contenido todavía...'}</p>`
+              }}
+            />
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function AdminPanel({ initialAuth = false, initialCms = {}, initialCards = [] }) {
   const [isAuthenticated, setIsAuthenticated] = useState(initialAuth);
   const [loginUser, setLoginUser] = useState('');
@@ -44,9 +447,21 @@ export default function AdminPanel({ initialAuth = false, initialCms = {}, initi
 
   const [cms, setCms] = useState(initialCms);
   const [cards, setCards] = useState(initialCards || []);
+  const [uploadedFiles, setUploadedFiles] = useState([]);
   const [activeTab, setActiveTab] = useState('news');
   const [statusMessage, setStatusMessage] = useState('');
   const [isSyncing, setIsSyncing] = useState(false);
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      fetch('/api/upload')
+        .then((res) => res.json())
+        .then((json) => {
+          if (json?.files) setUploadedFiles(json.files);
+        })
+        .catch(() => {});
+    }
+  }, [isAuthenticated]);
 
   // Estado formulario Noticias
   const [editingNewsId, setEditingNewsId] = useState(null);
@@ -55,6 +470,7 @@ export default function AdminPanel({ initialAuth = false, initialCms = {}, initi
     category: 'NOTICIA OFICIAL',
     faction: 'NETRUNNER',
     excerpt: '',
+    content: '',
     author: 'Admin_ES',
     date: 'HOY',
     readTime: '5 MIN',
@@ -93,45 +509,67 @@ export default function AdminPanel({ initialAuth = false, initialCms = {}, initi
     cards: []
   });
 
-  // Estado 3 Cartas de Arte Alternativo (Inicio)
+  // Estado 3 Cartas Más Vendidas Cardmarket (Inicio)
   const [altArtForm, setAltArtForm] = useState(
     initialCms?.altArtCards?.length === 3
-      ? initialCms.altArtCards
+      ? initialCms.altArtCards.map((c, idx) => ({
+          ...enrichCardObject(c, idx),
+          badge: c.badge || `TOP #0${idx + 1} BEST SELLER // CARDMARKET`
+        }))
       : [
           {
             slot: 1,
-            cardId: 'CP-018',
-            name: 'ALT CUNNINGHAM',
-            faction: 'NETRUNNER',
-            badge: 'ARTE ALTERNATIVO // EDICIÓN COLECCIONISTA',
-            artist: 'ARCHIVO OFICIAL NIGHT CITY',
+            id: 'CP-055',
+            cardId: '',
+            name: 'Johnny Silverhand // Rocking Renegade',
+            cardType: '',
+            faction: 'MERCENARIO',
+            edition: '',
+            artist: '',
+            collection: 'Welcome to Night City (Set 01)',
+            badge: 'TOP #01 BEST SELLER // CARDMARKET',
             image:
-              'https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/alt-cunningham.png'
+              'https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/johnny-silverhand-rocking-renegade.webp',
+            githubUrl:
+              'https://github.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/blob/main/johnny-silverhand-rocking-renegade.webp'
           },
           {
             slot: 2,
-            cardId: 'CP-003',
-            name: 'ADAM SMASHER',
-            faction: 'SOLO',
-            badge: 'ARTE ALTERNATIVO // FULL ART FOIL',
-            artist: 'ARASAKA SECURITY ARCHIVE',
+            id: 'CP-003',
+            cardId: '',
+            name: 'Adam Smasher // Metal Over Meat',
+            cardType: 'UNIT',
+            faction: 'CORPO',
+            edition: '',
+            artist: '',
+            collection: 'Welcome to Night City (Set 01)',
+            badge: 'TOP #02 BEST SELLER // CARDMARKET',
             image:
-              'https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/adam-smasher.png'
+              'https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/adam-smasher-metal-over-meat.webp',
+            githubUrl:
+              'https://github.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/blob/main/adam-smasher-metal-over-meat.webp'
           },
           {
             slot: 3,
-            cardId: 'CP-070',
-            name: 'JOHNNY SILVERHAND',
-            faction: 'ROCKERBOY',
-            badge: 'ARTE ALTERNATIVO // LEYENDA DE AFTERLIFE',
-            artist: 'SAMURAI TOUR 2023',
+            id: 'CP-007',
+            cardId: '',
+            name: 'Alt Cunningham // Mother of Daemons',
+            cardType: '',
+            faction: 'NETRUNNER',
+            edition: '',
+            artist: '',
+            collection: 'Welcome to Night City (Set 01)',
+            badge: 'TOP #03 BEST SELLER // CARDMARKET',
             image:
-              'https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/johnny-silverhand.png'
+              'https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/alt-cunningham-mother-of-daemons.webp',
+            githubUrl:
+              'https://github.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/blob/main/alt-cunningham-mother-of-daemons.webp'
           }
         ]
   );
   const [activeAltSlot, setActiveAltSlot] = useState(0);
   const [cardSearchAlt, setCardSearchAlt] = useState('');
+  const [githubUrlInputs, setGithubUrlInputs] = useState(['', '', '']);
 
   // Estado Histórico de Torneos (Resultados y Mazos Ganadores)
   const [editingHistId, setEditingHistId] = useState(null);
@@ -191,6 +629,7 @@ export default function AdminPanel({ initialAuth = false, initialCms = {}, initi
         category: 'NOTICIA OFICIAL',
         faction: 'NETRUNNER',
         excerpt: '',
+        content: '',
         author: 'Admin_ES',
         date: 'HOY',
         readTime: '5 MIN',
@@ -215,7 +654,28 @@ export default function AdminPanel({ initialAuth = false, initialCms = {}, initi
   // Guardar Hero
   const handleSaveHero = async (e) => {
     e.preventDefault();
-    const ok = await apiCall({ action: 'update_hero', heroArticle: heroForm });
+    const updatedHero = {
+      ...heroForm,
+      stats: [
+        {
+          label: 'CATEGORÍA',
+          value: heroForm.category || 'NOTICIA OFICIAL',
+          color: 'text-[#00F0FF]'
+        },
+        {
+          label: 'PALABRAS CLAVE',
+          value: heroForm.keywords || '#CyberpunkTCG #NightCity',
+          color: 'text-[#FCEE0A]'
+        },
+        {
+          label: heroForm.extraLabel || 'FORMATO / SET',
+          value: heroForm.extraValue || 'SET 01 // NIGHT CITY',
+          color: 'text-[#FF003C]'
+        }
+      ]
+    };
+    setHeroForm(updatedHero);
+    const ok = await apiCall({ action: 'update_hero', heroArticle: updatedHero });
     if (ok) {
       showToast('Portada Destacada (Hero) actualizada');
     }
@@ -293,30 +753,118 @@ export default function AdminPanel({ initialAuth = false, initialCms = {}, initi
     });
   };
 
-  // Guardar las 3 Cartas de Arte Alternativo de Inicio
+  // Guardar las 3 Cartas Más Vendidas (Cardmarket Best Sellers) de Inicio
   const handleSaveAltArt = async (e) => {
     e.preventDefault();
     const ok = await apiCall({ action: 'update_alt_art', altArtCards: altArtForm });
+
+    // Guardar también las correcciones en el catálogo de cartas para futuros autorrellenos
+    let savedCount = 0;
+    for (const slot of altArtForm) {
+      if (!slot.slug) continue;
+      try {
+        const res = await fetch('/api/cards', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'update_card',
+            slug: slot.slug,
+            fields: {
+              name: slot.name || '',
+              cardId: slot.cardId || '',
+              cardType: slot.cardType || '',
+              edition: slot.edition || '',
+              artist: slot.artist || '',
+              collection: slot.collection || ''
+            }
+          })
+        });
+        const json = await res.json();
+        if (json?.ok && json.card) {
+          savedCount++;
+          setCards((prev) => prev.map((c) => (c.slug === json.card.slug ? { ...c, ...json.card } : c)));
+        }
+      } catch {}
+    }
+
     if (ok) {
-      showToast('Las 3 Cartas de Arte Alternativo de Inicio han sido actualizadas');
+      showToast(
+        `Top 3 publicado en portada${savedCount ? ` y ${savedCount} cartas actualizadas en el catálogo` : ''}`
+      );
+    }
+  };
+
+  // Autocompletar todos los datos de la carta pegando la URL de GitHub
+  const handleAutofillFromGithubUrl = (slotIdx, rawUrl, showNotification = true) => {
+    setGithubUrlInputs((prev) => prev.map((v, i) => (i === slotIdx ? rawUrl : v)));
+    if (!rawUrl || !rawUrl.trim()) return;
+
+    const resolved = resolveCardFromGithubUrl(rawUrl, cards);
+    if (!resolved) return;
+
+    setAltArtForm((prev) =>
+      prev.map((item, idx) =>
+        idx === slotIdx
+          ? {
+              ...item,
+              id: resolved.id,
+              cardId: resolved.cardId,
+              slug: resolved.slug,
+              name: resolved.name,
+              cardType: resolved.cardType,
+              faction: resolved.faction,
+              edition: resolved.edition,
+              artist: resolved.artist,
+              collection: resolved.collection,
+              badge: item.badge || `TOP #0${slotIdx + 1} BEST SELLER // CARDMARKET`,
+              image: resolved.image,
+              githubUrl: resolved.githubUrl
+            }
+          : item
+      )
+    );
+
+    if (showNotification) {
+      const missing = ['cardType', 'artist', 'edition', 'cardId'].filter((k) => !resolved[k]);
+      showToast(
+        missing.length
+          ? `${resolved.name}: datos rellenados. Faltan por verificar: ${missing
+              .map((k) => ({ cardType: 'tipo', artist: 'artista', edition: 'rareza', cardId: 'nº' })[k])
+              .join(', ')} — complétalos y pulsa Publicar para guardarlos`
+          : `¡Datos autocompletados! ${resolved.name} (${resolved.cardType} • ${resolved.artist})`
+      );
     }
   };
 
   const handleSelectCardForAltSlot = (ghCard) => {
+    const enriched = enrichCardObject(ghCard);
     setAltArtForm((prev) =>
       prev.map((item, idx) =>
         idx === activeAltSlot
           ? {
               ...item,
-              cardId: ghCard.id,
-              name: ghCard.name,
-              faction: ghCard.faction,
-              image: ghCard.image
+              id: enriched.id,
+              cardId: enriched.cardId,
+              slug: enriched.slug,
+              name: enriched.name,
+              cardType: enriched.cardType,
+              faction: enriched.faction,
+              edition: enriched.edition,
+              artist: enriched.artist,
+              collection: enriched.collection,
+              badge: item.badge || `TOP #0${activeAltSlot + 1} BEST SELLER // CARDMARKET`,
+              image: enriched.image,
+              githubUrl: enriched.githubUrl
             }
           : item
       )
     );
-    showToast(`Carta "${ghCard.name}" asignada al Slot #${activeAltSlot + 1}`);
+    setGithubUrlInputs((prev) =>
+      prev.map((v, i) => (i === activeAltSlot ? enriched.githubUrl || enriched.image : v))
+    );
+    showToast(
+      `Carta "${enriched.name}" (${enriched.cardType}) autocompletada en el Slot #0${activeAltSlot + 1}`
+    );
   };
 
   // Guardar Histórico de Torneo (Resultado + Mazo Ganador)
@@ -410,7 +958,12 @@ export default function AdminPanel({ initialAuth = false, initialCms = {}, initi
       setCms(cmsJson);
       setHeroForm(cmsJson?.heroArticle || {});
       if (cmsJson?.altArtCards?.length === 3) {
-        setAltArtForm(cmsJson.altArtCards);
+        setAltArtForm(
+          cmsJson.altArtCards.map((c, idx) => ({
+            ...enrichCardObject(c, idx),
+            badge: c.badge || `TOP #0${idx + 1} BEST SELLER // CARDMARKET`
+          }))
+        );
       }
       if (cmsJson?.forumUrl) {
         setForumUrlInput(cmsJson.forumUrl);
@@ -445,11 +998,19 @@ export default function AdminPanel({ initialAuth = false, initialCms = {}, initi
     .slice(0, 12);
 
   const filteredAltPickerCards = cards
-    .filter(
-      (c) =>
-        c.name.toLowerCase().includes(cardSearchAlt.toLowerCase()) ||
-        c.slug.toLowerCase().includes(cardSearchAlt.toLowerCase())
-    )
+    .filter((c) => {
+      const q = cardSearchAlt.toLowerCase().trim();
+      if (!q) return true;
+      return (
+        c.name.toLowerCase().includes(q) ||
+        c.slug.toLowerCase().includes(q) ||
+        (c.cardType || '').toLowerCase().includes(q) ||
+        (c.artist || '').toLowerCase().includes(q) ||
+        (c.cardId || c.id || '').toLowerCase().includes(q) ||
+        (c.githubUrl || '').toLowerCase().includes(q) ||
+        (c.image || '').toLowerCase().includes(q)
+      );
+    })
     .slice(0, 18);
 
   const filteredHistPickerCards = cards
@@ -657,7 +1218,7 @@ export default function AdminPanel({ initialAuth = false, initialCms = {}, initi
           {[
             { id: 'news', label: `NOTICIAS (${cms.news?.length || 0})`, icon: Newspaper },
             { id: 'hero', label: 'NOTICIA DESTACADA (HERO)', icon: Sparkles },
-            { id: 'altArt', label: 'ARTE ALTERNATIVO (3)', icon: Sparkles },
+            { id: 'altArt', label: 'MÁS VENDIDAS CARDMARKET (3)', icon: Sparkles },
             { id: 'decks', label: `MAZOS (${cms.decks?.length || 0})`, icon: Layers },
             { id: 'tournaments', label: `TORNEOS (${cms.tournaments?.length || 0})`, icon: Trophy },
             {
@@ -753,19 +1314,28 @@ export default function AdminPanel({ initialAuth = false, initialCms = {}, initi
                   </div>
                 </div>
 
-                <div>
-                  <label className="block text-gray-400 mb-1">EXTRACTO / RESUMEN *</label>
-                  <textarea
-                    rows="3"
-                    required
-                    value={newsForm.excerpt}
-                    onChange={(e) => setNewsForm({ ...newsForm, excerpt: e.target.value })}
-                    placeholder="Resumen de la noticia que se verá en la tarjeta..."
-                    className="w-full bg-[#070a10] border border-gray-800 focus:border-[#00F0FF] px-3 py-2 text-white focus:outline-none"
-                  />
-                </div>
+                <HtmlArticleEditor
+                  excerpt={newsForm.excerpt}
+                  content={newsForm.content}
+                  onChangeExcerpt={(val) =>
+                    setNewsForm((prev) => ({
+                      ...prev,
+                      excerpt: val,
+                      readTime: calculateReadingTime(val, prev.content, 'MIN')
+                    }))
+                  }
+                  onChangeContent={(val) =>
+                    setNewsForm((prev) => ({
+                      ...prev,
+                      content: val,
+                      readTime: calculateReadingTime(prev.excerpt, val, 'MIN')
+                    }))
+                  }
+                  onUploadSuccess={setUploadedFiles}
+                  showToast={showToast}
+                />
 
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                   <div>
                     <label className="block text-gray-400 mb-1">AUTOR</label>
                     <input
@@ -776,46 +1346,41 @@ export default function AdminPanel({ initialAuth = false, initialCms = {}, initi
                     />
                   </div>
                   <div>
-                    <label className="block text-gray-400 mb-1">FECHA</label>
+                    <label className="block text-gray-400 mb-1">FECHA PUBLICACIÓN</label>
                     <input
                       type="text"
                       value={newsForm.date}
                       onChange={(e) => setNewsForm({ ...newsForm, date: e.target.value })}
+                      placeholder="10 NOV 2026"
                       className="w-full bg-[#070a10] border border-gray-800 px-3 py-2 text-white"
                     />
                   </div>
                   <div>
-                    <label className="block text-gray-400 mb-1">LECTURA</label>
+                    <label className="block text-[#FCEE0A] mb-1">LECTURA (AUTO)</label>
                     <input
                       type="text"
                       value={newsForm.readTime}
                       onChange={(e) => setNewsForm({ ...newsForm, readTime: e.target.value })}
-                      className="w-full bg-[#070a10] border border-gray-800 px-3 py-2 text-white"
+                      className="w-full bg-[#070a10] border border-gray-800 px-3 py-2 text-[#FCEE0A]"
                     />
+                  </div>
+                  <div>
+                    <label className="block text-[#00F0FF] mb-1">VISITAS REALES (AUTO)</label>
+                    <div className="w-full bg-[#000000] border border-gray-800 px-3 py-2 text-[#00F0FF] font-bold">
+                      {Number(newsForm.viewsCount) || 0}{' '}
+                      {(Number(newsForm.viewsCount) || 0) === 1 ? 'VISITA' : 'VISITAS'}
+                    </div>
                   </div>
                 </div>
 
-                <div>
-                  <label className="block text-gray-400 mb-1">IMAGEN (WALLPAPER LOCAL O URL)</label>
-                  <select
-                    value={newsForm.image}
-                    onChange={(e) => setNewsForm({ ...newsForm, image: e.target.value })}
-                    className="w-full bg-[#070a10] border border-gray-800 px-3 py-2 text-white mb-2"
-                  >
-                    {LOCAL_WALLPAPERS.map((wp) => (
-                      <option key={wp} value={wp}>
-                        {wp}
-                      </option>
-                    ))}
-                  </select>
-                  <input
-                    type="text"
-                    value={newsForm.image}
-                    onChange={(e) => setNewsForm({ ...newsForm, image: e.target.value })}
-                    placeholder="O pega cualquier URL de imagen..."
-                    className="w-full bg-[#070a10] border border-gray-800 px-3 py-2 text-white"
-                  />
-                </div>
+                <ImageUploadField
+                  label="IMAGEN DESTACADA DE LA NOTICIA (SUBIR ARCHIVO, WALLPAPER O URL)"
+                  value={newsForm.image}
+                  onChange={(url) => setNewsForm({ ...newsForm, image: url })}
+                  uploadedFiles={uploadedFiles}
+                  onUploadSuccess={setUploadedFiles}
+                  showToast={showToast}
+                />
               </div>
 
               <button
@@ -934,41 +1499,156 @@ export default function AdminPanel({ initialAuth = false, initialCms = {}, initi
                 />
               </div>
 
-              <div>
-                <label className="block text-gray-400 mb-1">DESCRIPCIÓN / ENTRADILLA *</label>
-                <textarea
-                  rows="3"
-                  required
-                  value={heroForm.excerpt}
-                  onChange={(e) => setHeroForm({ ...heroForm, excerpt: e.target.value })}
-                  className="w-full bg-[#070a10] border border-gray-800 px-3 py-2 text-white"
-                />
+              <HtmlArticleEditor
+                excerpt={heroForm.excerpt}
+                content={heroForm.content}
+                onChangeExcerpt={(val) =>
+                  setHeroForm((prev) => ({
+                    ...prev,
+                    excerpt: val,
+                    readTime: calculateReadingTime(val, prev.content, 'MIN LECTURA')
+                  }))
+                }
+                onChangeContent={(val) =>
+                  setHeroForm((prev) => ({
+                    ...prev,
+                    content: val,
+                    readTime: calculateReadingTime(prev.excerpt, val, 'MIN LECTURA')
+                  }))
+                }
+                onUploadSuccess={setUploadedFiles}
+                showToast={showToast}
+              />
+
+              {/* Las 3 Cajas Destacadas (Categoría, Palabras Clave y 3º Dato Personalizable) */}
+              <div className="bg-[#070a10] border border-gray-800 p-4 space-y-3">
+                <span className="text-[11px] font-mono font-bold text-[#FCEE0A] uppercase block">
+                  LAS 3 CAJAS DESTACADAS DEL HERO (CATEGORÍA, PALABRAS CLAVE Y DATO EXTRA)
+                </span>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-[#00F0FF] mb-1">
+                      CAJA 1: CATEGORÍA
+                    </label>
+                    <input
+                      type="text"
+                      value={heroForm.category ?? heroForm.stats?.[0]?.value ?? 'REGLAMENTO OFICIAL'}
+                      onChange={(e) => setHeroForm({ ...heroForm, category: e.target.value })}
+                      placeholder="Ej: REGLAMENTO OFICIAL"
+                      className="w-full bg-[#000000] border border-gray-800 px-3 py-2 text-[#00F0FF] font-bold"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[#FCEE0A] mb-1">
+                      CAJA 2: PALABRAS CLAVE (TAGS)
+                    </label>
+                    <input
+                      type="text"
+                      value={heroForm.keywords ?? heroForm.stats?.[1]?.value ?? '#Torneos #Jueces'}
+                      onChange={(e) => setHeroForm({ ...heroForm, keywords: e.target.value })}
+                      placeholder="Ej: #Torneos #Jueces #Banquillo"
+                      className="w-full bg-[#000000] border border-gray-800 px-3 py-2 text-[#FCEE0A] font-bold"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <input
+                      type="text"
+                      value={heroForm.extraLabel ?? heroForm.stats?.[2]?.label ?? 'FORMATO / SET'}
+                      onChange={(e) => setHeroForm({ ...heroForm, extraLabel: e.target.value })}
+                      placeholder="Título Caja 3 (ej: FORMATO / SET)"
+                      className="w-full bg-[#000000] border border-gray-800 px-2.5 py-1 text-[10px] text-gray-300 uppercase"
+                    />
+                    <input
+                      type="text"
+                      value={heroForm.extraValue ?? heroForm.stats?.[2]?.value ?? 'SET 01 // NIGHT CITY'}
+                      onChange={(e) => setHeroForm({ ...heroForm, extraValue: e.target.value })}
+                      placeholder="Valor Caja 3 (ej: SET 01 // NIGHT CITY)"
+                      className="w-full bg-[#000000] border border-gray-800 px-3 py-2 text-[#FF003C] font-bold"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Autor, Rol, Fecha de Publicación, Minutos de Lectura (Auto) y Vistas */}
+              <div className="bg-[#070a10] border border-gray-800 p-4 space-y-3">
+                <span className="text-[11px] font-mono font-bold text-[#00F0FF] uppercase block">
+                  AUTOR, FECHA DE PUBLICACIÓN, TIEMPO DE LECTURA Y VISTAS
+                </span>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-gray-400 mb-1">AUTOR DE LA NOTICIA</label>
+                    <input
+                      type="text"
+                      value={heroForm.author || ''}
+                      onChange={(e) => setHeroForm({ ...heroForm, author: e.target.value })}
+                      placeholder="Ej: ZeroCool_2077"
+                      className="w-full bg-[#000000] border border-gray-800 px-3 py-2 text-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-gray-400 mb-1">CARGO / ROL DEL AUTOR</label>
+                    <input
+                      type="text"
+                      value={heroForm.role || ''}
+                      onChange={(e) => setHeroForm({ ...heroForm, role: e.target.value })}
+                      placeholder="Ej: Analista Jefe // Cyberpulse eSports"
+                      className="w-full bg-[#000000] border border-gray-800 px-3 py-2 text-white"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-gray-400 mb-1">FECHA DE PUBLICACIÓN</label>
+                    <input
+                      type="text"
+                      value={heroForm.date || ''}
+                      onChange={(e) => setHeroForm({ ...heroForm, date: e.target.value })}
+                      placeholder="Ej: 10 NOV 2026"
+                      className="w-full bg-[#000000] border border-gray-800 px-3 py-2 text-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[#FCEE0A] mb-1">
+                      TIEMPO DE LECTURA (AUTO: 200 PAL/MIN)
+                    </label>
+                    <input
+                      type="text"
+                      value={heroForm.readTime || ''}
+                      onChange={(e) => setHeroForm({ ...heroForm, readTime: e.target.value })}
+                      placeholder="Ej: 3 MIN LECTURA"
+                      className="w-full bg-[#000000] border border-gray-800 px-3 py-2 text-[#FCEE0A] font-bold"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[#00F0FF] mb-1">
+                      VISITAS REALES (CONTADOR AUTOMÁTICO)
+                    </label>
+                    <div className="w-full bg-[#000000] border border-gray-800 px-3 py-2 text-[#00F0FF] font-bold">
+                      {Number(heroForm.viewsCount) || 0}{' '}
+                      {(Number(heroForm.viewsCount) || 0) === 1 ? 'VISITA' : 'VISITAS'}
+                    </div>
+                  </div>
+                </div>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-gray-400 mb-1">WALLPAPER DE FONDO</label>
-                  <select
-                    value={heroForm.wallpaper}
-                    onChange={(e) => setHeroForm({ ...heroForm, wallpaper: e.target.value })}
-                    className="w-full bg-[#070a10] border border-gray-800 px-3 py-2 text-white"
-                  >
-                    {LOCAL_WALLPAPERS.map((wp) => (
-                      <option key={wp} value={wp}>
-                        {wp}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-gray-400 mb-1">URL CARTA MVP DERECHA</label>
-                  <input
-                    type="text"
-                    value={heroForm.featuredCardImg}
-                    onChange={(e) => setHeroForm({ ...heroForm, featuredCardImg: e.target.value })}
-                    className="w-full bg-[#070a10] border border-gray-800 px-3 py-2 text-white"
-                  />
-                </div>
+                <ImageUploadField
+                  label="IMAGEN DESTACADA DE FONDO (ESTILO WORDPRESS)"
+                  value={heroForm.wallpaper}
+                  onChange={(url) => setHeroForm({ ...heroForm, wallpaper: url, image: url })}
+                  uploadedFiles={uploadedFiles}
+                  onUploadSuccess={setUploadedFiles}
+                  showToast={showToast}
+                />
+                <ImageUploadField
+                  label="CARTA MVP DERECHA"
+                  value={heroForm.featuredCardImg}
+                  onChange={(url) => setHeroForm({ ...heroForm, featuredCardImg: url })}
+                  uploadedFiles={uploadedFiles}
+                  onUploadSuccess={setUploadedFiles}
+                  showToast={showToast}
+                />
               </div>
             </div>
 
@@ -1085,6 +1765,15 @@ export default function AdminPanel({ initialAuth = false, initialCms = {}, initi
                     className="w-full bg-[#070a10] border border-gray-800 px-3 py-2 text-white"
                   />
                 </div>
+
+                <ImageUploadField
+                  label="IMAGEN BANNER DEL MAZO (SUBIR ARCHIVO O WALLPAPER)"
+                  value={deckForm.bannerWallpaper}
+                  onChange={(url) => setDeckForm({ ...deckForm, bannerWallpaper: url })}
+                  uploadedFiles={uploadedFiles}
+                  onUploadSuccess={setUploadedFiles}
+                  showToast={showToast}
+                />
 
                 {/* Buscador para añadir cartas reales del repositorio GitHub al Mazo */}
                 <div className="border-t border-gray-800 pt-3 space-y-2">
@@ -1306,6 +1995,15 @@ export default function AdminPanel({ initialAuth = false, initialCms = {}, initi
                     />
                   </div>
                 </div>
+
+                <ImageUploadField
+                  label="CARTEL / IMAGEN DEL TORNEO (SUBIR ARCHIVO O WALLPAPER)"
+                  value={tourForm.image}
+                  onChange={(url) => setTourForm({ ...tourForm, image: url })}
+                  uploadedFiles={uploadedFiles}
+                  onUploadSuccess={setUploadedFiles}
+                  showToast={showToast}
+                />
               </div>
 
               <button
@@ -1426,7 +2124,7 @@ export default function AdminPanel({ initialAuth = false, initialCms = {}, initi
         )}
 
         {/* ===============================================================
-            TAB 6: 3 CARTAS DE ARTE ALTERNATIVO EN PORTADA (INICIO)
+            TAB 6: TOP 3 CARTAS MÁS VENDIDAS (CARDMARKET BEST SELLERS - SINGLES)
            =============================================================== */}
         {activeTab === 'altArt' && (
           <form onSubmit={handleSaveAltArt} className="space-y-8">
@@ -1437,13 +2135,13 @@ export default function AdminPanel({ initialAuth = false, initialCms = {}, initi
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-800 pb-4">
                 <div>
                   <span className="text-[10px] font-mono text-[#00F0FF] uppercase tracking-widest block">
-                    VITRINA DE COLECCIONISTA // PORTADA INICIO
+                    MERCADO SECUNDARIO EUROPEO // CARDMARKET BEST SELLERS (SOLO SINGLES)
                   </span>
                   <h2 className="text-xl font-black uppercase text-white">
-                    GESTIÓN DE LAS <span className="text-[#FCEE0A]">3 CARTAS DE ARTE ALTERNATIVO</span>
+                    GESTIÓN DEL <span className="text-[#FCEE0A]">TOP 3 CARTAS MÁS VENDIDAS</span>
                   </h2>
                   <p className="text-xs font-mono text-gray-400 mt-1">
-                    Selecciona cada uno de los 3 slots y haz clic en cualquier carta del catálogo GitHub inferior o introduce una URL de imagen personalizada.
+                    Pega directamente la URL de GitHub de cualquier carta (o selecciónala abajo) y se rellenarán solos: Nombre, Tipo (Merc, Corpo, Rocker...), Edición, Artista, Colección e ID.
                   </p>
                 </div>
 
@@ -1453,11 +2151,11 @@ export default function AdminPanel({ initialAuth = false, initialCms = {}, initi
                   className="px-6 py-3.5 bg-[#FCEE0A] text-[#070a10] font-mono font-black text-xs uppercase tracking-widest hover:bg-[#00F0FF] flex items-center gap-2 cursor-pointer shrink-0"
                 >
                   <Save className="w-4 h-4" />
-                  <span>PUBLICAR LAS 3 CARTAS EN PORTADA</span>
+                  <span>PUBLICAR TOP 3 EN PORTADA</span>
                 </button>
               </div>
 
-              {/* Los 3 Slots de Arte Alternativo */}
+              {/* Los 3 Slots de Cartas Más Vendidas (Cardmarket Singles) */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 {altArtForm.map((slotItem, idx) => {
                   const isSelected = activeAltSlot === idx;
@@ -1474,7 +2172,7 @@ export default function AdminPanel({ initialAuth = false, initialCms = {}, initi
                     >
                       <div className="flex items-center justify-between border-b border-gray-800 pb-2.5">
                         <span className="text-xs font-mono font-black uppercase text-[#FCEE0A]">
-                          SLOT ARTE ALTERNATIVO #0{idx + 1}
+                          BEST SELLER #0{idx + 1} // CARDMARKET
                         </span>
                         <span
                           className={`px-2 py-0.5 text-[10px] font-mono font-bold uppercase ${
@@ -1487,6 +2185,48 @@ export default function AdminPanel({ initialAuth = false, initialCms = {}, initi
                         </span>
                       </div>
 
+                      {/* Campo Autocompletar por URL de GitHub */}
+                      <div
+                        onClick={(e) => e.stopPropagation()}
+                        className="bg-[#000000] border border-[#00F0FF]/60 p-3 space-y-2"
+                      >
+                        <label className="block text-[10px] font-mono font-black text-[#00F0FF] uppercase">
+                          ⚡ PEGAR URL DE GITHUB DE LA CARTA (AUTORRELLENO AUTOMÁTICO)
+                        </label>
+                        <div className="flex gap-1.5">
+                          <input
+                            type="text"
+                            value={githubUrlInputs[idx] || ''}
+                            onChange={(e) => handleAutofillFromGithubUrl(idx, e.target.value, false)}
+                            onPaste={(e) => {
+                              const pasted = e.clipboardData.getData('text');
+                              if (pasted) {
+                                e.preventDefault();
+                                handleAutofillFromGithubUrl(idx, pasted, true);
+                              }
+                            }}
+                            placeholder="https://github.com/.../carta.webp"
+                            className="w-full bg-[#070a10] border border-gray-800 focus:border-[#FCEE0A] px-2.5 py-1.5 text-[11px] font-mono text-white focus:outline-none"
+                          />
+                          <button
+                            type="button"
+                            onClick={() =>
+                              handleAutofillFromGithubUrl(
+                                idx,
+                                githubUrlInputs[idx] || slotItem.image,
+                                true
+                              )
+                            }
+                            className="px-2.5 py-1.5 bg-[#00F0FF] text-[#070a10] hover:bg-[#FCEE0A] font-mono font-black text-[10px] uppercase shrink-0 cursor-pointer"
+                          >
+                            AUTO
+                          </button>
+                        </div>
+                        <p className="text-[9px] font-mono text-gray-400">
+                          Acepta enlaces de GitHub (blob o raw) o el nombre del archivo .webp
+                        </p>
+                      </div>
+
                       <div className="h-56 bg-[#000000] border border-gray-800 flex items-center justify-center p-2">
                         <img
                           src={slotItem.image}
@@ -1495,11 +2235,11 @@ export default function AdminPanel({ initialAuth = false, initialCms = {}, initi
                         />
                       </div>
 
-                      <div className="space-y-3">
+                      <div className="space-y-3" onClick={(e) => e.stopPropagation()}>
                         <div className="grid grid-cols-2 gap-2">
                           <div>
                             <label className="block text-[10px] font-mono text-gray-400 uppercase mb-1">
-                              ID CARTA
+                              ID DE LA CARTA
                             </label>
                             <input
                               type="text"
@@ -1510,22 +2250,24 @@ export default function AdminPanel({ initialAuth = false, initialCms = {}, initi
                                   prev.map((it, i) => (i === idx ? { ...it, cardId: val } : it))
                                 );
                               }}
+                              placeholder="Ej: #138"
                               className="w-full bg-[#000000] border border-gray-800 px-2.5 py-1.5 text-xs font-mono text-[#FCEE0A]"
                             />
                           </div>
                           <div>
                             <label className="block text-[10px] font-mono text-gray-400 uppercase mb-1">
-                              FACCIÓN
+                              TIPO (MERC, CORPO, ROCKER...)
                             </label>
                             <input
                               type="text"
-                              value={slotItem.faction || ''}
+                              value={slotItem.cardType || slotItem.faction || ''}
                               onChange={(e) => {
                                 const val = e.target.value;
                                 setAltArtForm((prev) =>
-                                  prev.map((it, i) => (i === idx ? { ...it, faction: val } : it))
+                                  prev.map((it, i) => (i === idx ? { ...it, cardType: val } : it))
                                 );
                               }}
+                              placeholder="Ej: PROGRAM // BRAINDANCE"
                               className="w-full bg-[#000000] border border-gray-800 px-2.5 py-1.5 text-xs font-mono text-[#00F0FF]"
                             />
                           </div>
@@ -1548,54 +2290,101 @@ export default function AdminPanel({ initialAuth = false, initialCms = {}, initi
                           />
                         </div>
 
-                        <div>
-                          <label className="block text-[10px] font-mono text-gray-400 uppercase mb-1">
-                            ETIQUETA DE EDICIÓN ESPECIAL
-                          </label>
-                          <input
-                            type="text"
-                            value={slotItem.badge || ''}
-                            onChange={(e) => {
-                              const val = e.target.value;
-                              setAltArtForm((prev) =>
-                                prev.map((it, i) => (i === idx ? { ...it, badge: val } : it))
-                              );
-                            }}
-                            className="w-full bg-[#000000] border border-gray-800 px-2.5 py-1.5 text-xs font-mono text-white"
-                          />
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <label className="block text-[10px] font-mono text-gray-400 uppercase mb-1">
+                              EDICIÓN
+                            </label>
+                            <input
+                              type="text"
+                              value={slotItem.edition || ''}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                setAltArtForm((prev) =>
+                                  prev.map((it, i) => (i === idx ? { ...it, edition: val } : it))
+                                );
+                              }}
+                              placeholder="Ej: Epic Rare"
+                              className="w-full bg-[#000000] border border-gray-800 px-2.5 py-1.5 text-xs font-mono text-white"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[10px] font-mono text-gray-400 uppercase mb-1">
+                              ARTISTA
+                            </label>
+                            <input
+                              type="text"
+                              value={slotItem.artist || ''}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                setAltArtForm((prev) =>
+                                  prev.map((it, i) => (i === idx ? { ...it, artist: val } : it))
+                                );
+                              }}
+                              placeholder="Ej: Dardo Studios"
+                              className="w-full bg-[#000000] border border-gray-800 px-2.5 py-1.5 text-xs font-mono text-gray-200"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <label className="block text-[10px] font-mono text-gray-400 uppercase mb-1">
+                              COLECCIÓN (SET)
+                            </label>
+                            <input
+                              type="text"
+                              value={slotItem.collection || ''}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                setAltArtForm((prev) =>
+                                  prev.map((it, i) => (i === idx ? { ...it, collection: val } : it))
+                                );
+                              }}
+                              placeholder="Welcome to Night City (Set 01)"
+                              className="w-full bg-[#000000] border border-gray-800 px-2.5 py-1.5 text-xs font-mono text-[#FCEE0A]"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[10px] font-mono text-gray-400 uppercase mb-1">
+                              ETIQUETA RANKING
+                            </label>
+                            <input
+                              type="text"
+                              value={slotItem.badge || ''}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                setAltArtForm((prev) =>
+                                  prev.map((it, i) => (i === idx ? { ...it, badge: val } : it))
+                                );
+                              }}
+                              placeholder={`TOP #0${idx + 1} BEST SELLER`}
+                              className="w-full bg-[#000000] border border-gray-800 px-2.5 py-1.5 text-xs font-mono text-white"
+                            />
+                          </div>
                         </div>
 
                         <div>
-                          <label className="block text-[10px] font-mono text-gray-400 uppercase mb-1">
-                            ARTISTA / COLECCIÓN
-                          </label>
-                          <input
-                            type="text"
-                            value={slotItem.artist || ''}
-                            onChange={(e) => {
-                              const val = e.target.value;
-                              setAltArtForm((prev) =>
-                                prev.map((it, i) => (i === idx ? { ...it, artist: val } : it))
-                              );
-                            }}
-                            className="w-full bg-[#000000] border border-gray-800 px-2.5 py-1.5 text-xs font-mono text-gray-300"
-                          />
-                        </div>
-
-                        <div>
-                          <label className="block text-[10px] font-mono text-gray-400 uppercase mb-1">
-                            URL DE LA IMAGEN (GITHUB O LOCAL)
-                          </label>
-                          <input
-                            type="text"
+                          <ImageUploadField
+                            label="SUBIR IMAGEN O URL DE LA CARTA"
                             value={slotItem.image || ''}
-                            onChange={(e) => {
-                              const val = e.target.value;
-                              setAltArtForm((prev) =>
-                                prev.map((it, i) => (i === idx ? { ...it, image: val } : it))
-                              );
+                            onChange={(val) => {
+                              if (
+                                val.includes('github.com') ||
+                                val.includes('githubusercontent.com') ||
+                                val.endsWith('.webp')
+                              ) {
+                                handleAutofillFromGithubUrl(idx, val, true);
+                              } else {
+                                setAltArtForm((prev) =>
+                                  prev.map((it, i) => (i === idx ? { ...it, image: val } : it))
+                                );
+                              }
                             }}
-                            className="w-full bg-[#000000] border border-gray-800 px-2.5 py-1.5 text-[11px] font-mono text-gray-400"
+                            uploadedFiles={uploadedFiles}
+                            onUploadSuccess={setUploadedFiles}
+                            showToast={showToast}
+                            compact={true}
                           />
                         </div>
                       </div>
@@ -1609,11 +2398,11 @@ export default function AdminPanel({ initialAuth = false, initialCms = {}, initi
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                   <div>
                     <h3 className="text-sm font-mono font-bold uppercase text-[#00F0FF]">
-                      SELECTOR RÁPIDO DE CARTAS PARA EL SLOT #0{activeAltSlot + 1}
+                      CATÁLOGO DE CARTAS EN GITHUB PARA EL SLOT #0{activeAltSlot + 1}
                     </h3>
                     <p className="text-xs font-mono text-gray-400">
-                      Haz clic sobre una carta para asignarla automáticamente al Slot #0
-                      {activeAltSlot + 1} seleccionado arriba.
+                      También puedes hacer clic sobre cualquier carta de abajo para rellenar automáticamente todos sus datos en el Slot #0
+                      {activeAltSlot + 1}.
                     </p>
                   </div>
 
@@ -1623,7 +2412,7 @@ export default function AdminPanel({ initialAuth = false, initialCms = {}, initi
                       type="text"
                       value={cardSearchAlt}
                       onChange={(e) => setCardSearchAlt(e.target.value)}
-                      placeholder="Buscar carta por nombre..."
+                      placeholder="Buscar por nombre, tipo o artista..."
                       className="w-full bg-[#070a10] border border-gray-800 pl-9 pr-3 py-2 text-xs font-mono text-white"
                     />
                   </div>
@@ -1643,10 +2432,15 @@ export default function AdminPanel({ initialAuth = false, initialCms = {}, initi
                         loading="lazy"
                         className="w-full h-28 object-cover object-top mb-1.5"
                       />
-                      <span className="text-[9px] font-mono text-[#FCEE0A] block">{c.id}</span>
+                      <span className="text-[9px] font-mono text-[#FCEE0A] block">
+                        {c.cardId || c.id}
+                      </span>
                       <p className="text-[10px] font-bold text-white truncate group-hover:text-[#00F0FF]">
                         {c.name}
                       </p>
+                      <span className="text-[9px] font-mono text-gray-400 truncate block">
+                        {c.cardType || c.faction}
+                      </span>
                     </button>
                   ))}
                 </div>
@@ -1831,9 +2625,19 @@ export default function AdminPanel({ initialAuth = false, initialCms = {}, initi
               </div>
 
               {/* Carta Insignia del Mazo Ganador */}
-              <div className="border-t border-gray-800 pt-3 space-y-2">
+              <div className="border-t border-gray-800 pt-3 space-y-3">
+                <ImageUploadField
+                  label="IMAGEN CARTA INSIGNIA / FOTO GANADOR"
+                  value={histForm.featuredCardImg}
+                  onChange={(url) => setHistForm({ ...histForm, featuredCardImg: url })}
+                  uploadedFiles={uploadedFiles}
+                  onUploadSuccess={setUploadedFiles}
+                  showToast={showToast}
+                  compact={true}
+                />
+
                 <label className="block text-xs font-mono text-[#00F0FF] uppercase">
-                  Carta Insignia del Mazo Ganador
+                  O elegir carta insignia de GitHub:
                 </label>
                 <input
                   type="text"

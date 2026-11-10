@@ -1,77 +1,52 @@
 # ESTADO DEL PROYECTO — Portal Cyberpunk TCG España (Arquitectura Multipágina + Deckbuilder + CMS Protegido)
 
 **Fecha de actualización:** 10 de Noviembre de 2026  
-**Estado general:** ✅ Diseño visual Cyberpulse multipágina (Mac) fusionado con éxito con el motor y base de datos de cartas/noticias (`src/data/cards.json` y `src/data/cms.json`), Constructor de Mazos integrado, Vitrina de 3 Cartas de Arte Alternativo, Histórico de Torneos y Autenticación en `/admin`.
+**Estado general:** ✅ Portal completo con diseño Cyberpulse, arquitectura multipágina, Constructor de Mazos (Deckbuilder), CMS protegido con autenticación NetWatch, editor HTML de noticias estilo WordPress/Elementor, subida de archivos/imágenes, contador de visitas reales, sección de Top Cartas Más Vendidas (Cardmarket Best Sellers - Singles) y sistema de autorrelleno de metadatos de cartas verificado.
 
 ---
 
-## 0. Fusión de Entornos (Mac + Oficina)
-- **Fusión Completada:** Se ha integrado el trabajo visual y la arquitectura multipágina desarrollada en el Mac con el motor de datos remoto (`src/data/cards.json` con las 151 cartas sincronizadas de GitHub y `src/data/cms.json` con las noticias, mazos, torneos, cartas de arte alternativo e histórico de torneos).
-- **Dependencias Verificadas:** `npm install` ejecutado y validado sin conflictos.
+## 1. Novedades y Mejoras Implementadas
+
+1. **Subida de Archivos e Imágenes (`/api/upload.js`):**
+   - Selector "Examinar archivo..." para subir imágenes locales directamente al servidor (`public/images/uploads/`).
+   - Integrado en todos los formularios del CMS (Hero, Noticias, Mazos, Torneos, Cartas Más Vendidas, Histórico).
+
+2. **Editor de Noticias Enriquecido estilo WordPress / Elementor:**
+   - Barra de herramientas con soporte para negrita, cursiva, encabezados (`<h2>`, `<h3>`), listas (`<ul>`, `<ol>`, `<li>`), citas (`<blockquote>`), enlaces e imágenes.
+   - Soporte para separador de extracto `<!--more-->` ("Leer más") con vista previa instantánea.
+   - Modal de lectura completa con estilos Cyberpunk dedicados.
+
+3. **Portada (Hero) Avanzada:**
+   - Imagen destacada de fondo estilo WordPress con degradado Cyberpulse.
+   - Cajas de metadatos configurables (Categoría, Palabras clave, Formato/Set).
+   - Cálculo automático de minutos de lectura (~200 palabras/min).
+   - Contador de visitas reales (`viewsCount`) registrado en servidor.
+
+4. **Cartas Más Vendidas // Cardmarket Best Sellers (Solo Singles):**
+   - Sustituida la sección de "Arte Alternativo" por el Top 3 de cartas individuales más vendidas según Cardmarket (descartando material sellado).
+   - Ficha técnica completa por carta (ID, Tipo y subtipos, Edición/Rareza, Artista y Colección) tanto en tarjeta como en el visor HD.
+
+5. **Autorrelleno de Metadatos de Cartas Oficiales (`src/utils/cardMetadata.js` y `/api/cards.js`):**
+   - Al pegar cualquier URL de GitHub de la carta (enlace `github.com/.../blob/...` o `raw.githubusercontent.com/...`), el sistema detecta la carta y autorrellena Nombre, Tipo oficial, Artista, Edición/Rareza e ID de coleccionista.
+   - Datos verificados contra las fuentes oficiales (`cyberpunktcg.com`, `cyberpunktcg.gg`, `nightcity.es`).
+   - Persistencia de correcciones manuales realizadas desde `/admin` en `src/data/cards.json` para futuros autorrellenos.
 
 ---
 
-## 1. Arquitectura de Páginas Independientes
+## 2. Arquitectura de Páginas y Componentes
 
-1. **Inicio (`/` — `src/pages/index.astro`):**
-   - Barra superior con mensaje `Bienvenido a Night City, Edgerunner.` y `Cyberpunk TCG Set One - Welcome to Night City`.
-   - **Hero Section** destacada.
-   - **Últimas Noticias** con acceso a la hemeroteca completa.
-   - **Vitrina de 3 Cartas de Arte Alternativo** elegidas y publicadas desde `/admin` con modal de inspección HD.
-   - **Top 3 Mazos del Meta** manteniendo el escáner de carta *Featured* a la derecha.
-   - **Próximos Torneos** en formato de avance rápido.
-
-2. **Noticias (`/noticias` — `src/pages/noticias.astro`):**
-   - Archivo cronológico de noticias con selector de orden (`MÁS RECIENTES` / `MÁS ANTIGUAS`).
-   - Filtros interactivos por **Categoría** (`NOTICIA OFICIAL`, ` SPOILER SET 01`, `ANÁLISIS META`, `TORNEOS`, etc.), por **Facción** y buscador por texto.
-   - Lector modal de artículo completo sin perder el filtrado activo.
-
-3. **Base de Cartas + Constructor de Mazos (`/cartas` — `src/pages/cartas.astro`):**
-   - Catálogo oficial de **151 cartas** sincronizadas con GitHub (`cyberpunk-tcg-cartas`).
-   - Modo **Constructor de Mazos (Deckbuilder)** integrado:
-     - Permite añadir hasta 4 copias por carta con un clic sobre el catálogo.
-     - Configuración de nombre del mazo y facción principal.
-     - Persistencia automática en `localStorage`.
-     - Exportación de lista en formato competitivo al portapapeles o descarga directa en `.txt`.
-
-4. **Mazos del Meta (`/mazos` — `src/pages/mazos.astro`):**
-   - Clasificación de mazos competitivos actuales manteniendo la estructura de 12 columnas con la **carta Featured interactiva a la derecha**.
-
-5. **Torneos e Histórico (`/torneos` — `src/pages/torneos.astro`):**
-   - Calendario de **Próximos Torneos Oficiales**.
-   - **Histórico de Torneos y Campeones**: registro de torneos finalizados con ganador (1º), mazo campeón, récord de rondas, podio (2º y 3º puesto), resumen competitivo y carta insignia del mazo ganador.
-
-6. **Foro (Enlace Externo Discourse):**
-   - El ítem **Foro** del menú principal enlaza directamente a la URL de Discourse configurable desde `/admin`.
+1. **Inicio (`/` — `src/pages/index.astro`):** Hero destacado, Top Noticias, Top 3 Cartas Más Vendidas Cardmarket, Top Mazos del Meta y Próximos Torneos.
+2. **Noticias (`/noticias` — `src/pages/noticias.astro`):** Archivo con ordenación cronológica, filtros por categoría/facción, búsqueda y lector modal completo.
+3. **Base de Cartas + Constructor (`/cartas` — `src/pages/cartas.astro`):** Catálogo de cartas con visor modal HD y Deckbuilder con persistencia en `localStorage` y exportación.
+4. **Mazos del Meta (`/mazos` — `src/pages/mazos.astro`):** Mazos competitivos con cartas insignia e inspección individual.
+5. **Torneos e Histórico (`/torneos` — `src/pages/torneos.astro`):** Calendario de eventos y Hall of Fame de torneos finalizados.
+6. **Backend CMS Protegido (`/admin` — `src/pages/admin.astro`):** Panel completo con 8 pestañas de gestión protegidas con cookie de sesión NetWatch.
 
 ---
 
-## 2. Backend Protegido (`/admin` — `src/pages/admin.astro`)
+## 3. Próximos Pasos (Fase 1)
 
-- **Autenticación NetWatch (`src/utils/auth.js` y `src/pages/api/auth.js`):**
-  - Acceso protegido con usuario y contraseña (`admin` / `cyberpunk2077` por defecto, configurable mediante variables de entorno `ADMIN_USER`, `ADMIN_PASSWORD`, `ADMIN_SECRET`) y cookie firmada `HttpOnly`.
-- **Pestañas de Administración en `src/components/AdminPanel.jsx`:**
-  - `NOTICIAS`: Crear, editar y borrar noticias con categoría y facción.
-  - `NOTICIA DESTACADA (HERO)`: Configurar el titular y artículo principal de portada.
-  - `ARTE ALTERNATIVO (3)`: Selector visual conectado a las 151 cartas de GitHub para elegir y publicar las 3 cartas de arte alternativo de la portada.
-  - `MAZOS`: Gestión de los mazos del meta y sus cartas clave.
-  - `TORNEOS`: Gestión de próximos eventos abiertos.
-  - `HISTÓRICO TORNEOS`: Publicación de resultados de torneos pasados, podio y mazo ganador.
-  - `CARTAS GITHUB`: Sincronización en un clic con el repositorio de cartas.
-  - `FORO DISCOURSE`: Configuración en vivo de la URL externa del foro.
-
----
-
-## 3. Por dónde debemos continuar la Fase 1 mañana
-
-1. **Revisión Visual y Ajustes Finos de Diseño (UI/UX):**
-   - Continuar afinando textos, bloques y detalles visuales de cada una de las páginas (`/` Inicio, `/noticias`, `/cartas`, `/mazos`, `/torneos`) según las indicaciones del usuario.
-   - Conectar la URL definitiva del **Foro Discourse** en cuanto esté lista.
-2. **Contenido Extendido de Noticias y Mazos:**
-   - Añadir soporte para cuerpo de artículo completo (`content` / formato enriquecido) al crear noticias en `/admin`, de modo que al abrir una noticia se lea el artículo íntegro además del extracto.
-   -Permitir ver y exportar la lista completa de cartas (decklist de 40/50 cartas) tanto en los **Mazos del Meta** (`/mazos`) como en los **Mazos Ganadores del Histórico de Torneos** (`/torneos`).
-3. **Atributos Jugables de la Base de Cartas (`src/data/cards.json`):**
-   - Ampliar los metadatos de las 151 cartas (coste en Eddies, fuerza, tipo de carta, rareza, palabras clave y habilidad en español) y añadir filtros avanzados por coste/tipo dentro de `/cartas` y del **Constructor de Mazos**.
-4. **Preparación para Despliegue SSR (Cloudflare Pages / Node):**
-   - Configurar el adaptador oficial de Astro (`@astrojs/cloudflare` o `@astrojs/node`) y las variables de entorno (`ADMIN_USER`, `ADMIN_PASSWORD`, `ADMIN_SECRET`) para producción.
-
+1. Continuar ampliando y verificando los tipos y artistas de la base de cartas a medida que la comunidad y bases oficiales liberen nuevos detalles.
+2. Añadir filtros por tipo de carta (`Unit`, `Program`, `Gear`, `Legend`) y coste en el explorador de cartas.
+3. Conectar la URL definitiva del Foro Discourse una vez desplegado.
+4. Preparar configuración y adaptador de despliegue para producción (Node / Cloudflare).

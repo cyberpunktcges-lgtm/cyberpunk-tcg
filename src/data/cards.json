@@ -7,27 +7,42 @@
     "faction": "BANDAS",
     "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/6th-street-recruits.webp",
     "githubUrl": "https://github.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/blob/main/6th-street-recruits.webp",
-    "size": 111522
+    "size": 111522,
+    "collection": "Welcome to Night City (Set 01)",
+    "cardId": "#006",
+    "cardType": "UNIT // 6TH STREET • GANGER",
+    "edition": "Common",
+    "artist": "Daniel Valaisis"
   },
   {
     "id": "CP-002",
     "slug": "adam-smasher-ender-of-legends",
-    "name": "Adam Smasher Ender Of Legends",
+    "name": "Adam Smasher // Ender of Legends",
     "fileName": "adam-smasher-ender-of-legends.webp",
     "faction": "CORPO",
     "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/adam-smasher-ender-of-legends.webp",
     "githubUrl": "https://github.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/blob/main/adam-smasher-ender-of-legends.webp",
-    "size": 143742
+    "size": 143742,
+    "collection": "Welcome to Night City (Set 01)",
+    "cardId": "",
+    "cardType": "",
+    "edition": "",
+    "artist": ""
   },
   {
     "id": "CP-003",
     "slug": "adam-smasher-metal-over-meat",
-    "name": "Adam Smasher Metal Over Meat",
+    "name": "Adam Smasher // Metal Over Meat",
     "fileName": "adam-smasher-metal-over-meat.webp",
     "faction": "CORPO",
     "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/adam-smasher-metal-over-meat.webp",
     "githubUrl": "https://github.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/blob/main/adam-smasher-metal-over-meat.webp",
-    "size": 127666
+    "size": 127666,
+    "collection": "Welcome to Night City (Set 01)",
+    "cardId": "#041",
+    "cardType": "UNIT",
+    "edition": "",
+    "artist": ""
   },
   {
     "id": "CP-004",
@@ -37,17 +52,27 @@
     "faction": "MERCENARIO",
     "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/adrenaline-converter.webp",
     "githubUrl": "https://github.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/blob/main/adrenaline-converter.webp",
-    "size": 124516
+    "size": 124516,
+    "collection": "Welcome to Night City (Set 01)",
+    "cardId": "#059",
+    "cardType": "GEAR // CYBERWARE • MEDTECH",
+    "edition": "Common",
+    "artist": "ADIA"
   },
   {
     "id": "CP-005",
     "slug": "afterparty-at-lizzie-s",
-    "name": "Afterparty At Lizzie S",
+    "name": "Afterparty at Lizzie's",
     "fileName": "afterparty-at-lizzie-s.webp",
     "faction": "MERCENARIO",
     "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/afterparty-at-lizzie-s.webp",
     "githubUrl": "https://github.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/blob/main/afterparty-at-lizzie-s.webp",
-    "size": 114790
+    "size": 114790,
+    "collection": "Welcome to Night City (Set 01)",
+    "cardId": "#065",
+    "cardType": "PROGRAM // BRAINDANCE • MOX",
+    "edition": "Common",
+    "artist": "Alicja Użarowska"
   },
   {
     "id": "CP-006",
@@ -57,27 +82,42 @@
     "faction": "MERCENARIO",
     "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/all-is-lost.webp",
     "githubUrl": "https://github.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/blob/main/all-is-lost.webp",
-    "size": 110872
+    "size": 110872,
+    "collection": "Welcome to Night City (Set 01)",
+    "cardId": "#027",
+    "cardType": "PROGRAM // ZETATECH",
+    "edition": "Common",
+    "artist": "Fabrizio De Tommaso"
   },
   {
     "id": "CP-007",
     "slug": "alt-cunningham-mother-of-daemons",
-    "name": "Alt Cunningham Mother Of Daemons",
+    "name": "Alt Cunningham // Mother of Daemons",
     "fileName": "alt-cunningham-mother-of-daemons.webp",
     "faction": "NETRUNNER",
     "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/alt-cunningham-mother-of-daemons.webp",
     "githubUrl": "https://github.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/blob/main/alt-cunningham-mother-of-daemons.webp",
-    "size": 112512
+    "size": 112512,
+    "collection": "Welcome to Night City (Set 01)",
+    "cardId": "",
+    "cardType": "UNIT // NETRUNNER • AI",
+    "edition": "",
+    "artist": "Łukasz Poller"
   },
   {
     "id": "CP-008",
     "slug": "alt-cunningham-soulkiller-architect",
-    "name": "Alt Cunningham Soulkiller Architect",
+    "name": "Alt Cunningham // Soulkiller Architect",
     "fileName": "alt-cunningham-soulkiller-architect.webp",
     "faction": "NETRUNNER",
     "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/alt-cunningham-soulkiller-architect.webp",
     "githubUrl": "https://github.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/blob/main/alt-cunningham-soulkiller-architect.webp",
-    "size": 83238
+    "size": 83238,
+    "collection": "Welcome to Night City (Set 01)",
+    "cardId": "",
+    "cardType": "LEGEND // NETRUNNER",
+    "edition": "",
+    "artist": "Pandart Studio"
   },
   {
     "id": "CP-009",
@@ -87,17 +127,27 @@
     "faction": "BANDAS",
     "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/animals-wrecker.webp",
     "githubUrl": "https://github.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/blob/main/animals-wrecker.webp",
-    "size": 84580
+    "size": 84580,
+    "collection": "Welcome to Night City (Set 01)",
+    "cardId": "#007",
+    "cardType": "UNIT // ANIMAL • GANGER",
+    "edition": "Common",
+    "artist": ""
   },
   {
     "id": "CP-010",
     "slug": "appetite-for-destruction",
-    "name": "Appetite For Destruction",
+    "name": "Appetite for Destruction",
     "fileName": "appetite-for-destruction.webp",
     "faction": "MERCENARIO",
     "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/appetite-for-destruction.webp",
     "githubUrl": "https://github.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/blob/main/appetite-for-destruction.webp",
-    "size": 134046
+    "size": 134046,
+    "collection": "Welcome to Night City (Set 01)",
+    "cardId": "#028",
+    "cardType": "PROGRAM // GANGER",
+    "edition": "Uncommon",
+    "artist": ""
   },
   {
     "id": "CP-011",
@@ -107,7 +157,12 @@
     "faction": "CORPO",
     "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/arasaka-emergency-radioport.webp",
     "githubUrl": "https://github.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/blob/main/arasaka-emergency-radioport.webp",
-    "size": 134946
+    "size": 134946,
+    "collection": "Welcome to Night City (Set 01)",
+    "cardId": "#023",
+    "cardType": "GEAR",
+    "edition": "Common",
+    "artist": "ADIA"
   },
   {
     "id": "CP-012",
@@ -117,17 +172,27 @@
     "faction": "MERCENARIO",
     "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/augmented-negotiators.webp",
     "githubUrl": "https://github.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/blob/main/augmented-negotiators.webp",
-    "size": 107770
+    "size": 107770,
+    "collection": "Welcome to Night City (Set 01)",
+    "cardId": "#043",
+    "cardType": "UNIT // ARASAKA • CORPO",
+    "edition": "Common",
+    "artist": "Bernard Kowalczuk"
   },
   {
     "id": "CP-013",
     "slug": "bonnie-and-clyde",
-    "name": "Bonnie And Clyde",
+    "name": "Bonnie and Clyde",
     "fileName": "bonnie-and-clyde.webp",
     "faction": "MERCENARIO",
     "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/bonnie-and-clyde.webp",
     "githubUrl": "https://github.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/blob/main/bonnie-and-clyde.webp",
-    "size": 159668
+    "size": 159668,
+    "collection": "Welcome to Night City (Set 01)",
+    "cardId": "#029",
+    "cardType": "PROGRAM // BRAINDANCE",
+    "edition": "Uncommon",
+    "artist": "Rion Chow"
   },
   {
     "id": "CP-014",
@@ -137,27 +202,42 @@
     "faction": "MERCENARIO",
     "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/bootleg-black-sapphire-show.webp",
     "githubUrl": "https://github.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/blob/main/bootleg-black-sapphire-show.webp",
-    "size": 108048
+    "size": 108048,
+    "collection": "Welcome to Night City (Set 01)",
+    "cardId": "#066",
+    "cardType": "PROGRAM // BRAINDANCE",
+    "edition": "Uncommon",
+    "artist": "ADIA"
   },
   {
     "id": "CP-015",
     "slug": "caliber-totentanz-s-top-dog",
-    "name": "Caliber Totentanz S Top Dog",
+    "name": "Caliber // Totentanz's Top Dog",
     "fileName": "caliber-totentanz-s-top-dog.webp",
     "faction": "BANDAS",
     "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/caliber-totentanz-s-top-dog.webp",
     "githubUrl": "https://github.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/blob/main/caliber-totentanz-s-top-dog.webp",
-    "size": 128112
+    "size": 128112,
+    "collection": "Welcome to Night City (Set 01)",
+    "cardId": "#044",
+    "cardType": "UNIT",
+    "edition": "Rare",
+    "artist": "André Lima Araújo & Chris O'Halloran"
   },
   {
     "id": "CP-016",
     "slug": "carnage-at-the-colosseum",
-    "name": "Carnage At The Colosseum",
+    "name": "Carnage at the Colosseum",
     "fileName": "carnage-at-the-colosseum.webp",
     "faction": "MERCENARIO",
     "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/carnage-at-the-colosseum.webp",
     "githubUrl": "https://github.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/blob/main/carnage-at-the-colosseum.webp",
-    "size": 126262
+    "size": 126262,
+    "collection": "Welcome to Night City (Set 01)",
+    "cardId": "#030",
+    "cardType": "PROGRAM // BRAINDANCE",
+    "edition": "",
+    "artist": "Matías Bergara"
   },
   {
     "id": "CP-017",
@@ -167,7 +247,12 @@
     "faction": "MERCENARIO",
     "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/chrome-fang.webp",
     "githubUrl": "https://github.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/blob/main/chrome-fang.webp",
-    "size": 141880
+    "size": 141880,
+    "collection": "Welcome to Night City (Set 01)",
+    "cardId": "#008",
+    "cardType": "UNIT",
+    "edition": "Common",
+    "artist": "Bernard Kowalczuk"
   },
   {
     "id": "CP-018",
@@ -177,37 +262,57 @@
     "faction": "MERCENARIO",
     "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/chrome-reverie.webp",
     "githubUrl": "https://github.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/blob/main/chrome-reverie.webp",
-    "size": 103302
+    "size": 103302,
+    "collection": "Welcome to Night City (Set 01)",
+    "cardId": "#131",
+    "cardType": "PROGRAM // BRAINDANCE",
+    "edition": "",
+    "artist": ""
   },
   {
     "id": "CP-019",
     "slug": "corpo-security",
     "name": "Corpo Security",
     "fileName": "corpo-security.webp",
-    "faction": "MERCENARIO",
+    "faction": "CORPO",
     "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/corpo-security.webp",
     "githubUrl": "https://github.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/blob/main/corpo-security.webp",
-    "size": 110494
+    "size": 110494,
+    "collection": "Welcome to Night City (Set 01)",
+    "cardId": "#076",
+    "cardType": "UNIT // CORPO",
+    "edition": "Common",
+    "artist": ""
   },
   {
     "id": "CP-020",
     "slug": "corporate-surveillance",
     "name": "Corporate Surveillance",
     "fileName": "corporate-surveillance.webp",
-    "faction": "MERCENARIO",
+    "faction": "CORPO",
     "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/corporate-surveillance.webp",
     "githubUrl": "https://github.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/blob/main/corporate-surveillance.webp",
-    "size": 172414
+    "size": 172414,
+    "collection": "Welcome to Night City (Set 01)",
+    "cardId": "#097",
+    "cardType": "PROGRAM // CORPO",
+    "edition": "Uncommon",
+    "artist": "John Liew"
   },
   {
     "id": "CP-021",
     "slug": "cyberpsychosis",
     "name": "Cyberpsychosis",
     "fileName": "cyberpsychosis.webp",
-    "faction": "MERCENARIO",
+    "faction": "NETRUNNER",
     "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/cyberpsychosis.webp",
     "githubUrl": "https://github.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/blob/main/cyberpsychosis.webp",
-    "size": 127784
+    "size": 127784,
+    "collection": "Welcome to Night City (Set 01)",
+    "cardId": "#067",
+    "cardType": "PROGRAM",
+    "edition": "Uncommon",
+    "artist": "Michal Ivan"
   },
   {
     "id": "CP-022",
@@ -217,7 +322,12 @@
     "faction": "MERCENARIO",
     "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/deadman-transmitter.webp",
     "githubUrl": "https://github.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/blob/main/deadman-transmitter.webp",
-    "size": 89738
+    "size": 89738,
+    "collection": "Welcome to Night City (Set 01)",
+    "cardId": "#024",
+    "cardType": "GEAR",
+    "edition": "Uncommon",
+    "artist": "ADIA"
   },
   {
     "id": "CP-023",
@@ -227,87 +337,132 @@
     "faction": "MERCENARIO",
     "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/delamain-cab.webp",
     "githubUrl": "https://github.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/blob/main/delamain-cab.webp",
-    "size": 111020
+    "size": 111020,
+    "collection": "Welcome to Night City (Set 01)",
+    "cardId": "#112",
+    "cardType": "UNIT // VEHICLE",
+    "edition": "Common",
+    "artist": ""
   },
   {
     "id": "CP-024",
     "slug": "delamain-rideshare-ai",
-    "name": "Delamain Rideshare Ai",
+    "name": "Delamain // Rideshare AI",
     "fileName": "delamain-rideshare-ai.webp",
     "faction": "MERCENARIO",
     "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/delamain-rideshare-ai.webp",
     "githubUrl": "https://github.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/blob/main/delamain-rideshare-ai.webp",
-    "size": 75122
+    "size": 75122,
+    "collection": "Welcome to Night City (Set 01)",
+    "cardId": "#111",
+    "cardType": "UNIT // AI",
+    "edition": "Uncommon",
+    "artist": "Łukasz Wiktorzak"
   },
   {
     "id": "CP-025",
     "slug": "detonate",
     "name": "Detonate",
     "fileName": "detonate.webp",
-    "faction": "MERCENARIO",
+    "faction": "NETRUNNER",
     "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/detonate.webp",
     "githubUrl": "https://github.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/blob/main/detonate.webp",
-    "size": 88068
+    "size": 88068,
+    "collection": "Welcome to Night City (Set 01)",
+    "cardId": "#031",
+    "cardType": "PROGRAM",
+    "edition": "",
+    "artist": "Michal Ivan"
   },
   {
     "id": "CP-026",
     "slug": "dexter-deshawn-off-the-grid",
-    "name": "Dexter Deshawn Off The Grid",
+    "name": "Dexter DeShawn // Off the Grid",
     "fileName": "dexter-deshawn-off-the-grid.webp",
     "faction": "MERCENARIO",
     "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/dexter-deshawn-off-the-grid.webp",
     "githubUrl": "https://github.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/blob/main/dexter-deshawn-off-the-grid.webp",
-    "size": 91288
+    "size": 91288,
+    "collection": "Welcome to Night City (Set 01)",
+    "cardId": "",
+    "cardType": "LEGEND // FIXER",
+    "edition": "Rare",
+    "artist": ""
   },
   {
     "id": "CP-027",
     "slug": "dexter-deshawn-one-last-chance",
-    "name": "Dexter Deshawn One Last Chance",
+    "name": "Dexter DeShawn // One Last Chance",
     "fileName": "dexter-deshawn-one-last-chance.webp",
     "faction": "MERCENARIO",
     "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/dexter-deshawn-one-last-chance.webp",
     "githubUrl": "https://github.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/blob/main/dexter-deshawn-one-last-chance.webp",
-    "size": 95398
+    "size": 95398,
+    "collection": "Welcome to Night City (Set 01)",
+    "cardId": "",
+    "cardType": "UNIT // FIXER",
+    "edition": "Uncommon (Starter The Heist)",
+    "artist": "Mooncolony"
   },
   {
     "id": "CP-028",
     "slug": "dont-fear-the-reaper",
-    "name": "Dont Fear The Reaper",
+    "name": "(Don't Fear) The Reaper",
     "fileName": "dont-fear-the-reaper.webp",
     "faction": "MERCENARIO",
     "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/dont-fear-the-reaper.webp",
     "githubUrl": "https://github.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/blob/main/dont-fear-the-reaper.webp",
-    "size": 176124
+    "size": 176124,
+    "collection": "Welcome to Night City (Set 01)",
+    "cardId": "#098",
+    "cardType": "PROGRAM",
+    "edition": "",
+    "artist": "Alex Eckman-Lawn"
   },
   {
     "id": "CP-029",
     "slug": "dum-dum-maelstrom-triggerman",
-    "name": "Dum Dum Maelstrom Triggerman",
+    "name": "Dum Dum // Maelstrom Triggerman",
     "fileName": "dum-dum-maelstrom-triggerman.webp",
     "faction": "BANDAS",
     "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/dum-dum-maelstrom-triggerman.webp",
     "githubUrl": "https://github.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/blob/main/dum-dum-maelstrom-triggerman.webp",
-    "size": 117474
+    "size": 117474,
+    "collection": "Welcome to Night City (Set 01)",
+    "cardId": "#036",
+    "cardType": "LEGEND",
+    "edition": "Rare",
+    "artist": "Łukasz Poller"
   },
   {
     "id": "CP-030",
     "slug": "dying-night-v-s-pistol",
-    "name": "Dying Night V S Pistol",
+    "name": "Dying Night // V's Pistol",
     "fileName": "dying-night-v-s-pistol.webp",
     "faction": "MERCENARIO",
     "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/dying-night-v-s-pistol.webp",
     "githubUrl": "https://github.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/blob/main/dying-night-v-s-pistol.webp",
-    "size": 165640
+    "size": 165640,
+    "collection": "Welcome to Night City (Set 01)",
+    "cardId": "#128",
+    "cardType": "GEAR",
+    "edition": "Rare",
+    "artist": "Ivan Shavrin"
   },
   {
     "id": "CP-031",
     "slug": "el-sombrero-n-la-venganza-lenta",
-    "name": "El Sombrero N La Venganza Lenta",
+    "name": "El Sombrerón // La Venganza Lenta",
     "fileName": "el-sombrero-n-la-venganza-lenta.webp",
-    "faction": "MERCENARIO",
+    "faction": "BANDAS",
     "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/el-sombrero-n-la-venganza-lenta.webp",
     "githubUrl": "https://github.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/blob/main/el-sombrero-n-la-venganza-lenta.webp",
-    "size": 115752
+    "size": 115752,
+    "collection": "Welcome to Night City (Set 01)",
+    "cardId": "#009",
+    "cardType": "UNIT // GANGER • VALENTINO",
+    "edition": "Rare",
+    "artist": "Rafael de Latorre & Clonerh"
   },
   {
     "id": "CP-032",
@@ -317,27 +472,42 @@
     "faction": "MERCENARIO",
     "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/emergency-atlus.webp",
     "githubUrl": "https://github.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/blob/main/emergency-atlus.webp",
-    "size": 117310
+    "size": 117310,
+    "collection": "Welcome to Night City (Set 01)",
+    "cardId": "#077",
+    "cardType": "UNIT // TRAUMA TEAM • VEHICLE • ZETATECH",
+    "edition": "Common",
+    "artist": "Robert Sammelin"
   },
   {
     "id": "CP-033",
     "slug": "evelyn-parker-beautiful-enigma",
-    "name": "Evelyn Parker Beautiful Enigma",
+    "name": "Evelyn Parker // Beautiful Enigma",
     "fileName": "evelyn-parker-beautiful-enigma.webp",
     "faction": "MERCENARIO",
     "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/evelyn-parker-beautiful-enigma.webp",
     "githubUrl": "https://github.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/blob/main/evelyn-parker-beautiful-enigma.webp",
-    "size": 103534
+    "size": 103534,
+    "collection": "Welcome to Night City (Set 01)",
+    "cardId": "B107",
+    "cardType": "LEGEND // DOLL",
+    "edition": "Rare",
+    "artist": "Daniel Valaisis"
   },
   {
     "id": "CP-034",
     "slug": "evelyn-parker-scheming-siren",
-    "name": "Evelyn Parker Scheming Siren",
+    "name": "Evelyn Parker // Scheming Siren",
     "fileName": "evelyn-parker-scheming-siren.webp",
     "faction": "MERCENARIO",
     "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/evelyn-parker-scheming-siren.webp",
     "githubUrl": "https://github.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/blob/main/evelyn-parker-scheming-siren.webp",
-    "size": 111238
+    "size": 111238,
+    "collection": "Welcome to Night City (Set 01)",
+    "cardId": "",
+    "cardType": "UNIT // DOLL",
+    "edition": "Uncommon",
+    "artist": "Olgierd Ciszak"
   },
   {
     "id": "CP-035",
@@ -347,37 +517,57 @@
     "faction": "MERCENARIO",
     "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/field-operator.webp",
     "githubUrl": "https://github.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/blob/main/field-operator.webp",
-    "size": 84184
+    "size": 84184,
+    "collection": "Welcome to Night City (Set 01)",
+    "cardId": "#078",
+    "cardType": "UNIT // ARASAKA • CORPO • TECHIE",
+    "edition": "Common",
+    "artist": "Michal Ivan"
   },
   {
     "id": "CP-036",
     "slug": "floor-it",
-    "name": "Floor It",
+    "name": "Floor It!",
     "fileName": "floor-it.webp",
     "faction": "MERCENARIO",
     "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/floor-it.webp",
     "githubUrl": "https://github.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/blob/main/floor-it.webp",
-    "size": 177140
+    "size": 177140,
+    "collection": "Welcome to Night City (Set 01)",
+    "cardId": "#132",
+    "cardType": "PROGRAM",
+    "edition": "Common",
+    "artist": "Dofresh"
   },
   {
     "id": "CP-037",
     "slug": "fool-on-the-hill",
-    "name": "Fool On The Hill",
+    "name": "Fool on the Hill",
     "fileName": "fool-on-the-hill.webp",
     "faction": "MERCENARIO",
     "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/fool-on-the-hill.webp",
     "githubUrl": "https://github.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/blob/main/fool-on-the-hill.webp",
-    "size": 116554
+    "size": 116554,
+    "collection": "Welcome to Night City (Set 01)",
+    "cardId": "#099",
+    "cardType": "PROGRAM // MERC",
+    "edition": "Rare",
+    "artist": "Dofresh"
   },
   {
     "id": "CP-038",
     "slug": "gilded-mato-n",
-    "name": "Gilded Mato N",
+    "name": "Gilded Matón",
     "fileName": "gilded-mato-n.webp",
-    "faction": "MERCENARIO",
+    "faction": "BANDAS",
     "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/gilded-mato-n.webp",
     "githubUrl": "https://github.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/blob/main/gilded-mato-n.webp",
-    "size": 195270
+    "size": 195270,
+    "collection": "Welcome to Night City (Set 01)",
+    "cardId": "#045",
+    "cardType": "UNIT // GANGER • VALENTINO",
+    "edition": "Common",
+    "artist": "Josan Gonzalez"
   },
   {
     "id": "CP-039",
@@ -387,37 +577,57 @@
     "faction": "MERCENARIO",
     "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/gorilla-arms.webp",
     "githubUrl": "https://github.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/blob/main/gorilla-arms.webp",
-    "size": 117720
+    "size": 117720,
+    "collection": "Welcome to Night City (Set 01)",
+    "cardId": "#060",
+    "cardType": "GEAR // CYBERWARE",
+    "edition": "Common",
+    "artist": "TOPDOG Entertainment"
   },
   {
     "id": "CP-040",
     "slug": "goro-takemura-hands-unclean",
-    "name": "Goro Takemura Hands Unclean",
+    "name": "Goro Takemura // Hands Unclean",
     "fileName": "goro-takemura-hands-unclean.webp",
     "faction": "CORPO",
     "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/goro-takemura-hands-unclean.webp",
     "githubUrl": "https://github.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/blob/main/goro-takemura-hands-unclean.webp",
-    "size": 126092
+    "size": 126092,
+    "collection": "Welcome to Night City (Set 01)",
+    "cardId": "",
+    "cardType": "LEGEND",
+    "edition": "",
+    "artist": "Bad Moon Art Studio"
   },
   {
     "id": "CP-041",
     "slug": "goro-takemura-losing-his-way",
-    "name": "Goro Takemura Losing His Way",
+    "name": "Goro Takemura // Losing His Way",
     "fileName": "goro-takemura-losing-his-way.webp",
     "faction": "CORPO",
     "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/goro-takemura-losing-his-way.webp",
     "githubUrl": "https://github.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/blob/main/goro-takemura-losing-his-way.webp",
-    "size": 65458
+    "size": 65458,
+    "collection": "Welcome to Night City (Set 01)",
+    "cardId": "",
+    "cardType": "",
+    "edition": "",
+    "artist": ""
   },
   {
     "id": "CP-042",
     "slug": "goro-takemura-vengeful-bodyguard",
-    "name": "Goro Takemura Vengeful Bodyguard",
+    "name": "Goro Takemura // Vengeful Bodyguard",
     "fileName": "goro-takemura-vengeful-bodyguard.webp",
     "faction": "CORPO",
     "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/goro-takemura-vengeful-bodyguard.webp",
     "githubUrl": "https://github.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/blob/main/goro-takemura-vengeful-bodyguard.webp",
-    "size": 98948
+    "size": 98948,
+    "collection": "Welcome to Night City (Set 01)",
+    "cardId": "",
+    "cardType": "",
+    "edition": "",
+    "artist": ""
   },
   {
     "id": "CP-043",
@@ -427,37 +637,57 @@
     "faction": "MERCENARIO",
     "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/gunpoint-diplomacy.webp",
     "githubUrl": "https://github.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/blob/main/gunpoint-diplomacy.webp",
-    "size": 133282
+    "size": 133282,
+    "collection": "Welcome to Night City (Set 01)",
+    "cardId": "",
+    "cardType": "",
+    "edition": "",
+    "artist": ""
   },
   {
     "id": "CP-044",
     "slug": "hacked-corpo",
     "name": "Hacked Corpo",
     "fileName": "hacked-corpo.webp",
-    "faction": "MERCENARIO",
+    "faction": "CORPO",
     "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/hacked-corpo.webp",
     "githubUrl": "https://github.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/blob/main/hacked-corpo.webp",
-    "size": 72554
+    "size": 72554,
+    "collection": "Welcome to Night City (Set 01)",
+    "cardId": "",
+    "cardType": "",
+    "edition": "",
+    "artist": ""
   },
   {
     "id": "CP-045",
     "slug": "hanako-arasaka-daughter-of-the-emperor",
-    "name": "Hanako Arasaka Daughter Of The Emperor",
+    "name": "Hanako Arasaka // Daughter of the Emperor",
     "fileName": "hanako-arasaka-daughter-of-the-emperor.webp",
     "faction": "CORPO",
     "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/hanako-arasaka-daughter-of-the-emperor.webp",
     "githubUrl": "https://github.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/blob/main/hanako-arasaka-daughter-of-the-emperor.webp",
-    "size": 99852
+    "size": 99852,
+    "collection": "Welcome to Night City (Set 01)",
+    "cardId": "",
+    "cardType": "",
+    "edition": "",
+    "artist": ""
   },
   {
     "id": "CP-046",
     "slug": "hanako-arasaka-in-a-gilded-cage",
-    "name": "Hanako Arasaka In A Gilded Cage",
+    "name": "Hanako Arasaka // In a Gilded Cage",
     "fileName": "hanako-arasaka-in-a-gilded-cage.webp",
     "faction": "CORPO",
     "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/hanako-arasaka-in-a-gilded-cage.webp",
     "githubUrl": "https://github.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/blob/main/hanako-arasaka-in-a-gilded-cage.webp",
-    "size": 93606
+    "size": 93606,
+    "collection": "Welcome to Night City (Set 01)",
+    "cardId": "",
+    "cardType": "",
+    "edition": "",
+    "artist": ""
   },
   {
     "id": "CP-047",
@@ -467,7 +697,12 @@
     "faction": "MERCENARIO",
     "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/heywood-ripperdoc.webp",
     "githubUrl": "https://github.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/blob/main/heywood-ripperdoc.webp",
-    "size": 115846
+    "size": 115846,
+    "collection": "Welcome to Night City (Set 01)",
+    "cardId": "",
+    "cardType": "",
+    "edition": "",
+    "artist": ""
   },
   {
     "id": "CP-048",
@@ -477,117 +712,177 @@
     "faction": "MERCENARIO",
     "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/industrial-assembly.webp",
     "githubUrl": "https://github.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/blob/main/industrial-assembly.webp",
-    "size": 83996
+    "size": 83996,
+    "collection": "Welcome to Night City (Set 01)",
+    "cardId": "",
+    "cardType": "",
+    "edition": "",
+    "artist": ""
   },
   {
     "id": "CP-049",
     "slug": "jacked-in-voodoo-boy",
-    "name": "Jacked In Voodoo Boy",
+    "name": "Jacked-In Voodoo Boy",
     "fileName": "jacked-in-voodoo-boy.webp",
     "faction": "NETRUNNER",
     "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/jacked-in-voodoo-boy.webp",
     "githubUrl": "https://github.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/blob/main/jacked-in-voodoo-boy.webp",
-    "size": 214414
+    "size": 214414,
+    "collection": "Welcome to Night City (Set 01)",
+    "cardId": "",
+    "cardType": "",
+    "edition": "",
+    "artist": ""
   },
   {
     "id": "CP-050",
     "slug": "jackie-welles-mama-s-favorite",
-    "name": "Jackie Welles Mama S Favorite",
+    "name": "Jackie Welles // Mama's Favorite",
     "fileName": "jackie-welles-mama-s-favorite.webp",
     "faction": "MERCENARIO",
     "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/jackie-welles-mama-s-favorite.webp",
     "githubUrl": "https://github.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/blob/main/jackie-welles-mama-s-favorite.webp",
-    "size": 107988
+    "size": 107988,
+    "collection": "Welcome to Night City (Set 01)",
+    "cardId": "",
+    "cardType": "",
+    "edition": "",
+    "artist": ""
   },
   {
     "id": "CP-051",
     "slug": "jackie-welles-pour-one-out-for-me",
-    "name": "Jackie Welles Pour One Out For Me",
+    "name": "Jackie Welles // Pour One Out for Me",
     "fileName": "jackie-welles-pour-one-out-for-me.webp",
     "faction": "MERCENARIO",
     "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/jackie-welles-pour-one-out-for-me.webp",
     "githubUrl": "https://github.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/blob/main/jackie-welles-pour-one-out-for-me.webp",
-    "size": 103470
+    "size": 103470,
+    "collection": "Welcome to Night City (Set 01)",
+    "cardId": "",
+    "cardType": "",
+    "edition": "",
+    "artist": ""
   },
   {
     "id": "CP-052",
     "slug": "jackie-welles-ride-or-die-choom",
-    "name": "Jackie Welles Ride Or Die Choom",
+    "name": "Jackie Welles // Ride or Die Choom",
     "fileName": "jackie-welles-ride-or-die-choom.webp",
     "faction": "MERCENARIO",
     "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/jackie-welles-ride-or-die-choom.webp",
     "githubUrl": "https://github.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/blob/main/jackie-welles-ride-or-die-choom.webp",
-    "size": 110796
+    "size": 110796,
+    "collection": "Welcome to Night City (Set 01)",
+    "cardId": "",
+    "cardType": "",
+    "edition": "",
+    "artist": ""
   },
   {
     "id": "CP-053",
     "slug": "japantown-jonin",
     "name": "Japantown Jonin",
     "fileName": "japantown-jonin.webp",
-    "faction": "MERCENARIO",
+    "faction": "BANDAS",
     "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/japantown-jonin.webp",
     "githubUrl": "https://github.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/blob/main/japantown-jonin.webp",
-    "size": 188362
+    "size": 188362,
+    "collection": "Welcome to Night City (Set 01)",
+    "cardId": "",
+    "cardType": "",
+    "edition": "",
+    "artist": ""
   },
   {
     "id": "CP-054",
     "slug": "johnny-silverhand-never-stop-fighting",
-    "name": "Johnny Silverhand Never Stop Fighting",
+    "name": "Johnny Silverhand // Never Stop Fighting",
     "fileName": "johnny-silverhand-never-stop-fighting.webp",
     "faction": "MERCENARIO",
     "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/johnny-silverhand-never-stop-fighting.webp",
     "githubUrl": "https://github.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/blob/main/johnny-silverhand-never-stop-fighting.webp",
-    "size": 117534
+    "size": 117534,
+    "collection": "Welcome to Night City (Set 01)",
+    "cardId": "",
+    "cardType": "MERC // ROCKER // SAMURAI",
+    "edition": "",
+    "artist": ""
   },
   {
     "id": "CP-055",
     "slug": "johnny-silverhand-rocking-renegade",
-    "name": "Johnny Silverhand Rocking Renegade",
+    "name": "Johnny Silverhand // Rocking Renegade",
     "fileName": "johnny-silverhand-rocking-renegade.webp",
     "faction": "MERCENARIO",
     "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/johnny-silverhand-rocking-renegade.webp",
     "githubUrl": "https://github.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/blob/main/johnny-silverhand-rocking-renegade.webp",
-    "size": 156540
+    "size": 156540,
+    "collection": "Welcome to Night City (Set 01)",
+    "cardId": "",
+    "cardType": "",
+    "edition": "",
+    "artist": ""
   },
   {
     "id": "CP-056",
     "slug": "judy-a-lvarez-nothing-to-doubt",
-    "name": "Judy A Lvarez Nothing To Doubt",
+    "name": "Judy Álvarez // Nothing to Doubt",
     "fileName": "judy-a-lvarez-nothing-to-doubt.webp",
     "faction": "MERCENARIO",
     "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/judy-a-lvarez-nothing-to-doubt.webp",
     "githubUrl": "https://github.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/blob/main/judy-a-lvarez-nothing-to-doubt.webp",
-    "size": 84508
+    "size": 84508,
+    "collection": "Welcome to Night City (Set 01)",
+    "cardId": "",
+    "cardType": "",
+    "edition": "",
+    "artist": ""
   },
   {
     "id": "CP-057",
     "slug": "judy-alvarez-braindance-maestro",
-    "name": "Judy Alvarez Braindance Maestro",
+    "name": "Judy Álvarez // Braindance Maestro",
     "fileName": "judy-alvarez-braindance-maestro.webp",
-    "faction": "MERCENARIO",
+    "faction": "NETRUNNER",
     "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/judy-alvarez-braindance-maestro.webp",
     "githubUrl": "https://github.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/blob/main/judy-alvarez-braindance-maestro.webp",
-    "size": 117786
+    "size": 117786,
+    "collection": "Welcome to Night City (Set 01)",
+    "cardId": "",
+    "cardType": "",
+    "edition": "",
+    "artist": ""
   },
   {
     "id": "CP-058",
     "slug": "kerry-eurodyne-axe-attitude-audience",
-    "name": "Kerry Eurodyne Axe Attitude Audience",
+    "name": "Kerry Eurodyne // Axe, Attitude, Audience",
     "fileName": "kerry-eurodyne-axe-attitude-audience.webp",
     "faction": "MERCENARIO",
     "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/kerry-eurodyne-axe-attitude-audience.webp",
     "githubUrl": "https://github.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/blob/main/kerry-eurodyne-axe-attitude-audience.webp",
-    "size": 122952
+    "size": 122952,
+    "collection": "Welcome to Night City (Set 01)",
+    "cardId": "",
+    "cardType": "",
+    "edition": "",
+    "artist": ""
   },
   {
     "id": "CP-059",
     "slug": "kerry-eurodyne-the-last-rockerboy",
-    "name": "Kerry Eurodyne The Last Rockerboy",
+    "name": "Kerry Eurodyne // The Last Rockerboy",
     "fileName": "kerry-eurodyne-the-last-rockerboy.webp",
     "faction": "MERCENARIO",
     "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/kerry-eurodyne-the-last-rockerboy.webp",
     "githubUrl": "https://github.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/blob/main/kerry-eurodyne-the-last-rockerboy.webp",
-    "size": 76374
+    "size": 76374,
+    "collection": "Welcome to Night City (Set 01)",
+    "cardId": "",
+    "cardType": "",
+    "edition": "",
+    "artist": ""
   },
   {
     "id": "CP-060",
@@ -597,47 +892,72 @@
     "faction": "MERCENARIO",
     "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/kiroshi-optics.webp",
     "githubUrl": "https://github.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/blob/main/kiroshi-optics.webp",
-    "size": 116624
+    "size": 116624,
+    "collection": "Welcome to Night City (Set 01)",
+    "cardId": "",
+    "cardType": "",
+    "edition": "",
+    "artist": ""
   },
   {
     "id": "CP-061",
     "slug": "la-llorona-ghost-of-the-past",
-    "name": "La Llorona Ghost Of The Past",
+    "name": "La Llorona // Ghost of the Past",
     "fileName": "la-llorona-ghost-of-the-past.webp",
-    "faction": "MERCENARIO",
+    "faction": "BANDAS",
     "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/la-llorona-ghost-of-the-past.webp",
     "githubUrl": "https://github.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/blob/main/la-llorona-ghost-of-the-past.webp",
-    "size": 139568
+    "size": 139568,
+    "collection": "Welcome to Night City (Set 01)",
+    "cardId": "",
+    "cardType": "",
+    "edition": "",
+    "artist": ""
   },
   {
     "id": "CP-062",
     "slug": "les-elemens",
-    "name": "Les Elemens",
+    "name": "Les Éléments",
     "fileName": "les-elemens.webp",
     "faction": "MERCENARIO",
     "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/les-elemens.webp",
     "githubUrl": "https://github.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/blob/main/les-elemens.webp",
-    "size": 173892
+    "size": 173892,
+    "collection": "Welcome to Night City (Set 01)",
+    "cardId": "",
+    "cardType": "",
+    "edition": "",
+    "artist": ""
   },
   {
     "id": "CP-063",
     "slug": "live-with-the-aftermath",
-    "name": "Live With The Aftermath",
+    "name": "Live With the Aftermath",
     "fileName": "live-with-the-aftermath.webp",
     "faction": "MERCENARIO",
     "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/live-with-the-aftermath.webp",
     "githubUrl": "https://github.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/blob/main/live-with-the-aftermath.webp",
-    "size": 198370
+    "size": 198370,
+    "collection": "Welcome to Night City (Set 01)",
+    "cardId": "",
+    "cardType": "",
+    "edition": "",
+    "artist": ""
   },
   {
     "id": "CP-064",
     "slug": "lizzy-wizzy-delicate-weapon",
-    "name": "Lizzy Wizzy Delicate Weapon",
+    "name": "Lizzy Wizzy // Delicate Weapon",
     "fileName": "lizzy-wizzy-delicate-weapon.webp",
     "faction": "MERCENARIO",
     "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/lizzy-wizzy-delicate-weapon.webp",
     "githubUrl": "https://github.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/blob/main/lizzy-wizzy-delicate-weapon.webp",
-    "size": 113948
+    "size": 113948,
+    "collection": "Welcome to Night City (Set 01)",
+    "cardId": "",
+    "cardType": "",
+    "edition": "",
+    "artist": ""
   },
   {
     "id": "CP-065",
@@ -647,7 +967,12 @@
     "faction": "BANDAS",
     "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/maelstrom-goons.webp",
     "githubUrl": "https://github.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/blob/main/maelstrom-goons.webp",
-    "size": 121510
+    "size": 121510,
+    "collection": "Welcome to Night City (Set 01)",
+    "cardId": "",
+    "cardType": "",
+    "edition": "",
+    "artist": ""
   },
   {
     "id": "CP-066",
@@ -657,17 +982,27 @@
     "faction": "BANDAS",
     "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/maelstrom-zealots.webp",
     "githubUrl": "https://github.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/blob/main/maelstrom-zealots.webp",
-    "size": 161006
+    "size": 161006,
+    "collection": "Welcome to Night City (Set 01)",
+    "cardId": "",
+    "cardType": "",
+    "edition": "",
+    "artist": ""
   },
   {
     "id": "CP-067",
     "slug": "maman-brigitte-spirit-of-death",
-    "name": "Maman Brigitte Spirit Of Death",
+    "name": "Maman Brigitte // Spirit of Death",
     "fileName": "maman-brigitte-spirit-of-death.webp",
-    "faction": "MERCENARIO",
+    "faction": "NETRUNNER",
     "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/maman-brigitte-spirit-of-death.webp",
     "githubUrl": "https://github.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/blob/main/maman-brigitte-spirit-of-death.webp",
-    "size": 80806
+    "size": 80806,
+    "collection": "Welcome to Night City (Set 01)",
+    "cardId": "",
+    "cardType": "",
+    "edition": "",
+    "artist": ""
   },
   {
     "id": "CP-068",
@@ -677,7 +1012,12 @@
     "faction": "MERCENARIO",
     "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/mandibular-upgrade.webp",
     "githubUrl": "https://github.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/blob/main/mandibular-upgrade.webp",
-    "size": 138026
+    "size": 138026,
+    "collection": "Welcome to Night City (Set 01)",
+    "cardId": "",
+    "cardType": "",
+    "edition": "",
+    "artist": ""
   },
   {
     "id": "CP-069",
@@ -687,87 +1027,132 @@
     "faction": "MERCENARIO",
     "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/mantis-blades.webp",
     "githubUrl": "https://github.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/blob/main/mantis-blades.webp",
-    "size": 114068
+    "size": 114068,
+    "collection": "Welcome to Night City (Set 01)",
+    "cardId": "",
+    "cardType": "",
+    "edition": "",
+    "artist": ""
   },
   {
     "id": "CP-070",
     "slug": "maxtac-av",
-    "name": "Maxtac Av",
+    "name": "MaxTac AV",
     "fileName": "maxtac-av.webp",
     "faction": "CORPO",
     "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/maxtac-av.webp",
     "githubUrl": "https://github.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/blob/main/maxtac-av.webp",
-    "size": 87256
+    "size": 87256,
+    "collection": "Welcome to Night City (Set 01)",
+    "cardId": "",
+    "cardType": "",
+    "edition": "",
+    "artist": ""
   },
   {
     "id": "CP-071",
     "slug": "maxtac-heavy",
-    "name": "Maxtac Heavy",
+    "name": "MaxTac Heavy",
     "fileName": "maxtac-heavy.webp",
     "faction": "CORPO",
     "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/maxtac-heavy.webp",
     "githubUrl": "https://github.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/blob/main/maxtac-heavy.webp",
-    "size": 95998
+    "size": 95998,
+    "collection": "Welcome to Night City (Set 01)",
+    "cardId": "",
+    "cardType": "",
+    "edition": "",
+    "artist": ""
   },
   {
     "id": "CP-072",
     "slug": "maxtac-squadron",
-    "name": "Maxtac Squadron",
+    "name": "MaxTac Squadron",
     "fileName": "maxtac-squadron.webp",
     "faction": "CORPO",
     "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/maxtac-squadron.webp",
     "githubUrl": "https://github.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/blob/main/maxtac-squadron.webp",
-    "size": 88160
+    "size": 88160,
+    "collection": "Welcome to Night City (Set 01)",
+    "cardId": "",
+    "cardType": "",
+    "edition": "",
+    "artist": ""
   },
   {
     "id": "CP-073",
     "slug": "maxtac-suppression-team",
-    "name": "Maxtac Suppression Team",
+    "name": "MaxTac Suppression Team",
     "fileName": "maxtac-suppression-team.webp",
     "faction": "CORPO",
     "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/maxtac-suppression-team.webp",
     "githubUrl": "https://github.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/blob/main/maxtac-suppression-team.webp",
-    "size": 100320
+    "size": 100320,
+    "collection": "Welcome to Night City (Set 01)",
+    "cardId": "",
+    "cardType": "",
+    "edition": "",
+    "artist": ""
   },
   {
     "id": "CP-074",
     "slug": "memory-relapse",
     "name": "Memory Relapse",
     "fileName": "memory-relapse.webp",
-    "faction": "MERCENARIO",
+    "faction": "NETRUNNER",
     "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/memory-relapse.webp",
     "githubUrl": "https://github.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/blob/main/memory-relapse.webp",
-    "size": 172618
+    "size": 172618,
+    "collection": "Welcome to Night City (Set 01)",
+    "cardId": "",
+    "cardType": "",
+    "edition": "",
+    "artist": ""
   },
   {
     "id": "CP-075",
     "slug": "meredith-stout-stone-cold-corpo",
-    "name": "Meredith Stout Stone Cold Corpo",
+    "name": "Meredith Stout // Stone-Cold Corpo",
     "fileName": "meredith-stout-stone-cold-corpo.webp",
-    "faction": "MERCENARIO",
+    "faction": "CORPO",
     "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/meredith-stout-stone-cold-corpo.webp",
     "githubUrl": "https://github.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/blob/main/meredith-stout-stone-cold-corpo.webp",
-    "size": 75438
+    "size": 75438,
+    "collection": "Welcome to Night City (Set 01)",
+    "cardId": "",
+    "cardType": "",
+    "edition": "",
+    "artist": ""
   },
   {
     "id": "CP-076",
     "slug": "minotaur",
     "name": "Minotaur",
     "fileName": "minotaur.webp",
-    "faction": "MERCENARIO",
+    "faction": "CORPO",
     "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/minotaur.webp",
     "githubUrl": "https://github.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/blob/main/minotaur.webp",
-    "size": 83426
+    "size": 83426,
+    "collection": "Welcome to Night City (Set 01)",
+    "cardId": "",
+    "cardType": "",
+    "edition": "",
+    "artist": ""
   },
   {
     "id": "CP-077",
     "slug": "misty-olszewski-mender-of-broken-spirits",
-    "name": "Misty Olszewski Mender Of Broken Spirits",
+    "name": "Misty Olszewski // Mender of Broken Spirits",
     "fileName": "misty-olszewski-mender-of-broken-spirits.webp",
     "faction": "MERCENARIO",
     "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/misty-olszewski-mender-of-broken-spirits.webp",
     "githubUrl": "https://github.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/blob/main/misty-olszewski-mender-of-broken-spirits.webp",
-    "size": 107288
+    "size": 107288,
+    "collection": "Welcome to Night City (Set 01)",
+    "cardId": "",
+    "cardType": "",
+    "edition": "",
+    "artist": ""
   },
   {
     "id": "CP-078",
@@ -777,7 +1162,12 @@
     "faction": "MERCENARIO",
     "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/modded-kusanagi.webp",
     "githubUrl": "https://github.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/blob/main/modded-kusanagi.webp",
-    "size": 106310
+    "size": 106310,
+    "collection": "Welcome to Night City (Set 01)",
+    "cardId": "",
+    "cardType": "",
+    "edition": "",
+    "artist": ""
   },
   {
     "id": "CP-079",
@@ -787,7 +1177,12 @@
     "faction": "MERCENARIO",
     "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/modded-muramasa.webp",
     "githubUrl": "https://github.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/blob/main/modded-muramasa.webp",
-    "size": 87640
+    "size": 87640,
+    "collection": "Welcome to Night City (Set 01)",
+    "cardId": "",
+    "cardType": "",
+    "edition": "",
+    "artist": ""
   },
   {
     "id": "CP-080",
@@ -797,97 +1192,147 @@
     "faction": "BANDAS",
     "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/mox-inciters.webp",
     "githubUrl": "https://github.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/blob/main/mox-inciters.webp",
-    "size": 181812
+    "size": 181812,
+    "collection": "Welcome to Night City (Set 01)",
+    "cardId": "",
+    "cardType": "",
+    "edition": "",
+    "artist": ""
   },
   {
     "id": "CP-081",
     "slug": "mt0d12-flathead",
-    "name": "Mt0d12 Flathead",
+    "name": "MT0D12 Flathead",
     "fileName": "mt0d12-flathead.webp",
     "faction": "MERCENARIO",
     "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/mt0d12-flathead.webp",
     "githubUrl": "https://github.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/blob/main/mt0d12-flathead.webp",
-    "size": 88426
+    "size": 88426,
+    "collection": "Welcome to Night City (Set 01)",
+    "cardId": "",
+    "cardType": "",
+    "edition": "",
+    "artist": ""
   },
   {
     "id": "CP-082",
     "slug": "muamar-reyes-el-capita-n",
-    "name": "Muamar Reyes El Capita N",
+    "name": "Muamar Reyes // El Capitán",
     "fileName": "muamar-reyes-el-capita-n.webp",
     "faction": "MERCENARIO",
     "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/muamar-reyes-el-capita-n.webp",
     "githubUrl": "https://github.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/blob/main/muamar-reyes-el-capita-n.webp",
-    "size": 105026
+    "size": 105026,
+    "collection": "Welcome to Night City (Set 01)",
+    "cardId": "",
+    "cardType": "",
+    "edition": "",
+    "artist": ""
   },
   {
     "id": "CP-083",
     "slug": "nadia-fighting-through-grief",
-    "name": "Nadia Fighting Through Grief",
+    "name": "Nadia // Fighting Through Grief",
     "fileName": "nadia-fighting-through-grief.webp",
-    "faction": "MERCENARIO",
+    "faction": "CORPO",
     "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/nadia-fighting-through-grief.webp",
     "githubUrl": "https://github.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/blob/main/nadia-fighting-through-grief.webp",
-    "size": 111938
+    "size": 111938,
+    "collection": "Welcome to Night City (Set 01)",
+    "cardId": "",
+    "cardType": "",
+    "edition": "",
+    "artist": ""
   },
   {
     "id": "CP-084",
     "slug": "netwatch-netdriver",
-    "name": "Netwatch Netdriver",
+    "name": "NetWatch Netdriver",
     "fileName": "netwatch-netdriver.webp",
     "faction": "CORPO",
     "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/netwatch-netdriver.webp",
     "githubUrl": "https://github.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/blob/main/netwatch-netdriver.webp",
-    "size": 159424
+    "size": 159424,
+    "collection": "Welcome to Night City (Set 01)",
+    "cardId": "",
+    "cardType": "",
+    "edition": "",
+    "artist": ""
   },
   {
     "id": "CP-085",
     "slug": "nocturne-op55-n1",
-    "name": "Nocturne Op55 N1",
+    "name": "Nocturne Op55N1",
     "fileName": "nocturne-op55-n1.webp",
-    "faction": "MERCENARIO",
+    "faction": "CORPO",
     "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/nocturne-op55-n1.webp",
     "githubUrl": "https://github.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/blob/main/nocturne-op55-n1.webp",
-    "size": 125852
+    "size": 125852,
+    "collection": "Welcome to Night City (Set 01)",
+    "cardId": "",
+    "cardType": "",
+    "edition": "",
+    "artist": ""
   },
   {
     "id": "CP-086",
     "slug": "octant",
     "name": "Octant",
     "fileName": "octant.webp",
-    "faction": "MERCENARIO",
+    "faction": "CORPO",
     "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/octant.webp",
     "githubUrl": "https://github.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/blob/main/octant.webp",
-    "size": 90662
+    "size": 90662,
+    "collection": "Welcome to Night City (Set 01)",
+    "cardId": "",
+    "cardType": "",
+    "edition": "",
+    "artist": ""
   },
   {
     "id": "CP-087",
     "slug": "offduty-malfini",
-    "name": "Offduty Malfini",
+    "name": "Off-Duty Malfini",
     "fileName": "offduty-malfini.webp",
     "faction": "MERCENARIO",
     "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/offduty-malfini.webp",
     "githubUrl": "https://github.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/blob/main/offduty-malfini.webp",
-    "size": 145276
+    "size": 145276,
+    "collection": "Welcome to Night City (Set 01)",
+    "cardId": "",
+    "cardType": "",
+    "edition": "",
+    "artist": ""
   },
   {
     "id": "CP-088",
     "slug": "over-the-edge",
-    "name": "Over The Edge",
+    "name": "Over the Edge",
     "fileName": "over-the-edge.webp",
     "faction": "MERCENARIO",
     "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/over-the-edge.webp",
     "githubUrl": "https://github.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/blob/main/over-the-edge.webp",
-    "size": 191430
+    "size": 191430,
+    "collection": "Welcome to Night City (Set 01)",
+    "cardId": "",
+    "cardType": "",
+    "edition": "",
+    "artist": ""
   },
   {
     "id": "CP-089",
     "slug": "overwatch-panams-gift",
-    "name": "Overwatch Panams Gift",
+    "name": "Overwatch // Panam's Gift",
     "fileName": "overwatch-panams-gift.webp",
     "faction": "MERCENARIO",
     "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/overwatch-panams-gift.webp",
     "githubUrl": "https://github.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/blob/main/overwatch-panams-gift.webp",
-    "size": 148462
+    "size": 148462,
+    "collection": "Welcome to Night City (Set 01)",
+    "cardId": "",
+    "cardType": "",
+    "edition": "",
+    "artist": ""
   },
   {
     "id": "CP-090",
@@ -897,37 +1342,57 @@
     "faction": "NETRUNNER",
     "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/pacifica-netrunner.webp",
     "githubUrl": "https://github.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/blob/main/pacifica-netrunner.webp",
-    "size": 89538
+    "size": 89538,
+    "collection": "Welcome to Night City (Set 01)",
+    "cardId": "",
+    "cardType": "",
+    "edition": "",
+    "artist": ""
   },
   {
     "id": "CP-091",
     "slug": "padre-man-of-the-cross",
-    "name": "Padre Man Of The Cross",
+    "name": "Padre // Man of the Cross",
     "fileName": "padre-man-of-the-cross.webp",
     "faction": "MERCENARIO",
     "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/padre-man-of-the-cross.webp",
     "githubUrl": "https://github.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/blob/main/padre-man-of-the-cross.webp",
-    "size": 112618
+    "size": 112618,
+    "collection": "Welcome to Night City (Set 01)",
+    "cardId": "",
+    "cardType": "",
+    "edition": "",
+    "artist": ""
   },
   {
     "id": "CP-092",
     "slug": "panam-palmer-nomad-cavalry",
-    "name": "Panam Palmer Nomad Cavalry",
+    "name": "Panam Palmer // Nomad Cavalry",
     "fileName": "panam-palmer-nomad-cavalry.webp",
     "faction": "MERCENARIO",
     "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/panam-palmer-nomad-cavalry.webp",
     "githubUrl": "https://github.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/blob/main/panam-palmer-nomad-cavalry.webp",
-    "size": 121770
+    "size": 121770,
+    "collection": "Welcome to Night City (Set 01)",
+    "cardId": "",
+    "cardType": "",
+    "edition": "",
+    "artist": ""
   },
   {
     "id": "CP-093",
     "slug": "panam-palmer-strength-through-family",
-    "name": "Panam Palmer Strength Through Family",
+    "name": "Panam Palmer // Strength Through Family",
     "fileName": "panam-palmer-strength-through-family.webp",
     "faction": "MERCENARIO",
     "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/panam-palmer-strength-through-family.webp",
     "githubUrl": "https://github.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/blob/main/panam-palmer-strength-through-family.webp",
-    "size": 93406
+    "size": 93406,
+    "collection": "Welcome to Night City (Set 01)",
+    "cardId": "",
+    "cardType": "",
+    "edition": "",
+    "artist": ""
   },
   {
     "id": "CP-094",
@@ -937,37 +1402,57 @@
     "faction": "MERCENARIO",
     "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/peace-offering.webp",
     "githubUrl": "https://github.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/blob/main/peace-offering.webp",
-    "size": 136874
+    "size": 136874,
+    "collection": "Welcome to Night City (Set 01)",
+    "cardId": "",
+    "cardType": "",
+    "edition": "",
+    "artist": ""
   },
   {
     "id": "CP-095",
     "slug": "pepe-najarro-working-doubles",
-    "name": "Pepe Najarro Working Doubles",
+    "name": "Pepe Najarro // Working Doubles",
     "fileName": "pepe-najarro-working-doubles.webp",
     "faction": "MERCENARIO",
     "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/pepe-najarro-working-doubles.webp",
     "githubUrl": "https://github.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/blob/main/pepe-najarro-working-doubles.webp",
-    "size": 84854
+    "size": 84854,
+    "collection": "Welcome to Night City (Set 01)",
+    "cardId": "",
+    "cardType": "",
+    "edition": "",
+    "artist": ""
   },
   {
     "id": "CP-096",
     "slug": "placide-voodoo-sentinel",
-    "name": "Placide Voodoo Sentinel",
+    "name": "Placide // Voodoo Sentinel",
     "fileName": "placide-voodoo-sentinel.webp",
     "faction": "NETRUNNER",
     "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/placide-voodoo-sentinel.webp",
     "githubUrl": "https://github.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/blob/main/placide-voodoo-sentinel.webp",
-    "size": 126912
+    "size": 126912,
+    "collection": "Welcome to Night City (Set 01)",
+    "cardId": "",
+    "cardType": "",
+    "edition": "",
+    "artist": ""
   },
   {
     "id": "CP-097",
     "slug": "psycho-squad",
     "name": "Psycho Squad",
     "fileName": "psycho-squad.webp",
-    "faction": "MERCENARIO",
+    "faction": "CORPO",
     "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/psycho-squad.webp",
     "githubUrl": "https://github.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/blob/main/psycho-squad.webp",
-    "size": 120348
+    "size": 120348,
+    "collection": "Welcome to Night City (Set 01)",
+    "cardId": "",
+    "cardType": "",
+    "edition": "",
+    "artist": ""
   },
   {
     "id": "CP-098",
@@ -977,27 +1462,42 @@
     "faction": "MERCENARIO",
     "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/pyramid-song.webp",
     "githubUrl": "https://github.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/blob/main/pyramid-song.webp",
-    "size": 146324
+    "size": 146324,
+    "collection": "Welcome to Night City (Set 01)",
+    "cardId": "",
+    "cardType": "",
+    "edition": "",
+    "artist": ""
   },
   {
     "id": "CP-099",
     "slug": "rebecca-having-a-moment",
-    "name": "Rebecca Having A Moment",
+    "name": "Rebecca // Having a Moment",
     "fileName": "rebecca-having-a-moment.webp",
     "faction": "MERCENARIO",
     "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/rebecca-having-a-moment.webp",
     "githubUrl": "https://github.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/blob/main/rebecca-having-a-moment.webp",
-    "size": 140436
+    "size": 140436,
+    "collection": "Welcome to Night City (Set 01)",
+    "cardId": "",
+    "cardType": "",
+    "edition": "",
+    "artist": ""
   },
   {
     "id": "CP-100",
     "slug": "reboot-optics",
     "name": "Reboot Optics",
     "fileName": "reboot-optics.webp",
-    "faction": "MERCENARIO",
+    "faction": "NETRUNNER",
     "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/reboot-optics.webp",
     "githubUrl": "https://github.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/blob/main/reboot-optics.webp",
-    "size": 115848
+    "size": 115848,
+    "collection": "Welcome to Night City (Set 01)",
+    "cardId": "",
+    "cardType": "",
+    "edition": "",
+    "artist": ""
   },
   {
     "id": "CP-101",
@@ -1007,87 +1507,132 @@
     "faction": "MERCENARIO",
     "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/riding-nomad.webp",
     "githubUrl": "https://github.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/blob/main/riding-nomad.webp",
-    "size": 110592
+    "size": 110592,
+    "collection": "Welcome to Night City (Set 01)",
+    "cardId": "",
+    "cardType": "",
+    "edition": "",
+    "artist": ""
   },
   {
     "id": "CP-102",
     "slug": "riot-shield",
     "name": "Riot Shield",
     "fileName": "riot-shield.webp",
-    "faction": "MERCENARIO",
+    "faction": "CORPO",
     "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/riot-shield.webp",
     "githubUrl": "https://github.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/blob/main/riot-shield.webp",
-    "size": 92730
+    "size": 92730,
+    "collection": "Welcome to Night City (Set 01)",
+    "cardId": "",
+    "cardType": "",
+    "edition": "",
+    "artist": ""
   },
   {
     "id": "CP-103",
     "slug": "rita-wheeler-no-stupid-questions",
-    "name": "Rita Wheeler No Stupid Questions",
+    "name": "Rita Wheeler // No Stupid Questions",
     "fileName": "rita-wheeler-no-stupid-questions.webp",
-    "faction": "MERCENARIO",
+    "faction": "BANDAS",
     "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/rita-wheeler-no-stupid-questions.webp",
     "githubUrl": "https://github.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/blob/main/rita-wheeler-no-stupid-questions.webp",
-    "size": 104956
+    "size": 104956,
+    "collection": "Welcome to Night City (Set 01)",
+    "cardId": "",
+    "cardType": "",
+    "edition": "",
+    "artist": ""
   },
   {
     "id": "CP-104",
     "slug": "river-ward-detective-on-the-hunt",
-    "name": "River Ward Detective On The Hunt",
+    "name": "River Ward // Detective on the Hunt",
     "fileName": "river-ward-detective-on-the-hunt.webp",
     "faction": "MERCENARIO",
     "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/river-ward-detective-on-the-hunt.webp",
     "githubUrl": "https://github.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/blob/main/river-ward-detective-on-the-hunt.webp",
-    "size": 96920
+    "size": 96920,
+    "collection": "Welcome to Night City (Set 01)",
+    "cardId": "",
+    "cardType": "",
+    "edition": "",
+    "artist": ""
   },
   {
     "id": "CP-105",
     "slug": "rockn-rockerboy",
-    "name": "Rockn Rockerboy",
+    "name": "Rockin' Rockerboy",
     "fileName": "rockn-rockerboy.webp",
     "faction": "MERCENARIO",
     "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/rockn-rockerboy.webp",
     "githubUrl": "https://github.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/blob/main/rockn-rockerboy.webp",
-    "size": 79784
+    "size": 79784,
+    "collection": "Welcome to Night City (Set 01)",
+    "cardId": "",
+    "cardType": "",
+    "edition": "",
+    "artist": ""
   },
   {
     "id": "CP-106",
     "slug": "rogue-amendiares-preem-solo",
-    "name": "Rogue Amendiares Preem Solo",
+    "name": "Rogue Amendiares // Preem Solo",
     "fileName": "rogue-amendiares-preem-solo.webp",
     "faction": "MERCENARIO",
     "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/rogue-amendiares-preem-solo.webp",
     "githubUrl": "https://github.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/blob/main/rogue-amendiares-preem-solo.webp",
-    "size": 111242
+    "size": 111242,
+    "collection": "Welcome to Night City (Set 01)",
+    "cardId": "",
+    "cardType": "",
+    "edition": "",
+    "artist": ""
   },
   {
     "id": "CP-107",
     "slug": "rogue-amendiares-queen-of-the-afterlife",
-    "name": "Rogue Amendiares Queen Of The Afterlife",
+    "name": "Rogue Amendiares // Queen of the Afterlife",
     "fileName": "rogue-amendiares-queen-of-the-afterlife.webp",
     "faction": "MERCENARIO",
     "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/rogue-amendiares-queen-of-the-afterlife.webp",
     "githubUrl": "https://github.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/blob/main/rogue-amendiares-queen-of-the-afterlife.webp",
-    "size": 129232
+    "size": 129232,
+    "collection": "Welcome to Night City (Set 01)",
+    "cardId": "",
+    "cardType": "",
+    "edition": "",
+    "artist": ""
   },
   {
     "id": "CP-108",
     "slug": "royce-dont-call-me-simon",
-    "name": "Royce Dont Call Me Simon",
+    "name": "Royce // Don't Call Me Simon",
     "fileName": "royce-dont-call-me-simon.webp",
     "faction": "BANDAS",
     "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/royce-dont-call-me-simon.webp",
     "githubUrl": "https://github.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/blob/main/royce-dont-call-me-simon.webp",
-    "size": 143164
+    "size": 143164,
+    "collection": "Welcome to Night City (Set 01)",
+    "cardId": "",
+    "cardType": "",
+    "edition": "",
+    "artist": ""
   },
   {
     "id": "CP-109",
     "slug": "royce-psycho-on-the-edge",
-    "name": "Royce Psycho On The Edge",
+    "name": "Royce // Psycho on the Edge",
     "fileName": "royce-psycho-on-the-edge.webp",
     "faction": "BANDAS",
     "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/royce-psycho-on-the-edge.webp",
     "githubUrl": "https://github.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/blob/main/royce-psycho-on-the-edge.webp",
-    "size": 104528
+    "size": 104528,
+    "collection": "Welcome to Night City (Set 01)",
+    "cardId": "",
+    "cardType": "",
+    "edition": "",
+    "artist": ""
   },
   {
     "id": "CP-110",
@@ -1097,17 +1642,27 @@
     "faction": "MERCENARIO",
     "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/ruthless-lowlife.webp",
     "githubUrl": "https://github.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/blob/main/ruthless-lowlife.webp",
-    "size": 200422
+    "size": 200422,
+    "collection": "Welcome to Night City (Set 01)",
+    "cardId": "",
+    "cardType": "",
+    "edition": "",
+    "artist": ""
   },
   {
     "id": "CP-111",
     "slug": "saburo-arasaka-stubborn-patriarch",
-    "name": "Saburo Arasaka Stubborn Patriarch",
+    "name": "Saburo Arasaka // Stubborn Patriarch",
     "fileName": "saburo-arasaka-stubborn-patriarch.webp",
     "faction": "CORPO",
     "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/saburo-arasaka-stubborn-patriarch.webp",
     "githubUrl": "https://github.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/blob/main/saburo-arasaka-stubborn-patriarch.webp",
-    "size": 111596
+    "size": 111596,
+    "collection": "Welcome to Night City (Set 01)",
+    "cardId": "",
+    "cardType": "",
+    "edition": "",
+    "artist": ""
   },
   {
     "id": "CP-112",
@@ -1117,17 +1672,27 @@
     "faction": "MERCENARIO",
     "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/safety-override.webp",
     "githubUrl": "https://github.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/blob/main/safety-override.webp",
-    "size": 101706
+    "size": 101706,
+    "collection": "Welcome to Night City (Set 01)",
+    "cardId": "",
+    "cardType": "",
+    "edition": "",
+    "artist": ""
   },
   {
     "id": "CP-113",
     "slug": "sandayu-oda-hanakos-guardian",
-    "name": "Sandayu Oda Hanakos Guardian",
+    "name": "Sandayu Oda // Hanako's Guardian",
     "fileName": "sandayu-oda-hanakos-guardian.webp",
-    "faction": "MERCENARIO",
+    "faction": "CORPO",
     "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/sandayu-oda-hanakos-guardian.webp",
     "githubUrl": "https://github.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/blob/main/sandayu-oda-hanakos-guardian.webp",
-    "size": 109918
+    "size": 109918,
+    "collection": "Welcome to Night City (Set 01)",
+    "cardId": "",
+    "cardType": "",
+    "edition": "",
+    "artist": ""
   },
   {
     "id": "CP-114",
@@ -1137,47 +1702,72 @@
     "faction": "MERCENARIO",
     "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/sandevistan.webp",
     "githubUrl": "https://github.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/blob/main/sandevistan.webp",
-    "size": 106432
+    "size": 106432,
+    "collection": "Welcome to Night City (Set 01)",
+    "cardId": "",
+    "cardType": "",
+    "edition": "",
+    "artist": ""
   },
   {
     "id": "CP-115",
     "slug": "sasha-yakovleva-won-t-let-you-down",
-    "name": "Sasha Yakovleva Won T Let You Down",
+    "name": "Sasha Yakovleva // Won't Let You Down",
     "fileName": "sasha-yakovleva-won-t-let-you-down.webp",
-    "faction": "MERCENARIO",
+    "faction": "NETRUNNER",
     "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/sasha-yakovleva-won-t-let-you-down.webp",
     "githubUrl": "https://github.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/blob/main/sasha-yakovleva-won-t-let-you-down.webp",
-    "size": 129512
+    "size": 129512,
+    "collection": "Welcome to Night City (Set 01)",
+    "cardId": "",
+    "cardType": "",
+    "edition": "",
+    "artist": ""
   },
   {
     "id": "CP-116",
     "slug": "satori-sword-of-saburo",
-    "name": "Satori Sword Of Saburo",
+    "name": "Satori // Sword of Saburo",
     "fileName": "satori-sword-of-saburo.webp",
-    "faction": "MERCENARIO",
+    "faction": "CORPO",
     "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/satori-sword-of-saburo.webp",
     "githubUrl": "https://github.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/blob/main/satori-sword-of-saburo.webp",
-    "size": 132550
+    "size": 132550,
+    "collection": "Welcome to Night City (Set 01)",
+    "cardId": "",
+    "cardType": "",
+    "edition": "",
+    "artist": ""
   },
   {
     "id": "CP-117",
     "slug": "saul-bright-stormrider",
-    "name": "Saul Bright Stormrider",
+    "name": "Saul Bright // Stormrider",
     "fileName": "saul-bright-stormrider.webp",
     "faction": "MERCENARIO",
     "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/saul-bright-stormrider.webp",
     "githubUrl": "https://github.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/blob/main/saul-bright-stormrider.webp",
-    "size": 111710
+    "size": 111710,
+    "collection": "Welcome to Night City (Set 01)",
+    "cardId": "",
+    "cardType": "",
+    "edition": "",
+    "artist": ""
   },
   {
     "id": "CP-118",
     "slug": "screw-lovelorn-fool",
-    "name": "Screw Lovelorn Fool",
+    "name": "Screw // Lovelorn Fool",
     "fileName": "screw-lovelorn-fool.webp",
     "faction": "MERCENARIO",
     "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/screw-lovelorn-fool.webp",
     "githubUrl": "https://github.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/blob/main/screw-lovelorn-fool.webp",
-    "size": 111970
+    "size": 111970,
+    "collection": "Welcome to Night City (Set 01)",
+    "cardId": "",
+    "cardType": "",
+    "edition": "",
+    "artist": ""
   },
   {
     "id": "CP-119",
@@ -1187,7 +1777,12 @@
     "faction": "MERCENARIO",
     "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/secondhand-bombus.webp",
     "githubUrl": "https://github.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/blob/main/secondhand-bombus.webp",
-    "size": 139446
+    "size": 139446,
+    "collection": "Welcome to Night City (Set 01)",
+    "cardId": "",
+    "cardType": "",
+    "edition": "",
+    "artist": ""
   },
   {
     "id": "CP-120",
@@ -1197,7 +1792,12 @@
     "faction": "MERCENARIO",
     "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/shattered-memories.webp",
     "githubUrl": "https://github.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/blob/main/shattered-memories.webp",
-    "size": 136572
+    "size": 136572,
+    "collection": "Welcome to Night City (Set 01)",
+    "cardId": "",
+    "cardType": "",
+    "edition": "",
+    "artist": ""
   },
   {
     "id": "CP-121",
@@ -1207,7 +1807,12 @@
     "faction": "MERCENARIO",
     "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/sketchy-ripper.webp",
     "githubUrl": "https://github.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/blob/main/sketchy-ripper.webp",
-    "size": 129630
+    "size": 129630,
+    "collection": "Welcome to Night City (Set 01)",
+    "cardId": "",
+    "cardType": "",
+    "edition": "",
+    "artist": ""
   },
   {
     "id": "CP-122",
@@ -1217,47 +1822,72 @@
     "faction": "MERCENARIO",
     "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/swordwise-huscle.webp",
     "githubUrl": "https://github.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/blob/main/swordwise-huscle.webp",
-    "size": 151640
+    "size": 151640,
+    "collection": "Welcome to Night City (Set 01)",
+    "cardId": "",
+    "cardType": "",
+    "edition": "",
+    "artist": ""
   },
   {
     "id": "CP-123",
     "slug": "synapse-burnout",
     "name": "Synapse Burnout",
     "fileName": "synapse-burnout.webp",
-    "faction": "MERCENARIO",
+    "faction": "NETRUNNER",
     "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/synapse-burnout.webp",
     "githubUrl": "https://github.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/blob/main/synapse-burnout.webp",
-    "size": 118114
+    "size": 118114,
+    "collection": "Welcome to Night City (Set 01)",
+    "cardId": "",
+    "cardType": "",
+    "edition": "",
+    "artist": ""
   },
   {
     "id": "CP-124",
     "slug": "t-bug-amateur-philosopher",
-    "name": "T Bug Amateur Philosopher",
+    "name": "T-Bug // Amateur Philosopher",
     "fileName": "t-bug-amateur-philosopher.webp",
     "faction": "NETRUNNER",
     "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/t-bug-amateur-philosopher.webp",
     "githubUrl": "https://github.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/blob/main/t-bug-amateur-philosopher.webp",
-    "size": 128138
+    "size": 128138,
+    "collection": "Welcome to Night City (Set 01)",
+    "cardId": "",
+    "cardType": "",
+    "edition": "",
+    "artist": ""
   },
   {
     "id": "CP-125",
     "slug": "take-control",
     "name": "Take Control",
     "fileName": "take-control.webp",
-    "faction": "MERCENARIO",
+    "faction": "NETRUNNER",
     "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/take-control.webp",
     "githubUrl": "https://github.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/blob/main/take-control.webp",
-    "size": 187842
+    "size": 187842,
+    "collection": "Welcome to Night City (Set 01)",
+    "cardId": "",
+    "cardType": "",
+    "edition": "",
+    "artist": ""
   },
   {
     "id": "CP-126",
     "slug": "tetratronic-rippler",
     "name": "Tetratronic Rippler",
     "fileName": "tetratronic-rippler.webp",
-    "faction": "MERCENARIO",
+    "faction": "NETRUNNER",
     "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/tetratronic-rippler.webp",
     "githubUrl": "https://github.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/blob/main/tetratronic-rippler.webp",
-    "size": 118344
+    "size": 118344,
+    "collection": "Welcome to Night City (Set 01)",
+    "cardId": "",
+    "cardType": "",
+    "edition": "",
+    "artist": ""
   },
   {
     "id": "CP-127",
@@ -1267,27 +1897,42 @@
     "faction": "MERCENARIO",
     "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/the-heist.webp",
     "githubUrl": "https://github.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/blob/main/the-heist.webp",
-    "size": 139206
+    "size": 139206,
+    "collection": "Welcome to Night City (Set 01)",
+    "cardId": "",
+    "cardType": "",
+    "edition": "",
+    "artist": ""
   },
   {
     "id": "CP-128",
     "slug": "the-relic-experimental-biochip",
-    "name": "The Relic Experimental Biochip",
+    "name": "The Relic // Experimental Biochip",
     "fileName": "the-relic-experimental-biochip.webp",
-    "faction": "MERCENARIO",
+    "faction": "CORPO",
     "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/the-relic-experimental-biochip.webp",
     "githubUrl": "https://github.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/blob/main/the-relic-experimental-biochip.webp",
-    "size": 137074
+    "size": 137074,
+    "collection": "Welcome to Night City (Set 01)",
+    "cardId": "",
+    "cardType": "",
+    "edition": "",
+    "artist": ""
   },
   {
     "id": "CP-129",
     "slug": "three-mouths-one-desire",
-    "name": "Three Mouths One Desire",
+    "name": "Three Mouths, One Desire",
     "fileName": "three-mouths-one-desire.webp",
     "faction": "MERCENARIO",
     "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/three-mouths-one-desire.webp",
     "githubUrl": "https://github.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/blob/main/three-mouths-one-desire.webp",
-    "size": 117622
+    "size": 117622,
+    "collection": "Welcome to Night City (Set 01)",
+    "cardId": "",
+    "cardType": "",
+    "edition": "",
+    "artist": ""
   },
   {
     "id": "CP-130",
@@ -1297,7 +1942,12 @@
     "faction": "MERCENARIO",
     "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/towerfall.webp",
     "githubUrl": "https://github.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/blob/main/towerfall.webp",
-    "size": 118448
+    "size": 118448,
+    "collection": "Welcome to Night City (Set 01)",
+    "cardId": "#138",
+    "cardType": "PROGRAM // BRAINDANCE",
+    "edition": "Epic Rare",
+    "artist": "Dardo Studios"
   },
   {
     "id": "CP-131",
@@ -1307,7 +1957,12 @@
     "faction": "CORPO",
     "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/trauma-team-operatives.webp",
     "githubUrl": "https://github.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/blob/main/trauma-team-operatives.webp",
-    "size": 108872
+    "size": 108872,
+    "collection": "Welcome to Night City (Set 01)",
+    "cardId": "",
+    "cardType": "",
+    "edition": "",
+    "artist": ""
   },
   {
     "id": "CP-132",
@@ -1317,17 +1972,27 @@
     "faction": "MERCENARIO",
     "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/trust-no-one.webp",
     "githubUrl": "https://github.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/blob/main/trust-no-one.webp",
-    "size": 176134
+    "size": 176134,
+    "collection": "Welcome to Night City (Set 01)",
+    "cardId": "",
+    "cardType": "",
+    "edition": "",
+    "artist": ""
   },
   {
     "id": "CP-133",
     "slug": "tyger-s-whisper",
-    "name": "Tyger S Whisper",
+    "name": "Tyger's Whisper",
     "fileName": "tyger-s-whisper.webp",
     "faction": "BANDAS",
     "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/tyger-s-whisper.webp",
     "githubUrl": "https://github.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/blob/main/tyger-s-whisper.webp",
-    "size": 126648
+    "size": 126648,
+    "collection": "Welcome to Night City (Set 01)",
+    "cardId": "",
+    "cardType": "",
+    "edition": "",
+    "artist": ""
   },
   {
     "id": "CP-134",
@@ -1337,97 +2002,147 @@
     "faction": "MERCENARIO",
     "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/unlikely-bond.webp",
     "githubUrl": "https://github.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/blob/main/unlikely-bond.webp",
-    "size": 112148
+    "size": 112148,
+    "collection": "Welcome to Night City (Set 01)",
+    "cardId": "",
+    "cardType": "",
+    "edition": "",
+    "artist": ""
   },
   {
     "id": "CP-135",
     "slug": "v-corporate-exile",
-    "name": "V Corporate Exile",
+    "name": "V // Corporate Exile",
     "fileName": "v-corporate-exile.webp",
-    "faction": "MERCENARIO",
+    "faction": "CORPO",
     "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/v-corporate-exile.webp",
     "githubUrl": "https://github.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/blob/main/v-corporate-exile.webp",
-    "size": 91900
+    "size": 91900,
+    "collection": "Welcome to Night City (Set 01)",
+    "cardId": "",
+    "cardType": "",
+    "edition": "",
+    "artist": ""
   },
   {
     "id": "CP-136",
     "slug": "v-roamer-of-the-badlands",
-    "name": "V Roamer Of The Badlands",
+    "name": "V // Roamer of the Badlands",
     "fileName": "v-roamer-of-the-badlands.webp",
     "faction": "MERCENARIO",
     "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/v-roamer-of-the-badlands.webp",
     "githubUrl": "https://github.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/blob/main/v-roamer-of-the-badlands.webp",
-    "size": 100394
+    "size": 100394,
+    "collection": "Welcome to Night City (Set 01)",
+    "cardId": "",
+    "cardType": "",
+    "edition": "",
+    "artist": ""
   },
   {
     "id": "CP-137",
     "slug": "v-streetkid",
-    "name": "V Streetkid",
+    "name": "V // Streetkid",
     "fileName": "v-streetkid.webp",
     "faction": "MERCENARIO",
     "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/v-streetkid.webp",
     "githubUrl": "https://github.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/blob/main/v-streetkid.webp",
-    "size": 111200
+    "size": 111200,
+    "collection": "Welcome to Night City (Set 01)",
+    "cardId": "",
+    "cardType": "",
+    "edition": "",
+    "artist": ""
   },
   {
     "id": "CP-138",
     "slug": "valentino-guerrera",
     "name": "Valentino Guerrera",
     "fileName": "valentino-guerrera.webp",
-    "faction": "MERCENARIO",
+    "faction": "BANDAS",
     "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/valentino-guerrera.webp",
     "githubUrl": "https://github.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/blob/main/valentino-guerrera.webp",
-    "size": 169196
+    "size": 169196,
+    "collection": "Welcome to Night City (Set 01)",
+    "cardId": "",
+    "cardType": "",
+    "edition": "",
+    "artist": ""
   },
   {
     "id": "CP-139",
     "slug": "valentino-street-racer",
     "name": "Valentino Street Racer",
     "fileName": "valentino-street-racer.webp",
-    "faction": "MERCENARIO",
+    "faction": "BANDAS",
     "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/valentino-street-racer.webp",
     "githubUrl": "https://github.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/blob/main/valentino-street-racer.webp",
-    "size": 175432
+    "size": 175432,
+    "collection": "Welcome to Night City (Set 01)",
+    "cardId": "",
+    "cardType": "",
+    "edition": "",
+    "artist": ""
   },
   {
     "id": "CP-140",
     "slug": "viktor-vektor-drop-your-illusions",
-    "name": "Viktor Vektor Drop Your Illusions",
+    "name": "Viktor Vektor // Drop Your Illusions",
     "fileName": "viktor-vektor-drop-your-illusions.webp",
     "faction": "MERCENARIO",
     "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/viktor-vektor-drop-your-illusions.webp",
     "githubUrl": "https://github.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/blob/main/viktor-vektor-drop-your-illusions.webp",
-    "size": 83838
+    "size": 83838,
+    "collection": "Welcome to Night City (Set 01)",
+    "cardId": "",
+    "cardType": "",
+    "edition": "",
+    "artist": ""
   },
   {
     "id": "CP-141",
     "slug": "viktor-vektor-sit-down-and-relax",
-    "name": "Viktor Vektor Sit Down And Relax",
+    "name": "Viktor Vektor // Sit Down and Relax",
     "fileName": "viktor-vektor-sit-down-and-relax.webp",
     "faction": "MERCENARIO",
     "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/viktor-vektor-sit-down-and-relax.webp",
     "githubUrl": "https://github.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/blob/main/viktor-vektor-sit-down-and-relax.webp",
-    "size": 116184
+    "size": 116184,
+    "collection": "Welcome to Night City (Set 01)",
+    "cardId": "",
+    "cardType": "",
+    "edition": "",
+    "artist": ""
   },
   {
     "id": "CP-142",
     "slug": "viktor-vektor-you-might-feel-a-little-pinch",
-    "name": "Viktor Vektor You Might Feel A Little Pinch",
+    "name": "Viktor Vektor // You Might Feel a Little Pinch",
     "fileName": "viktor-vektor-you-might-feel-a-little-pinch.webp",
     "faction": "MERCENARIO",
     "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/viktor-vektor-you-might-feel-a-little-pinch.webp",
     "githubUrl": "https://github.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/blob/main/viktor-vektor-you-might-feel-a-little-pinch.webp",
-    "size": 120786
+    "size": 120786,
+    "collection": "Welcome to Night City (Set 01)",
+    "cardId": "",
+    "cardType": "",
+    "edition": "",
+    "artist": ""
   },
   {
     "id": "CP-143",
     "slug": "wakako-okada-peace-and-harmony",
-    "name": "Wakako Okada Peace And Harmony",
+    "name": "Wakako Okada // Peace and Harmony",
     "fileName": "wakako-okada-peace-and-harmony.webp",
-    "faction": "MERCENARIO",
+    "faction": "BANDAS",
     "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/wakako-okada-peace-and-harmony.webp",
     "githubUrl": "https://github.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/blob/main/wakako-okada-peace-and-harmony.webp",
-    "size": 104082
+    "size": 104082,
+    "collection": "Welcome to Night City (Set 01)",
+    "cardId": "",
+    "cardType": "",
+    "edition": "",
+    "artist": ""
   },
   {
     "id": "CP-144",
@@ -1437,7 +2152,12 @@
     "faction": "MERCENARIO",
     "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/we-gotta-live-together.webp",
     "githubUrl": "https://github.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/blob/main/we-gotta-live-together.webp",
-    "size": 123816
+    "size": 123816,
+    "collection": "Welcome to Night City (Set 01)",
+    "cardId": "",
+    "cardType": "",
+    "edition": "",
+    "artist": ""
   },
   {
     "id": "CP-145",
@@ -1447,17 +2167,27 @@
     "faction": "NETRUNNER",
     "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/westbrook-netrunner.webp",
     "githubUrl": "https://github.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/blob/main/westbrook-netrunner.webp",
-    "size": 77270
+    "size": 77270,
+    "collection": "Welcome to Night City (Set 01)",
+    "cardId": "",
+    "cardType": "",
+    "edition": "",
+    "artist": ""
   },
   {
     "id": "CP-146",
     "slug": "wild-in-the-streets",
-    "name": "Wild In The Streets",
+    "name": "Wild in the Streets",
     "fileName": "wild-in-the-streets.webp",
     "faction": "MERCENARIO",
     "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/wild-in-the-streets.webp",
     "githubUrl": "https://github.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/blob/main/wild-in-the-streets.webp",
-    "size": 134326
+    "size": 134326,
+    "collection": "Welcome to Night City (Set 01)",
+    "cardId": "",
+    "cardType": "",
+    "edition": "",
+    "artist": ""
   },
   {
     "id": "CP-147",
@@ -1467,27 +2197,42 @@
     "faction": "BANDAS",
     "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/wraith-marauders.webp",
     "githubUrl": "https://github.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/blob/main/wraith-marauders.webp",
-    "size": 88612
+    "size": 88612,
+    "collection": "Welcome to Night City (Set 01)",
+    "cardId": "",
+    "cardType": "",
+    "edition": "",
+    "artist": ""
   },
   {
     "id": "CP-148",
     "slug": "yorinobu-arasaka-embracing-destruction",
-    "name": "Yorinobu Arasaka Embracing Destruction",
+    "name": "Yorinobu Arasaka // Embracing Destruction",
     "fileName": "yorinobu-arasaka-embracing-destruction.webp",
     "faction": "CORPO",
     "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/yorinobu-arasaka-embracing-destruction.webp",
     "githubUrl": "https://github.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/blob/main/yorinobu-arasaka-embracing-destruction.webp",
-    "size": 105086
+    "size": 105086,
+    "collection": "Welcome to Night City (Set 01)",
+    "cardId": "",
+    "cardType": "",
+    "edition": "",
+    "artist": ""
   },
   {
     "id": "CP-149",
     "slug": "yorinobu-arasaka-steel-dragon",
-    "name": "Yorinobu Arasaka Steel Dragon",
+    "name": "Yorinobu Arasaka // Steel Dragon",
     "fileName": "yorinobu-arasaka-steel-dragon.webp",
     "faction": "CORPO",
     "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/yorinobu-arasaka-steel-dragon.webp",
     "githubUrl": "https://github.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/blob/main/yorinobu-arasaka-steel-dragon.webp",
-    "size": 127750
+    "size": 127750,
+    "collection": "Welcome to Night City (Set 01)",
+    "cardId": "",
+    "cardType": "",
+    "edition": "",
+    "artist": ""
   },
   {
     "id": "CP-150",
@@ -1497,7 +2242,12 @@
     "faction": "CORPO",
     "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/zetatech-berserk.webp",
     "githubUrl": "https://github.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/blob/main/zetatech-berserk.webp",
-    "size": 142204
+    "size": 142204,
+    "collection": "Welcome to Night City (Set 01)",
+    "cardId": "",
+    "cardType": "",
+    "edition": "",
+    "artist": ""
   },
   {
     "id": "CP-151",
@@ -1507,6 +2257,11 @@
     "faction": "CORPO",
     "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/zetatech-faceplate.webp",
     "githubUrl": "https://github.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/blob/main/zetatech-faceplate.webp",
-    "size": 135180
+    "size": 135180,
+    "collection": "Welcome to Night City (Set 01)",
+    "cardId": "",
+    "cardType": "",
+    "edition": "",
+    "artist": ""
   }
 ]

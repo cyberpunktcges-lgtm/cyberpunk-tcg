@@ -100,21 +100,63 @@ function CyberpulseButton({
   );
 }
 
+/**
+ * Extrae un resumen corto de 2-3 líneas al estilo WordPress:
+ * - Si contiene la etiqueta <!--more-->, corta justo ahí.
+ * - Elimina etiquetas HTML para que en la tarjeta previa se vea limpio.
+ */
+function getShortExcerpt(article, maxChars = 185) {
+  if (!article) return '';
+  const rawSource = article.excerpt || article.content || '';
+  const beforeMore = rawSource.split(/<!--\s*more\s*-->/i)[0] || rawSource;
+  const plain = beforeMore
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (plain.length <= maxChars) return plain;
+  return `${plain.slice(0, maxChars).trim()}...`;
+}
+
+/**
+ * Devuelve el HTML completo de la noticia (estilo WordPress / Elementor):
+ * - Soporta listas (<ul>, <ol>, <li>), títulos (<h2>, <h3>), negritas (<strong>, <b>),
+ *   citas (<blockquote>), enlaces (<a>) e imágenes (<img>).
+ * - Si el texto viene en texto plano sin etiquetas HTML, convierte los saltos de línea en párrafos <p>.
+ */
+function getFullArticleHtml(article) {
+  if (!article) return '';
+  const fullRaw = (article.content && article.content.trim())
+    ? article.content
+    : (article.excerpt || '');
+  const cleaned = fullRaw.replace(/<!--\s*more\s*-->/gi, '');
+  const hasHtmlTags = /<\/?[a-z][\s\S]*>/i.test(cleaned);
+
+  if (hasHtmlTags) {
+    return cleaned;
+  }
+
+  return cleaned
+    .split(/\n{2,}/)
+    .map((p) => `<p>${p.replace(/\n/g, '<br />')}</p>`)
+    .join('');
+}
+
 export default function CyberpunkPortal({
   initialCms = {},
   initialCards = [],
   currentPage = 'inicio'
 }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [cmsState, setCmsState] = useState(initialCms);
 
   // Datos dinámicos cargados desde el Backend CMS (src/data/cms.json)
-  const heroArticle = initialCms.heroArticle || {};
-  const recentArticles = initialCms.news || [];
-  const topDecks = initialCms.decks || [];
-  const tournaments = initialCms.tournaments || [];
-  const pastTournaments = initialCms.pastTournaments || [];
-  const altArtCards = (initialCms.altArtCards || []).slice(0, 3);
-  const forumUrl = initialCms.forumUrl || 'https://foro.cyberpunktcg.es';
+  const heroArticle = cmsState.heroArticle || {};
+  const recentArticles = cmsState.news || [];
+  const topDecks = cmsState.decks || [];
+  const tournaments = cmsState.tournaments || [];
+  const pastTournaments = cmsState.pastTournaments || [];
+  const altArtCards = (cmsState.altArtCards || []).slice(0, 3);
+  const forumUrl = cmsState.forumUrl || 'https://foro.cyberpunktcg.es';
   const allCards = initialCards || [];
 
   // Estados de filtrado de Noticias (Portada y Página /noticias)
@@ -123,6 +165,38 @@ export default function CyberpunkPortal({
   const [newsSearchQuery, setNewsSearchQuery] = useState('');
   const [newsSortOrder, setNewsSortOrder] = useState('DESC'); // DESC = más recientes primero
   const [readingArticle, setReadingArticle] = useState(null);
+
+  // Abrir noticia y contabilizar visita real en el servidor
+  const handleOpenArticle = async (article, isHero = false) => {
+    if (!article) return;
+    setReadingArticle(article);
+
+    try {
+      const storageKey = `cp_tcg_viewed_${isHero ? 'HERO' : article.id}`;
+      if (sessionStorage.getItem(storageKey)) return;
+      sessionStorage.setItem(storageKey, '1');
+
+      const res = await fetch('/api/cms', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'increment_view',
+          articleId: article.id,
+          isHero
+        })
+      });
+      const json = await res.json();
+      if (json?.ok && json?.data) {
+        setCmsState(json.data);
+        if (isHero && json.data.heroArticle) {
+          setReadingArticle(json.data.heroArticle);
+        } else if (article.id && Array.isArray(json.data.news)) {
+          const updated = json.data.news.find((n) => n.id === article.id);
+          if (updated) setReadingArticle(updated);
+        }
+      }
+    } catch {}
+  };
 
   // Estados del Buscador de Base de Cartas
   const [cardSearchQuery, setCardSearchQuery] = useState('');
@@ -301,18 +375,19 @@ export default function CyberpunkPortal({
   const renderAltArtShowcase = () => {
     if (!altArtCards || altArtCards.length === 0) return null;
     return (
-      <section aria-labelledby="alt-art-heading" className="space-y-8">
+      <section aria-labelledby="bestsellers-heading" className="space-y-8">
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-gray-800 pb-5">
           <div>
-            <div className="flex items-center gap-2 text-xs font-mono text-[#FCEE0A] uppercase tracking-widest mb-1">
-              <Sparkles className="w-4 h-4 text-[#00F0FF]" />
-              <span>SELECCIÓN ESPECIAL DE LA ADMINISTRACIÓN // NIGHT CITY VAULT</span>
+            <div className="flex flex-wrap items-center gap-2 text-xs font-mono text-[#FCEE0A] uppercase tracking-widest mb-1">
+              <Flame className="w-4 h-4 text-[#FF003C]" />
+              <span>TENDENCIAS DEL MERCADO EUROPEO // CARDMARKET BEST SELLERS (SOLO SINGLES)</span>
             </div>
             <h2
-              id="alt-art-heading"
+              id="bestsellers-heading"
               className="text-2xl sm:text-4xl font-black uppercase tracking-tight text-white"
             >
-              CARTAS DE <span className="text-[#00F0FF]">ARTE ALTERNATIVO</span>
+              CARTAS <span className="text-[#FCEE0A]">MÁS VENDIDAS</span>{' '}
+              <span className="text-[#00F0FF]">// CARDMARKET</span>
             </h2>
           </div>
 
@@ -343,18 +418,20 @@ export default function CyberpunkPortal({
               style={{ clipPath: CYBER_CLIP }}
               className="group cursor-pointer bg-[#000000] border-2 border-[#FCEE0A]/80 hover:border-[#00F0FF] transition-all duration-300 flex flex-col justify-between overflow-hidden rounded-none relative"
             >
-              <div className="p-4 border-b border-gray-800 bg-[#070a10] flex items-center justify-between">
+              {/* Cabecera Ranking Cardmarket + ID */}
+              <div className="p-4 border-b border-gray-800 bg-[#070a10] flex items-center justify-between gap-2">
                 <span
                   style={{ clipPath: CYBER_CLIP }}
                   className="px-2.5 py-1 bg-[#FCEE0A] text-[#070a10] font-mono font-black text-[10px] uppercase tracking-wider"
                 >
-                  {card.badge || `ARTE ALTERNATIVO #0${idx + 1}`}
+                  {card.badge || `TOP #0${idx + 1} BEST SELLER // CARDMARKET`}
                 </span>
-                <span className="text-xs font-mono font-bold text-[#00F0FF]">
-                  {card.faction}
+                <span className="text-[11px] font-mono font-bold text-[#00F0FF] shrink-0">
+                  {card.cardId || card.id}
                 </span>
               </div>
 
+              {/* Imagen de la Carta */}
               <div className="relative h-96 w-full bg-gradient-to-b from-[#070a10] via-[#000000] to-[#070a10] p-6 flex items-center justify-center overflow-hidden">
                 <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(0,240,255,0.14),transparent_70%)] opacity-70 group-hover:opacity-100 transition-opacity" />
                 <img
@@ -364,19 +441,49 @@ export default function CyberpunkPortal({
                 />
               </div>
 
-              <div className="p-5 bg-[#000000] border-t border-gray-800 flex items-center justify-between gap-2">
-                <div className="min-w-0">
-                  <span className="text-[10px] font-mono text-gray-400 uppercase block">
-                    {card.artist || 'Edición Especial Coleccionista'}
-                  </span>
-                  <h3 className="text-base font-black text-white uppercase truncate group-hover:text-[#FCEE0A] transition-colors">
+              {/* Ficha Técnica Completa de la Carta */}
+              <div className="p-5 bg-[#000000] border-t border-gray-800 space-y-3.5">
+                <div>
+                  <div className="flex items-center justify-between gap-2 mb-1">
+                    <span className="text-[10px] font-mono font-black text-[#00F0FF] uppercase tracking-wider">
+                      {card.cardType || card.faction || 'MERC // EDGERUNNER'}
+                    </span>
+                    <span className="text-[10px] font-mono text-[#FCEE0A] uppercase">
+                      {card.edition || '—'}
+                    </span>
+                  </div>
+                  <h3 className="text-lg font-black text-white uppercase truncate group-hover:text-[#FCEE0A] transition-colors">
                     {card.name}
                   </h3>
                 </div>
-                <span className="shrink-0 text-xs font-mono font-bold text-[#00F0FF] group-hover:text-[#FCEE0A] uppercase flex items-center gap-1">
-                  <span>INSPECCIONAR</span>
-                  <ChevronRight className="w-4 h-4" />
-                </span>
+
+                {/* Rejilla de Metadatos (ID, Tipo, Edición, Artista, Colección) */}
+                <div className="grid grid-cols-2 gap-2 pt-2 border-t border-gray-900 text-[11px] font-mono">
+                  <div className="bg-[#070a10] border border-gray-800/80 px-2.5 py-1.5">
+                    <span className="text-[9px] text-gray-500 uppercase block">ARTISTA</span>
+                    <span className="text-gray-200 font-bold truncate block">
+                      {card.artist || '—'}
+                    </span>
+                  </div>
+                  <div className="bg-[#070a10] border border-gray-800/80 px-2.5 py-1.5">
+                    <span className="text-[9px] text-gray-500 uppercase block">ID CARTA</span>
+                    <span className="text-[#00F0FF] font-bold truncate block">
+                      {card.cardId || card.id}
+                    </span>
+                  </div>
+                  <div className="col-span-2 bg-[#070a10] border border-gray-800/80 px-2.5 py-1.5 flex items-center justify-between gap-2">
+                    <div className="min-w-0">
+                      <span className="text-[9px] text-gray-500 uppercase block">COLECCIÓN</span>
+                      <span className="text-[#FCEE0A] font-bold truncate block">
+                        {card.collection || 'Welcome to Night City (Set 01)'}
+                      </span>
+                    </div>
+                    <span className="shrink-0 text-[10px] font-mono font-bold text-[#00F0FF] group-hover:text-[#FCEE0A] uppercase flex items-center gap-0.5">
+                      <span>VER FICHA</span>
+                      <ChevronRight className="w-3.5 h-3.5" />
+                    </span>
+                  </div>
+                </div>
               </div>
             </motion.div>
           ))}
@@ -1052,7 +1159,8 @@ export default function CyberpunkPortal({
                 <div className="flex items-center justify-between border-b border-gray-800 pb-3">
                   <div>
                     <span className="text-xs font-mono text-[#00F0FF] uppercase block">
-                      ESCÁNER DE CARTA // {modalCard.id} • {modalCard.faction}
+                      ESCÁNER DE CARTA // {modalCard.cardId || modalCard.id} •{' '}
+                      {modalCard.cardType || modalCard.faction}
                     </span>
                     <h3 className="text-xl font-black text-white uppercase">
                       {modalCard.name}
@@ -1072,12 +1180,46 @@ export default function CyberpunkPortal({
                   <img
                     src={modalCard.image}
                     alt={modalCard.name}
-                    className="max-h-[460px] w-auto object-contain"
+                    className="max-h-[420px] w-auto object-contain"
                   />
                 </div>
 
+                {/* Ficha Técnica Completa en el Visor Modal */}
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-[11px] font-mono bg-[#000000] border border-gray-800 p-3">
+                  <div>
+                    <span className="text-[9px] text-gray-500 uppercase block">ID CARTA</span>
+                    <span className="text-[#00F0FF] font-bold block truncate">
+                      {modalCard.cardId || modalCard.id}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-[9px] text-gray-500 uppercase block">TIPO DE CARTA</span>
+                    <span className="text-[#FCEE0A] font-bold block truncate">
+                      {modalCard.cardType || modalCard.type || modalCard.faction}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-[9px] text-gray-500 uppercase block">EDICIÓN</span>
+                    <span className="text-white font-bold block truncate">
+                      {modalCard.edition || '—'}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-[9px] text-gray-500 uppercase block">ARTISTA</span>
+                    <span className="text-gray-200 font-bold block truncate">
+                      {modalCard.artist || '—'}
+                    </span>
+                  </div>
+                  <div className="col-span-2">
+                    <span className="text-[9px] text-gray-500 uppercase block">COLECCIÓN</span>
+                    <span className="text-[#00F0FF] font-bold block truncate">
+                      {modalCard.collection || 'Welcome to Night City (Set 01)'}
+                    </span>
+                  </div>
+                </div>
+
                 <div className="flex items-center justify-between text-xs font-mono text-gray-400 pt-1">
-                  <span>{modalCard.fileName || modalCard.type || 'Carta Oficial Cyberpunk TCG'}</span>
+                  <span>{modalCard.badge || modalCard.fileName || 'Carta Oficial Cyberpunk TCG'}</span>
                   {currentPage === 'cartas' && (
                     <button
                       type="button"
@@ -1146,10 +1288,14 @@ export default function CyberpunkPortal({
                 </div>
 
                 <div className="p-6 sm:p-8 space-y-5">
-                  <div className="flex items-center justify-between text-xs font-mono text-gray-400 border-b border-gray-800 pb-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2 text-xs font-mono text-gray-400 border-b border-gray-800 pb-3">
                     <span>AUTOR: @{readingArticle.author}</span>
                     <span>
-                      {readingArticle.date} • {readingArticle.readTime}
+                      {readingArticle.date} • {readingArticle.readTime} •{' '}
+                      <strong className="text-[#00F0FF]">
+                        {Number(readingArticle.viewsCount) || 0}{' '}
+                        {(Number(readingArticle.viewsCount) || 0) === 1 ? 'VISITA' : 'VISITAS'}
+                      </strong>
                     </span>
                   </div>
 
@@ -1157,9 +1303,22 @@ export default function CyberpunkPortal({
                     {readingArticle.title}
                   </h2>
 
-                  <div className="space-y-4 text-gray-200 text-sm sm:text-base leading-relaxed whitespace-pre-line">
-                    <p>{readingArticle.excerpt}</p>
-                    {readingArticle.content && <p>{readingArticle.content}</p>}
+                  <div
+                    className="cyber-article-content"
+                    dangerouslySetInnerHTML={{
+                      __html: getFullArticleHtml(readingArticle)
+                    }}
+                  />
+
+                  <div className="pt-4 border-t border-gray-800 flex justify-end">
+                    <button
+                      type="button"
+                      onClick={() => setReadingArticle(null)}
+                      style={{ clipPath: CYBER_CLIP }}
+                      className="px-5 py-2.5 bg-[#FCEE0A] text-[#070a10] hover:bg-[#00F0FF] font-mono font-black text-xs uppercase tracking-wider cursor-pointer"
+                    >
+                      CERRAR NOTICIA
+                    </button>
                   </div>
                 </div>
               </motion.div>
@@ -1175,13 +1334,13 @@ export default function CyberpunkPortal({
             {/* HERO SECTION */}
             <section id="inicio" aria-labelledby="hero-heading" className="relative border-b border-gray-800">
               <div className="relative min-h-[580px] lg:min-h-[640px] flex items-center overflow-hidden">
+                {/* Fondo ambiental de la sección */}
                 <img
-                  src={heroArticle.wallpaper}
-                  alt="Night City Cyberpunk 2077 Wallpaper"
-                  className="absolute inset-0 w-full h-full object-cover object-center scale-105 filter contrast-110"
+                  src={heroArticle.wallpaper || heroArticle.image || '/images/wallpapers/cyberpunk-hero.jpg'}
+                  alt={heroArticle.title || 'Imagen Destacada'}
+                  className="absolute inset-0 w-full h-full object-cover object-center scale-105 opacity-35 blur-[2px]"
                 />
-                <div className="absolute inset-0 bg-gradient-to-r from-[#070a10] via-[#070a10]/90 to-[#070a10]/40" />
-                <div className="absolute inset-0 bg-gradient-to-t from-[#070a10] via-[#070a10]/45 to-[#000000]/75" />
+                <div className="absolute inset-0 bg-gradient-to-t from-[#070a10] via-[#070a10]/65 to-[#000000]/75" />
                 <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-[#FCEE0A] via-[#FF003C] to-[#00F0FF]" />
 
                 <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 lg:py-16 w-full">
@@ -1191,90 +1350,135 @@ export default function CyberpunkPortal({
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ duration: 0.5 }}
                       style={{ clipPath: CYBER_CLIP }}
-                      className="lg:col-span-8 bg-[#070a10]/85 backdrop-blur-md border border-gray-800 hover:border-[#FCEE0A] hover:shadow-[0_0_35px_rgba(252,238,10,0.3)] transition-all duration-300 p-6 sm:p-8 lg:p-10 space-y-6 rounded-none relative"
+                      className="lg:col-span-8 bg-[#000000] border border-gray-800 hover:border-[#FCEE0A] hover:shadow-[0_0_35px_rgba(252,238,10,0.3)] transition-all duration-300 p-6 sm:p-8 lg:p-10 rounded-none relative overflow-hidden group"
                     >
-                      <div className="absolute top-0 left-0 bottom-0 w-1.5 bg-[#FCEE0A]" />
+                      {/* IMAGEN DESTACADA DE FONDO (ESTILO WORDPRESS FEATURED IMAGE) */}
+                      <img
+                        src={heroArticle.wallpaper || heroArticle.image || '/images/wallpapers/cyberpunk-hero.jpg'}
+                        alt={heroArticle.title || 'Imagen Destacada'}
+                        className="absolute inset-0 w-full h-full object-cover object-center opacity-55 group-hover:scale-105 group-hover:opacity-65 transition-all duration-700"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-[#070a10] via-[#070a10]/80 to-[#070a10]/35" />
+                      <div className="absolute inset-0 bg-gradient-to-r from-[#070a10]/90 via-[#070a10]/55 to-transparent" />
+                      <div className="absolute top-0 left-0 bottom-0 w-1.5 bg-[#FCEE0A] z-10" />
 
-                      <div className="flex flex-wrap items-center gap-3">
-                        <span
-                          style={{ clipPath: CYBER_CLIP }}
-                          className="px-3.5 py-1 bg-[#FCEE0A] text-[#070a10] font-mono font-black text-xs uppercase tracking-widest rounded-none"
-                        >
-                          {heroArticle.tag}
-                        </span>
-                        <span
-                          style={{ clipPath: CYBER_CLIP }}
-                          className="px-3 py-1 bg-[#FF003C]/20 border border-[#FF003C] text-[#FF003C] font-mono font-bold text-xs uppercase tracking-wider flex items-center gap-1.5 rounded-none"
-                        >
-                          <Crosshair className="w-3.5 h-3.5" />
-                          {heroArticle.faction}
-                        </span>
-                        <span className="text-xs font-mono text-[#00F0FF] ml-auto">
-                          ID // {heroArticle.id}
-                        </span>
-                      </div>
-
-                      <h1
-                        id="hero-heading"
-                        className="text-2xl sm:text-4xl lg:text-5xl font-black tracking-tight text-white uppercase leading-[1.08]"
-                      >
-                        {heroArticle.title}
-                      </h1>
-
-                      <p className="text-gray-200 text-base sm:text-lg leading-relaxed">
-                        {heroArticle.excerpt}
-                      </p>
-
-                      {heroArticle.stats && (
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
-                          {heroArticle.stats.map((stat) => (
-                            <div
-                              key={stat.label}
+                      <div className="relative z-10 space-y-6">
+                        <div className="flex flex-wrap items-center gap-3">
+                          <span
+                            style={{ clipPath: CYBER_CLIP }}
+                            className="px-3.5 py-1 bg-[#FCEE0A] text-[#070a10] font-mono font-black text-xs uppercase tracking-widest rounded-none"
+                          >
+                            {heroArticle.tag}
+                          </span>
+                          {heroArticle.faction && (
+                            <span
                               style={{ clipPath: CYBER_CLIP }}
-                              className="bg-[#000000]/80 border border-gray-800 p-3.5 rounded-none"
+                              className="px-3 py-1 bg-[#FF003C]/25 border border-[#FF003C] text-[#FF003C] font-mono font-bold text-xs uppercase tracking-wider flex items-center gap-1.5 rounded-none"
+                            >
+                              <Crosshair className="w-3.5 h-3.5" />
+                              {heroArticle.faction}
+                            </span>
+                          )}
+                          <span className="text-xs font-mono text-[#00F0FF] ml-auto bg-[#000000]/75 px-2.5 py-1 border border-gray-800">
+                            ID // {heroArticle.id}
+                          </span>
+                        </div>
+
+                        <h1
+                          id="hero-heading"
+                          className="text-2xl sm:text-4xl lg:text-5xl font-black tracking-tight text-white uppercase leading-[1.08] drop-shadow-[0_2px_10px_rgba(0,0,0,0.9)]"
+                        >
+                          {heroArticle.title}
+                        </h1>
+
+                        <p className="text-gray-100 text-base sm:text-lg leading-relaxed line-clamp-3 drop-shadow-[0_1px_6px_rgba(0,0,0,0.9)]">
+                          {getShortExcerpt(heroArticle, 220)}
+                        </p>
+
+                        {/* 3 Cajas de Metadatos de la Noticia Destacada (Categoría, Palabras Clave y Formato/Set) */}
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
+                          {[
+                            {
+                              label: 'CATEGORÍA',
+                              value:
+                                heroArticle.category ||
+                                heroArticle.stats?.[0]?.value ||
+                                'NOTICIA OFICIAL',
+                              color: 'text-[#00F0FF]'
+                            },
+                            {
+                              label: 'PALABRAS CLAVE',
+                              value:
+                                heroArticle.keywords ||
+                                heroArticle.stats?.[1]?.value ||
+                                '#CyberpunkTCG #NightCity',
+                              color: 'text-[#FCEE0A]'
+                            },
+                            {
+                              label:
+                                heroArticle.extraLabel ||
+                                heroArticle.stats?.[2]?.label ||
+                                'FORMATO / SET',
+                              value:
+                                heroArticle.extraValue ||
+                                heroArticle.stats?.[2]?.value ||
+                                'SET 01 // NIGHT CITY',
+                              color: 'text-[#FF003C]'
+                            }
+                          ].map((stat, idx) => (
+                            <div
+                              key={idx}
+                              style={{ clipPath: CYBER_CLIP }}
+                              className="bg-[#000000]/85 backdrop-blur-sm border border-gray-800 p-3.5 rounded-none"
                             >
                               <p className="text-[10px] font-mono text-gray-400 uppercase tracking-widest">
                                 {stat.label}
                               </p>
-                              <p className={`text-xl font-mono font-black mt-0.5 ${stat.color}`}>
+                              <p className={`text-sm sm:text-base font-mono font-black mt-1 truncate ${stat.color}`}>
                                 {stat.value}
                               </p>
                             </div>
                           ))}
                         </div>
-                      )}
 
-                      <div className="pt-5 border-t border-gray-800 flex flex-wrap items-center justify-between gap-4">
-                        <div className="flex items-center gap-4 text-xs font-mono text-gray-300">
-                          <div className="flex items-center gap-2.5">
-                            <div
-                              style={{ clipPath: CYBER_CLIP }}
-                              className="w-9 h-9 bg-[#00F0FF]/20 border border-[#00F0FF] text-[#00F0FF] font-black flex items-center justify-center rounded-none"
-                            >
-                              ZC
+                        <div className="pt-5 border-t border-gray-800/90 flex flex-wrap items-center justify-between gap-4">
+                          <div className="flex flex-wrap items-center gap-3 sm:gap-4 text-xs font-mono text-gray-200">
+                            <div className="flex items-center gap-2.5">
+                              <div
+                                style={{ clipPath: CYBER_CLIP }}
+                                className="w-9 h-9 bg-[#00F0FF]/20 border border-[#00F0FF] text-[#00F0FF] font-black flex items-center justify-center rounded-none uppercase"
+                              >
+                                {(heroArticle.author || 'CP').slice(0, 2)}
+                              </div>
+                              <div>
+                                <p className="text-white font-bold">{heroArticle.author}</p>
+                                <p className="text-[11px] text-gray-400">{heroArticle.role}</p>
+                              </div>
                             </div>
-                            <div>
-                              <p className="text-white font-bold">{heroArticle.author}</p>
-                              <p className="text-[11px] text-gray-400">{heroArticle.role}</p>
-                            </div>
+                            <span className="hidden sm:inline text-gray-700">|</span>
+                            <span className="flex items-center gap-1 text-gray-200" title="Fecha de publicación">
+                              <Calendar className="w-3.5 h-3.5 text-[#FF003C]" />
+                              {heroArticle.date || 'HOY'}
+                            </span>
+                            <span className="flex items-center gap-1 text-gray-200" title="Tiempo estimado de lectura">
+                              <Clock className="w-3.5 h-3.5 text-[#FCEE0A]" />
+                              {heroArticle.readTime}
+                            </span>
+                            <span className="flex items-center gap-1 text-gray-200" title="Visitas reales de la noticia">
+                              <Eye className="w-3.5 h-3.5 text-[#00F0FF]" />
+                              {`${Number(heroArticle.viewsCount) || 0} ${(Number(heroArticle.viewsCount) || 0) === 1 ? 'VISITA' : 'VISITAS'}`}
+                            </span>
                           </div>
-                          <span className="hidden sm:inline text-gray-700">|</span>
-                          <span className="flex items-center gap-1 text-gray-300">
-                            <Clock className="w-3.5 h-3.5 text-[#FCEE0A]" />
-                            {heroArticle.readTime}
-                          </span>
-                          <span className="flex items-center gap-1 text-gray-300">
-                            <Eye className="w-3.5 h-3.5 text-[#00F0FF]" />
-                            {heroArticle.views}
-                          </span>
-                        </div>
 
-                        <div className="flex flex-wrap items-center gap-3">
-                          <a href="/cartas">
-                            <CyberpulseButton variant="primary" icon={ChevronRight}>
-                              EXPLORAR BASE DE CARTAS
+                          <div className="flex flex-wrap items-center gap-3">
+                            <CyberpulseButton
+                              variant="primary"
+                              icon={ChevronRight}
+                              onClick={() => handleOpenArticle(heroArticle, true)}
+                            >
+                              LEER NOTICIA COMPLETA
                             </CyberpulseButton>
-                          </a>
+                          </div>
                         </div>
                       </div>
                     </motion.div>
@@ -1356,7 +1560,7 @@ export default function CyberpunkPortal({
                   {recentArticles.slice(0, 4).map((article, idx) => (
                     <motion.article
                       key={article.id}
-                      onClick={() => setReadingArticle(article)}
+                      onClick={() => handleOpenArticle(article, false)}
                       initial={{ opacity: 0, y: 20 }}
                       whileInView={{ opacity: 1, y: 0 }}
                       viewport={{ once: true }}
@@ -1395,7 +1599,7 @@ export default function CyberpunkPortal({
                           </h3>
 
                           <p className="text-xs text-gray-300 leading-relaxed line-clamp-3">
-                            {article.excerpt}
+                            {getShortExcerpt(article, 165)}
                           </p>
                         </div>
                       </div>
@@ -1406,7 +1610,7 @@ export default function CyberpunkPortal({
                           {article.readTime}
                         </span>
                         <span className="flex items-center gap-1 font-bold text-[#FCEE0A] group-hover:text-[#00F0FF] transition-colors uppercase">
-                          <span>LEER MÁS</span>
+                          <span>LEER MÁS / READ MORE</span>
                           <ChevronRight className="w-3.5 h-3.5" />
                         </span>
                       </div>
@@ -1524,7 +1728,7 @@ export default function CyberpunkPortal({
                 {sortedArticles.map((article) => (
                   <article
                     key={article.id}
-                    onClick={() => setReadingArticle(article)}
+                    onClick={() => handleOpenArticle(article, false)}
                     style={{ clipPath: CYBER_CLIP }}
                     className="group cursor-pointer bg-[#000000] border border-gray-800 hover:border-[#00F0FF] hover:shadow-[0_0_25px_rgba(0,240,255,0.35)] transition-all flex flex-col justify-between overflow-hidden"
                   >
@@ -1554,16 +1758,16 @@ export default function CyberpunkPortal({
                         <h2 className="text-lg font-black text-white uppercase group-hover:text-[#FCEE0A] transition-colors">
                           {article.title}
                         </h2>
-                        <p className="text-xs text-gray-300 leading-relaxed">
-                          {article.excerpt}
+                        <p className="text-xs text-gray-300 leading-relaxed line-clamp-3">
+                          {getShortExcerpt(article, 165)}
                         </p>
                       </div>
                     </div>
 
                     <div className="px-5 py-3.5 border-t border-gray-800 bg-[#070a10] flex items-center justify-between text-xs font-mono">
                       <span className="text-gray-400">{article.readTime}</span>
-                      <span className="text-[#00F0FF] font-bold uppercase flex items-center gap-1">
-                        <span>LEER ARTÍCULO</span>
+                      <span className="text-[#00F0FF] group-hover:text-[#FCEE0A] font-bold uppercase flex items-center gap-1">
+                        <span>LEER MÁS / READ MORE</span>
                         <ChevronRight className="w-3.5 h-3.5" />
                       </span>
                     </div>
