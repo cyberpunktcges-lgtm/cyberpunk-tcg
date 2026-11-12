@@ -20,12 +20,21 @@ import {
   User,
   KeyRound,
   Upload,
-  Image as ImageIcon
+  Image as ImageIcon,
+  ChevronUp,
+  ChevronDown,
+  Maximize2,
+  Minimize2,
+  X
 } from 'lucide-react';
 import { resolveCardFromGithubUrl, enrichCardObject } from '../utils/cardMetadata.js';
 
 const CYBER_CLIP =
   'polygon(0 0, calc(100% - 15px) 0, 100% 15px, 100% 100%, 15px 100%, 0 calc(100% - 15px))';
+
+// Tiers numéricos 1-5 (convierte los antiguos S/A/B a su equivalente)
+const LEGACY_TIERS = { 'TIER S': 'TIER 1', 'TIER A': 'TIER 2', 'TIER B': 'TIER 3' };
+const formatTier = (tier) => LEGACY_TIERS[tier] || tier || 'TIER 1';
 
 const LOCAL_WALLPAPERS = [
   '/images/wallpapers/cyberpunk-hero.jpg',
@@ -245,7 +254,7 @@ function HtmlArticleEditor({
       <div>
         <div className="flex items-center justify-between mb-1">
           <label className="text-[#FCEE0A] font-bold uppercase">
-            1. ENTRADILLA CORTA (2-3 LÍNEAS ANTES DEL &quot;LEER MÁS / READ MORE&quot;) *
+            1. ENTRADILLA CORTA (2-3 LÍNEAS ANTES DEL &quot;LEER MÁS&quot;) *
           </label>
           <span className="text-[10px] text-gray-500">
             {(excerpt || '').length} caracteres
@@ -468,8 +477,8 @@ export default function AdminPanel({ initialAuth = false, initialCms = {}, initi
   const [newsForm, setNewsForm] = useState({
     title: '',
     category: 'NOTICIA OFICIAL',
-    faction: 'NETRUNNER',
-    excerpt: '',
+    source: '',
+excerpt: '',
     content: '',
     author: 'Admin_ES',
     date: 'HOY',
@@ -494,19 +503,25 @@ export default function AdminPanel({ initialAuth = false, initialCms = {}, initi
     image: '/images/wallpapers/Night_City_3840x2160.png'
   });
 
-  // Estado formulario Mazos
+    // Estado formulario Mazos
   const [editingDeckId, setEditingDeckId] = useState(null);
   const [cardSearchDeck, setCardSearchDeck] = useState('');
+  const [deckPickerTarget, setDeckPickerTarget] = useState('main'); // 'main' | 'sideboard' | 'legends' | 'featured'
+  const [deckPickerColorFilter, setDeckPickerColorFilter] = useState('ALL'); // 'ALL' | 'Red' | 'Green' | 'Yellow' | 'Blue'
+  const [deckPickerTypeFilter, setDeckPickerTypeFilter] = useState('ALL'); // 'ALL' | 'UNIDADES' | 'PROGRAMAS' | 'EQUIPO' | 'LEYENDAS'
   const [deckForm, setDeckForm] = useState({
-    rank: '#01',
     name: '',
     archetype: 'NETRUNNER // CONTROL',
-    tier: 'TIER S',
-    winrate: '60.0%',
+    tier: 'TIER 1',
+    featuredCardId: null,
+    featuredCard: null,
     pilot: 'CyberPlayer',
     bannerWallpaper: '/images/wallpapers/Night_City_3840x2160.png',
     description: '',
-    cards: []
+    legends: [],
+    cards: [],
+    deckList: [],
+    sideboard: []
   });
 
   // Estado 3 Cartas Más Vendidas Cardmarket (Inicio)
@@ -555,8 +570,8 @@ export default function AdminPanel({ initialAuth = false, initialCms = {}, initi
             cardId: '',
             name: 'Alt Cunningham // Mother of Daemons',
             cardType: '',
-            faction: 'NETRUNNER',
-            edition: '',
+            source: '',
+edition: '',
             artist: '',
             collection: 'Welcome to Night City (Set 01)',
             badge: 'TOP #03 BEST SELLER // CARDMARKET',
@@ -581,8 +596,8 @@ export default function AdminPanel({ initialAuth = false, initialCms = {}, initi
     playersCount: '32 Edgerunners',
     winner: '',
     winningDeck: '',
-    faction: 'NETRUNNER',
-    score: '6 - 0',
+    source: '',
+score: '6 - 0',
     runnerUp: '',
     thirdPlace: '',
     featuredCardImg:
@@ -627,8 +642,8 @@ export default function AdminPanel({ initialAuth = false, initialCms = {}, initi
       setNewsForm({
         title: '',
         category: 'NOTICIA OFICIAL',
-        faction: 'NETRUNNER',
-        excerpt: '',
+        source: '',
+excerpt: '',
         content: '',
         author: 'Admin_ES',
         date: 'HOY',
@@ -704,53 +719,349 @@ export default function AdminPanel({ initialAuth = false, initialCms = {}, initi
     }
   };
 
+  // Helper para resetear formulario de mazos
+  const resetDeckForm = () => {
+    setEditingDeckId(null);
+    setDeckPickerTarget('legends');
+    setDeckForm({
+      name: '',
+      archetype: 'NETRUNNER // CONTROL',
+      tier: 'TIER 1',
+      featuredCardId: null,
+      featuredCard: null,
+      pilot: 'CyberPlayer',
+      bannerWallpaper: '/images/wallpapers/Night_City_3840x2160.png',
+      description: '',
+      legends: [],
+      cards: [],
+      deckList: [],
+      sideboard: []
+    });
+  };
+
+  // Cargar mazo para edición separando las 3 Leyendas y la Carta Destacada
+  const handleStartEditDeck = (deck) => {
+    setEditingDeckId(deck.id);
+    const existingLegendsCount = (Array.isArray(deck.legends) && deck.legends.length) || (Array.isArray(deck.cards) && deck.cards.length) || 0;
+    setDeckPickerTarget(existingLegendsCount >= 3 ? 'main' : 'legends');
+
+    let legends = [];
+    let featuredCard = deck.featuredCard || null;
+    let featuredCardId = deck.featuredCardId || null;
+
+    if (Array.isArray(deck.legends) && deck.legends.length > 0) {
+      legends = [...deck.legends];
+    } else if (Array.isArray(deck.cards)) {
+      if (deck.cards.length <= 3) {
+        legends = [...deck.cards];
+      } else {
+        if (featuredCardId) {
+          featuredCard = deck.cards.find((c) => c.id === featuredCardId) || deck.cards[3];
+          legends = deck.cards.filter((c) => c.id !== featuredCard.id).slice(0, 3);
+        } else {
+          legends = deck.cards.slice(0, 3);
+          featuredCard = deck.cards[3];
+          featuredCardId = featuredCard.id;
+        }
+      }
+    }
+
+    if (!featuredCard && featuredCardId) {
+      featuredCard = legends.find((c) => c.id === featuredCardId) || null;
+    }
+    if (!featuredCardId && legends[0]) {
+      featuredCardId = legends[0].id;
+      featuredCard = legends[0];
+    }
+
+    setDeckForm({
+      ...deck,
+      tier: formatTier(deck.tier),
+      legends,
+      cards: legends,
+      featuredCard,
+      featuredCardId: featuredCardId || legends[0]?.id || null,
+      deckList: Array.isArray(deck.deckList) ? [...deck.deckList] : [],
+      sideboard: Array.isArray(deck.sideboard) ? [...deck.sideboard] : []
+    });
+  };
+
   // Guardar Mazo
   const handleSaveDeck = async (e) => {
     e.preventDefault();
     if (!deckForm.name.trim()) return;
     const action = editingDeckId ? 'update' : 'create';
-    const item = editingDeckId ? { ...deckForm, id: editingDeckId } : deckForm;
+    const legends = deckForm.legends || deckForm.cards || [];
+    const featuredCard =
+      deckForm.featuredCard ||
+      legends.find((c) => c.id === deckForm.featuredCardId) ||
+      legends[0] ||
+      null;
+    const featuredCardId = deckForm.featuredCardId || featuredCard?.id || null;
+
+    const item = {
+      ...deckForm,
+      id: editingDeckId || deckForm.id,
+      legends,
+      cards: legends,
+      featuredCard,
+      featuredCardId,
+      deckList: deckForm.deckList || [],
+      sideboard: deckForm.sideboard || []
+    };
+
     const ok = await apiCall({ action, section: 'decks', item });
     if (ok) {
       showToast(editingDeckId ? 'Mazo actualizado en el Meta' : 'Nuevo mazo añadido al Meta');
-      setEditingDeckId(null);
-      setDeckForm({
-        rank: `#0${(cms.decks?.length || 0) + 1}`,
-        name: '',
-        archetype: 'NETRUNNER // CONTROL',
-        tier: 'TIER S',
-        winrate: '60.0%',
-        pilot: 'CyberPlayer',
-        bannerWallpaper: '/images/wallpapers/Night_City_3840x2160.png',
-        description: '',
-        cards: []
-      });
+      resetDeckForm();
     }
+  };
+
+
+  // Mover mazo arriba o abajo en el orden del ranking
+  const handleMoveDeck = async (index, direction) => {
+    const targetIndex = direction === 'up' ? index - 1 : index + 1;
+    const decks = [...(cms.decks || [])];
+    if (targetIndex < 0 || targetIndex >= decks.length) return;
+
+    const temp = decks[index];
+    decks[index] = decks[targetIndex];
+    decks[targetIndex] = temp;
+
+    // Actualización inmediata en UI
+    setCms((prev) => ({ ...prev, decks }));
+
+    const ok = await apiCall({ action: 'reorder', section: 'decks', items: decks });
+    if (ok) {
+      showToast(
+        targetIndex < 3
+          ? `Mazo movido a la posición #${targetIndex + 1} (Visible en el Top 3 de Portada)`
+          : `Mazo movido a la posición #${targetIndex + 1}`
+      );
+    }
+  };
+
+
+  const handleIncrementDeckCard = (cardId) => {
+    setDeckForm((prev) => {
+      const mainCard = (prev.deckList || []).find((c) => c.id === cardId);
+      const mainQty = mainCard ? mainCard.qty || 1 : 0;
+      const sideCard = (prev.sideboard || []).find((c) => c.id === cardId);
+      const sideQty = sideCard ? sideCard.qty || 1 : 0;
+
+      if (mainQty + sideQty >= 3) {
+        showToast('Máximo 3 copias permitidas en total (Baraja + Banquillo)');
+        return prev;
+      }
+
+
+
+      const list = (prev.deckList || []).map((c) => {
+        if (c.id === cardId) {
+          return { ...c, qty: (c.qty || 1) + 1 };
+        }
+        return c;
+      });
+      return { ...prev, deckList: list };
+    });
+  };
+
+  const handleDecrementDeckCard = (cardId) => {
+    setDeckForm((prev) => {
+      const list = (prev.deckList || [])
+        .map((c) => {
+          if (c.id === cardId) {
+            return { ...c, qty: (c.qty || 1) - 1 };
+          }
+          return c;
+        })
+        .filter((c) => (c.qty || 0) > 0);
+      return { ...prev, deckList: list };
+    });
+  };
+
+  const handleIncrementSideboardCard = (cardId) => {
+    setDeckForm((prev) => {
+      const mainCard = (prev.deckList || []).find((c) => c.id === cardId);
+      const mainQty = mainCard ? mainCard.qty || 1 : 0;
+      const sideCard = (prev.sideboard || []).find((c) => c.id === cardId);
+      const sideQty = sideCard ? sideCard.qty || 1 : 0;
+
+      if (mainQty + sideQty >= 3) {
+        showToast('Máximo 3 copias permitidas en total (Baraja + Banquillo)');
+        return prev;
+      }
+
+      const totalSide = (prev.sideboard || []).reduce((acc, c) => acc + (c.qty || 1), 0);
+      if (totalSide >= 7) {
+        showToast('El banquillo ya tiene el máximo reglamentario de 7 cartas');
+        return prev;
+      }
+
+      const list = (prev.sideboard || []).map((c) => {
+        if (c.id === cardId) {
+          return { ...c, qty: (c.qty || 1) + 1 };
+        }
+        return c;
+      });
+      return { ...prev, sideboard: list };
+    });
+  };
+
+  const handleDecrementSideboardCard = (cardId) => {
+    setDeckForm((prev) => {
+      const list = (prev.sideboard || [])
+        .map((c) => {
+          if (c.id === cardId) {
+            return { ...c, qty: (c.qty || 1) - 1 };
+          }
+          return c;
+        })
+        .filter((c) => (c.qty || 0) > 0);
+      return { ...prev, sideboard: list };
+    });
   };
 
   const handleAddCardToDeck = (ghCard) => {
-    if (deckForm.cards.length >= 6) {
-      showToast('Máximo 6 cartas destacadas por mazo en portada');
-      return;
-    }
     const newCardObj = {
       id: ghCard.id,
       name: ghCard.name,
-      type: `${ghCard.faction} // CARTA OFICIAL`,
+      type: ghCard.cardType || `${ghCard.faction} // CARTA OFICIAL`,
+      cardType: ghCard.cardType || '',
+      faction: ghCard.faction || '',
       cost: '4 EDDIES',
       power: '6 FUERZA',
-      rarity: 'ÉPICA',
+      rarity: ghCard.edition || 'ÉPICA',
       image: ghCard.image,
-      ability: `Carta oficial del archivo Cyberpunk TCG (${ghCard.fileName}).`
+      ability: ''
     };
-    setDeckForm({ ...deckForm, cards: [...deckForm.cards, newCardObj] });
+
+    if (deckPickerTarget === 'featured') {
+      setDeckForm((prev) => ({
+        ...prev,
+        featuredCard: newCardObj,
+        featuredCardId: newCardObj.id
+      }));
+      showToast(`Carta destacada asignada: ${ghCard.name}`);
+      return;
+    }
+
+    if (deckPickerTarget === 'legends') {
+      const currentLegends = deckForm.legends || deckForm.cards || [];
+      if (currentLegends.length >= 3) {
+        showToast('Un mazo solo puede tener 3 Leyendas. Quita una para cambiarla.');
+        return;
+      }
+      const updatedLegends = [...currentLegends, newCardObj];
+      setDeckForm((prev) => {
+        const hasFeatured = prev.featuredCardId && (prev.featuredCard || updatedLegends.some((l) => l.id === prev.featuredCardId));
+        return {
+          ...prev,
+          legends: updatedLegends,
+          cards: updatedLegends,
+          featuredCardId: hasFeatured ? prev.featuredCardId : newCardObj.id,
+          featuredCard: hasFeatured ? prev.featuredCard : newCardObj
+        };
+      });
+      showToast(`Leyenda #${updatedLegends.length} añadida: ${ghCard.name}`);
+      if (updatedLegends.length >= 3) {
+        setDeckPickerTarget('main');
+        showToast('¡3 Leyendas completadas! Posicionado automáticamente en: + AÑADIR A BARAJA');
+      }
+      return;
+    }
+
+    if (deckPickerTarget === 'main') {
+      setDeckForm((prev) => {
+        const mainList = Array.isArray(prev.deckList) ? [...prev.deckList] : [];
+        const sideList = Array.isArray(prev.sideboard) ? [...prev.sideboard] : [];
+
+        const mainItem = mainList.find((c) => c.id === ghCard.id);
+        const mainQty = mainItem ? mainItem.qty || 1 : 0;
+        const sideItem = sideList.find((c) => c.id === ghCard.id);
+        const sideQty = sideItem ? sideItem.qty || 1 : 0;
+
+        if (mainQty + sideQty >= 3) {
+          showToast(`Máximo 3 copias permitidas de ${ghCard.name} en total (Baraja + Banquillo)`);
+          return prev;
+        }
+
+
+
+        const existingIdx = mainList.findIndex((c) => c.id === ghCard.id);
+        if (existingIdx !== -1) {
+          mainList[existingIdx] = {
+            ...mainList[existingIdx],
+            qty: (mainList[existingIdx].qty || 1) + 1
+          };
+        } else {
+          mainList.push({ ...newCardObj, qty: 1 });
+        }
+        return { ...prev, deckList: mainList };
+      });
+      showToast(`Añadida a la Baraja Principal: ${ghCard.name}`);
+      return;
+    }
+
+    if (deckPickerTarget === 'sideboard') {
+      setDeckForm((prev) => {
+        const mainList = Array.isArray(prev.deckList) ? [...prev.deckList] : [];
+        const sideList = Array.isArray(prev.sideboard) ? [...prev.sideboard] : [];
+
+        const mainItem = mainList.find((c) => c.id === ghCard.id);
+        const mainQty = mainItem ? mainItem.qty || 1 : 0;
+        const sideItem = sideList.find((c) => c.id === ghCard.id);
+        const sideQty = sideItem ? sideItem.qty || 1 : 0;
+
+        if (mainQty + sideQty >= 3) {
+          showToast(`Máximo 3 copias permitidas de ${ghCard.name} en total (Baraja + Banquillo)`);
+          return prev;
+        }
+
+        const totalSide = sideList.reduce((acc, c) => acc + (c.qty || 1), 0);
+        if (totalSide >= 7) {
+          showToast('El banquillo ya tiene el máximo reglamentario de 7 cartas');
+          return prev;
+        }
+
+        const existingIdx = sideList.findIndex((c) => c.id === ghCard.id);
+        if (existingIdx !== -1) {
+          sideList[existingIdx] = {
+            ...sideList[existingIdx],
+            qty: (sideList[existingIdx].qty || 1) + 1
+          };
+        } else {
+          sideList.push({ ...newCardObj, qty: 1 });
+        }
+        return { ...prev, sideboard: sideList };
+      });
+      showToast(`Añadida al Banquillo (Sideboard): ${ghCard.name}`);
+      return;
+    }
   };
 
-  const handleRemoveCardFromDeck = (idx) => {
-    setDeckForm({
-      ...deckForm,
-      cards: deckForm.cards.filter((_, i) => i !== idx)
-    });
+  const handleRemoveLegend = (idx) => {
+    const currentLegends = deckForm.legends || deckForm.cards || [];
+    const removedCard = currentLegends[idx];
+    const updatedLegends = currentLegends.filter((_, i) => i !== idx);
+
+    let nextFeaturedId = deckForm.featuredCardId;
+    let nextFeatured = deckForm.featuredCard;
+
+    if (removedCard && deckForm.featuredCardId === removedCard.id) {
+      if (deckForm.featuredCard?.id === removedCard.id) {
+        nextFeatured = updatedLegends[0] || null;
+        nextFeaturedId = nextFeatured?.id || null;
+      }
+    }
+
+    setDeckForm((prev) => ({
+      ...prev,
+      legends: updatedLegends,
+      cards: updatedLegends,
+      featuredCard: nextFeatured,
+      featuredCardId: nextFeaturedId
+    }));
   };
 
   // Guardar las 3 Cartas Más Vendidas (Cardmarket Best Sellers) de Inicio
@@ -888,8 +1199,8 @@ export default function AdminPanel({ initialAuth = false, initialCms = {}, initi
         playersCount: '32 Edgerunners',
         winner: '',
         winningDeck: '',
-        faction: 'NETRUNNER',
-        score: '6 - 0',
+        source: '',
+score: '6 - 0',
         runnerUp: '',
         thirdPlace: '',
         featuredCardImg:
@@ -989,13 +1300,39 @@ export default function AdminPanel({ initialAuth = false, initialCms = {}, initi
     setLoginPass('');
   };
 
-  const filteredDeckPickerCards = cards
-    .filter(
-      (c) =>
-        c.name.toLowerCase().includes(cardSearchDeck.toLowerCase()) ||
-        c.slug.toLowerCase().includes(cardSearchDeck.toLowerCase())
-    )
-    .slice(0, 12);
+  const filteredDeckPickerCards = cards.filter((c) => {
+    const q = (cardSearchDeck || '').toLowerCase().trim();
+    const typeStr = `${c.cardType || ''} ${c.type || ''} ${c.faction || ''} ${c.name || ''}`.toUpperCase();
+
+    // Filtro por Color / Aspect
+    if (deckPickerColorFilter !== 'ALL' && c.aspect !== deckPickerColorFilter && c.color !== deckPickerColorFilter) {
+      return false;
+    }
+
+    // Filtro por Tipo de carta (100% verificado)
+    if (deckPickerTypeFilter === 'LEYENDAS') {
+      if (c.officialType !== 'LEGEND' && !typeStr.includes('LEGEND') && !typeStr.includes('LEYENDA')) return false;
+    } else if (deckPickerTypeFilter === 'PROGRAMAS') {
+      if (c.officialType !== 'PROGRAM' && !typeStr.includes('PROGRAM') && !typeStr.includes('PROGRAMA')) return false;
+    } else if (deckPickerTypeFilter === 'EQUIPO') {
+      if (c.officialType !== 'GEAR' && !typeStr.includes('GEAR') && !typeStr.includes('EQUIPO') && !typeStr.includes('CYBERWARE')) return false;
+    } else if (deckPickerTypeFilter === 'UNIDADES') {
+      if (c.officialType !== 'UNIT' && !typeStr.includes('UNIT') && !typeStr.includes('UNIDAD')) return false;
+    }
+
+    if (!q) return true;
+
+    return (
+      (c.name || '').toLowerCase().includes(q) ||
+      (c.slug || '').toLowerCase().includes(q) ||
+      (c.id || '').toLowerCase().includes(q) ||
+      (c.cardId || '').toLowerCase().includes(q) ||
+      (c.faction || '').toLowerCase().includes(q) ||
+      (c.cardType || '').toLowerCase().includes(q) ||
+      (c.type || '').toLowerCase().includes(q) ||
+      (c.artist || '').toLowerCase().includes(q)
+    );
+  });
 
   const filteredAltPickerCards = cards
     .filter((c) => {
@@ -1300,17 +1637,14 @@ export default function AdminPanel({ initialAuth = false, initialCms = {}, initi
                     />
                   </div>
                   <div>
-                    <label className="block text-gray-400 mb-1">FACCIÓN</label>
-                    <select
-                      value={newsForm.faction}
-                      onChange={(e) => setNewsForm({ ...newsForm, faction: e.target.value })}
+                    <label className="block text-gray-400 mb-1">FUENTE DE LA NOTICIA (OPCIONAL)</label>
+                    <input
+                      type="text"
+                      value={newsForm.source || ''}
+                      onChange={(e) => setNewsForm({ ...newsForm, source: e.target.value })}
+                      placeholder="Ej: IGN, Cyberpunk TCG Oficial, Twitter..."
                       className="w-full bg-[#070a10] border border-gray-800 focus:border-[#00F0FF] px-3 py-2 text-white focus:outline-none"
-                    >
-                      <option value="NETRUNNER">NETRUNNER</option>
-                      <option value="CORPO">CORPO</option>
-                      <option value="BANDAS">BANDAS</option>
-                      <option value="MERCENARIO">MERCENARIO</option>
-                    </select>
+                    />
                   </div>
                 </div>
 
@@ -1416,7 +1750,7 @@ export default function AdminPanel({ initialAuth = false, initialCms = {}, initi
                           <span className="px-2 py-0.5 bg-[#FCEE0A] text-[#070a10] font-black">
                             {item.category}
                           </span>
-                          <span className="text-[#00F0FF]">{item.faction}</span>
+                          {item.source && <span className="text-gray-400">Fuente: {item.source}</span>}
                           <span className="text-gray-500">• {item.date}</span>
                         </div>
                         <h4 className="text-sm font-black text-white uppercase mt-1">
@@ -1477,11 +1811,12 @@ export default function AdminPanel({ initialAuth = false, initialCms = {}, initi
                 />
               </div>
               <div>
-                <label className="block text-gray-400 mb-1">FACCIÓN / ENFRENTAMIENTO</label>
+                <label className="block text-gray-400 mb-1">FUENTE DE LA NOTICIA (OPCIONAL)</label>
                 <input
                   type="text"
-                  value={heroForm.faction}
-                  onChange={(e) => setHeroForm({ ...heroForm, faction: e.target.value })}
+                  value={heroForm.source || ''}
+                  onChange={(e) => setHeroForm({ ...heroForm, source: e.target.value })}
+                  placeholder="Ej: IGN, Cyberpunk TCG Oficial, Twitter..."
                   className="w-full bg-[#070a10] border border-gray-800 px-3 py-2 text-white"
                 />
               </div>
@@ -1667,233 +2002,866 @@ export default function AdminPanel({ initialAuth = false, initialCms = {}, initi
             TAB 3: GESTIÓN DE MAZOS (CON SELECTOR DE CARTAS DE GITHUB)
            =============================================================== */}
         {activeTab === 'decks' && (
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-            <form
-              onSubmit={handleSaveDeck}
+          <div className="space-y-8">
+            {/* FILA SUPERIOR: Formulario de Configuración del Mazo (Izq) + Lista de Mazos (Der) */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+              {/* Formulario del Mazo Actual */}
+              <form
+                onSubmit={handleSaveDeck}
+                style={{ clipPath: CYBER_CLIP }}
+                className="lg:col-span-7 bg-[#000000] border border-gray-800 p-6 space-y-4 rounded-none"
+              >
+                <div className="flex items-center justify-between border-b border-gray-800 pb-3">
+                  <div>
+                    <span className="text-[10px] font-mono text-[#00F0FF] uppercase block">
+                      CONFIGURACIÓN COMPETITIVA // BARAJA PRINCIPAL (MÍN. 40) + 7 BANQUILLO + 3 LEYENDAS
+                    </span>
+                    <h2 className="text-base font-black uppercase text-[#FCEE0A] font-mono">
+                      {editingDeckId ? `EDITANDO MAZO // ${editingDeckId}` : 'CREAR NUEVO MAZO META'}
+                    </h2>
+                  </div>
+                  {editingDeckId && (
+                    <button
+                      type="button"
+                      onClick={() => resetDeckForm()}
+                      className="text-xs font-mono text-[#FF003C] hover:underline cursor-pointer"
+                    >
+                      Cancelar Edición
+                    </button>
+                  )}
+                </div>
+
+                <div className="space-y-3 text-xs font-mono">
+                  <div>
+                    <label className="block text-gray-400 mb-1">TIER DEL MAZO</label>
+                    <select
+                      value={formatTier(deckForm.tier)}
+                      onChange={(e) => setDeckForm({ ...deckForm, tier: e.target.value })}
+                      className="w-full bg-[#070a10] border border-gray-800 px-3 py-2 text-white"
+                    >
+                      <option value="TIER 1">TIER 1 (Nivel Máximo Competitivo)</option>
+                      <option value="TIER 2">TIER 2 (Muy Fuerte)</option>
+                      <option value="TIER 3">TIER 3 (Competitivo Viable)</option>
+                      <option value="TIER 4">TIER 4 (Rogue / Estrategia Experimental)</option>
+                      <option value="TIER 5">TIER 5 (Casual / En Desarrollo)</option>
+                    </select>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-gray-400 mb-1">NOMBRE DEL MAZO *</label>
+                      <input
+                        type="text"
+                        required
+                        value={deckForm.name}
+                        onChange={(e) => setDeckForm({ ...deckForm, name: e.target.value })}
+                        placeholder="Ej: Arasaka Control Protocol"
+                        className="w-full bg-[#070a10] border border-gray-800 px-3 py-2 text-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-gray-400 mb-1">PILOTO / AUTOR</label>
+                      <input
+                        type="text"
+                        value={deckForm.pilot}
+                        onChange={(e) => setDeckForm({ ...deckForm, pilot: e.target.value })}
+                        className="w-full bg-[#070a10] border border-gray-800 px-3 py-2 text-white"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-gray-400 mb-1">ARQUETIPO</label>
+                    <input
+                      type="text"
+                      value={deckForm.archetype}
+                      onChange={(e) => setDeckForm({ ...deckForm, archetype: e.target.value })}
+                      className="w-full bg-[#070a10] border border-gray-800 px-3 py-2 text-white"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-gray-400 mb-1">DESCRIPCIÓN TÁCTICA *</label>
+                    <textarea
+                      rows="2"
+                      required
+                      value={deckForm.description}
+                      onChange={(e) => setDeckForm({ ...deckForm, description: e.target.value })}
+                      className="w-full bg-[#070a10] border border-gray-800 px-3 py-2 text-white"
+                    />
+                  </div>
+
+                  <ImageUploadField
+                    label="IMAGEN BANNER DEL MAZO (SUBIR ARCHIVO O WALLPAPER)"
+                    value={deckForm.bannerWallpaper}
+                    onChange={(url) => setDeckForm({ ...deckForm, bannerWallpaper: url })}
+                    uploadedFiles={uploadedFiles}
+                    onUploadSuccess={setUploadedFiles}
+                    showToast={showToast}
+                  />
+
+                  {/* 1. LAS 3 LEYENDAS */}
+                  <div className="border-t border-gray-800 pt-3 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <label className="block text-[#00F0FF] font-bold text-xs uppercase tracking-wider">
+                        1. LAS 3 LEYENDAS DEL MAZO ({(deckForm.legends || deckForm.cards || []).length} / 3)
+                      </label>
+                      <span className="text-[10px] text-gray-400">Pulsa ★ para marcarla como destacada</span>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                      {[0, 1, 2].map((slotIdx) => {
+                        const currentLegends = deckForm.legends || deckForm.cards || [];
+                        const legend = currentLegends[slotIdx];
+                        const isFeatured = legend && (deckForm.featuredCardId === legend.id);
+                        if (legend) {
+                          return (
+                            <div
+                              key={legend.id}
+                              className={`p-2 bg-[#070a10] border flex items-center gap-2 ${
+                                isFeatured ? 'border-[#FCEE0A] shadow-[0_0_12px_rgba(252,238,10,0.35)]' : 'border-gray-800'
+                              }`}
+                            >
+                              <img
+                                src={legend.image}
+                                alt={legend.name}
+                                className="w-10 h-14 object-cover object-top shrink-0 border border-gray-800"
+                              />
+                              <div className="min-w-0 flex-1 text-[11px] font-mono">
+                                <span className="text-[9px] text-[#FCEE0A] font-bold block">LEYENDA #{slotIdx + 1}</span>
+                                <p className="text-white font-bold truncate">{legend.name}</p>
+                                <div className="flex items-center gap-2 mt-1">
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      setDeckForm((prev) => ({
+                                        ...prev,
+                                        featuredCardId: legend.id,
+                                        featuredCard: legend
+                                      }))
+                                    }
+                                    className={`text-[10px] font-mono cursor-pointer flex items-center gap-0.5 ${
+                                      isFeatured ? 'text-[#FCEE0A] font-bold' : 'text-gray-500 hover:text-[#FCEE0A]'
+                                    }`}
+                                  >
+                                    <span>★</span>
+                                    <span>{isFeatured ? 'Destacada' : 'Hacer destacada'}</span>
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleRemoveLegend(slotIdx)}
+                                    className="text-[#FF003C] hover:underline text-[10px] cursor-pointer ml-auto"
+                                  >
+                                    Quitar
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        }
+                        return (
+                          <div
+                            key={slotIdx}
+                            className="p-3 bg-[#070a10] border border-dashed border-gray-800 flex flex-col items-center justify-center text-center text-gray-500 text-[11px] font-mono min-h-[70px]"
+                          >
+                            <span>[ Leyenda #{slotIdx + 1} Vacía ]</span>
+                            <span className="text-[9px] text-gray-600">Añade desde el catálogo</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* 2. CARTA DESTACADA EN PORTADA */}
+                  <div className="p-3 bg-[#070a10] border border-[#00F0FF]/40 space-y-2">
+                    <div className="flex items-center justify-between text-xs font-mono">
+                      <span className="text-[#00F0FF] font-bold flex items-center gap-1.5">
+                        <Sparkles className="w-3.5 h-3.5 text-[#FCEE0A]" />
+                        2. CARTA DESTACADA EN PORTADA
+                      </span>
+                      {deckForm.featuredCard && (
+                        <span className="text-[10px] px-2 py-0.5 bg-[#FCEE0A] text-[#070a10] font-bold">
+                          {(deckForm.legends || deckForm.cards || []).some((l) => l.id === deckForm.featuredCardId)
+                            ? 'UNA DE LAS LEYENDAS'
+                            : 'OTRA CARTA DEL MAZO'}
+                        </span>
+                      )}
+                    </div>
+
+                    {deckForm.featuredCard ? (
+                      <div className="flex items-center gap-3 bg-[#000000] p-2 border border-gray-800">
+                        <img
+                          src={deckForm.featuredCard.image}
+                          alt={deckForm.featuredCard.name}
+                          className="w-12 h-16 object-cover object-top border border-gray-800 shrink-0"
+                        />
+                        <div className="min-w-0 flex-1 text-xs font-mono">
+                          <p className="text-white font-bold truncate">{deckForm.featuredCard.name}</p>
+                          <span className="text-[10px] text-gray-400 block">
+                            {deckForm.featuredCard.type || 'CARTA OFICIAL'}
+                          </span>
+                          <span className="text-[9px] text-gray-500 font-mono block">
+                            {deckForm.featuredCard.id}
+                          </span>
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="text-xs text-gray-500 font-mono">
+                        No hay carta destacada seleccionada (se usará la Leyenda 1 por defecto).
+                      </p>
+                    )}
+                  </div>
+
+                  {/* 3. BARAJA PRINCIPAL (40 CARTAS) */}
+                  <div className="border-t border-gray-800 pt-3 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <label className="text-xs font-mono text-[#FCEE0A] font-bold uppercase block">
+                          3. BARAJA PRINCIPAL // {(deckForm.deckList || []).reduce((acc, c) => acc + (c.qty || 1), 0)} CARTAS (MÍNIMO 40)
+                        </label>
+                        <span className="text-[10px] font-mono text-gray-400">
+                          Mínimo 40 cartas en baraja principal (sin límite superior, admite 40, 41, 42, 43 o más). Máx 3 copias por carta en total.
+                        </span>
+                      </div>
+
+                      {(deckForm.deckList || []).length > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => setDeckForm((prev) => ({ ...prev, deckList: [] }))}
+                          className="text-[10px] font-mono text-[#FF003C] hover:underline cursor-pointer"
+                        >
+                          Vaciar baraja
+                        </button>
+                      )}
+                    </div>
+
+                    {(deckForm.deckList || []).length > 0 ? (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-52 overflow-y-auto p-2 bg-[#070a10] border border-gray-800">
+                        {(deckForm.deckList || []).map((card) => {
+                          const totalCopies = (card.qty || 1) + ((deckForm.sideboard || []).find((s) => s.id === card.id)?.qty || 0);
+                          const totalMain = (deckForm.deckList || []).reduce((acc, c) => acc + (c.qty || 1), 0);
+                          const canIncrement = totalCopies < 3;
+
+                          return (
+                            <div
+                              key={card.id}
+                              className="bg-[#000000] border border-gray-800 p-2 flex items-center justify-between gap-2"
+                            >
+                              <div className="flex items-center gap-2 min-w-0">
+                                <img
+                                  src={card.image}
+                                  alt={card.name}
+                                  className="w-7 h-10 object-contain shrink-0"
+                                />
+                                <div className="min-w-0">
+                                  <p className="text-[11px] font-bold text-white truncate">
+                                    {card.name}
+                                  </p>
+                                  <span className="text-[9px] font-mono text-gray-400">
+                                    {card.id}
+                                  </span>
+                                </div>
+                              </div>
+
+                              <div className="flex items-center gap-1 shrink-0">
+                                <button
+                                  type="button"
+                                  onClick={() => handleDecrementDeckCard(card.id)}
+                                  className="w-5 h-5 bg-[#070a10] border border-gray-700 hover:border-[#FF003C] text-white text-[10px] flex items-center justify-center cursor-pointer"
+                                  title="Reducir copia"
+                                >
+                                  -
+                                </button>
+                                <span className="w-5 text-center text-xs font-black text-[#FCEE0A]">
+                                  {card.qty || 1}
+                                </span>
+                                <button
+                                  type="button"
+                                  disabled={!canIncrement}
+                                  onClick={() => handleIncrementDeckCard(card.id)}
+                                  title={!canIncrement ? 'Límite alcanzado' : 'Añadir copia'}
+                                  className={`w-5 h-5 bg-[#070a10] border text-[10px] flex items-center justify-center ${
+                                    !canIncrement
+                                      ? 'border-gray-800 text-gray-600 cursor-not-allowed opacity-40'
+                                      : 'border-gray-700 hover:border-[#00F0FF] text-white cursor-pointer'
+                                  }`}
+                                >
+                                  +
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <p className="text-xs text-gray-500 font-mono p-3 bg-[#070a10] border border-gray-800">
+                        No hay cartas en la baraja principal. Selecciona el modo "+ AÑADIR A BARAJA" en el catálogo inferior.
+                      </p>
+                    )}
+                  </div>
+
+                  {/* 4. BANQUILLO // SIDEBOARD (7 CARTAS) */}
+                  <div className="border-t border-gray-800 pt-3 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <label className="text-xs font-mono text-[#00F0FF] font-bold uppercase block">
+                          4. BANQUILLO // SIDEBOARD // {(deckForm.sideboard || []).reduce((acc, c) => acc + (c.qty || 1), 0)} / 7 CARTAS
+                        </label>
+                        <span className="text-[10px] font-mono text-gray-400">
+                          Exactamente 7 cartas en el banquillo. Máx 3 copias por carta en total (Baraja + Banquillo).
+                        </span>
+                      </div>
+
+                      {(deckForm.sideboard || []).length > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => setDeckForm((prev) => ({ ...prev, sideboard: [] }))}
+                          className="text-[10px] font-mono text-[#FF003C] hover:underline cursor-pointer"
+                        >
+                          Vaciar banquillo
+                        </button>
+                      )}
+                    </div>
+
+                    {(deckForm.sideboard || []).length > 0 ? (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-52 overflow-y-auto p-2 bg-[#070a10] border border-gray-800">
+                        {(deckForm.sideboard || []).map((card) => {
+                          const totalCopies = (card.qty || 1) + ((deckForm.deckList || []).find((m) => m.id === card.id)?.qty || 0);
+                          const totalSide = (deckForm.sideboard || []).reduce((acc, c) => acc + (c.qty || 1), 0);
+                          const canIncrement = totalCopies < 3 && totalSide < 7;
+
+                          return (
+                            <div
+                              key={card.id}
+                              className="bg-[#000000] border border-[#00F0FF]/30 p-2 flex items-center justify-between gap-2"
+                            >
+                              <div className="flex items-center gap-2 min-w-0">
+                                <img
+                                  src={card.image}
+                                  alt={card.name}
+                                  className="w-7 h-10 object-contain shrink-0"
+                                />
+                                <div className="min-w-0">
+                                  <p className="text-[11px] font-bold text-white truncate">
+                                    {card.name}
+                                  </p>
+                                  <span className="text-[9px] font-mono text-gray-400">
+                                    {card.id}
+                                  </span>
+                                </div>
+                              </div>
+
+                              <div className="flex items-center gap-1 shrink-0">
+                                <button
+                                  type="button"
+                                  onClick={() => handleDecrementSideboardCard(card.id)}
+                                  className="w-5 h-5 bg-[#070a10] border border-gray-700 hover:border-[#FF003C] text-white text-[10px] flex items-center justify-center cursor-pointer"
+                                  title="Reducir copia"
+                                >
+                                  -
+                                </button>
+                                <span className="w-5 text-center text-xs font-black text-[#00F0FF]">
+                                  {card.qty || 1}
+                                </span>
+                                <button
+                                  type="button"
+                                  disabled={!canIncrement}
+                                  onClick={() => handleIncrementSideboardCard(card.id)}
+                                  title={!canIncrement ? 'Límite alcanzado' : 'Añadir copia'}
+                                  className={`w-5 h-5 bg-[#070a10] border text-[10px] flex items-center justify-center ${
+                                    !canIncrement
+                                      ? 'border-gray-800 text-gray-600 cursor-not-allowed opacity-40'
+                                      : 'border-gray-700 hover:border-[#00F0FF] text-white cursor-pointer'
+                                  }`}
+                                >
+                                  +
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <p className="text-xs text-gray-500 font-mono p-3 bg-[#070a10] border border-gray-800">
+                        No hay cartas en el banquillo. Selecciona el modo "+ AÑADIR A BANQUILLO" en el catálogo inferior.
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                <button
+                  type="submit"
+                  style={{ clipPath: CYBER_CLIP }}
+                  className="w-full py-3.5 bg-[#FCEE0A] text-[#070a10] font-mono font-black text-xs uppercase tracking-widest cursor-pointer flex items-center justify-center gap-2 mt-4 shadow-[0_0_20px_rgba(252,238,10,0.4)]"
+                >
+                  <Save className="w-4 h-4" />
+                  <span>{editingDeckId ? 'ACTUALIZAR MAZO' : 'GUARDAR NUEVO MAZO'}</span>
+                </button>
+              </form>
+
+              {/* Lista de Mazos con Reordenación */}
+              <div className="lg:col-span-5 space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-gray-800 pb-2">
+                  <div>
+                    <h3 className="text-sm font-mono font-bold uppercase text-[#00F0FF]">
+                      ORDEN DE MAZOS ({cms.decks?.length || 0})
+                    </h3>
+                    <p className="text-[11px] font-mono text-gray-400">
+                      Los 3 primeros se muestran en el <strong className="text-[#FCEE0A]">TOP 3 de Portada</strong>. Usa las flechas ▲ / ▼ para ordenarlos.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  {(cms.decks || []).map((deck, idx) => {
+                    const isInTop3 = idx < 3;
+                    const mainCardsCount = (deck.deckList || []).reduce((acc, c) => acc + (c.qty || 1), 0);
+                    const sideCardsCount = (deck.sideboard || []).reduce((acc, c) => acc + (c.qty || 1), 0);
+                    const isCurrentlyEditing = editingDeckId === deck.id;
+
+                    return (
+                      <div
+                        key={deck.id || idx}
+                        className={`bg-[#000000] border p-4 flex items-center gap-4 transition-all ${
+                          isCurrentlyEditing
+                            ? 'border-[#FCEE0A] shadow-[0_0_20px_rgba(252,238,10,0.3)]'
+                            : isInTop3
+                            ? 'border-[#00F0FF]/60 hover:border-[#00F0FF]'
+                            : 'border-gray-800 hover:border-gray-700'
+                        }`}
+                      >
+                        {/* Controles de Reordenación ▲ / ▼ */}
+                        <div className="flex flex-col items-center gap-1 shrink-0">
+                          <button
+                            type="button"
+                            disabled={idx === 0}
+                            onClick={() => handleMoveDeck(idx, -1)}
+                            className={`w-7 h-7 flex items-center justify-center border transition-all ${
+                              idx === 0
+                                ? 'border-gray-800 text-gray-700 cursor-not-allowed opacity-30'
+                                : 'border-gray-700 hover:border-[#00F0FF] text-gray-300 hover:text-[#00F0FF] bg-[#070a10] cursor-pointer'
+                            }`}
+                            title="Mover hacia arriba"
+                          >
+                            <ChevronUp className="w-4 h-4" />
+                          </button>
+                          <button
+                            type="button"
+                            disabled={idx === (cms.decks || []).length - 1}
+                            onClick={() => handleMoveDeck(idx, 1)}
+                            className={`w-7 h-7 flex items-center justify-center border transition-all ${
+                              idx === (cms.decks || []).length - 1
+                                ? 'border-gray-800 text-gray-700 cursor-not-allowed opacity-30'
+                                : 'border-gray-700 hover:border-[#00F0FF] text-gray-300 hover:text-[#00F0FF] bg-[#070a10] cursor-pointer'
+                            }`}
+                            title="Mover hacia abajo"
+                          >
+                            <ChevronDown className="w-4 h-4" />
+                          </button>
+                        </div>
+
+                        {/* Ficha resumen del mazo */}
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-xs font-mono font-bold text-[#FCEE0A]">
+                              #{idx + 1}
+                            </span>
+                            <span className="text-xs font-mono text-gray-400">
+                              [{formatTier(deck.tier)}]
+                            </span>
+
+                            {isInTop3 ? (
+                              <span className="text-[10px] font-mono px-1.5 py-0.2 bg-[#00F0FF]/15 text-[#00F0FF] border border-[#00F0FF]/30 font-bold">
+                                ★ EN TOP 3 PORTADA
+                              </span>
+                            ) : (
+                              <span className="text-[10px] font-mono text-gray-500">
+                                (Página /mazos)
+                              </span>
+                            )}
+
+                            <span className="text-gray-400 text-[11px]">@{deck.pilot}</span>
+                          </div>
+
+                          <h4 className="text-base font-black text-white uppercase mt-1 truncate">
+                            {deck.name}
+                          </h4>
+                          <p className="text-xs text-gray-400 font-mono truncate">
+                            3 Leyendas • {mainCardsCount}/40 Baraja • {sideCardsCount}/7 Banquillo
+                          </p>
+                        </div>
+
+                        {/* Botones de Edición y Borrado */}
+                        <div className="flex items-center gap-2 shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => handleStartEditDeck(deck)}
+                            className="p-2 bg-[#070a10] border border-gray-800 hover:border-[#00F0FF] text-[#00F0FF] cursor-pointer transition-colors"
+                            title="Editar mazo"
+                          >
+                            <Edit3 className="w-4 h-4" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDelete('decks', deck.id, 'Mazo')}
+                            className="p-2 bg-[#070a10] border border-gray-800 hover:border-[#FF003C] text-[#FF003C] cursor-pointer transition-colors"
+                            title="Eliminar mazo"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+
+            {/* FILA INFERIOR: CATÁLOGO Y BUSCADOR COMPLETO A TODO EL ANCHO (w-full) */}
+            <div
               style={{ clipPath: CYBER_CLIP }}
-              className="lg:col-span-6 bg-[#000000] border border-gray-800 p-6 space-y-4 rounded-none"
+              className="w-full bg-[#000000] border-2 border-gray-800 p-6 space-y-5 rounded-none shadow-[0_0_40px_rgba(0,0,0,0.8)]"
             >
-              <div className="flex items-center justify-between border-b border-gray-800 pb-3">
-                <h2 className="text-base font-black uppercase text-[#FCEE0A] font-mono">
-                  {editingDeckId ? `EDITANDO MAZO // ${editingDeckId}` : 'CREAR NUEVO MAZO META'}
-                </h2>
-                {editingDeckId && (
+              {/* Encabezado y Selector de Modo de Asignación */}
+              <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4 border-b border-gray-800 pb-4">
+                <div>
+                  <div className="flex items-center gap-2 text-xs font-mono text-[#00F0FF] uppercase tracking-wider">
+                    <Database className="w-4 h-4 text-[#FCEE0A]" />
+                    <span>CATÁLOGO COMPLETO DE CARTAS // 151 CARTAS OFICIALES GITHUB</span>
+                  </div>
+                  <h3 className="text-xl sm:text-2xl font-black uppercase text-white mt-0.5">
+                    BUSCADOR Y ASIGNADOR DE CARTAS A MAZO
+                  </h3>
+                  <p className="text-xs font-mono text-gray-400 mt-1">
+                    Selecciona a qué sección quieres añadir cartas y haz clic en cualquiera de las cartas del catálogo.
+                  </p>
+                </div>
+
+                {/* Botones de Modo de Clic */}
+                <div className="flex flex-wrap items-center gap-2">
                   <button
                     type="button"
-                    onClick={() => setEditingDeckId(null)}
-                    className="text-xs font-mono text-[#FF003C] underline cursor-pointer"
+                    onClick={() => setDeckPickerTarget('main')}
+                    className={`px-3.5 py-2 border font-mono text-xs font-black transition-all cursor-pointer flex items-center gap-2 ${
+                      deckPickerTarget === 'main'
+                        ? 'bg-[#FF003C] text-white border-[#FF003C] shadow-[0_0_15px_rgba(255,0,60,0.6)]'
+                        : 'bg-[#070a10] text-gray-400 border-gray-800 hover:text-white hover:border-gray-700'
+                    }`}
                   >
-                    Cancelar
+                    <Plus className="w-4 h-4" />
+                    <span>+ AÑADIR A BARAJA</span>
+                    <span className="px-1.5 py-0.5 bg-black/50 text-[11px] font-mono ml-1 text-white">
+                      {(deckForm.deckList || []).reduce((acc, c) => acc + (c.qty || 1), 0)} CARTAS
+                    </span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setDeckPickerTarget('sideboard')}
+                    className={`px-3.5 py-2 border font-mono text-xs font-black transition-all cursor-pointer flex items-center gap-2 ${
+                      deckPickerTarget === 'sideboard'
+                        ? 'bg-[#00F0FF] text-[#070a10] border-[#00F0FF] shadow-[0_0_15px_rgba(0,240,255,0.6)]'
+                        : 'bg-[#070a10] text-gray-400 border-gray-800 hover:text-white hover:border-gray-700'
+                    }`}
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>+ AÑADIR A BANQUILLO (7)</span>
+                    <span className="px-1.5 py-0.5 bg-black/50 text-[11px] font-mono ml-1 text-white">
+                      {(deckForm.sideboard || []).reduce((acc, c) => acc + (c.qty || 1), 0)}/7
+                    </span>
+                  </button>
+
+                  {(() => {
+                    const currentLegendsCount = (deckForm.legends || deckForm.cards || []).length;
+                    const isLegendsLocked = currentLegendsCount >= 3;
+                    return (
+                      <button
+                        type="button"
+                        disabled={isLegendsLocked}
+                        onClick={() => {
+                          if (!isLegendsLocked) setDeckPickerTarget('legends');
+                        }}
+                        title={
+                          isLegendsLocked
+                            ? 'Límite de 3 leyendas alcanzado. Elimina una de las leyendas para desbloquear.'
+                            : 'Añadir Leyendas al mazo (máximo 3)'
+                        }
+                        className={`px-3.5 py-2 border font-mono text-xs font-black transition-all flex items-center gap-2 ${
+                          isLegendsLocked
+                            ? 'bg-[#070a10] text-gray-500 border-gray-900 cursor-not-allowed opacity-50'
+                            : deckPickerTarget === 'legends'
+                            ? 'bg-[#FCEE0A] text-[#070a10] border-[#FCEE0A] shadow-[0_0_15px_rgba(252,238,10,0.6)] cursor-pointer'
+                            : 'bg-[#070a10] text-gray-400 border-gray-800 hover:text-white hover:border-gray-700 cursor-pointer'
+                        }`}
+                      >
+                        {isLegendsLocked ? (
+                          <Lock className="w-4 h-4 text-gray-500" />
+                        ) : (
+                          <Plus className="w-4 h-4" />
+                        )}
+                        <span>
+                          {isLegendsLocked ? '3 LEYENDAS (BLOQUEADO)' : '+ LEYENDAS (MÁX 3)'}
+                        </span>
+                        <span
+                          className={`px-1.5 py-0.5 text-[11px] font-mono ml-1 ${
+                            isLegendsLocked ? 'bg-gray-900 text-gray-500' : 'bg-black/50 text-white'
+                          }`}
+                        >
+                          {currentLegendsCount}/3
+                        </span>
+                      </button>
+                    );
+                  })()}
+
+                  <button
+                    type="button"
+                    onClick={() => setDeckPickerTarget('featured')}
+                    className={`px-3.5 py-2 border font-mono text-xs font-black transition-all cursor-pointer flex items-center gap-2 ${
+                      deckPickerTarget === 'featured'
+                        ? 'bg-purple-600 text-white border-purple-500 shadow-[0_0_15px_rgba(168,85,247,0.6)]'
+                        : 'bg-[#070a10] text-gray-400 border-gray-800 hover:text-white hover:border-gray-700'
+                    }`}
+                  >
+                    <Sparkles className="w-4 h-4" />
+                    <span>★ CARTA DESTACADA</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Barra de Búsqueda Grande */}
+              <div className="relative">
+                <Search className="w-5 h-5 text-[#FCEE0A] absolute left-4 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  value={cardSearchDeck}
+                  onChange={(e) => setCardSearchDeck(e.target.value)}
+                  placeholder="Buscar por nombre, código CP-XXX, facción o tipo (ej: Smasher, Saburo, Johnny, CP-001)..."
+                  className="w-full pl-12 pr-28 py-3.5 bg-[#070a10] border-2 border-gray-800 focus:border-[#00F0FF] text-white text-sm font-mono placeholder-gray-500 transition-all focus:outline-none"
+                />
+                {cardSearchDeck && (
+                  <button
+                    type="button"
+                    onClick={() => setCardSearchDeck('')}
+                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white text-xs font-mono flex items-center gap-1.5 bg-[#000000] px-2.5 py-1.5 border border-gray-700 cursor-pointer"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                    <span>Limpiar</span>
                   </button>
                 )}
               </div>
 
-              <div className="space-y-3 text-xs font-mono">
-                <div className="grid grid-cols-3 gap-3">
-                  <div>
-                    <label className="block text-gray-400 mb-1">RANGO</label>
-                    <input
-                      type="text"
-                      value={deckForm.rank}
-                      onChange={(e) => setDeckForm({ ...deckForm, rank: e.target.value })}
-                      className="w-full bg-[#070a10] border border-gray-800 px-3 py-2 text-white"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-gray-400 mb-1">TIER</label>
-                    <select
-                      value={deckForm.tier}
-                      onChange={(e) => setDeckForm({ ...deckForm, tier: e.target.value })}
-                      className="w-full bg-[#070a10] border border-gray-800 px-3 py-2 text-white"
+              {/* Píldoras de Filtro (Facción y Tipo) */}
+              <div className="space-y-2">
+                <div className="flex flex-wrap items-center gap-2 text-xs font-mono">
+                  <span className="text-gray-400 font-bold uppercase mr-1">Color:</span>
+                  {[
+                    { id: 'ALL', label: `TODOS (${cards.length})` },
+                    { id: 'Red', label: 'ROJAS (38)', color: '#FF003C' },
+                    { id: 'Green', label: 'VERDES (38)', color: '#00FF66' },
+                    { id: 'Yellow', label: 'AMARILLAS (37)', color: '#FCEE0A' },
+                    { id: 'Blue', label: 'AZULES (38)', color: '#00F0FF' }
+                  ].map((col) => (
+                    <button
+                      key={col.id}
+                      type="button"
+                      onClick={() => setDeckPickerColorFilter(col.id)}
+                      className={`px-3 py-1 border font-bold transition-all cursor-pointer ${
+                        deckPickerColorFilter === col.id
+                          ? 'bg-[#FCEE0A] text-[#070a10] border-[#FCEE0A]'
+                          : 'bg-[#070a10] text-gray-400 border-gray-800 hover:text-white hover:border-gray-700'
+                      }`}
                     >
-                      <option value="TIER S">TIER S</option>
-                      <option value="TIER A">TIER A</option>
-                      <option value="TIER B">TIER B</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-gray-400 mb-1">WINRATE</label>
-                    <input
-                      type="text"
-                      value={deckForm.winrate}
-                      onChange={(e) => setDeckForm({ ...deckForm, winrate: e.target.value })}
-                      className="w-full bg-[#070a10] border border-gray-800 px-3 py-2 text-white"
-                    />
-                  </div>
+                      {col.label}
+                    </button>
+                  ))}
+
+                  <span className="text-gray-500 ml-auto">{filteredDeckPickerCards.length} cartas encontradas</span>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-gray-400 mb-1">NOMBRE DEL MAZO *</label>
-                    <input
-                      type="text"
-                      required
-                      value={deckForm.name}
-                      onChange={(e) => setDeckForm({ ...deckForm, name: e.target.value })}
-                      placeholder="Ej: Arasaka Control Protocol"
-                      className="w-full bg-[#070a10] border border-gray-800 px-3 py-2 text-white"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-gray-400 mb-1">PILOTO / AUTOR</label>
-                    <input
-                      type="text"
-                      value={deckForm.pilot}
-                      onChange={(e) => setDeckForm({ ...deckForm, pilot: e.target.value })}
-                      className="w-full bg-[#070a10] border border-gray-800 px-3 py-2 text-white"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-gray-400 mb-1">ARQUETIPO</label>
-                  <input
-                    type="text"
-                    value={deckForm.archetype}
-                    onChange={(e) => setDeckForm({ ...deckForm, archetype: e.target.value })}
-                    className="w-full bg-[#070a10] border border-gray-800 px-3 py-2 text-white"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-gray-400 mb-1">DESCRIPCIÓN TÁCTICA *</label>
-                  <textarea
-                    rows="2"
-                    required
-                    value={deckForm.description}
-                    onChange={(e) => setDeckForm({ ...deckForm, description: e.target.value })}
-                    className="w-full bg-[#070a10] border border-gray-800 px-3 py-2 text-white"
-                  />
-                </div>
-
-                <ImageUploadField
-                  label="IMAGEN BANNER DEL MAZO (SUBIR ARCHIVO O WALLPAPER)"
-                  value={deckForm.bannerWallpaper}
-                  onChange={(url) => setDeckForm({ ...deckForm, bannerWallpaper: url })}
-                  uploadedFiles={uploadedFiles}
-                  onUploadSuccess={setUploadedFiles}
-                  showToast={showToast}
-                />
-
-                {/* Buscador para añadir cartas reales del repositorio GitHub al Mazo */}
-                <div className="border-t border-gray-800 pt-3 space-y-2">
-                  <label className="block text-[#00F0FF] font-bold">
-                    AÑADIR CARTAS DEL GITHUB ({deckForm.cards.length} seleccionadas)
-                  </label>
-
-                  {/* Cartas actualmente en el mazo */}
-                  {deckForm.cards.length > 0 && (
-                    <div className="flex flex-wrap gap-2 pb-2">
-                      {deckForm.cards.map((c, idx) => (
-                        <span
-                          key={`${c.id}-${idx}`}
-                          className="px-2.5 py-1 bg-[#070a10] border border-[#FCEE0A] text-white flex items-center gap-2"
-                        >
-                          <span>{c.name}</span>
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveCardFromDeck(idx)}
-                            className="text-[#FF003C] font-black cursor-pointer"
-                          >
-                            ×
-                          </button>
-                        </span>
-                      ))}
-                    </div>
-                  )}
-
-                  <div className="relative">
-                    <Search className="w-4 h-4 text-[#FCEE0A] absolute left-3 top-1/2 -translate-y-1/2" />
-                    <input
-                      type="text"
-                      value={cardSearchDeck}
-                      onChange={(e) => setCardSearchDeck(e.target.value)}
-                      placeholder="Buscar carta de tu GitHub para añadir al mazo..."
-                      className="w-full pl-9 pr-3 py-2 bg-[#070a10] border border-gray-800 text-white"
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 max-h-48 overflow-y-auto p-2 bg-[#070a10] border border-gray-800">
-                    {filteredDeckPickerCards.map((ghCard) => (
-                      <button
-                        key={ghCard.id}
-                        type="button"
-                        onClick={() => handleAddCardToDeck(ghCard)}
-                        className="group text-left bg-[#000000] border border-gray-800 hover:border-[#FCEE0A] p-1.5 transition-all cursor-pointer"
-                      >
-                        <img
-                          src={ghCard.image}
-                          alt={ghCard.name}
-                          className="w-full h-20 object-cover object-top"
-                        />
-                        <p className="text-[10px] text-white font-bold truncate mt-1">
-                          {ghCard.name}
-                        </p>
-                      </button>
-                    ))}
-                  </div>
+                <div className="flex flex-wrap items-center gap-2 text-xs font-mono">
+                  <span className="text-gray-400 font-bold uppercase mr-1">Tipo:</span>
+                  {[
+                    { id: 'ALL', label: 'TODOS LOS TIPOS (151)' },
+                    { id: 'UNIDADES', label: 'UNIDADES (74)' },
+                    { id: 'PROGRAMAS', label: 'PROGRAMAS (34)' },
+                    { id: 'EQUIPO', label: 'EQUIPO / GEAR (16)' },
+                    { id: 'LEYENDAS', label: 'LEYENDAS (27)' }
+                  ].map((t) => (
+                    <button
+                      key={t.id}
+                      type="button"
+                      onClick={() => setDeckPickerTypeFilter(t.id)}
+                      className={`px-3 py-1 border font-bold transition-all cursor-pointer ${
+                        deckPickerTypeFilter === t.id
+                          ? 'bg-[#00F0FF] text-[#070a10] border-[#00F0FF]'
+                          : 'bg-[#070a10] text-gray-400 border-gray-800 hover:text-white hover:border-gray-700'
+                      }`}
+                    >
+                      {t.label}
+                    </button>
+                  ))}
+                  <span className="text-[10px] text-gray-500 italic">
+                    ✓ Base de datos oficial sincronizada (151 cartas clasificadas)
+                  </span>
                 </div>
               </div>
 
-              <button
-                type="submit"
-                style={{ clipPath: CYBER_CLIP }}
-                className="w-full py-3.5 bg-[#FCEE0A] text-[#070a10] font-mono font-black text-xs uppercase tracking-widest cursor-pointer flex items-center justify-center gap-2"
-              >
-                <Save className="w-4 h-4" />
-                <span>{editingDeckId ? 'ACTUALIZAR MAZO' : 'GUARDAR NUEVO MAZO'}</span>
-              </button>
-            </form>
-
-            {/* Lista de Mazos */}
-            <div className="lg:col-span-6 space-y-4">
-              <h3 className="text-sm font-mono font-bold uppercase text-[#00F0FF]">
-                MAZOS ACTIVOS EN PORTADA ({cms.decks?.length || 0})
-              </h3>
-              <div className="space-y-3">
-                {cms.decks?.map((deck) => (
-                  <div
-                    key={deck.id}
-                    style={{ clipPath: CYBER_CLIP }}
-                    className="bg-[#000000] border border-gray-800 p-4 flex items-center justify-between gap-4"
-                  >
-                    <div>
-                      <div className="flex items-center gap-2 text-xs font-mono">
-                        <span className="px-2 py-0.5 bg-[#FCEE0A] text-[#070a10] font-black">
-                          {deck.rank} // {deck.tier}
-                        </span>
-                        <span className="text-[#00F0FF]">{deck.winrate} WR</span>
-                        <span className="text-gray-400">@{deck.pilot}</span>
-                      </div>
-                      <h4 className="text-base font-black text-white uppercase mt-1">
-                        {deck.name}
-                      </h4>
-                      <p className="text-xs text-gray-400 font-mono">
-                        {deck.cards?.length || 0} cartas asociadas
-                      </p>
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setEditingDeckId(deck.id);
-                          setDeckForm({ ...deck });
-                        }}
-                        className="p-2 bg-[#070a10] border border-gray-800 hover:border-[#00F0FF] text-[#00F0FF] cursor-pointer"
-                      >
-                        <Edit3 className="w-4 h-4" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleDelete('decks', deck.id, 'Mazo')}
-                        className="p-2 bg-[#070a10] border border-gray-800 hover:border-[#FF003C] text-[#FF003C] cursor-pointer"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
+              {/* Rejilla a Todo el Ancho (6 Columnas en Pantalla Grande) */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 p-4 bg-[#070a10] border border-gray-800 max-h-[720px] overflow-y-auto">
+                {filteredDeckPickerCards.length === 0 ? (
+                  <div className="col-span-full py-16 text-center text-gray-500 font-mono text-sm">
+                    No se encontraron cartas que coincidan con la búsqueda o filtros.
                   </div>
-                ))}
+                ) : (
+                  filteredDeckPickerCards.map((ghCard) => {
+                    const inMainItem = (deckForm.deckList || []).find((c) => c.id === ghCard.id);
+                    const mainQty = inMainItem ? inMainItem.qty || 1 : 0;
+                    const inSideItem = (deckForm.sideboard || []).find((c) => c.id === ghCard.id);
+                    const sideQty = inSideItem ? inSideItem.qty || 1 : 0;
+                    const totalCopies = mainQty + sideQty;
+                    const isAtMaxCopies = totalCopies >= 3;
+
+                    const isLegend = (deckForm.legends || deckForm.cards || []).some((l) => l.id === ghCard.id);
+                    const isFeatured = deckForm.featuredCardId === ghCard.id;
+
+                    const totalMain = (deckForm.deckList || []).reduce((acc, c) => acc + (c.qty || 1), 0);
+                    const totalSide = (deckForm.sideboard || []).reduce((acc, c) => acc + (c.qty || 1), 0);
+                    
+                    const isSideFull = totalSide >= 7;
+
+                    let disableAdd = false;
+                    let actionLabel = '';
+
+                    if (deckPickerTarget === 'main') {
+                      if (isAtMaxCopies) {
+                        disableAdd = true;
+                        actionLabel = 'MÁX 3 COPIAS';
+                      } else {
+                        actionLabel = mainQty > 0 ? `+ BARAJA (${mainQty}/3)` : '+ AÑADIR A BARAJA';
+                      }
+                    } else if (deckPickerTarget === 'sideboard') {
+                      if (isAtMaxCopies) {
+                        disableAdd = true;
+                        actionLabel = 'MÁX 3 COPIAS';
+                      } else if (isSideFull) {
+                        disableAdd = true;
+                        actionLabel = 'BANQUILLO LLENO (7/7)';
+                      } else {
+                        actionLabel = sideQty > 0 ? `+ BANQUILLO (${sideQty}/3)` : '+ AÑADIR A BANQUILLO';
+                      }
+                    } else if (deckPickerTarget === 'legends') {
+                      const curLegendsCount = (deckForm.legends || deckForm.cards || []).length;
+                      if (curLegendsCount >= 3 && !isLegend) {
+                        disableAdd = true;
+                        actionLabel = '3/3 LEYENDAS (BLOQUEADO)';
+                      } else {
+                        actionLabel = isLegend ? 'LEYENDA ASIGNADA' : '+ ASIGNAR LEYENDA';
+                      }
+                    } else if (deckPickerTarget === 'featured') {
+                      actionLabel = isFeatured ? '★ DESTACADA ACTUAL' : '★ HACER DESTACADA';
+                    }
+
+                    return (
+                      <div
+                        key={ghCard.id}
+                        onClick={() => handleAddCardToDeck(ghCard)}
+                        className={`group text-left bg-[#000000] border p-2.5 transition-all cursor-pointer flex flex-col justify-between relative hover:shadow-[0_0_20px_rgba(0,240,255,0.25)] ${
+                          isAtMaxCopies
+                            ? 'border-[#FF003C]/80 bg-[#FF003C]/5'
+                            : mainQty > 0
+                            ? 'border-[#FCEE0A] bg-[#FCEE0A]/5'
+                            : sideQty > 0
+                            ? 'border-[#00F0FF] bg-[#00F0FF]/5'
+                            : isLegend
+                            ? 'border-[#00F0FF] bg-[#00F0FF]/5'
+                            : 'border-gray-800 hover:border-[#00F0FF]'
+                        }`}
+                      >
+                        {/* Badges superiores de estado */}
+                        <div className="flex items-center justify-between gap-1 mb-1.5 text-[9px] font-mono">
+                          <span className="text-gray-400 font-bold">{ghCard.id}</span>
+                          {isAtMaxCopies ? (
+                            <span className="px-1.5 py-0.5 bg-[#FF003C] text-white font-black uppercase">
+                              3/3 MÁX
+                            </span>
+                          ) : mainQty > 0 ? (
+                            <span className="px-1.5 py-0.5 bg-[#FCEE0A] text-[#070a10] font-black uppercase">
+                              {mainQty}/3 BARAJA
+                            </span>
+                          ) : sideQty > 0 ? (
+                            <span className="px-1.5 py-0.5 bg-[#00F0FF] text-[#070a10] font-black uppercase">
+                              {sideQty}/3 BANQUILLO
+                            </span>
+                          ) : isLegend ? (
+                            <span className="px-1.5 py-0.5 bg-[#00F0FF] text-[#070a10] font-black uppercase">
+                              LEYENDA
+                            </span>
+                          ) : isFeatured ? (
+                            <span className="px-1.5 py-0.5 bg-[#FCEE0A] text-[#070a10] font-black uppercase">
+                              ★ DESTACADA
+                            </span>
+                          ) : (
+                            <span className="text-gray-500 truncate max-w-[80px]">
+                              {ghCard.aspect ? `[${ghCard.aspect.toUpperCase()}]` : (ghCard.faction || ghCard.cardType || '')}
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Imagen Grande de la Carta */}
+                        <div className="relative h-52 w-full overflow-hidden bg-black/60 p-1.5 flex items-center justify-center border border-gray-900 group-hover:border-gray-700 transition-colors">
+                          <img
+                            src={ghCard.image}
+                            alt={ghCard.name}
+                            className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-300 drop-shadow-[0_0_10px_rgba(0,0,0,0.9)]"
+                          />
+
+                          {/* Overlay al pasar ratón */}
+                          <div className="absolute inset-0 bg-[#070a10]/75 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center p-2 text-center pointer-events-none">
+                            <span className="text-[10px] font-mono font-black uppercase px-2 py-1 bg-[#FCEE0A] text-[#070a10] shadow-[0_0_10px_rgba(252,238,10,0.8)]">
+                              {actionLabel}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Información y botón inferior */}
+                        <div className="mt-2 space-y-1.5">
+                          <p className="text-xs font-black text-white group-hover:text-[#FCEE0A] transition-colors leading-tight line-clamp-1">
+                            {ghCard.name}
+                          </p>
+                          <div className="flex items-center justify-between text-[10px] font-mono text-gray-400">
+                            <span className="truncate max-w-[110px]">{ghCard.type || ghCard.faction || 'OFICIAL'}</span>
+                            {ghCard.cost && <span className="text-[#FCEE0A] font-bold">{ghCard.cost}</span>}
+                          </div>
+
+                          <div className="pt-1">
+                            <button
+                              type="button"
+                              disabled={disableAdd}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleAddCardToDeck(ghCard);
+                              }}
+                              className={`w-full py-1.5 text-[10px] font-mono font-black uppercase transition-all flex items-center justify-center gap-1 ${
+                                disableAdd
+                                  ? 'bg-gray-800 text-gray-500 cursor-not-allowed'
+                                  : deckPickerTarget === 'main'
+                                  ? 'bg-[#FF003C] hover:bg-[#FF003C]/80 text-white cursor-pointer shadow-[0_0_10px_rgba(255,0,60,0.4)]'
+                                  : deckPickerTarget === 'sideboard'
+                                  ? 'bg-[#00F0FF] hover:bg-[#00F0FF]/80 text-[#070a10] cursor-pointer shadow-[0_0_10px_rgba(0,240,255,0.4)]'
+                                  : deckPickerTarget === 'legends'
+                                  ? 'bg-[#FCEE0A] hover:bg-[#FCEE0A]/80 text-[#070a10] cursor-pointer shadow-[0_0_10px_rgba(252,238,10,0.4)]'
+                                  : 'bg-purple-600 hover:bg-purple-500 text-white cursor-pointer shadow-[0_0_10px_rgba(168,85,247,0.4)]'
+                              }`}
+                            >
+                              <Plus className="w-3 h-3" />
+                              <span>{actionLabel}</span>
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
               </div>
             </div>
           </div>

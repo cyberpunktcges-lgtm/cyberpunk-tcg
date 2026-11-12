@@ -113,6 +113,8 @@ export async function POST({ request }) {
       );
     } else if (action === 'delete' && section && Array.isArray(cms[section]) && id) {
       cms[section] = cms[section].filter((existing) => existing.id !== id);
+    } else if (action === 'reorder' && section && Array.isArray(body.items)) {
+      cms[section] = body.items;
     } else if (action === 'replace_all' && body.data) {
       await writeCmsData(body.data);
       return new Response(JSON.stringify({ ok: true, data: body.data }), {
