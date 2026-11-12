@@ -522,31 +522,7 @@ export default function CyberpunkPortal({
       ctx.fillRect(canvasW - 56, canvasH - 22, 40, 6);
       ctx.fillRect(canvasW - 22, canvasH - 56, 6, 40);
 
-      // 2. Cabecera del Póster
-      const topPad = 48;
-      ctx.fillStyle = '#FCEE0A';
-      ctx.font = 'bold 16px monospace';
-      ctx.fillText('CYBERPUNK TCG ESPAÑA // DECK SHOWCASE RRSS', 48, topPad);
-
-      ctx.fillStyle = '#FFFFFF';
-      ctx.font = '900 36px sans-serif';
-      ctx.fillText(customDeckName.toUpperCase(), 48, topPad + 45);
-
-      // Subtítulo con facción y total
-      ctx.fillStyle = '#00F0FF';
-      ctx.font = 'bold 18px monospace';
-      const statsText = `[FACCIÓN: ${customDeckFaction.toUpperCase()}] • ${totalDeckCards} CARTAS (👑 ${cat.counts.legends} LEYENDAS | 🤖 ${cat.counts.units} UNIDADES | 💾 ${cat.counts.programs} PROGRAMAS | ⚙️ ${cat.counts.gears} GEARS)`;
-      ctx.fillText(statsText, 48, topPad + 75);
-
-      // Línea divisoria
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.moveTo(48, topPad + 95);
-      ctx.lineTo(canvasW - 48, topPad + 95);
-      ctx.stroke();
-
-      // 3. Helper para cargar imágenes con timeout de seguridad
+      // 2. Helper para cargar imágenes con timeout de seguridad
       const loadImg = (url) =>
         new Promise((resolve) => {
           if (!url) return resolve(null);
@@ -557,6 +533,59 @@ export default function CyberpunkPortal({
           img.src = url;
           setTimeout(() => resolve(null), 3000);
         });
+
+      // Cargar logo oficial de Cyberpunk TCG España para estamparlo en el póster
+      const logoImg = await loadImg('/images/logo-cyberpunk-tcg-españa.jpg');
+
+      // 3. Cabecera del Póster
+      const topPad = 48;
+
+      // Dibujar Logo oficial en la esquina superior derecha
+      if (logoImg) {
+        const logoH = isVert || isStory ? 54 : 68;
+        const logoW = Math.round(logoH * 2.925);
+        const logoX = canvasW - 48 - logoW;
+        const logoY = topPad - 8;
+
+        // Placa / marco de fondo cyberpunk para que resalte sobre el fondo oscuro
+        ctx.fillStyle = '#000000';
+        ctx.fillRect(logoX - 6, logoY - 4, logoW + 12, logoH + 8);
+        ctx.strokeStyle = '#00F0FF';
+        ctx.lineWidth = 1.5;
+        ctx.strokeRect(logoX - 6, logoY - 4, logoW + 12, logoH + 8);
+
+        // Acentos de esquina amarillos en el marco del logo
+        ctx.fillStyle = '#FCEE0A';
+        ctx.fillRect(logoX - 6, logoY - 4, 10, 3);
+        ctx.fillRect(logoX - 6, logoY - 4, 3, 10);
+        ctx.fillRect(logoX + logoW + 6 - 10, logoY + logoH + 4 - 3, 10, 3);
+        ctx.fillRect(logoX + logoW + 6 - 3, logoY + logoH + 4 - 10, 3, 10);
+
+        ctx.drawImage(logoImg, logoX, logoY, logoW, logoH);
+      }
+
+      ctx.fillStyle = '#FCEE0A';
+      ctx.font = 'bold 16px monospace';
+      ctx.fillText('CYBERPUNK TCG ESPAÑA // DECK SHOWCASE RRSS', 48, topPad);
+
+      const maxTitleW = logoImg ? canvasW - 48 - (isVert || isStory ? 230 : 280) : canvasW - 96;
+      ctx.fillStyle = '#FFFFFF';
+      ctx.font = '900 36px sans-serif';
+      ctx.fillText(customDeckName.toUpperCase(), 48, topPad + 45, maxTitleW);
+
+      // Subtítulo con facción y total
+      ctx.fillStyle = '#00F0FF';
+      ctx.font = 'bold 18px monospace';
+      const statsText = `[FACCIÓN: ${customDeckFaction.toUpperCase()}] • ${totalDeckCards} CARTAS (👑 ${cat.counts.legends} LEYENDAS | 🤖 ${cat.counts.units} UNIDADES | 💾 ${cat.counts.programs} PROGRAMAS | ⚙️ ${cat.counts.gears} GEARS)`;
+      ctx.fillText(statsText, 48, topPad + 75, maxTitleW);
+
+      // Línea divisoria
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(48, topPad + 95);
+      ctx.lineTo(canvasW - 48, topPad + 95);
+      ctx.stroke();
 
       // Secciones a renderizar (incluyendo Banquillo / Sideboard)
       const sections = [
@@ -2729,33 +2758,35 @@ export default function CyberpunkPortal({
                     }`}
                   >
                     {/* Header del Tapete */}
-                    <div className="border-b border-gray-800/80 pb-4 flex flex-col sm:flex-row sm:items-end justify-between gap-3">
-                      <div>
-                        <div className="flex items-center gap-2 text-[10px] font-mono text-[#FCEE0A] uppercase tracking-widest mb-1">
-                          <img
-                            src="/images/logo-cyberpunk-tcg-españa.jpg"
-                            alt="Logo"
-                            className="h-5 w-auto object-contain border border-gray-800"
-                          />
-                          <span>CYBERPUNK TCG ESPAÑA // DECK SHOWCASE</span>
-                        </div>
-                        <h2 className="text-2xl sm:text-4xl font-black uppercase text-white tracking-tight">
-                          {customDeckName}
-                        </h2>
-                        <div className="flex flex-wrap items-center gap-2 mt-2 font-mono text-xs">
-                          <span
-                            style={{ clipPath: CYBER_CLIP }}
-                            className="px-2.5 py-0.5 bg-[#00F0FF] text-[#070a10] font-black uppercase"
-                          >
-                            FACCIÓN: {customDeckFaction}
-                          </span>
-                          <span className="text-gray-400">
-                            TOTAL: <strong className="text-white">{cat.counts.total} CARTAS</strong>
-                          </span>
-                          <span className="text-gray-600">•</span>
-                          <span className="text-gray-400">
-                            MÍN 40 BARAJA + {cat.counts.sideboard}/7 BANQUILLO
-                          </span>
+                    <div className="border-b border-gray-800/80 pb-4 flex flex-col md:flex-row md:items-end justify-between gap-4">
+                      <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+                        <img
+                          src="/images/logo-cyberpunk-tcg-españa.jpg"
+                          alt="Logo Cyberpunk TCG España"
+                          className="h-10 sm:h-12 w-auto object-contain bg-[#000000] p-1 border border-[#00F0FF]/40 shadow-[0_0_15px_rgba(0,240,255,0.25)] shrink-0 self-start sm:self-auto"
+                        />
+                        <div>
+                          <div className="flex items-center gap-2 text-[10px] font-mono text-[#FCEE0A] uppercase tracking-widest mb-1">
+                            <span>CYBERPUNK TCG ESPAÑA // DECK SHOWCASE</span>
+                          </div>
+                          <h2 className="text-2xl sm:text-4xl font-black uppercase text-white tracking-tight">
+                            {customDeckName}
+                          </h2>
+                          <div className="flex flex-wrap items-center gap-2 mt-2 font-mono text-xs">
+                            <span
+                              style={{ clipPath: CYBER_CLIP }}
+                              className="px-2.5 py-0.5 bg-[#00F0FF] text-[#070a10] font-black uppercase"
+                            >
+                              FACCIÓN: {customDeckFaction}
+                            </span>
+                            <span className="text-gray-400">
+                              TOTAL: <strong className="text-white">{cat.counts.total} CARTAS</strong>
+                            </span>
+                            <span className="text-gray-600">•</span>
+                            <span className="text-gray-400">
+                              MÍN 40 BARAJA + {cat.counts.sideboard}/7 BANQUILLO
+                            </span>
+                          </div>
                         </div>
                       </div>
 
