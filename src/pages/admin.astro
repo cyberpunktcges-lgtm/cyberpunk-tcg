@@ -1,0 +1,23 @@
+---
+import '../styles/global.css';
+import AdminPanel from '../components/AdminPanel.jsx';
+import cmsData from '../data/cms.json';
+import cardsData from '../data/cards.json';
+---
+
+<html lang="es">
+	<head>
+		<meta charset="utf-8" />
+		<link rel="icon" type="image/png" href="/favicon.png" />
+		<link rel="shortcut icon" href="/favicon.png" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<title>Panel de Administración // Cyberpunk TCG España</title>
+	</head>
+	<body class="bg-[#070a10] text-white antialiased rounded-none">
+		<AdminPanel
+			client:load
+			initialCms={cmsData}
+			initialCards={cardsData}
+		/>
+	</body>
+</html>

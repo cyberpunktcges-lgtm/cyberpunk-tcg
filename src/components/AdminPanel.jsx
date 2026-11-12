@@ -28,6 +28,13 @@ import {
   X
 } from 'lucide-react';
 import { resolveCardFromGithubUrl, enrichCardObject } from '../utils/cardMetadata.js';
+import {
+  getStoredToken,
+  saveStoredToken,
+  getFileFromGithub,
+  commitFileToGithub,
+  uploadImageToGithub
+} from '../utils/githubCms.js';
 
 const CYBER_CLIP =
   'polygon(0 0, calc(100% - 15px) 0, 100% 15px, 100% 100%, 15px 100%, 0 calc(100% - 15px))';
@@ -63,30 +70,18 @@ function ImageUploadField({
     if (!file) return;
 
     setIsUploading(true);
+    if (showToast) showToast('Subiendo imagen a GitHub...');
     try {
-      const formData = new FormData();
-      formData.append('file', file);
-
-      const res = await fetch('/api/upload', {
-        method: 'POST',
-        body: formData
-      });
-      const json = await res.json();
-
-      if (res.ok && json.ok && json.url) {
-        onChange(json.url);
-        if (onUploadSuccess && json.files) {
-          onUploadSuccess(json.files);
-        }
+      const res = await uploadImageToGithub(file);
+      if (res && res.url) {
+        onChange(res.url);
         if (showToast) {
-          showToast(`Imagen subida: ${json.fileName}`);
+          showToast(`Imagen subida a GitHub: ${res.fileName}`);
         }
-      } else if (showToast) {
-        showToast(json.error || 'Error al subir la imagen');
       }
     } catch (err) {
       if (showToast) {
-        showToast('Error de red al subir el archivo');
+        showToast(err.message || 'Error al subir la imagen a GitHub');
       }
     } finally {
       setIsUploading(false);
@@ -227,21 +222,15 @@ function HtmlArticleEditor({
     const file = e.target.files?.[0];
     if (!file) return;
     setIsUploadingInline(true);
+    if (showToast) showToast('Subiendo imagen a GitHub...');
     try {
-      const formData = new FormData();
-      formData.append('file', file);
-      const res = await fetch('/api/upload', {
-        method: 'POST',
-        body: formData
-      });
-      const json = await res.json();
-      if (res.ok && json.ok && json.url) {
-        insertHtmlSnippet(`\n<img src="${json.url}" alt="${file.name}" />\n`, '', '');
-        if (onUploadSuccess && json.files) onUploadSuccess(json.files);
-        if (showToast) showToast('Imagen insertada en el cuerpo de la noticia');
+      const res = await uploadImageToGithub(file);
+      if (res && res.url) {
+        insertHtmlSnippet(`\n<img src="${res.url}" alt="${file.name}" />\n`, '', '');
+        if (showToast) showToast('Imagen subida a GitHub e insertada en el artículo');
       }
-    } catch {
-      if (showToast) showToast('Error al subir imagen para el artículo');
+    } catch (err) {
+      if (showToast) showToast(err.message || 'Error al subir imagen a GitHub');
     } finally {
       setIsUploadingInline(false);
       e.target.value = '';
@@ -448,7 +437,9 @@ function HtmlArticleEditor({
 }
 
 export default function AdminPanel({ initialAuth = false, initialCms = {}, initialCards = [] }) {
-  const [isAuthenticated, setIsAuthenticated] = useState(initialAuth);
+  const [isAuthenticated, setIsAuthenticated] = useState(
+    () => typeof window !== 'undefined' && sessionStorage.getItem('cp_tcg_admin_auth') === '1'
+  );
   const [loginUser, setLoginUser] = useState('');
   const [loginPass, setLoginPass] = useState('');
   const [loginError, setLoginError] = useState('');
@@ -463,10 +454,18 @@ export default function AdminPanel({ initialAuth = false, initialCms = {}, initi
 
   useEffect(() => {
     if (isAuthenticated) {
-      fetch('/api/upload')
-        .then((res) => res.json())
-        .then((json) => {
-          if (json?.files) setUploadedFiles(json.files);
+      getFileFromGithub('src/data/cms.json')
+        .then((res) => {
+          if (res?.parsed) {
+            setCms(res.parsed);
+            if (res.parsed.heroArticle) setHeroForm(res.parsed.heroArticle);
+            if (res.parsed.forumUrl) setForumUrlInput(res.parsed.forumUrl);
+          }
+        })
+        .catch(() => {});
+      getFileFromGithub('src/data/cards.json')
+        .then((res) => {
+          if (res?.parsed) setCards(res.parsed);
         })
         .catch(() => {});
     }
@@ -616,17 +615,64 @@ score: '6 - 0',
   };
 
   const apiCall = async (payload) => {
-    const res = await fetch('/api/cms', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    });
-    const json = await res.json();
-    if (json.ok && json.data) {
-      setCms(json.data);
+    try {
+      const { action, section, item, id, heroArticle, altArtCards, forumUrl } = payload;
+      let newCms = JSON.parse(JSON.stringify(cms));
+
+      if (action === 'update_hero' && heroArticle) {
+        const currentCount = Number(newCms.heroArticle?.viewsCount) || 0;
+        newCms.heroArticle = {
+          ...newCms.heroArticle,
+          ...heroArticle,
+          viewsCount: currentCount,
+          views: `${currentCount} ${currentCount === 1 ? 'VISITA' : 'VISITAS'}`
+        };
+      } else if (action === 'update_alt_art' && Array.isArray(altArtCards)) {
+        newCms.altArtCards = altArtCards.slice(0, 3);
+      } else if (action === 'update_forum_url' && typeof forumUrl === 'string') {
+        newCms.forumUrl = forumUrl.trim();
+      } else if (action === 'create' && section) {
+        if (!Array.isArray(newCms[section])) newCms[section] = [];
+        const prefix =
+          section === 'news'
+            ? 'NEWS-'
+            : section === 'decks'
+            ? 'DECK-'
+            : section === 'tournaments'
+            ? 'TOURNAMENT-'
+            : section === 'pastTournaments'
+            ? 'PAST-TOURNAMENT-'
+            : 'ITEM-';
+        const newItem = {
+          ...item,
+          id: `${prefix}${Date.now()}`
+        };
+        newCms[section].unshift(newItem);
+      } else if (action === 'update' && section && item?.id) {
+        if (!Array.isArray(newCms[section])) newCms[section] = [];
+        newCms[section] = newCms[section].map((existing) =>
+          existing.id === item.id ? { ...existing, ...item } : existing
+        );
+      } else if (action === 'delete' && section && id) {
+        if (Array.isArray(newCms[section])) {
+          newCms[section] = newCms[section].filter((existing) => existing.id !== id);
+        }
+      }
+
+      showToast('Guardando en GitHub...');
+      await commitFileToGithub(
+        'src/data/cms.json',
+        JSON.stringify(newCms, null, 2),
+        `[CMS] ${action} en ${section || 'contenido'}`
+      );
+      setCms(newCms);
+      showToast('¡Guardado en GitHub! Cloudflare está desplegando los cambios (~25s)');
       return true;
+    } catch (err) {
+      console.error('Error en apiCall:', err);
+      showToast(`Error al guardar en GitHub: ${err.message}`);
+      return false;
     }
-    return false;
   };
 
   // Guardar Noticia (Crear o Editar)
@@ -1070,32 +1116,36 @@ excerpt: '',
     const ok = await apiCall({ action: 'update_alt_art', altArtCards: altArtForm });
 
     // Guardar también las correcciones en el catálogo de cartas para futuros autorrellenos
+    let updatedCards = [...cards];
     let savedCount = 0;
     for (const slot of altArtForm) {
       if (!slot.slug) continue;
+      const idx = updatedCards.findIndex((c) => c.slug === slot.slug);
+      if (idx !== -1) {
+        updatedCards[idx] = {
+          ...updatedCards[idx],
+          name: slot.name || updatedCards[idx].name,
+          cardId: slot.cardId || updatedCards[idx].cardId,
+          cardType: slot.cardType || updatedCards[idx].cardType,
+          edition: slot.edition || updatedCards[idx].edition,
+          artist: slot.artist || updatedCards[idx].artist,
+          collection: slot.collection || updatedCards[idx].collection
+        };
+        savedCount++;
+      }
+    }
+
+    if (savedCount > 0) {
       try {
-        const res = await fetch('/api/cards', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            action: 'update_card',
-            slug: slot.slug,
-            fields: {
-              name: slot.name || '',
-              cardId: slot.cardId || '',
-              cardType: slot.cardType || '',
-              edition: slot.edition || '',
-              artist: slot.artist || '',
-              collection: slot.collection || ''
-            }
-          })
-        });
-        const json = await res.json();
-        if (json?.ok && json.card) {
-          savedCount++;
-          setCards((prev) => prev.map((c) => (c.slug === json.card.slug ? { ...c, ...json.card } : c)));
-        }
-      } catch {}
+        await commitFileToGithub(
+          'src/data/cards.json',
+          JSON.stringify(updatedCards, null, 2),
+          `[CMS] Actualizar ${savedCount} cartas en catálogo`
+        );
+        setCards(updatedCards);
+      } catch (err) {
+        console.error('Error al guardar cartas:', err);
+      }
     }
 
     if (ok) {
@@ -1242,59 +1292,54 @@ score: '6 - 0',
     setLoginError('');
     setIsLoggingIn(true);
     try {
-      const res = await fetch('/api/auth', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'login',
-          username: loginUser.trim(),
-          password: loginPass
-        })
-      });
-      const json = await res.json();
-      if (!res.ok || !json.ok) {
-        setLoginError(json.error || 'Credenciales incorrectas');
+      const pass = loginPass.trim();
+      let tokenToUse = pass || getStoredToken();
+
+      if (!tokenToUse) {
+        setLoginError('Por favor introduce tu GitHub Token (ghp_...) para autenticar');
         setIsLoggingIn(false);
         return;
       }
 
-      // Cargar datos del CMS y Cartas una vez autenticado
+      // Validar conexión contra GitHub y traer los datos más frescos
       const [cmsRes, cardsRes] = await Promise.all([
-        fetch('/api/cms'),
-        fetch('/api/cards')
+        getFileFromGithub('src/data/cms.json', tokenToUse),
+        getFileFromGithub('src/data/cards.json', tokenToUse)
       ]);
-      const cmsJson = await cmsRes.json();
-      const cardsJson = await cardsRes.json();
 
-      setCms(cmsJson);
-      setHeroForm(cmsJson?.heroArticle || {});
-      if (cmsJson?.altArtCards?.length === 3) {
+      saveStoredToken(tokenToUse);
+      setCms(cmsRes.parsed);
+      setHeroForm(cmsRes.parsed?.heroArticle || {});
+      if (cmsRes.parsed?.altArtCards?.length === 3) {
         setAltArtForm(
-          cmsJson.altArtCards.map((c, idx) => ({
+          cmsRes.parsed.altArtCards.map((c, idx) => ({
             ...enrichCardObject(c, idx),
             badge: c.badge || `TOP #0${idx + 1} BEST SELLER // CARDMARKET`
           }))
         );
       }
-      if (cmsJson?.forumUrl) {
-        setForumUrlInput(cmsJson.forumUrl);
+      if (cmsRes.parsed?.forumUrl) {
+        setForumUrlInput(cmsRes.parsed.forumUrl);
       }
-      setCards(cardsJson?.cards || []);
+      setCards(cardsRes.parsed || []);
       setIsAuthenticated(true);
+      if (typeof window !== 'undefined') {
+        sessionStorage.setItem('cp_tcg_admin_auth', '1');
+      }
       setLoginPass('');
+      showToast('¡Conectado a GitHub! Puedes publicar desde el móvil o cualquier PC');
     } catch (err) {
-      setLoginError('Error de conexión con el servidor de autenticación');
+      console.error('Error al autenticar:', err);
+      setLoginError(`Error de conexión con GitHub: ${err.message}. Verifica que el token sea correcto.`);
     } finally {
       setIsLoggingIn(false);
     }
   };
 
   const handleLogout = async () => {
-    await fetch('/api/auth', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'logout' })
-    });
+    if (typeof window !== 'undefined') {
+      sessionStorage.removeItem('cp_tcg_admin_auth');
+    }
     setIsAuthenticated(false);
     setLoginUser('');
     setLoginPass('');
@@ -1430,39 +1475,24 @@ score: '6 - 0',
 
             <form onSubmit={handleLogin} className="space-y-4">
               <div>
-                <label className="block text-xs font-mono text-gray-400 uppercase mb-1.5">
-                  USUARIO ADMINISTRADOR
-                </label>
-                <div className="relative">
-                  <User className="w-4 h-4 text-[#FCEE0A] absolute left-3 top-1/2 -translate-y-1/2" />
-                  <input
-                    type="text"
-                    required
-                    autoComplete="username"
-                    value={loginUser}
-                    onChange={(e) => setLoginUser(e.target.value)}
-                    placeholder="Introduce tu usuario..."
-                    className="w-full bg-[#070a10] border border-gray-800 focus:border-[#00F0FF] pl-10 pr-3 py-2.5 text-sm font-mono text-white focus:outline-none rounded-none"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-mono text-gray-400 uppercase mb-1.5">
-                  CLAVE DE ACCESO (PASSWORD)
+                <label className="block text-xs font-mono text-gray-300 uppercase mb-1.5 flex items-center justify-between">
+                  <span>GITHUB ACCESS TOKEN</span>
+                  <span className="text-[#00F0FF] text-[10px]">ACCESO CMS EN LA NUBE</span>
                 </label>
                 <div className="relative">
                   <KeyRound className="w-4 h-4 text-[#FCEE0A] absolute left-3 top-1/2 -translate-y-1/2" />
                   <input
                     type="password"
                     required
-                    autoComplete="current-password"
                     value={loginPass}
                     onChange={(e) => setLoginPass(e.target.value)}
-                    placeholder="••••••••••••"
+                    placeholder="Pega aquí tu token ghp_..."
                     className="w-full bg-[#070a10] border border-gray-800 focus:border-[#00F0FF] pl-10 pr-3 py-2.5 text-sm font-mono text-white focus:outline-none rounded-none"
                   />
                 </div>
+                <p className="text-[11px] font-mono text-gray-500 mt-1.5 leading-relaxed">
+                  Introduce tu token de GitHub con permiso <code className="text-[#FCEE0A]">repo</code>. Se guardará en este navegador/móvil para que no tengas que escribirlo cada vez.
+                </p>
               </div>
 
               <button
@@ -1472,7 +1502,7 @@ score: '6 - 0',
                 className="w-full py-3.5 bg-[#FCEE0A] text-[#070a10] hover:bg-[#00F0FF] font-mono font-black text-xs uppercase tracking-widest flex items-center justify-center gap-2 cursor-pointer transition-colors rounded-none mt-2"
               >
                 <Lock className="w-4 h-4" />
-                <span>{isLoggingIn ? 'VERIFICANDO CREDENCIALES...' : 'AUTENTICAR Y ENTRAR AL CMS'}</span>
+                <span>{isLoggingIn ? 'CONECTANDO CON GITHUB...' : 'CONECTAR Y ENTRAR AL CMS'}</span>
               </button>
             </form>
           </div>
