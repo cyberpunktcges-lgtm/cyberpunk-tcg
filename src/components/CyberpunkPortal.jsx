@@ -166,7 +166,7 @@ export default function CyberpunkPortal({
   const tournaments = cmsState.tournaments || [];
   const pastTournaments = cmsState.pastTournaments || [];
   const altArtCards = (cmsState.altArtCards || []).slice(0, 3);
-  const forumUrl = cmsState.forumUrl || 'https://foro.cyberpunktcg.es';
+  const forumUrl = 'https://foro.cyberpunktcg.es';
   const allCards = initialCards || [];
 
   // Estados de filtrado de Noticias (Portada y Página /noticias)
@@ -4210,32 +4210,46 @@ export default function CyberpunkPortal({
 
       {/* Footer Geométrico Cyberpulse + Cyberpunk 2077 */}
       <footer className="relative z-10 border-t border-gray-800 bg-[#000000] mt-16 py-10">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs font-mono text-gray-400">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row items-center justify-between gap-6 text-xs font-mono text-gray-400">
           <div className="flex items-center gap-3">
             <img
               src="/images/logo-cyberpunk-tcg-españa.jpg"
               alt="Cyberpunk TCG España"
-              className="h-9 w-auto object-contain"
+              className="h-10 w-auto object-contain"
             />
-            <span className="text-white font-bold uppercase">
-              CYBERPUNK TCG ESPAÑA // PORTAL NO OFICIAL
-            </span>
+            <div>
+              <span className="text-white font-bold uppercase tracking-wider block">
+                CYBERPUNK TCG ESPAÑA
+              </span>
+              <span className="text-[10px] text-gray-500 uppercase tracking-widest block">
+                PORTAL Y HERRAMIENTAS DE LA COMUNIDAD (NO OFICIAL)
+              </span>
+            </div>
           </div>
-          <div className="flex items-center gap-4">
+
+          <div className="flex flex-wrap items-center justify-center md:justify-end gap-5">
             <a
-              href={forumUrl}
+              href="https://foro.cyberpunktcg.es"
               target="_blank"
               rel="noopener noreferrer"
-              className="text-[#00F0FF] hover:text-[#FCEE0A] transition-colors flex items-center gap-1"
+              className="text-[#00F0FF] hover:text-[#FCEE0A] font-bold uppercase transition-colors flex items-center gap-1.5"
+              title="Abrir foro de la comunidad en nueva pestaña"
             >
+              <MessageSquare className="w-3.5 h-3.5" />
               <span>FORO COMUNIDAD</span>
-              <ExternalLink className="w-3 h-3" />
-            </a>
-            <span>•</span>
-            <a href="/admin" className="text-gray-500 hover:text-[#FCEE0A] transition-colors">
-              ACCESO STAFF
+              <ExternalLink className="w-3 h-3 opacity-70" />
             </a>
 
+            <span className="text-gray-700 hidden sm:inline">•</span>
+
+            <a
+              href="mailto:cyberpunktcges@gmail.com"
+              className="text-gray-300 hover:text-[#FCEE0A] font-bold transition-colors flex items-center gap-1.5 bg-[#070a10] border border-gray-800 hover:border-[#FCEE0A] px-3 py-1.5"
+              title="Contacto para colaboraciones o publicidad"
+            >
+              <Mail className="w-3.5 h-3.5 text-[#FCEE0A]" />
+              <span>CONTACTO / PUBLICIDAD: <span className="text-white underline">cyberpunktcges@gmail.com</span></span>
+            </a>
           </div>
         </div>
       </footer>
