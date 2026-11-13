@@ -121,11 +121,12 @@ export function createInitialGameState(playerDeckInput, botDeckInput, allCards =
   const state = {
     turnNumber: 1,
     activePlayer: 'player', // 'player' | 'bot'
-    phase: 'MAIN', // 'START' | 'MAIN' | 'END'
+    phase: 'START', // 'START' | 'MAIN' | 'END'
     isGameOver: false,
     winner: null,
     overtime: false,
     combatEvent: null, // Si hay un ataque en curso
+    mulliganDecided: false, // Control de fase inicial de Keep / Mulligan
     actionLog: initialLog,
 
     player: {
@@ -496,5 +497,33 @@ export function passTurn(state) {
     return state;
   }
 
+  return state;
+}
+
+/**
+ * Realiza Mulligan de la mano inicial (baraja la mano y roba 5 cartas nuevas)
+ */
+export function mulliganHand(state, playerKey = 'player') {
+  const p = state[playerKey];
+  p.deck = shuffleDeck([...p.deck, ...p.hand]);
+  p.hand = p.deck.splice(0, 5);
+  state.mulliganDecided = true;
+  state.phase = 'MAIN';
+  state.actionLog.unshift(
+    `🔄 ${p.name} realiza MULLIGAN y roba una nueva mano de 5 cartas.`
+  );
+  return state;
+}
+
+/**
+ * Mantiene la mano inicial (KEEP)
+ */
+export function keepHand(state, playerKey = 'player') {
+  const p = state[playerKey];
+  state.mulliganDecided = true;
+  state.phase = 'MAIN';
+  state.actionLog.unshift(
+    `✅ ${p.name} decide MANTENER (Keep) su mano inicial de ${p.hand.length} cartas.`
+  );
   return state;
 }
