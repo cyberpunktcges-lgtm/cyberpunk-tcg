@@ -2148,6 +2148,17 @@
   ],
   "tournaments": [
     {
+      "name": "WIN-A-BETA CYBERPUNK TCG",
+      "date": "07 DIC",
+      "location": "JÚPITER ALCOBENDAS",
+      "format": "Constructed Estándar (BO3)",
+      "prizePool": "CAJA DE SOBRES DE BETA",
+      "players": "",
+      "status": "INSCRIPCIONES ABIERTAS",
+      "image": "/images/uploads/1794558701703-torneo_jupiter.jpg",
+      "id": "TOURNAMENT-1794558705516"
+    },
+    {
       "name": "Torneo Cyberpunk TCG - Manga Barcelona",
       "date": "06 DIC",
       "location": "FIRA GRAN VIVA BARCELONA (ESPAÑA)",
