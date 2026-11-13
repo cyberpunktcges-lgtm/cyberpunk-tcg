@@ -184,17 +184,30 @@ function PolyhedralDie({
   );
 }
 
+// Helper para identificar si una carta es de tipo LEYENDA (usa reverso back_leyenda.jpg)
+// Las unidades, gears y programas usan reverso normal (back_normal.png)
+export function isLegendCard(card) {
+  if (!card) return false;
+  if (card.isLegend === true) return true;
+  const official = (card.officialType || '').toUpperCase();
+  if (official === 'LEGEND') return true;
+  const cardType = (card.cardType || card.type || '').toUpperCase();
+  if (cardType.startsWith('LEGEND') || cardType.includes('LEGEND')) return true;
+  return false;
+}
+
 // Reverso oficial icónico de carta Cyberpunk TCG (Normal y Leyenda)
-function CyberCardBack({ className = '', count = null, isLegend = false }) {
+function CyberCardBack({ className = '', count = null, isLegend = false, card = null }) {
   const [imgError, setImgError] = useState(false);
-  const src = isLegend ? '/images/back_leyenda.jpg' : '/images/back_normal.png';
+  const legend = isLegend || isLegendCard(card);
+  const src = legend ? '/images/back_leyenda.jpg' : '/images/back_normal.png';
 
   if (!imgError) {
     return (
       <div className={`relative rounded-sm overflow-hidden select-none shadow-md ${className}`}>
         <img
           src={src}
-          alt={isLegend ? 'Legend Card Back' : 'Cyberpunk TCG Card Back'}
+          alt={legend ? 'Legend Card Back' : 'Cyberpunk TCG Card Back'}
           className="w-full h-full object-cover pointer-events-none"
           onError={() => setImgError(true)}
         />
@@ -242,6 +255,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
   const [selectedHandCard, setSelectedHandCard] = useState(null);
   const [selectedFieldUnit, setSelectedFieldUnit] = useState(null);
   const [inspectedCard, setInspectedCard] = useState(null);
+  const [isInspectedFlipped, setIsInspectedFlipped] = useState(false);
   const [showLogModal, setShowLogModal] = useState(false);
 
   // Comprobar si ya había sesión en sessionStorage
@@ -1186,41 +1200,83 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
       )}
 
       {/* =====================================================================
-          MODAL DE INSPECCIÓN HD DE CARTA
+          MODAL DE INSPECCIÓN HD DE CARTA CON VOLTEO ANVERSO / REVERSO OFICIAL
          ===================================================================== */}
-      {inspectedCard && (
-        <div
-          className="fixed inset-0 z-50 bg-black/90 backdrop-blur-md flex items-center justify-center p-4 font-mono"
-          onClick={() => setInspectedCard(null)}
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            style={{ clipPath: CYBER_CLIP }}
-            className="max-w-md w-full bg-[#000000] border-2 border-[#00F0FF] p-4 space-y-3 relative shadow-[0_0_50px_rgba(0,240,255,0.4)]"
-          >
-            <div className="flex items-center justify-between border-b border-gray-800 pb-2">
-              <span className="text-xs text-[#00F0FF] font-black uppercase">
-                {inspectedCard.name}
-              </span>
-              <button
-                type="button"
-                onClick={() => setInspectedCard(null)}
-                className="text-gray-400 hover:text-white"
-              >
-                ✕
-              </button>
-            </div>
+      {inspectedCard && (() => {
+        const isLeg = isLegendCard(inspectedCard);
+        const backSrc = isLeg ? '/images/back_leyenda.jpg' : '/images/back_normal.png';
 
-            <div className="w-full flex justify-center py-2">
-              <img
-                src={inspectedCard.image}
-                alt={inspectedCard.name}
-                className="max-h-[70vh] w-auto object-contain rounded-sm"
-              />
+        return (
+          <div
+            className="fixed inset-0 z-50 bg-black/90 backdrop-blur-md flex items-center justify-center p-4 font-mono"
+            onClick={() => {
+              setInspectedCard(null);
+              setIsInspectedFlipped(false);
+            }}
+          >
+            <div
+              onClick={(e) => e.stopPropagation()}
+              style={{ clipPath: CYBER_CLIP }}
+              className="max-w-md w-full bg-[#000000] border-2 border-[#00F0FF] p-4 space-y-3 relative shadow-[0_0_50px_rgba(0,240,255,0.4)]"
+            >
+              <div className="flex items-center justify-between border-b border-gray-800 pb-2 gap-2">
+                <div className="min-w-0">
+                  <span className="text-[10px] text-gray-400 uppercase block truncate">
+                    {isLeg ? '👑 LEYENDA' : inspectedCard.officialType || inspectedCard.cardType || 'UNIDAD / GEAR / PROGRAMA'}
+                  </span>
+                  <span className="text-xs text-[#00F0FF] font-black uppercase truncate block">
+                    {inspectedCard.name}
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setIsInspectedFlipped(!isInspectedFlipped)}
+                    className="px-2.5 py-1 bg-[#FCEE0A] hover:bg-white text-[#070a10] font-black text-[10px] uppercase cursor-pointer transition-colors shadow"
+                    title="Girar carta para ver el reverso oficial"
+                  >
+                    {isInspectedFlipped ? 'VER ANVERSO' : 'VER REVERSO'}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setInspectedCard(null);
+                      setIsInspectedFlipped(false);
+                    }}
+                    className="p-1 bg-[#070a10] border border-gray-700 hover:border-white text-gray-300 hover:text-white"
+                  >
+                    ✕
+                  </button>
+                </div>
+              </div>
+
+              <div
+                className="w-full flex justify-center py-2 cursor-pointer select-none"
+                onClick={() => setIsInspectedFlipped(!isInspectedFlipped)}
+                title="Haz clic para voltear la carta"
+              >
+                <img
+                  src={isInspectedFlipped ? backSrc : inspectedCard.image}
+                  alt={isInspectedFlipped ? 'Reverso oficial' : inspectedCard.name}
+                  className="max-h-[65vh] w-auto object-contain rounded-sm transition-transform duration-200 hover:scale-[1.02] shadow-2xl"
+                />
+              </div>
+
+              <div className="text-center text-[10px] text-gray-400 border-t border-gray-900 pt-1.5 flex items-center justify-between">
+                <span>
+                  Reverso:{' '}
+                  <strong className={isLeg ? 'text-[#FCEE0A]' : 'text-[#00F0FF]'}>
+                    {isLeg ? 'LEYENDA (DORADO)' : 'NORMAL (UNIDADES, GEARS, PROGRAMAS)'}
+                  </strong>
+                </span>
+                <span className="text-gray-600">[Clic para girar]</span>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* =====================================================================
           MODAL DE REGISTRO DE COMBATE (TERMINAL LOG)

@@ -46,7 +46,8 @@ import {
   Mail,
   Crown,
   Camera,
-  Smartphone
+  Smartphone,
+  RotateCw
 } from 'lucide-react';
 
 const CYBER_CLIP =
@@ -727,6 +728,7 @@ export default function CyberpunkPortal({
   const [lightboxList, setLightboxList] = useState([]);
   const [lightboxIndex, setLightboxIndex] = useState(0);
   const [lightboxZoom, setLightboxZoom] = useState(false);
+  const [lightboxFlipped, setLightboxFlipped] = useState(false);
   const [zoomPos, setZoomPos] = useState({ x: 50, y: 50 });
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [socialToast, setSocialToast] = useState(null);
@@ -793,6 +795,7 @@ export default function CyberpunkPortal({
     setLightboxList(list.length > 0 ? list : [card]);
     setLightboxIndex(index >= 0 ? index : 0);
     setLightboxZoom(false);
+    setLightboxFlipped(false);
     setZoomPos({ x: 50, y: 50 });
   };
 
@@ -802,6 +805,7 @@ export default function CyberpunkPortal({
     setLightboxIndex(nextIdx);
     setLightboxCard(lightboxList[nextIdx]);
     setLightboxZoom(false);
+    setLightboxFlipped(false);
   };
 
   const handlePrevLightboxCard = () => {
@@ -810,6 +814,7 @@ export default function CyberpunkPortal({
     setLightboxIndex(prevIdx);
     setLightboxCard(lightboxList[prevIdx]);
     setLightboxZoom(false);
+    setLightboxFlipped(false);
   };
 
   const toggleFullscreen = () => {
@@ -2379,6 +2384,7 @@ export default function CyberpunkPortal({
               setLightboxCard(null);
               setModalCard(null);
               setLightboxZoom(false);
+              setLightboxFlipped(false);
             };
 
             return (
@@ -2408,6 +2414,21 @@ export default function CyberpunkPortal({
                     </div>
 
                     <div className="flex items-center gap-1.5 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => setLightboxFlipped(!lightboxFlipped)}
+                        style={{ clipPath: CYBER_CLIP }}
+                        className={`px-2.5 py-1.5 text-xs font-mono font-bold flex items-center gap-1 border transition-all cursor-pointer ${
+                          lightboxFlipped
+                            ? 'bg-[#FCEE0A] text-[#070a10] border-[#FCEE0A]'
+                            : 'bg-[#000000] text-gray-300 border-gray-700 hover:border-[#FCEE0A] hover:text-[#FCEE0A]'
+                        }`}
+                        title="Girar carta (Ver reverso oficial)"
+                      >
+                        <RotateCw className="w-3.5 h-3.5" />
+                        <span className="hidden sm:inline">{lightboxFlipped ? 'ANVERSO' : 'REVERSO'}</span>
+                      </button>
+
                       <button
                         type="button"
                         onClick={() => setLightboxZoom(!lightboxZoom)}
@@ -2465,28 +2486,43 @@ export default function CyberpunkPortal({
 
                     <div
                       className={`relative max-h-[58vh] overflow-hidden flex items-center justify-center ${
-                        lightboxZoom ? 'cursor-zoom-out' : 'cursor-zoom-in'
+                        lightboxZoom && !lightboxFlipped ? 'cursor-zoom-out' : 'cursor-zoom-in'
                       }`}
-                      onClick={() => setLightboxZoom(!lightboxZoom)}
+                      onClick={() => {
+                        if (!lightboxFlipped) {
+                          setLightboxZoom(!lightboxZoom);
+                        } else {
+                          setLightboxFlipped(false);
+                        }
+                      }}
                       onMouseMove={handleMouseMoveZoom}
                     >
-                      <img
-                        src={currentCard.image}
-                        alt={currentCard.name}
-                        style={
-                          lightboxZoom
-                            ? {
-                                transform: 'scale(2.2)',
-                                transformOrigin: `${zoomPos.x}% ${zoomPos.y}%`,
-                                transition: 'transform 0.12s ease-out'
-                              }
-                            : {
-                                transform: 'scale(1)',
-                                transition: 'transform 0.25s ease'
-                              }
-                        }
-                        className="max-h-[55vh] w-auto object-contain drop-shadow-[0_0_35px_rgba(0,0,0,0.95)]"
-                      />
+                      {(() => {
+                        const isLeg = currentCard.officialType === 'LEGEND' || (currentCard.cardType || currentCard.type || '').toUpperCase().includes('LEGEND');
+                        const cardImg = lightboxFlipped
+                          ? (isLeg ? '/images/back_leyenda.jpg' : '/images/back_normal.png')
+                          : currentCard.image;
+
+                        return (
+                          <img
+                            src={cardImg}
+                            alt={lightboxFlipped ? (isLeg ? 'Reverso Leyenda' : 'Reverso Normal') : currentCard.name}
+                            style={
+                              lightboxZoom && !lightboxFlipped
+                                ? {
+                                    transform: 'scale(2.2)',
+                                    transformOrigin: `${zoomPos.x}% ${zoomPos.y}%`,
+                                    transition: 'transform 0.12s ease-out'
+                                  }
+                                : {
+                                    transform: 'scale(1)',
+                                    transition: 'transform 0.25s ease'
+                                  }
+                            }
+                            className="max-h-[55vh] w-auto object-contain drop-shadow-[0_0_35px_rgba(0,0,0,0.95)]"
+                          />
+                        );
+                      })()}
                     </div>
 
                     {currentList.length > 1 && (
@@ -2503,7 +2539,13 @@ export default function CyberpunkPortal({
 
                     <div className="absolute bottom-2 left-3 right-3 flex items-center justify-between text-[10px] font-mono text-gray-500 pointer-events-none">
                       <span>{currentList.length > 1 ? `Carta ${currentIdx + 1} de ${currentList.length}` : 'Visor Oficial'}</span>
-                      <span>{lightboxZoom ? 'Mueve el ratón para explorar • Clic para reducir' : 'Haz clic o pulsa Z para zoom 2X'}</span>
+                      <span>
+                        {lightboxFlipped
+                          ? 'Mostrando reverso oficial · Clic para volver al anverso'
+                          : lightboxZoom
+                          ? 'Mueve el ratón para explorar • Clic para reducir'
+                          : 'Haz clic o pulsa Z para zoom 2X'}
+                      </span>
                     </div>
                   </div>
 

@@ -37,6 +37,8 @@ export default function ProxyPrintModal({
   const [showRuler, setShowRuler] = useState(true);
   const [selectedSheetIndex, setSelectedSheetIndex] = useState(0);
   const [isPreparingPrint, setIsPreparingPrint] = useState(false);
+  const [includeBacks, setIncludeBacks] = useState(false);
+  const [previewBack, setPreviewBack] = useState(false);
 
   // 1. Expandir todas las cartas según su cantidad (qty) sin duplicar leyendas
   const expandedCards = useMemo(() => {
@@ -165,11 +167,105 @@ export default function ProxyPrintModal({
     }
 
     // Construcción del HTML para cada hoja A4
-    const sheetsHtml = sheets
-      .map((sheetCards, sheetIdx) => {
-        // Rellenar hasta 9 cartas para mantener la geometría de corte
-        const gridItems = Array.from({ length: 9 }).map((_, idx) => {
-          const card = sheetCards[idx];
+    const renderedSheets = [];
+
+    sheets.forEach((sheetCards, sheetIdx) => {
+      // 1. Hoja frontal (Anverso)
+      const frontGrid = Array.from({ length: 9 }).map((_, idx) => {
+        const card = sheetCards[idx];
+        if (!card) {
+          return `
+            <div class="proxy-card empty">
+              <div class="empty-placeholder">
+                <span>ESPACIO VACÍO</span>
+              </div>
+            </div>
+          `;
+        }
+
+        const fallbackImg = '/images/wallpapers/Night_City_3840x2160.png';
+        const cardImg = card.image || fallbackImg;
+
+        return `
+          <div class="proxy-card">
+            <img src="${cardImg}" alt="${card.name || 'Carta Cyberpunk'}" loading="eager" />
+            <div class="card-hairline-border"></div>
+          </div>
+        `;
+      }).join('');
+
+      renderedSheets.push(`
+        <div class="proxy-sheet">
+          <!-- Guías de corte en márgenes -->
+          ${
+            showCropMarks
+              ? `
+            <div class="crop-mark-v" style="left: 10.5mm; top: 0; height: 12mm;"></div>
+            <div class="crop-mark-v" style="left: 73.5mm; top: 0; height: 12mm;"></div>
+            <div class="crop-mark-v" style="left: 136.5mm; top: 0; height: 12mm;"></div>
+            <div class="crop-mark-v" style="left: 199.5mm; top: 0; height: 12mm;"></div>
+            <div class="crop-mark-v" style="left: 10.5mm; bottom: 0; height: 12mm;"></div>
+            <div class="crop-mark-v" style="left: 73.5mm; bottom: 0; height: 12mm;"></div>
+            <div class="crop-mark-v" style="left: 136.5mm; bottom: 0; height: 12mm;"></div>
+            <div class="crop-mark-v" style="left: 199.5mm; bottom: 0; height: 12mm;"></div>
+            <div class="crop-mark-h" style="top: 16mm; left: 0; width: 7mm;"></div>
+            <div class="crop-mark-h" style="top: 104mm; left: 0; width: 7mm;"></div>
+            <div class="crop-mark-h" style="top: 192mm; left: 0; width: 7mm;"></div>
+            <div class="crop-mark-h" style="top: 280mm; left: 0; width: 7mm;"></div>
+            <div class="crop-mark-h" style="top: 16mm; right: 0; width: 7mm;"></div>
+            <div class="crop-mark-h" style="top: 104mm; right: 0; width: 7mm;"></div>
+            <div class="crop-mark-h" style="top: 192mm; right: 0; width: 7mm;"></div>
+            <div class="crop-mark-h" style="top: 280mm; right: 0; width: 7mm;"></div>
+          `
+              : ''
+          }
+
+          <!-- Cabecera de calibración (50 mm) -->
+          <div class="sheet-header">
+            ${
+              showRuler
+                ? `
+              <div class="ruler-container">
+                <div class="ruler-line">
+                  <div class="ruler-tick left"></div>
+                  <span class="ruler-label">50 mm</span>
+                  <div class="ruler-tick right"></div>
+                </div>
+                <div class="ruler-text">
+                  Esta línea debe medir exactamente 50 mm al imprimir. Si no coincide, imprime al 100% de escala (desactiva "Ajustar a la página").
+                </div>
+              </div>
+            `
+                : '<div></div>'
+            }
+            <div class="sheet-index-tag">
+              cyberpunktcg.es // PROXY SHEET ${sheetIdx + 1}/${totalSheets} (ANVERSO)
+            </div>
+          </div>
+
+          <!-- Rejilla 3x3 de Cartas Oficiales (63mm x 88mm) -->
+          <div class="sheet-grid">
+            ${frontGrid}
+          </div>
+
+          <!-- Pie de página con información y descargo de responsabilidad -->
+          <div class="sheet-footer">
+            <div class="footer-left">
+              <strong>${deckName.toUpperCase()}</strong> · Hoja ${sheetIdx + 1} de ${totalSheets} (ANVERSO) · cyberpunktcg.es
+            </div>
+            <div class="footer-right">
+              Este es un trabajo de fans no oficial. No está aprobado ni respaldado por CD PROJEKT RED.
+            </div>
+          </div>
+        </div>
+      `);
+
+      // 2. Si se solicitan reversos para impresión a doble cara (duplex borde largo)
+      if (includeBacks) {
+        // En impresión a doble cara, las columnas se invierten horizontalmente: 0->2, 1->1, 2->0
+        const backMirrorMap = [2, 1, 0, 5, 4, 3, 8, 7, 6];
+        const backGrid = backMirrorMap.map((origIdx) => {
+          const card = sheetCards[origIdx];
           if (!card) {
             return `
               <div class="proxy-card empty">
@@ -180,42 +276,35 @@ export default function ProxyPrintModal({
             `;
           }
 
-          const fallbackImg = '/images/wallpapers/Night_City_3840x2160.png';
-          const cardImg = card.image || fallbackImg;
+          const isLeg = card.isLegend || card.officialType === 'LEGEND' || (card.cardType || '').toUpperCase().includes('LEGEND');
+          const backSrc = isLeg ? '/images/back_leyenda.jpg' : '/images/back_normal.png';
 
           return `
             <div class="proxy-card">
-              <img src="${cardImg}" alt="${card.name || 'Carta Cyberpunk'}" loading="eager" />
+              <img src="${backSrc}" alt="Reverso ${isLeg ? 'Leyenda' : 'Normal'}" loading="eager" />
               <div class="card-hairline-border"></div>
             </div>
           `;
         }).join('');
 
-        return `
+        renderedSheets.push(`
           <div class="proxy-sheet">
             <!-- Guías de corte en márgenes -->
             ${
               showCropMarks
                 ? `
-              <!-- Guías superiores (verticales) -->
               <div class="crop-mark-v" style="left: 10.5mm; top: 0; height: 12mm;"></div>
               <div class="crop-mark-v" style="left: 73.5mm; top: 0; height: 12mm;"></div>
               <div class="crop-mark-v" style="left: 136.5mm; top: 0; height: 12mm;"></div>
               <div class="crop-mark-v" style="left: 199.5mm; top: 0; height: 12mm;"></div>
-
-              <!-- Guías inferiores (verticales) -->
               <div class="crop-mark-v" style="left: 10.5mm; bottom: 0; height: 12mm;"></div>
               <div class="crop-mark-v" style="left: 73.5mm; bottom: 0; height: 12mm;"></div>
               <div class="crop-mark-v" style="left: 136.5mm; bottom: 0; height: 12mm;"></div>
               <div class="crop-mark-v" style="left: 199.5mm; bottom: 0; height: 12mm;"></div>
-
-              <!-- Guías laterales izquierdas (horizontales) -->
               <div class="crop-mark-h" style="top: 16mm; left: 0; width: 7mm;"></div>
               <div class="crop-mark-h" style="top: 104mm; left: 0; width: 7mm;"></div>
               <div class="crop-mark-h" style="top: 192mm; left: 0; width: 7mm;"></div>
               <div class="crop-mark-h" style="top: 280mm; left: 0; width: 7mm;"></div>
-
-              <!-- Guías laterales derechas (horizontales) -->
               <div class="crop-mark-h" style="top: 16mm; right: 0; width: 7mm;"></div>
               <div class="crop-mark-h" style="top: 104mm; right: 0; width: 7mm;"></div>
               <div class="crop-mark-h" style="top: 192mm; right: 0; width: 7mm;"></div>
@@ -224,7 +313,6 @@ export default function ProxyPrintModal({
                 : ''
             }
 
-            <!-- Cabecera de calibración (50 mm) -->
             <div class="sheet-header">
               ${
                 showRuler
@@ -236,35 +324,37 @@ export default function ProxyPrintModal({
                     <div class="ruler-tick right"></div>
                   </div>
                   <div class="ruler-text">
-                    Esta línea debe medir exactamente 50 mm al imprimir. Si no coincide, imprime al 100% de escala (desactiva "Ajustar a la página").
+                    REVERSO OFICIAL ESPEJADO (Alineado para impresión dúplex / doble cara).
                   </div>
                 </div>
               `
                   : '<div></div>'
               }
               <div class="sheet-index-tag">
-                cyberpunktcg.es // PROXY SHEET ${sheetIdx + 1}/${totalSheets}
+                cyberpunktcg.es // PROXY SHEET ${sheetIdx + 1}/${totalSheets} (REVERSO)
               </div>
             </div>
 
             <!-- Rejilla 3x3 de Cartas Oficiales (63mm x 88mm) -->
             <div class="sheet-grid">
-              ${gridItems}
+              ${backGrid}
             </div>
 
             <!-- Pie de página con información y descargo de responsabilidad -->
             <div class="sheet-footer">
               <div class="footer-left">
-                <strong>${deckName.toUpperCase()}</strong> · Hoja ${sheetIdx + 1} de ${totalSheets} · cyberpunktcg.es
+                <strong>${deckName.toUpperCase()}</strong> · Hoja ${sheetIdx + 1} de ${totalSheets} (REVERSO) · cyberpunktcg.es
               </div>
               <div class="footer-right">
-                Este es un trabajo de fans no oficial. No está aprobado ni respaldado por CD PROJEKT RED.
+                Reverso dorado para Leyendas · Reverso oficial amarillo para Unidades, Gears y Programas.
               </div>
             </div>
           </div>
-        `;
-      })
-      .join('');
+        `);
+      }
+    });
+
+    const sheetsHtml = renderedSheets.join('');
 
     const fullDocumentHtml = `
       <!DOCTYPE html>
@@ -613,6 +703,18 @@ export default function ProxyPrintModal({
               />
               <span>Regla 50 mm</span>
             </label>
+
+            <span className="text-gray-700 hidden lg:inline">|</span>
+
+            <label className="flex items-center gap-2 text-gray-200 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={includeBacks}
+                onChange={(e) => setIncludeBacks(e.target.checked)}
+                className="accent-[#FCEE0A] w-4 h-4 cursor-pointer"
+              />
+              <span>🎴 Reversos oficiales (Doble cara)</span>
+            </label>
           </div>
 
           {/* Estadísticas de la hoja */}
@@ -661,6 +763,29 @@ export default function ProxyPrintModal({
             </div>
 
             <div className="flex items-center gap-2 shrink-0">
+              {includeBacks && (
+                <div className="flex items-center gap-1 border border-gray-800 p-0.5 bg-[#000000] mr-2">
+                  <button
+                    type="button"
+                    onClick={() => setPreviewBack(false)}
+                    className={`px-2 py-0.5 text-[10px] font-mono font-bold uppercase transition-colors ${
+                      !previewBack ? 'bg-[#00F0FF] text-[#070a10]' : 'text-gray-400 hover:text-white'
+                    }`}
+                  >
+                    Anverso
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPreviewBack(true)}
+                    className={`px-2 py-0.5 text-[10px] font-mono font-bold uppercase transition-colors ${
+                      previewBack ? 'bg-[#FCEE0A] text-[#070a10]' : 'text-gray-400 hover:text-white'
+                    }`}
+                  >
+                    Reverso
+                  </button>
+                </div>
+              )}
+
               <button
                 type="button"
                 disabled={currentSheetIndex === 0}
@@ -728,7 +853,10 @@ export default function ProxyPrintModal({
               {/* Rejilla 3x3 */}
               <div className="grid grid-cols-3 grid-rows-3 gap-0 w-full h-[88%] border border-gray-400">
                 {Array.from({ length: 9 }).map((_, idx) => {
-                  const card = currentSheet[idx];
+                  const backMirrorMap = [2, 1, 0, 5, 4, 3, 8, 7, 6];
+                  const origIdx = (includeBacks && previewBack) ? backMirrorMap[idx] : idx;
+                  const card = currentSheet[origIdx];
+
                   if (!card) {
                     return (
                       <div
@@ -740,13 +868,18 @@ export default function ProxyPrintModal({
                     );
                   }
 
+                  const isLeg = card.isLegend || card.officialType === 'LEGEND' || (card.cardType || '').toUpperCase().includes('LEGEND');
+                  const cardImg = (includeBacks && previewBack)
+                    ? (isLeg ? '/images/back_leyenda.jpg' : '/images/back_normal.png')
+                    : (card.image || '/images/wallpapers/Night_City_3840x2160.png');
+
                   return (
                     <div
-                      key={`${card.id}-${idx}`}
+                      key={`${card.id}-${idx}-${previewBack ? 'back' : 'front'}`}
                       className="relative overflow-hidden bg-black border border-black/30 group"
                     >
                       <img
-                        src={card.image || '/images/wallpapers/Night_City_3840x2160.png'}
+                        src={cardImg}
                         alt={card.name}
                         className="w-full h-full object-fill"
                       />
