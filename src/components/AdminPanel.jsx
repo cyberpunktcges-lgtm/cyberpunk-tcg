@@ -35,6 +35,7 @@ import {
   commitFileToGithub,
   uploadImageToGithub
 } from '../utils/githubCms.js';
+import { parseTournamentDate, isTournamentPast } from '../utils/dateUtils.js';
 
 const CYBER_CLIP =
   'polygon(0 0, calc(100% - 15px) 0, 100% 15px, 100% 100%, 15px 100%, 0 calc(100% - 15px))';
@@ -494,6 +495,7 @@ excerpt: '',
   const [tourForm, setTourForm] = useState({
     name: '',
     date: '',
+    dateIso: '',
     location: 'Discord Oficial // Online',
     format: 'Constructed Estándar (BO3)',
     prizePool: '',
@@ -755,6 +757,7 @@ excerpt: '',
       setTourForm({
         name: '',
         date: '',
+        dateIso: '',
         location: 'Discord Oficial // Online',
         format: 'Constructed Estándar (BO3)',
         prizePool: '',
@@ -2924,17 +2927,40 @@ score: '6 - 0',
                   />
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div>
-                    <label className="block text-gray-400 mb-1">FECHA Y HORA *</label>
+                    <label className="block text-gray-400 mb-1">FECHA VISIBLE *</label>
                     <input
                       type="text"
                       required
                       value={tourForm.date}
                       onChange={(e) => setTourForm({ ...tourForm, date: e.target.value })}
-                      placeholder="Ej: 30 NOV • 18:00 CET"
+                      placeholder="Ej: 06 DIC o 30 NOV • 18:00"
                       className="w-full bg-[#070a10] border border-gray-800 px-3 py-2 text-white"
                     />
+                    <span className="text-[10px] text-gray-500 mt-0.5 block">
+                      Texto mostrado en las tarjetas
+                    </span>
+                  </div>
+                  <div>
+                    <label className="block text-gray-400 mb-1">CALENDARIO (OPCIONAL)</label>
+                    <input
+                      type="date"
+                      value={tourForm.dateIso || ''}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        const updates = { dateIso: val };
+                        if (!tourForm.date && val) {
+                          const [y, m, d] = val.split('-');
+                          updates.date = `${d}/${m}/${y}`;
+                        }
+                        setTourForm({ ...tourForm, ...updates });
+                      }}
+                      className="w-full bg-[#070a10] border border-gray-800 px-3 py-2 text-white"
+                    />
+                    <span className="text-[10px] text-gray-500 mt-0.5 block">
+                      Para ordenación exacta
+                    </span>
                   </div>
                   <div>
                     <label className="block text-gray-400 mb-1">ESTADO</label>
@@ -2946,7 +2972,7 @@ score: '6 - 0',
                       <option value="INSCRIPCIONES ABIERTAS">INSCRIPCIONES ABIERTAS</option>
                       <option value="ÚLTIMAS PLAZAS">ÚLTIMAS PLAZAS</option>
                       <option value="EN CURSO // LIVE">EN CURSO // LIVE</option>
-                      <option value="FINALIZADO">FINALIZADO</option>
+                      <option value="FINALIZADO">FINALIZADO (Mover a Histórico)</option>
                     </select>
                   </div>
                 </div>
@@ -3015,54 +3041,96 @@ score: '6 - 0',
             </form>
 
             <div className="lg:col-span-7 space-y-4">
-              <h3 className="text-sm font-mono font-bold uppercase text-[#00F0FF]">
-                TORNEOS ACTIVOS ({cms.tournaments?.length || 0})
-              </h3>
-              <div className="space-y-3">
-                {cms.tournaments?.map((tour) => (
-                  <div
-                    key={tour.id}
-                    style={{ clipPath: CYBER_CLIP }}
-                    className="bg-[#000000] border border-gray-800 p-4 flex items-center justify-between gap-4"
-                  >
-                    <div>
-                      <div className="flex items-center gap-2 text-[10px] font-mono">
-                        <span className="px-2 py-0.5 bg-[#FF003C] text-white font-black">
-                          {tour.status}
-                        </span>
-                        <span className="text-[#FCEE0A]">{tour.date}</span>
-                        <span className="text-gray-400">• {tour.location}</span>
-                      </div>
-                      <h4 className="text-base font-black text-white uppercase mt-1">
-                        {tour.name}
-                      </h4>
-                      <p className="text-xs font-mono text-[#00F0FF]">
-                        Premios: {tour.prizePool} | {tour.players}
-                      </p>
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setEditingTourId(tour.id);
-                          setTourForm({ ...tour });
-                        }}
-                        className="p-2 bg-[#070a10] border border-gray-800 hover:border-[#00F0FF] text-[#00F0FF] cursor-pointer"
-                      >
-                        <Edit3 className="w-4 h-4" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleDelete('tournaments', tour.id, 'Torneo')}
-                        className="p-2 bg-[#070a10] border border-gray-800 hover:border-[#FF003C] text-[#FF003C] cursor-pointer"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
-                ))}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 border-b border-gray-800 pb-2">
+                <h3 className="text-sm font-mono font-bold uppercase text-[#00F0FF]">
+                  TORNEOS ({cms.tournaments?.length || 0})
+                </h3>
+                <span className="text-[10px] font-mono text-gray-400">
+                  ORDENADOS POR FECHA MÁS PRÓXIMA
+                </span>
               </div>
+
+              {(() => {
+                const list = [...(cms.tournaments || [])].sort((a, b) => {
+                  const da = parseTournamentDate(a.date, a.dateIso);
+                  const db = parseTournamentDate(b.date, b.dateIso);
+                  const ta = da ? da.getTime() : Infinity;
+                  const tb = db ? db.getTime() : Infinity;
+                  return ta - tb;
+                });
+
+                if (list.length === 0) {
+                  return (
+                    <div
+                      style={{ clipPath: CYBER_CLIP }}
+                      className="bg-[#000000] border border-gray-800 p-8 text-center text-xs font-mono text-gray-400"
+                    >
+                      No hay torneos registrados. Utiliza el formulario para crear uno.
+                    </div>
+                  );
+                }
+
+                return (
+                  <div className="space-y-3">
+                    {list.map((tour) => {
+                      const isPast = isTournamentPast(tour);
+                      return (
+                        <div
+                          key={tour.id}
+                          style={{ clipPath: CYBER_CLIP }}
+                          className={`bg-[#000000] border p-4 flex items-center justify-between gap-4 transition-all ${
+                            isPast
+                              ? 'border-gray-800 opacity-80'
+                              : 'border-gray-800 hover:border-[#FCEE0A]'
+                          }`}
+                        >
+                          <div className="min-w-0">
+                            <div className="flex flex-wrap items-center gap-2 text-[10px] font-mono">
+                              <span
+                                className={`px-2 py-0.5 font-black uppercase text-white ${
+                                  isPast ? 'bg-[#FF003C]' : 'bg-[#00F0FF] text-[#070a10]'
+                                }`}
+                              >
+                                {isPast ? 'FINALIZADO // EN HISTÓRICO' : tour.status}
+                              </span>
+                              <span className="text-[#FCEE0A] font-bold">{tour.date}</span>
+                              <span className="text-gray-400">• {tour.location}</span>
+                            </div>
+                            <h4 className="text-base font-black text-white uppercase mt-1 truncate">
+                              {tour.name}
+                            </h4>
+                            <p className="text-xs font-mono text-[#00F0FF]">
+                              Premios: {tour.prizePool} {tour.players ? `| ${tour.players}` : ''}
+                            </p>
+                          </div>
+
+                          <div className="flex items-center gap-2 shrink-0">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setEditingTourId(tour.id);
+                                setTourForm({ ...tour });
+                              }}
+                              className="p-2 bg-[#070a10] border border-gray-800 hover:border-[#00F0FF] text-[#00F0FF] cursor-pointer"
+                              title="Editar torneo"
+                            >
+                              <Edit3 className="w-4 h-4" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDelete('tournaments', tour.id, 'Torneo')}
+                              className="p-2 bg-[#070a10] border border-gray-800 hover:border-[#FF003C] text-[#FF003C] cursor-pointer"
+                              title="Eliminar torneo"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })()}
             </div>
           </div>
         )}

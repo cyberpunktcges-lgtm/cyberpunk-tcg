@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { splitAndSortTournaments } from '../utils/dateUtils.js';
 import {
   Terminal,
   Layers,
@@ -163,8 +164,14 @@ export default function CyberpunkPortal({
   const heroArticle = cmsState.heroArticle || {};
   const recentArticles = cmsState.news || [];
   const topDecks = cmsState.decks || [];
-  const tournaments = cmsState.tournaments || [];
-  const pastTournaments = cmsState.pastTournaments || [];
+
+  // Clasificación y ordenación automática de torneos:
+  // - Próximos: los más cercanos a hoy primero (ascendente)
+  // - Histórico: torneos cuya fecha ha pasado o marcados como FINALIZADO (descendente)
+  const { upcomingTournaments: tournaments, pastTournaments } = useMemo(() => {
+    return splitAndSortTournaments(cmsState.tournaments || [], cmsState.pastTournaments || []);
+  }, [cmsState.tournaments, cmsState.pastTournaments]);
+
   const altArtCards = (cmsState.altArtCards || []).slice(0, 3);
   const forumUrl = 'https://foro.cyberpunktcg.es';
   const allCards = initialCards || [];
@@ -1834,61 +1841,74 @@ export default function CyberpunkPortal({
           )}
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {tournaments.map((tour) => (
-            <div
-              key={tour.id}
-              style={{ clipPath: CYBER_CLIP }}
-              className="group bg-[#000000] border border-gray-800 hover:border-[#FCEE0A] hover:shadow-[0_0_25px_rgba(252,238,10,0.35)] transition-all duration-300 flex flex-col justify-between overflow-hidden rounded-none"
-            >
-              <div>
-                <div className="relative h-40 w-full overflow-hidden border-b border-gray-800">
-                  <img
-                    src={tour.image || '/images/wallpapers/Night_City_3840x2160.png'}
-                    alt={tour.name}
-                    className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-500"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-[#000000] via-[#000000]/40 to-transparent" />
-                  <span
-                    style={{ clipPath: CYBER_CLIP }}
-                    className="absolute top-3 left-3 px-2.5 py-1 bg-[#FF003C] text-white font-mono font-black text-[10px] uppercase tracking-wider"
-                  >
-                    {tour.status}
-                  </span>
-                </div>
+        {tournaments.length === 0 ? (
+          <div
+            style={{ clipPath: CYBER_CLIP }}
+            className="bg-[#000000] border border-gray-800 p-10 text-center font-mono text-sm text-gray-400 space-y-2 rounded-none"
+          >
+            <Trophy className="w-8 h-8 text-[#FCEE0A] mx-auto mb-2 opacity-60" />
+            <p className="text-white font-bold uppercase text-base">NO HAY PRÓXIMOS TORNEOS ACTIVOS</p>
+            <p className="text-xs text-gray-400">
+              Todos los torneos cuya fecha ha pasado se encuentran archivados en el Histórico abajo.
+            </p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {tournaments.map((tour) => (
+              <div
+                key={tour.id}
+                style={{ clipPath: CYBER_CLIP }}
+                className="group bg-[#000000] border border-gray-800 hover:border-[#FCEE0A] hover:shadow-[0_0_25px_rgba(252,238,10,0.35)] transition-all duration-300 flex flex-col justify-between overflow-hidden rounded-none"
+              >
+                <div>
+                  <div className="relative h-40 w-full overflow-hidden border-b border-gray-800">
+                    <img
+                      src={tour.image || '/images/wallpapers/Night_City_3840x2160.png'}
+                      alt={tour.name}
+                      className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-500"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-[#000000] via-[#000000]/40 to-transparent" />
+                    <span
+                      style={{ clipPath: CYBER_CLIP }}
+                      className="absolute top-3 left-3 px-2.5 py-1 bg-[#FF003C] text-white font-mono font-black text-[10px] uppercase tracking-wider"
+                    >
+                      {tour.status}
+                    </span>
+                  </div>
 
-                <div className="p-5 space-y-3">
-                  <h3 className="text-lg font-black text-white uppercase group-hover:text-[#FCEE0A] transition-colors">
-                    {tour.name}
-                  </h3>
+                  <div className="p-5 space-y-3">
+                    <h3 className="text-lg font-black text-white uppercase group-hover:text-[#FCEE0A] transition-colors">
+                      {tour.name}
+                    </h3>
 
-                  <div className="space-y-1.5 text-xs font-mono text-gray-300">
-                    <p className="flex items-center gap-2">
-                      <Calendar className="w-3.5 h-3.5 text-[#FCEE0A]" />
-                      <span>{tour.date}</span>
-                    </p>
-                    <p className="flex items-center gap-2">
-                      <MapPin className="w-3.5 h-3.5 text-[#00F0FF]" />
-                      <span>{tour.location}</span>
-                    </p>
-                    <p className="flex items-center gap-2">
-                      <Users className="w-3.5 h-3.5 text-[#FF003C]" />
-                      <span>
-                        {tour.players} • {tour.format}
-                      </span>
-                    </p>
+                    <div className="space-y-1.5 text-xs font-mono text-gray-300">
+                      <p className="flex items-center gap-2">
+                        <Calendar className="w-3.5 h-3.5 text-[#FCEE0A]" />
+                        <span>{tour.date}</span>
+                      </p>
+                      <p className="flex items-center gap-2">
+                        <MapPin className="w-3.5 h-3.5 text-[#00F0FF]" />
+                        <span>{tour.location}</span>
+                      </p>
+                      <p className="flex items-center gap-2">
+                        <Users className="w-3.5 h-3.5 text-[#FF003C]" />
+                        <span>
+                          {tour.players} • {tour.format}
+                        </span>
+                      </p>
+                    </div>
                   </div>
                 </div>
-              </div>
 
-              <div className="p-4 border-t border-gray-800 bg-[#070a10] flex items-center justify-between text-xs font-mono">
-                <span className="text-[#00F0FF] font-bold truncate">
-                  Premios: {tour.prizePool}
-                </span>
+                <div className="p-4 border-t border-gray-800 bg-[#070a10] flex items-center justify-between text-xs font-mono">
+                  <span className="text-[#00F0FF] font-bold truncate">
+                    Premios: {tour.prizePool}
+                  </span>
+                </div>
               </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </section>
 
       {includeHistory && (
@@ -1944,79 +1964,148 @@ export default function CyberpunkPortal({
                       {hist.name}
                     </h3>
 
-                    <p className="text-sm text-gray-300 leading-relaxed">
-                      {hist.summary}
-                    </p>
+                    {hist.summary ? (
+                      <p className="text-sm text-gray-300 leading-relaxed">
+                        {hist.summary}
+                      </p>
+                    ) : hist.description ? (
+                      <p className="text-sm text-gray-300 leading-relaxed">
+                        {hist.description}
+                      </p>
+                    ) : null}
 
-                    {/* Podio y Mazo Ganador */}
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
-                      <div
-                        style={{ clipPath: CYBER_CLIP }}
-                        className="bg-[#070a10] border border-[#FCEE0A]/60 p-3.5"
-                      >
-                        <span className="text-[10px] font-mono text-[#FCEE0A] uppercase block">
-                          🏆 CAMPEÓN ({hist.score || '1º PUESTO'})
-                        </span>
-                        <p className="text-sm font-black text-white mt-0.5">{hist.winner}</p>
-                        <p className="text-xs font-mono text-[#00F0FF] mt-0.5">
-                          Mazo: {hist.winningDeck}
-                        </p>
+                    {/* Podio y Mazo Ganador (si están registrados) o Datos del Evento Finalizado */}
+                    {hist.winner ? (
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
+                        <div
+                          style={{ clipPath: CYBER_CLIP }}
+                          className="bg-[#070a10] border border-[#FCEE0A]/60 p-3.5"
+                        >
+                          <span className="text-[10px] font-mono text-[#FCEE0A] uppercase block">
+                            🏆 CAMPEÓN ({hist.score || '1º PUESTO'})
+                          </span>
+                          <p className="text-sm font-black text-white mt-0.5">{hist.winner}</p>
+                          <p className="text-xs font-mono text-[#00F0FF] mt-0.5">
+                            Mazo: {hist.winningDeck}
+                          </p>
+                        </div>
+
+                        {hist.runnerUp && (
+                          <div
+                            style={{ clipPath: CYBER_CLIP }}
+                            className="bg-[#070a10] border border-gray-800 p-3.5"
+                          >
+                            <span className="text-[10px] font-mono text-gray-400 uppercase block">
+                              🥈 FINALISTA (2º PUESTO)
+                            </span>
+                            <p className="text-xs font-bold text-gray-200 mt-1">{hist.runnerUp}</p>
+                          </div>
+                        )}
+
+                        {hist.thirdPlace && (
+                          <div
+                            style={{ clipPath: CYBER_CLIP }}
+                            className="bg-[#070a10] border border-gray-800 p-3.5"
+                          >
+                            <span className="text-[10px] font-mono text-gray-400 uppercase block">
+                              🥉 SEMIFINALISTA (3º PUESTO)
+                            </span>
+                            <p className="text-xs font-bold text-gray-200 mt-1">{hist.thirdPlace}</p>
+                          </div>
+                        )}
                       </div>
-
-                      {hist.runnerUp && (
+                    ) : (
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
                         <div
                           style={{ clipPath: CYBER_CLIP }}
                           className="bg-[#070a10] border border-gray-800 p-3.5"
                         >
                           <span className="text-[10px] font-mono text-gray-400 uppercase block">
-                            🥈 FINALISTA (2º PUESTO)
+                            FORMATO
                           </span>
-                          <p className="text-xs font-bold text-gray-200 mt-1">{hist.runnerUp}</p>
+                          <p className="text-xs font-bold text-[#00F0FF] mt-1">
+                            {hist.format || 'Constructed Estándar'}
+                          </p>
                         </div>
-                      )}
 
-                      {hist.thirdPlace && (
+                        {hist.prizePool && (
+                          <div
+                            style={{ clipPath: CYBER_CLIP }}
+                            className="bg-[#070a10] border border-gray-800 p-3.5"
+                          >
+                            <span className="text-[10px] font-mono text-gray-400 uppercase block">
+                              PREMIOS DEL EVENTO
+                            </span>
+                            <p className="text-xs font-bold text-[#FCEE0A] mt-1">
+                              {hist.prizePool}
+                            </p>
+                          </div>
+                        )}
+
                         <div
                           style={{ clipPath: CYBER_CLIP }}
-                          className="bg-[#070a10] border border-gray-800 p-3.5"
+                          className="bg-[#070a10] border border-[#FF003C]/40 p-3.5"
                         >
-                          <span className="text-[10px] font-mono text-gray-400 uppercase block">
-                            🥉 SEMIFINALISTA (3º PUESTO)
+                          <span className="text-[10px] font-mono text-[#FF003C] uppercase block">
+                            ESTADO // HISTÓRICO
                           </span>
-                          <p className="text-xs font-bold text-gray-200 mt-1">{hist.thirdPlace}</p>
+                          <p className="text-xs font-mono text-gray-300 mt-1">
+                            Edición Concluida
+                          </p>
                         </div>
-                      )}
-                    </div>
+                      </div>
+                    )}
                   </div>
 
-                  {/* Carta insignia del mazo campeón */}
+                  {/* Columna derecha: Carta insignia del mazo campeón o Cartel del Evento */}
                   <div className="lg:col-span-4 flex flex-col items-center justify-center bg-[#070a10] border border-gray-800 p-4">
-                    <span className="text-[10px] font-mono text-[#FCEE0A] uppercase tracking-widest mb-2">
-                      MAZO CAMPEÓN // {hist.winningFaction || 'META'}
-                    </span>
-                    {hist.featuredCardImg && (
-                      <img
-                        src={hist.featuredCardImg}
-                        alt={hist.winningDeck}
-                        onClick={() =>
-                          setModalCard({
-                            id: hist.id,
-                            name: hist.winningDeck,
-                            faction: hist.winningFaction || 'CAMPEÓN',
-                            image: hist.featuredCardImg,
-                            fileName: 'Carta Insignia del Torneo'
-                          })
-                        }
-                        className="h-56 w-auto object-contain cursor-pointer hover:scale-105 transition-transform"
-                      />
+                    {hist.winner && hist.featuredCardImg ? (
+                      <>
+                        <span className="text-[10px] font-mono text-[#FCEE0A] uppercase tracking-widest mb-2">
+                          MAZO CAMPEÓN // {hist.winningFaction || 'META'}
+                        </span>
+                        <img
+                          src={hist.featuredCardImg}
+                          alt={hist.winningDeck}
+                          onClick={() =>
+                            setModalCard({
+                              id: hist.id,
+                              name: hist.winningDeck,
+                              faction: hist.winningFaction || 'CAMPEÓN',
+                              image: hist.featuredCardImg,
+                              fileName: 'Carta Insignia del Torneo'
+                            })
+                          }
+                          className="h-56 w-auto object-contain cursor-pointer hover:scale-105 transition-transform"
+                        />
+                        <a
+                          href="/mazos"
+                          className="mt-3 text-xs font-mono font-bold text-[#00F0FF] hover:text-[#FCEE0A] uppercase flex items-center gap-1"
+                        >
+                          <span>Ver Mazos del Meta</span>
+                          <ChevronRight className="w-3.5 h-3.5" />
+                        </a>
+                      </>
+                    ) : hist.image ? (
+                      <div className="w-full text-center">
+                        <span className="text-[10px] font-mono text-[#00F0FF] uppercase tracking-widest mb-2 block">
+                          CARTEL DEL EVENTO
+                        </span>
+                        <div className="relative overflow-hidden border border-gray-800 max-h-48">
+                          <img
+                            src={hist.image}
+                            alt={hist.name}
+                            className="w-full h-44 object-cover object-center"
+                          />
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="w-full h-36 flex flex-col items-center justify-center text-center p-4 border border-dashed border-gray-800 text-gray-500 font-mono text-xs">
+                        <Award className="w-8 h-8 text-gray-600 mb-1" />
+                        <span className="text-gray-400 font-bold uppercase">EDICIÓN ARCHIVADA</span>
+                        <span className="text-[10px] text-gray-600 mt-1">Torneo finalizado</span>
+                      </div>
                     )}
-                    <a
-                      href="/mazos"
-                      className="mt-3 text-xs font-mono font-bold text-[#00F0FF] hover:text-[#FCEE0A] uppercase flex items-center gap-1"
-                    >
-                      <span>Ver Mazos del Meta</span>
-                      <ChevronRight className="w-3.5 h-3.5" />
-                    </a>
                   </div>
                 </div>
               ))}
