@@ -2146,7 +2146,19 @@
       ]
     }
   ],
-  "tournaments": [],
+  "tournaments": [
+    {
+      "name": "Torneo Cyberpunk TCG - Manga Barcelona",
+      "date": "06 DIC",
+      "location": "FIRA GRAN VIVA BARCELONA (ESPAÑA)",
+      "format": "Constructed Estándar (BO3)",
+      "prizePool": "CAJAS Y SOBRES",
+      "players": "",
+      "status": "INSCRIPCIONES ABIERTAS",
+      "image": "/images/uploads/1794558412685-25ed088d-8a8a-4e23-9691-b44388b2f258.jpg",
+      "id": "TOURNAMENT-1794558415996"
+    }
+  ],
   "forumUrl": "https://foro.cyberpunktcg.es",
   "altArtCards": [
     {
