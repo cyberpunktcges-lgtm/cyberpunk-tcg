@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { splitAndSortTournaments } from '../utils/dateUtils.js';
+import ProxyPrintModal from './ProxyPrintModal.jsx';
 import {
   Terminal,
   Layers,
@@ -31,6 +32,7 @@ import {
   Copy,
   Check,
   Download,
+  Printer,
   Award,
   Filter,
   ArrowUpDown,
@@ -235,6 +237,25 @@ export default function CyberpunkPortal({
   const [deckViewTab, setDeckViewTab] = useState('list'); // 'list' | 'visual'
   const [isGeneratingDeckImg, setIsGeneratingDeckImg] = useState(false);
   const [deckToast, setDeckToast] = useState(null);
+
+  // Estado para el Visor / Impresión de Proxys A4 (Estándar Choombattler)
+  const [proxyModalOpen, setProxyModalOpen] = useState(false);
+  const [proxyModalData, setProxyModalData] = useState({
+    deckName: '',
+    cards: [],
+    legends: [],
+    sideboard: []
+  });
+
+  const handleOpenProxyPrint = (deckName, cards, legends = [], sideboard = []) => {
+    setProxyModalData({
+      deckName: deckName || 'Mazo Cyberpunk TCG',
+      cards: cards || [],
+      legends: legends || [],
+      sideboard: sideboard || []
+    });
+    setProxyModalOpen(true);
+  };
 
   // Cargar y persistir borrador del Constructor de Mazos en localStorage
   useEffect(() => {
@@ -1534,6 +1555,24 @@ export default function CyberpunkPortal({
                     <Download className="w-4 h-4" />
                     <span>EXPORTAR .TXT</span>
                   </button>
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      handleOpenProxyPrint(
+                        activeDeck.name,
+                        activeDeck.deckList,
+                        getDeckLegends(activeDeck),
+                        activeDeck.sideboard
+                      )
+                    }
+                    style={{ clipPath: CYBER_CLIP }}
+                    className="px-4 py-2 bg-[#FCEE0A] hover:bg-[#00F0FF] text-[#070a10] font-black uppercase tracking-wider flex items-center gap-1.5 cursor-pointer transition-colors shadow-[0_0_15px_rgba(252,238,10,0.35)]"
+                    title="Exportar mazo a PDF en formato proxys (rejilla 3x3 para A4)"
+                  >
+                    <Printer className="w-4 h-4" />
+                    <span>IMPRIMIR PROXYS (PDF)</span>
+                  </button>
                 </div>
               </div>
 
@@ -2814,6 +2853,24 @@ export default function CyberpunkPortal({
                       >
                         <Download className="w-4 h-4" />
                         <span>{isGeneratingDeckImg ? 'GENERANDO...' : 'DESCARGAR PNG'}</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() =>
+                          handleOpenProxyPrint(
+                            customDeckName,
+                            customDeckList,
+                            cat.legends,
+                            customSideboardList
+                          )
+                        }
+                        style={{ clipPath: CYBER_CLIP }}
+                        className="px-4 py-2 bg-[#00F0FF] text-[#070a10] font-mono font-black text-xs uppercase flex items-center gap-1.5 cursor-pointer hover:bg-[#FCEE0A] transition-all"
+                        title="Exportar mazo a PDF para imprimir proxys con guías de corte"
+                      >
+                        <Printer className="w-4 h-4" />
+                        <span>IMPRIMIR PROXYS (PDF)</span>
                       </button>
 
                       <button
@@ -4291,6 +4348,26 @@ export default function CyberpunkPortal({
                     </button>
                   </div>
 
+                  {/* Botón de Impresión de Proxys (Estándar Choombattler) */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const cat = getCategorizedDeck(customDeckList, customSideboardList);
+                      handleOpenProxyPrint(
+                        customDeckName,
+                        cat.units.concat(cat.programs, cat.gears, cat.others),
+                        cat.legends,
+                        customSideboardList
+                      );
+                    }}
+                    disabled={customDeckList.length === 0}
+                    style={{ clipPath: CYBER_CLIP }}
+                    className="w-full py-2.5 bg-[#000000] border border-[#00F0FF] hover:border-[#FCEE0A] hover:bg-[#FCEE0A] hover:text-[#070a10] text-[#00F0FF] font-mono font-black text-xs uppercase flex items-center justify-center gap-2 cursor-pointer disabled:opacity-40 transition-all shadow-[0_0_15px_rgba(0,240,255,0.2)]"
+                  >
+                    <Printer className="w-4 h-4" />
+                    <span>IMPRIMIR PROXYS (PDF A4)</span>
+                  </button>
+
                   {customDeckList.length > 0 && (
                     <button
                       type="button"
@@ -4327,6 +4404,16 @@ export default function CyberpunkPortal({
           </main>
         )}
       </div>
+
+      {/* Modal Oficial de Exportación e Impresión de Proxys A4 (Estándar Choombattler) */}
+      <ProxyPrintModal
+        isOpen={proxyModalOpen}
+        onClose={() => setProxyModalOpen(false)}
+        deckName={proxyModalData.deckName}
+        cards={proxyModalData.cards}
+        legends={proxyModalData.legends}
+        sideboard={proxyModalData.sideboard}
+      />
 
       {/* Footer Geométrico Cyberpulse + Cyberpunk 2077 */}
       <footer className="relative z-10 border-t border-gray-800 bg-[#000000] mt-16 py-10">
