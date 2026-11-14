@@ -40,6 +40,9 @@ import {
   keepHand,
   hasKeyword,
   calculateGigsToSteal,
+  getEligibleFixerDice,
+  rollInGig,
+  rollDie,
   DICE_CONFIG
 } from '../utils/cyberpunkEngine.js';
 import { runBotTurn, decideBotBlocker } from '../utils/botAi.js';
@@ -358,6 +361,11 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
   const [showLogModal, setShowLogModal] = useState(false);
   const [showRulesModal, setShowRulesModal] = useState(false);
 
+  // Estados para Drag & Drop y Animación de Dados
+  const [isDragOverField, setIsDragOverField] = useState(false);
+  const [isDragOverEddies, setIsDragOverEddies] = useState(false);
+  const [rollingAnimation, setRollingAnimation] = useState(null);
+
   // Pila de historial para la función "DESHACER" (Undo)
   const [history, setHistory] = useState([]);
 
@@ -374,6 +382,77 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
       setGameState(prev);
       setSelectedHandCard(null);
       setSelectedFieldUnit(null);
+    }
+  };
+
+  // Lanzar animación de dado con resultados aleatorios rodando y parada en el valor final
+  const triggerDiceRoll = (dieType) => {
+    if (rollingAnimation || !gameState) return;
+    const normDie = dieType.toLowerCase();
+    const config = DICE_CONFIG[normDie] || DICE_CONFIG.d6;
+    const finalVal = rollDie(normDie);
+
+    setRollingAnimation({
+      dieType: normDie,
+      currentValue: Math.floor(Math.random() * config.max) + 1,
+      finalValue: finalVal,
+      isRolling: true,
+      isFinished: false
+    });
+
+    let count = 0;
+    const interval = setInterval(() => {
+      count++;
+      setRollingAnimation((prev) => {
+        if (!prev) return null;
+        return {
+          ...prev,
+          currentValue: Math.floor(Math.random() * config.max) + 1
+        };
+      });
+
+      if (count >= 16) {
+        clearInterval(interval);
+        setRollingAnimation((prev) => ({
+          ...prev,
+          currentValue: finalVal,
+          isRolling: false,
+          isFinished: true
+        }));
+
+        setTimeout(() => {
+          pushHistory();
+          rollInGig(gameState, 'player', normDie, finalVal);
+          setGameState({ ...gameState });
+          setRollingAnimation(null);
+        }, 850);
+      }
+    }, 65);
+  };
+
+  // Jugar carta arrastrada o clicada
+  const handlePlayCard = (cardInstanceId) => {
+    if (!gameState || gameState.activePlayer !== 'player' || gameState.isGameOver) return;
+    pushHistory();
+    const res = playUnitCard(gameState, 'player', cardInstanceId);
+    if (res.success) {
+      setSelectedHandCard(null);
+      setGameState({ ...gameState });
+    } else {
+      alert(res.reason);
+    }
+  };
+
+  // Vender carta arrastrada o clicada
+  const handleSellCard = (cardInstanceId) => {
+    if (!gameState || gameState.activePlayer !== 'player' || gameState.isGameOver) return;
+    pushHistory();
+    const res = sellCardForEddies(gameState, 'player', cardInstanceId);
+    if (res.success) {
+      setSelectedHandCard(null);
+      setGameState({ ...gameState });
+    } else {
+      alert(res.reason);
     }
   };
 
@@ -750,9 +829,13 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                     title={leg.isFaceUp ? leg.name : 'Leyenda boca abajo del Rival'}
                   >
                     {leg.isFaceUp ? (
-                      <img src={leg.image} alt={leg.name} className="w-full h-full object-cover" />
+                      <div className={`w-full h-full transition-transform duration-300 flex items-center justify-center ${leg.isSpent ? 'rotate-90 scale-75' : ''}`}>
+                        <img src={leg.image} alt={leg.name} className="w-full h-full object-cover" />
+                      </div>
                     ) : (
-                      <CyberCardBack isLegend={true} className="w-full h-full text-[8px]" />
+                      <div className={`w-full h-full transition-transform duration-300 flex items-center justify-center ${leg.isSpent ? 'rotate-90 scale-75' : ''}`}>
+                        <CyberCardBack isLegend={true} className="w-full h-full text-[8px]" />
+                      </div>
                     )}
                   </div>
                 ))}
@@ -898,11 +981,13 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                           : 'Clic para llamar Leyenda (Coste: 1 €$)'
                       }
                     >
-                      {leg.isFaceUp ? (
-                        <img src={leg.image} alt={leg.name} className="w-full h-full object-cover" />
-                      ) : (
-                        <CyberCardBack isLegend={true} className="w-full h-full text-[8px]" />
-                      )}
+                      <div className={`w-full h-full transition-transform duration-300 flex items-center justify-center ${leg.isSpent ? 'rotate-90 scale-75' : ''}`}>
+                        {leg.isFaceUp ? (
+                          <img src={leg.image} alt={leg.name} className="w-full h-full object-cover" />
+                        ) : (
+                          <CyberCardBack isLegend={true} className="w-full h-full text-[8px]" />
+                        )}
+                      </div>
 
                       {/* Indicador de Penalización de Turno 1 o Gastada */}
                       {leg.isSpent && (
@@ -929,88 +1014,41 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
 
         {/* ===============================================================
             CAMPO DE BATALLA CENTRAL:
-            - Dividido en dos mitades horizontales
-            - Barra divisoria luminosa en el centro con indicadores de fase
-            - Unidades animadas con Framer Motion proyectando resplandor
+            - Dividido estrictamente en dos mitades (Campo Rival arriba / Tu Campo abajo)
+            - Las cartas gastadas se giran 90 grados
+            - Zona de Tu Campo habilitada como Drop-Zone para arrastrar cartas
            =============================================================== */}
-        <main className="flex-1 flex flex-col justify-between overflow-y-auto relative p-3 sm:p-5 pb-52">
-          {/* MITAD HORIZONTAL SUPERIOR: CAMPO DE BATALLA DEL RIVAL */}
-          <div className="space-y-2">
-            {/* Cabecera del Campo Rival (Mano Oculta, Eddies y Mazo Rival) */}
-            <div className="flex flex-wrap items-center justify-between gap-2 bg-[#070a10]/85 border border-[#0dfceb]/30 px-3 py-2 rounded-sm shadow-md">
-              {/* Mano del Rival Boca Abajo */}
-              <div className="flex items-center gap-2">
-                <span className="text-[10px] font-mono text-gray-400 uppercase tracking-wider">
-                  MANO RIVAL ({bot.hand.length}):
-                </span>
-                <div className="flex items-center gap-1">
-                  {bot.hand.map((_, i) => (
-                    <div
-                      key={i}
-                      className="w-6 h-9 sm:w-7 sm:h-10 rounded-xs overflow-hidden shadow border border-black shrink-0"
-                      title="Carta en mano del rival"
-                    >
-                      <CyberCardBack className="w-full h-full" />
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Eddies del Rival */}
-              <div className="flex items-center gap-2">
-                <span className="text-[10px] font-mono text-gray-500 uppercase tracking-widest">
-                  EDDIES:
-                </span>
-                <div className="flex items-center gap-1">
-                  {bot.eddies.map((_, i) => (
-                    <div
-                      key={i}
-                      className="w-6 h-3.5 bg-[#FCEE0A] border border-black rounded-xs shadow-sm"
-                      title="1 €$ del rival"
-                    />
-                  ))}
-                </div>
-              </div>
-
-              {/* Pilas de Mazo y Trash del Rival a la derecha */}
-              <div className="flex items-center gap-2">
-                <CyberDeckPile
-                  label="MAZO"
-                  count={bot.deck.length}
-                  isTrash={false}
-                  sizeClass="w-10 sm:w-12 h-14 sm:h-16"
-                />
-                <CyberDeckPile
-                  label="TRASH"
-                  count={bot.trash.length}
-                  isTrash={true}
-                  topCard={bot.trash.length > 0 ? bot.trash[bot.trash.length - 1] : null}
-                  onClick={() =>
-                    bot.trash.length > 0 && setInspectedCard(bot.trash[bot.trash.length - 1])
-                  }
-                  sizeClass="w-10 sm:w-12 h-14 sm:h-16"
-                />
-              </div>
+        <main className="flex-1 flex flex-col justify-between overflow-y-auto relative p-2 sm:p-4 pb-52 gap-2">
+          {/* 1. CAMPO DEL RIVAL (MITAD SUPERIOR) */}
+          <div className="flex-1 min-h-[170px] sm:min-h-[200px] border border-dashed border-[#FF003C]/30 bg-[#000000]/60 p-3 flex flex-col justify-center items-center relative rounded-sm shadow-inner">
+            <div className="absolute top-1.5 left-2 flex items-center gap-1.5 text-[9px] font-mono text-[#FF003C] uppercase tracking-widest pointer-events-none opacity-80">
+              <span className="w-1.5 h-1.5 rounded-full bg-[#FF003C]" />
+              <span>CAMPO DEL RIVAL ({bot.field.length} UNIDADES)</span>
             </div>
 
-            {/* Zona de Unidades del Rival en Mesa (Framer Motion) */}
-            <div className="min-h-[140px] sm:min-h-[165px] border border-dashed border-[#0dfceb]/25 bg-[#000000]/60 p-3 flex items-center justify-center relative">
-              {bot.field.length === 0 ? (
-                <span className="text-xs font-mono text-gray-600 italic">
-                  [CAMPO DEL RIVAL VACÍO]
-                </span>
-              ) : (
-                <div className="flex flex-wrap items-center justify-center gap-3 w-full">
-                  {bot.field.map((unit) => {
-                    const canAttackThisUnit =
-                      selectedFieldUnit &&
-                      !selectedFieldUnit.isSpent &&
-                      !selectedFieldUnit.isLagging &&
-                      unit.isSpent;
+            {bot.field.length === 0 ? (
+              <span className="text-xs font-mono text-gray-600 italic">
+                [CAMPO DEL RIVAL VACÍO]
+              </span>
+            ) : (
+              <div className="flex flex-wrap items-center justify-center gap-3 w-full py-2">
+                {bot.field.map((unit) => {
+                  const canAttackThisUnit =
+                    selectedFieldUnit &&
+                    !selectedFieldUnit.isSpent &&
+                    !selectedFieldUnit.isLagging &&
+                    unit.isSpent;
 
-                    return (
+                  return (
+                    <div
+                      key={unit.instanceId}
+                      className={`transition-all duration-300 flex items-center justify-center shrink-0 ${
+                        unit.isSpent
+                          ? 'w-36 sm:w-40 md:w-44 h-24 sm:h-28 md:h-32 my-1'
+                          : 'w-24 sm:w-28 md:w-32 h-36 sm:h-40 md:h-44'
+                      }`}
+                    >
                       <motion.div
-                        key={unit.instanceId}
                         layout
                         initial={{ opacity: 0, scale: 0.8 }}
                         animate={{
@@ -1022,6 +1060,8 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                                 '0 0 25px rgba(255, 0, 60, 0.95)',
                                 '0 0 10px rgba(255, 0, 60, 0.5)'
                               ]
+                            : unit.isSpent
+                            ? '0 0 15px rgba(255, 0, 60, 0.25)'
                             : '0 0 0px rgba(0,0,0,0)'
                         }}
                         transition={{
@@ -1049,11 +1089,11 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                           }
                         }}
                         style={{ clipPath: CYBER_CARD_CLIP }}
-                        className={`w-24 sm:w-28 md:w-32 h-36 sm:h-40 md:h-44 bg-black border-2 transition-all cursor-pointer flex flex-col justify-between relative shadow-xl ${
+                        className={`w-24 sm:w-28 md:w-32 h-36 sm:h-40 md:h-44 bg-black border-2 transition-transform duration-300 cursor-pointer flex flex-col justify-between relative shadow-xl ${
                           canAttackThisUnit
                             ? 'border-[#FF003C] animate-pulse'
                             : unit.isSpent
-                            ? 'border-gray-800 opacity-60 rotate-3'
+                            ? 'border-gray-800 opacity-75 rotate-90'
                             : 'border-[#FF003C]/80 hover:border-[#FF003C]'
                         }`}
                       >
@@ -1087,26 +1127,26 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                           {unit.currentPower}
                         </div>
 
-                        {/* Estado: GASTADA */}
+                        {/* Estado: GASTADA (con texto contra-rotado para leerlo recto) */}
                         {unit.isSpent && (
-                          <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
-                            <span className="px-2 py-0.5 bg-black border border-[#FF003C] text-[#FF003C] font-mono font-black text-[11px] uppercase tracking-wider">
+                          <div className="absolute inset-0 bg-black/60 flex items-center justify-center z-20">
+                            <span className="px-2 py-0.5 bg-black border border-[#FF003C] text-[#FF003C] font-mono font-black text-[10px] uppercase tracking-wider -rotate-90">
                               GASTADA
                             </span>
                           </div>
                         )}
                       </motion.div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
           {/* ===============================================================
               BARRA DIVISORIA LUMINOSA CENTRAL CON INDICADORES DE FASE
              =============================================================== */}
-          <div className="my-3 relative flex items-center justify-center">
+          <div className="my-1 relative flex items-center justify-center shrink-0">
             {/* Línea láser de neón con resplandor */}
             <div className="absolute inset-x-0 h-[2px] bg-gradient-to-r from-transparent via-[#FCEE0A] to-transparent shadow-[0_0_20px_#FCEE0A]" />
 
@@ -1118,7 +1158,11 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
               <span className="text-[#0dfceb]">TURNO {gameState.turnNumber}</span>
               <span className="text-gray-600">•</span>
               <span className={isMyTurn ? 'text-[#FCEE0A]' : 'text-[#FF003C]'}>
-                {isMyTurn ? 'TU TURNO // FASE PRINCIPAL' : 'IA PENSANDO ACCIONES...'}
+                {gameState.pendingGigRoll
+                  ? 'FASE DE INICIO // ELIGE DADO'
+                  : isMyTurn
+                  ? 'TU TURNO // FASE PRINCIPAL'
+                  : 'IA PENSANDO ACCIONES...'}
               </span>
 
               {/* Botón oficial para Asaltar Gigs rivales según tabla de poder */}
@@ -1157,23 +1201,55 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
             </div>
           </div>
 
-          {/* MITAD HORIZONTAL INFERIOR: CAMPO DE BATALLA DEL JUGADOR */}
-          <div className="space-y-2">
-            {/* Zona de Unidades Propias en Mesa (Framer Motion con Resplandor) */}
-            <div className="min-h-[140px] sm:min-h-[165px] border border-dashed border-[#0dfceb]/40 bg-[#000000]/60 p-3 flex items-center justify-center relative">
-              {p.field.length === 0 ? (
-                <span className="text-xs font-mono text-gray-500 italic">
-                  [TU CAMPO DE BATALLA VACÍO — JUEGA UNIDADES DESDE TU MANO ABAJO]
+          {/* 2. TU CAMPO DE BATALLA (MITAD INFERIOR - DROP ZONE PARA ARRASTRAR) */}
+          <div
+            onDragOver={(e) => {
+              e.preventDefault();
+              if (!isDragOverField) setIsDragOverField(true);
+            }}
+            onDragLeave={() => setIsDragOverField(false)}
+            onDrop={(e) => {
+              e.preventDefault();
+              setIsDragOverField(false);
+              const cardId = e.dataTransfer.getData('text/plain');
+              if (cardId) handlePlayCard(cardId);
+            }}
+            className={`flex-1 min-h-[170px] sm:min-h-[200px] border flex flex-col justify-center items-center relative rounded-sm transition-all p-3 shadow-inner ${
+              isDragOverField
+                ? 'border-[#0dfceb] bg-[#0dfceb]/15 shadow-[0_0_35px_rgba(13,252,235,0.45)]'
+                : 'border-dashed border-[#0dfceb]/35 bg-[#000000]/60'
+            }`}
+          >
+            <div className="absolute top-1.5 left-2 flex items-center gap-1.5 text-[9px] font-mono text-[#0dfceb] uppercase tracking-widest pointer-events-none">
+              <span className="w-1.5 h-1.5 rounded-full bg-[#0dfceb] animate-pulse" />
+              <span>TU CAMPO DE BATALLA ({p.field.length} UNIDADES)</span>
+              {isDragOverField && (
+                <span className="text-[#FCEE0A] font-black animate-bounce ml-2">
+                  ➔ ¡SUELTA LA CARTA AQUÍ PARA DESPLEGARLA!
                 </span>
-              ) : (
-                <div className="flex flex-wrap items-center justify-center gap-3 w-full">
-                  {p.field.map((unit) => {
-                    const isSelected = selectedFieldUnit?.instanceId === unit.instanceId;
-                    const canAttack = isMyTurn && !unit.isSpent && !unit.isLagging;
+              )}
+            </div>
 
-                    return (
+            {p.field.length === 0 ? (
+              <span className="text-xs font-mono text-gray-500 italic text-center">
+                [TU CAMPO DE BATALLA ESTÁ VACÍO — ARRASTRA CARTAS DESDE TU MANO O SELECCIÓNALAS PARA JUGAR]
+              </span>
+            ) : (
+              <div className="flex flex-wrap items-center justify-center gap-3 w-full py-2">
+                {p.field.map((unit) => {
+                  const isSelected = selectedFieldUnit?.instanceId === unit.instanceId;
+                  const canAttack = isMyTurn && !unit.isSpent && !unit.isLagging;
+
+                  return (
+                    <div
+                      key={unit.instanceId}
+                      className={`transition-all duration-300 flex items-center justify-center shrink-0 ${
+                        unit.isSpent
+                          ? 'w-36 sm:w-40 md:w-44 h-24 sm:h-28 md:h-32 my-1'
+                          : 'w-24 sm:w-28 md:w-32 h-36 sm:h-40 md:h-44'
+                      }`}
+                    >
                       <motion.div
-                        key={unit.instanceId}
                         layout
                         initial={{ opacity: 0, scale: 0.8 }}
                         animate={{
@@ -1187,6 +1263,8 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                                 '0 0 25px rgba(252, 238, 10, 0.85)',
                                 '0 0 10px rgba(13, 252, 235, 0.4)'
                               ]
+                            : unit.isSpent
+                            ? '0 0 15px rgba(13, 252, 235, 0.25)'
                             : '0 0 0px rgba(0,0,0,0)'
                         }}
                         transition={{
@@ -1205,13 +1283,13 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                           }
                         }}
                         style={{ clipPath: CYBER_CARD_CLIP }}
-                        className={`w-24 sm:w-28 md:w-32 h-36 sm:h-40 md:h-44 bg-black border-2 transition-all cursor-pointer flex flex-col justify-between relative shadow-xl ${
+                        className={`w-24 sm:w-28 md:w-32 h-36 sm:h-40 md:h-44 bg-black border-2 transition-transform duration-300 cursor-pointer flex flex-col justify-between relative shadow-xl ${
                           isSelected
                             ? 'border-[#FCEE0A] -translate-y-2 scale-105'
                             : canAttack
                             ? 'border-[#0dfceb] hover:border-[#FCEE0A]'
                             : unit.isSpent
-                            ? 'border-gray-800 opacity-60 rotate-3'
+                            ? 'border-gray-800 opacity-75 rotate-90'
                             : 'border-gray-800'
                         }`}
                       >
@@ -1250,42 +1328,20 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                           {unit.currentPower}
                         </div>
 
-                        {/* Estado: GASTADA */}
+                        {/* Estado: GASTADA (con texto contra-rotado para leerlo recto) */}
                         {unit.isSpent && (
-                          <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
-                            <span className="px-2 py-0.5 bg-black border border-gray-600 text-gray-300 font-mono font-black text-[11px] uppercase tracking-wider">
+                          <div className="absolute inset-0 bg-black/60 flex items-center justify-center z-20">
+                            <span className="px-2 py-0.5 bg-black border border-gray-600 text-gray-300 font-mono font-black text-[10px] uppercase tracking-wider -rotate-90">
                               GASTADA
                             </span>
                           </div>
                         )}
                       </motion.div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-
-            {/* Fila Inferior del Campo: Eddies Disponibles */}
-            <div className="flex items-center justify-between bg-[#070a10]/85 border border-[#0dfceb]/30 px-3 py-1.5 rounded-sm">
-              <span className="text-[10px] font-mono text-gray-400 uppercase tracking-widest">
-                TUS EDDIES ({availableEddies} €$ DISPONIBLES):
-              </span>
-              <div className="flex items-center gap-1">
-                {p.eddies.map((ed, i) => (
-                  <div
-                    key={i}
-                    className={`w-6 h-3.5 rounded-xs border shadow-sm flex items-center justify-center font-mono text-[7px] font-black ${
-                      ed.isSpent
-                        ? 'bg-black border-gray-800 text-gray-700'
-                        : 'bg-[#0dfceb]/25 border-[#0dfceb] text-[#0dfceb]'
-                    }`}
-                    title={ed.isSpent ? 'Gastado este turno' : '1 €$ disponible'}
-                  >
-                    €$
-                  </div>
-                ))}
+                    </div>
+                  );
+                })}
               </div>
-            </div>
+            )}
           </div>
         </main>
       </div>
@@ -1331,19 +1387,25 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
 
                 <button
                   type="button"
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    setIsDragOverEddies(true);
+                  }}
+                  onDragLeave={() => setIsDragOverEddies(false)}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    setIsDragOverEddies(false);
+                    const cardId = e.dataTransfer.getData('text/plain');
+                    if (cardId) handleSellCard(cardId);
+                  }}
                   disabled={!isMyTurn || p.hasSoldThisTurn}
                   onClick={() => {
-                    pushHistory();
-                    const res = sellCardForEddies(gameState, 'player', selectedHandCard.instanceId);
-                    if (res.success) {
-                      setSelectedHandCard(null);
-                      setGameState({ ...gameState });
-                    } else {
-                      alert(res.reason);
-                    }
+                    handleSellCard(selectedHandCard.instanceId);
                   }}
                   style={{ clipPath: CYBER_BUTTON }}
-                  className="px-3 py-1 bg-[#FCEE0A] hover:bg-white text-[#070a10] font-black text-xs uppercase cursor-pointer disabled:opacity-40 transition-colors shadow-[0_0_15px_rgba(252,238,10,0.4)]"
+                  className={`px-3 py-1 font-black text-xs uppercase cursor-pointer disabled:opacity-40 transition-colors shadow-[0_0_15px_rgba(252,238,10,0.4)] ${
+                    isDragOverEddies ? 'bg-white text-black animate-pulse' : 'bg-[#FCEE0A] hover:bg-white text-[#070a10]'
+                  }`}
                 >
                   VENDER (+1 €$)
                 </button>
@@ -1398,17 +1460,23 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                 return (
                   <motion.div
                     key={card.instanceId}
+                    draggable={isMyTurn}
+                    onDragStart={(e) => {
+                      e.dataTransfer.setData('text/plain', card.instanceId);
+                      setSelectedHandCard(card);
+                    }}
                     whileHover={{ y: -16, scale: 1.15, zIndex: 40 }}
                     whileTap={{ scale: 0.95 }}
                     onClick={() => setSelectedHandCard(isSelected ? null : card)}
                     style={{ clipPath: CYBER_CARD_CLIP }}
-                    className={`w-16 sm:w-20 md:w-22 h-24 sm:h-28 md:h-30 bg-black border transition-all duration-150 cursor-pointer shrink-0 relative shadow-lg ${
+                    className={`w-16 sm:w-20 md:w-22 h-24 sm:h-28 md:h-30 bg-black border transition-all duration-150 cursor-grab active:cursor-grabbing shrink-0 relative shadow-lg ${
                       isSelected
                         ? 'border-[#FCEE0A] shadow-[0_0_25px_rgba(252,238,10,0.85)] -translate-y-4 scale-110 z-30'
                         : canAfford && isMyTurn
                         ? 'border-[#0dfceb]/80 hover:border-[#FCEE0A]'
                         : 'border-gray-800 opacity-70'
                     }`}
+                    title="Arrastra esta carta al campo para jugarla, o haz clic para seleccionarla"
                   >
                     <img
                       src={card.image}
@@ -1455,43 +1523,48 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
           MENÚS DESPLEGABLES / FLOTANTES (Fondo Translúcido y font-mono)
          ===================================================================== */}
 
-      {/* 1. MODAL FLOTANTE DE MULLIGAN (INICIO DE PARTIDA) */}
+      {/* 1. MODAL FLOTANTE DE MULLIGAN (INICIO DE PARTIDA) - ANCHO EXPANDIDO */}
       {!gameState.mulliganDecided && (
         <div className="fixed inset-0 z-50 bg-[#000000]/85 backdrop-blur-md flex items-center justify-center p-4 font-mono">
           <div
             style={{ clipPath: CYBER_CLIP }}
-            className="max-w-xl w-full bg-[#070a10]/95 border-2 border-[#FCEE0A] p-6 sm:p-8 space-y-6 shadow-[0_0_60px_rgba(252,238,10,0.45)] text-center backdrop-blur-md"
+            className="max-w-5xl w-full bg-[#070a10]/95 border-2 border-[#FCEE0A] p-6 sm:p-8 space-y-6 shadow-[0_0_60px_rgba(252,238,10,0.45)] text-center backdrop-blur-md"
           >
             <div className="space-y-1">
               <span className="text-[11px] text-[#0dfceb] uppercase tracking-widest block">
                 FASE INICIAL // PREPARACIÓN DE PARTIDA
               </span>
-              <h2 className="text-2xl font-black text-white uppercase">
+              <h2 className="text-2xl sm:text-3xl font-black text-white uppercase">
                 TU MANO INICIAL <span className="text-[#FCEE0A]">({p.hand.length} CARTAS)</span>
               </h2>
             </div>
 
-            <p className="text-xs text-gray-300 leading-relaxed">
+            <p className="text-xs sm:text-sm text-gray-300 leading-relaxed max-w-2xl mx-auto">
               Según el reglamento oficial de Cyberpunk TCG, ambos jugadores roban 6 cartas de apertura. Tienes derecho a un único <strong>MULLIGAN</strong> por partida para barajar tu mano entera en el mazo y robar 6 cartas nuevas.
             </p>
 
-            {/* Vista previa de las cartas iniciales */}
-            <div className="flex items-center justify-center gap-2 overflow-x-auto py-2">
+            {/* Vista previa de las 6 cartas iniciales en ancho completo */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3 sm:gap-4 justify-items-center py-4">
               {p.hand.map((c) => (
                 <div
                   key={c.instanceId}
                   style={{ clipPath: CYBER_CARD_CLIP }}
-                  className="w-20 sm:w-24 h-28 sm:h-36 bg-black border border-gray-700 shrink-0 relative overflow-hidden"
+                  className="w-28 sm:w-32 md:w-36 h-40 sm:h-48 md:h-52 bg-black border border-gray-700 shrink-0 relative overflow-hidden shadow-xl transition-transform hover:scale-105"
                 >
                   <img src={c.image} alt={c.name} className="w-full h-full object-cover" />
-                  <span className="absolute bottom-0.5 right-0.5 px-1 bg-[#FCEE0A] text-[#070a10] text-[9px] font-black">
+                  <span className="absolute bottom-1 right-1 px-1.5 py-0.5 bg-[#FCEE0A] text-[#070a10] text-[10px] font-black shadow">
                     {c.parsedCost} €$
                   </span>
+                  {c.parsedPower > 0 && (
+                    <span className="absolute bottom-1 left-1 px-1.5 py-0.5 bg-[#FF003C] text-white text-[10px] font-black shadow">
+                      {c.parsedPower}
+                    </span>
+                  )}
                 </div>
               ))}
             </div>
 
-            <div className="grid grid-cols-2 gap-4 pt-2">
+            <div className="grid grid-cols-2 gap-4 pt-2 max-w-xl mx-auto">
               <button
                 type="button"
                 onClick={() => {
@@ -1499,7 +1572,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                   setGameState({ ...gameState });
                 }}
                 style={{ clipPath: CYBER_BUTTON }}
-                className="py-3.5 bg-[#0dfceb] hover:bg-[#FCEE0A] text-[#070a10] font-black text-xs uppercase tracking-widest cursor-pointer transition-all shadow-[0_0_20px_rgba(13,252,235,0.4)]"
+                className="py-3.5 bg-[#0dfceb] hover:bg-[#FCEE0A] text-[#070a10] font-black text-xs sm:text-sm uppercase tracking-widest cursor-pointer transition-all shadow-[0_0_20px_rgba(13,252,235,0.4)]"
               >
                 CONSERVAR (KEEP)
               </button>
@@ -1511,10 +1584,133 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                   setGameState({ ...gameState });
                 }}
                 style={{ clipPath: CYBER_BUTTON }}
-                className="py-3.5 bg-[#000000] border border-[#FF003C] hover:bg-[#FF003C] hover:text-white text-[#FF003C] font-black text-xs uppercase tracking-widest cursor-pointer transition-colors shadow-[0_0_15px_rgba(255,0,60,0.4)]"
+                className="py-3.5 bg-[#000000] border border-[#FF003C] hover:bg-[#FF003C] hover:text-white text-[#FF003C] font-black text-xs sm:text-sm uppercase tracking-widest cursor-pointer transition-colors shadow-[0_0_15px_rgba(255,0,60,0.4)]"
               >
                 MULLIGAN (6 NUEVAS)
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 2. MODAL DE SELECCIÓN DE DADOS DEL FIXER (FASE DE INICIO // ROLL IN A GIG) */}
+      {gameState.mulliganDecided && isMyTurn && (gameState.pendingGigRoll || gameState.phase === 'START_GIG_SELECT') && p.fixerDice.length > 0 && !rollingAnimation && (
+        <div className="fixed inset-0 z-40 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 font-mono">
+          <div
+            style={{ clipPath: CYBER_CLIP }}
+            className="max-w-2xl w-full bg-[#070a10] border-2 border-[#0dfceb] p-6 sm:p-8 text-center space-y-6 shadow-[0_0_60px_rgba(13,252,235,0.45)]"
+          >
+            <div className="space-y-1">
+              <span className="text-[10px] sm:text-xs text-[#FCEE0A] uppercase tracking-widest block font-bold">
+                FASE DE INICIO // ROLL IN A GIG (PASO 5)
+              </span>
+              <h3 className="text-xl sm:text-2xl font-black text-white uppercase">
+                ELIGE UN DADO DE TU FIXER PARA RODAR
+              </h3>
+              <p className="text-xs text-gray-300 max-w-lg mx-auto">
+                Regla oficial: Puedes elegir y tirar <strong>cualquier dado</strong> de tu Fixer (D4, D6, D8, D10, D12), salvo el <strong>D20</strong>, que siempre es el último que se tira.
+              </p>
+            </div>
+
+            {/* Grid de dados disponibles en el Fixer */}
+            <div className="flex flex-wrap items-center justify-center gap-4 py-4">
+              {p.fixerDice.map((d) => {
+                const isD20Disabled = p.fixerDice.length > 1 && d.toLowerCase() === 'd20';
+
+                return (
+                  <button
+                    key={d}
+                    type="button"
+                    disabled={isD20Disabled}
+                    onClick={() => triggerDiceRoll(d)}
+                    style={{ clipPath: CYBER_BUTTON }}
+                    className={`p-4 flex flex-col items-center justify-center gap-2 transition-all border ${
+                      isD20Disabled
+                        ? 'bg-black/60 border-gray-800 opacity-35 cursor-not-allowed'
+                        : 'bg-black border-[#0dfceb]/60 hover:border-[#FCEE0A] hover:bg-[#0dfceb]/15 cursor-pointer shadow-[0_0_20px_rgba(13,252,235,0.3)] hover:scale-110 active:scale-95'
+                    }`}
+                    title={
+                      isD20Disabled
+                        ? 'El D20 no se puede elegir hasta que sea el último dado restante en el Fixer'
+                        : `Lanzar dado ${d.toUpperCase()}`
+                    }
+                  >
+                    <PolyhedralDie type={d} size={52} isWaiting={false} />
+                    <span
+                      className={`text-xs font-black uppercase tracking-wider ${
+                        isD20Disabled ? 'text-gray-600' : 'text-[#FCEE0A]'
+                      }`}
+                    >
+                      {isD20Disabled ? 'D20 (ÚLTIMO)' : `TIRAR ${d.toUpperCase()}`}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 3. ANIMACIÓN POLIÉDRICA CYBERPUNK AL LANZAR DADO (RESULTADO ALEATORIO) */}
+      {rollingAnimation && (
+        <div className="fixed inset-0 z-50 bg-[#000000]/85 backdrop-blur-md flex items-center justify-center p-4 font-mono select-none">
+          <div
+            style={{ clipPath: CYBER_CLIP }}
+            className="max-w-md w-full bg-[#070a10] border-2 border-[#FCEE0A] p-8 flex flex-col items-center justify-center space-y-6 shadow-[0_0_70px_rgba(252,238,10,0.55)] text-center relative overflow-hidden"
+          >
+            {/* Rayos láser animados */}
+            <div className="absolute inset-x-0 h-0.5 bg-gradient-to-r from-transparent via-[#0dfceb] to-transparent top-0 animate-pulse" />
+            <div className="absolute inset-x-0 h-0.5 bg-gradient-to-r from-transparent via-[#FCEE0A] to-transparent bottom-0 animate-pulse" />
+
+            <span className="text-[10px] text-[#0dfceb] uppercase tracking-widest font-bold">
+              {rollingAnimation.isFinished ? '// DADO FIJADO //' : '// LANZANDO DADO EN EL FIXER //'}
+            </span>
+
+            {/* Dado girando a toda velocidad con números aleatorios parpadeando */}
+            <motion.div
+              animate={
+                rollingAnimation.isFinished
+                  ? { rotate: 0, scale: [1.3, 1], y: [-12, 0] }
+                  : {
+                      rotate: [0, 90, 180, 270, 360],
+                      scale: [0.95, 1.15, 0.95, 1.1, 1],
+                      y: [0, -10, 5, -5, 0]
+                    }
+              }
+              transition={
+                rollingAnimation.isFinished
+                  ? { duration: 0.45, type: 'spring' }
+                  : { repeat: Infinity, duration: 0.45, ease: 'linear' }
+              }
+              className="my-3 relative flex items-center justify-center"
+            >
+              <PolyhedralDie
+                type={rollingAnimation.dieType}
+                value={rollingAnimation.currentValue}
+                size={120}
+                isWaiting={false}
+                isStolen={false}
+              />
+            </motion.div>
+
+            <div className="space-y-1">
+              <h4 className="text-4xl font-black uppercase tracking-wider text-white">
+                {rollingAnimation.dieType.toUpperCase()}:{' '}
+                <span
+                  className={
+                    rollingAnimation.isFinished
+                      ? 'text-[#FCEE0A] drop-shadow-[0_0_20px_#FCEE0A]'
+                      : 'text-[#0dfceb]'
+                  }
+                >
+                  {rollingAnimation.currentValue}
+                </span>
+              </h4>
+              <span className="text-xs block font-bold text-gray-400">
+                {rollingAnimation.isFinished
+                  ? `⭐ ¡${rollingAnimation.finalValue} Credibilidad sumada a tus Gigs!`
+                  : `Generando entropía cuántica de Night City...`}
+              </span>
             </div>
           </div>
         </div>

@@ -559,12 +559,71 @@ export function fightRivalUnit(state, attackerPlayerKey, attackerUnitId, targetU
 }
 
 /**
+ * Retorna los dados disponibles para rodar desde el Fixer:
+ * REGLA OFICIAL: Puedes tirar cualquier dado, excepto el D20, que siempre se tira el último.
+ */
+export function getEligibleFixerDice(fixerDice = []) {
+  if (fixerDice.length <= 1) return [...fixerDice];
+  return fixerDice.filter((d) => d.toLowerCase() !== 'd20');
+}
+
+/**
+ * Extrae y rueda un dado elegido del Fixer hacia la zona de Gigs.
+ */
+export function rollInGig(state, playerKey, dieType, specificRollValue = null) {
+  const p = state[playerKey];
+  const normDie = dieType.toLowerCase();
+
+  const idx = p.fixerDice.findIndex((d) => d.toLowerCase() === normDie);
+  if (idx === -1) {
+    return { success: false, reason: `El dado ${normDie.toUpperCase()} no está disponible en el Fixer.` };
+  }
+
+  // Validación oficial: D20 siempre el último
+  if (p.fixerDice.length > 1 && normDie === 'd20') {
+    return { success: false, reason: 'El D20 no se puede elegir hasta que sea el último dado restante en el Fixer.' };
+  }
+
+  // Extraer el dado del Fixer
+  p.fixerDice.splice(idx, 1);
+  const rollValue = specificRollValue !== null ? specificRollValue : rollDie(normDie);
+
+  const gigEntry = {
+    die: normDie,
+    value: rollValue,
+    stolenFrom: null,
+    id: `${playerKey}-gig-${p.gigs.length}`
+  };
+  p.gigs.push(gigEntry);
+
+  state.pendingGigRoll = false;
+  state.phase = 'MAIN';
+
+  state.actionLog.unshift(
+    `🎲 ${p.name} lanza su dado ${normDie.toUpperCase()} del Fixer y obtiene un ${rollValue} (Credibilidad en la Calle: ⭐ ${calculateStreetCred(p.gigs)}).`
+  );
+
+  // Si ambos han vaciado el Fixer, empieza el OVERTIME
+  const otherKey = playerKey === 'player' ? 'bot' : 'player';
+  if (state[otherKey].fixerDice.length === 0 && p.fixerDice.length === 0 && !state.overtime) {
+    state.overtime = true;
+    state.actionLog.unshift(
+      `⚡ ¡OVERTIME ACTIVADO! Ambos Fixers están vacíos. El primer jugador en controlar 7 Gigs gana inmediatamente.`
+    );
+  }
+
+  return { success: true, die: normDie, value: rollValue, gigEntry };
+}
+
+/**
  * Ejecuta los pasos obligatorios de la FASE DE INICIO (Start Phase) de un jugador:
  * 1. Comprobar victoria (7 o más dados de Gig).
  * 2. Efectos de inicio de turno.
  * 3. Enderezar (Ready) cartas de Leyendas, Campo y Eddies (respetando penalización turno 1).
  * 4. Robar 1 carta del mazo (Derrota si no puede robar).
- * 5. Roll in a Gig: sacar un dado del Fixer y rodarlo a la zona de Gigs (D20 siempre el último).
+ * 5. Roll in a Gig:
+ *    - Para el Jugador: activa la selección interactiva de dados (D20 reservado al final).
+ *    - Para el Bot: elige un dado elegible y lo rueda automáticamente.
  */
 export function executeStartPhase(state, playerKey) {
   const p = state[playerKey];
@@ -621,21 +680,25 @@ export function executeStartPhase(state, playerKey) {
     return state;
   }
 
-  // 4. ROLL IN A GIG (Extraer y rodar dado del Fixer)
+  // 4. ROLL IN A GIG (Selección y lanzamiento de dado del Fixer)
   if (p.fixerDice.length > 0) {
-    const nextDieType = p.fixerDice.shift();
-    const rollValue = rollDie(nextDieType);
-    p.gigs.push({
-      die: nextDieType,
-      value: rollValue,
-      stolenFrom: null,
-      id: `${playerKey}-gig-${p.gigs.length}`
-    });
-
-    state.actionLog.unshift(
-      `🎲 ${p.name} lanza su dado ${nextDieType.toUpperCase()} del Fixer y saca un ${rollValue} (Credibilidad: ⭐ ${calculateStreetCred(p.gigs)}).`
-    );
+    if (playerKey === 'player') {
+      // El jugador elegirá su dado interactivamente
+      state.pendingGigRoll = true;
+      state.phase = 'START_GIG_SELECT';
+      state.actionLog.unshift(
+        `🎲 ${p.name}: Elige un dado de tu Fixer para rodarlo a la zona de Gigs (el D20 será el último).`
+      );
+    } else {
+      // El bot escoge un dado elegible (cualquiera excepto D20 mientras queden otros)
+      const eligible = getEligibleFixerDice(p.fixerDice);
+      const chosen = eligible[0] || p.fixerDice[0];
+      rollInGig(state, 'bot', chosen);
+    }
   } else {
+    state.pendingGigRoll = false;
+    state.phase = 'MAIN';
+
     // Si ambos han vaciado el Fixer, empieza el OVERTIME
     const otherKey = playerKey === 'player' ? 'bot' : 'player';
     if (state[otherKey].fixerDice.length === 0 && !state.overtime) {
