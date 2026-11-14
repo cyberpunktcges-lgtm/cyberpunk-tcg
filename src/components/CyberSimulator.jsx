@@ -38,9 +38,11 @@ import {
   passTurn,
   mulliganHand,
   keepHand,
+  hasKeyword,
+  calculateGigsToSteal,
   DICE_CONFIG
 } from '../utils/cyberpunkEngine.js';
-import { runBotTurn } from '../utils/botAi.js';
+import { runBotTurn, decideBotBlocker } from '../utils/botAi.js';
 
 // =========================================================================
 // CLIP-PATHS GEOMÉTRICOS CYBERPUNK (ESQUINAS RECORTADAS EN DIAGONAL)
@@ -852,41 +854,74 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                 <span className="text-[9px] text-gray-400 uppercase">
                   TUS LEYENDAS (3 SLOTS):
                 </span>
-                {isMyTurn && !p.hasCalledLegendThisTurn && (
+                {isMyTurn && !p.hasCalledLegendThisTurn && availableEddies >= 1 && (
                   <span className="text-[8px] text-[#0dfceb] animate-pulse">
-                    [CLIC PARA REVELAR]
+                    [LLAMAR: 1 €$]
                   </span>
                 )}
               </div>
               <div className="grid grid-cols-3 gap-1.5">
-                {p.legends.map((leg, i) => (
-                  <div
-                    key={leg.instanceId || i}
-                    onClick={() => {
-                      if (!leg.isFaceUp && isMyTurn && !p.hasCalledLegendThisTurn) {
-                        pushHistory();
-                        callLegendFaceUp(gameState, 'player', leg.instanceId);
-                        setGameState({ ...gameState });
-                      } else {
-                        setInspectedCard(leg);
+                {p.legends.map((leg, i) => {
+                  const isTurn1Penalty = leg.isSpent && gameState.turnNumber === 1 && i < 2;
+
+                  return (
+                    <div
+                      key={leg.instanceId || i}
+                      onClick={() => {
+                        if (!leg.isFaceUp && isMyTurn && !p.hasCalledLegendThisTurn) {
+                          if (availableEddies < 1) {
+                            alert('Llamar a una Leyenda boca arriba cuesta 1 €$. No tienes Eddies disponibles.');
+                            return;
+                          }
+                          pushHistory();
+                          const res = callLegendFaceUp(gameState, 'player', leg.instanceId);
+                          if (!res.success) {
+                            alert(res.reason);
+                          }
+                          setGameState({ ...gameState });
+                        } else {
+                          setInspectedCard(leg);
+                        }
+                      }}
+                      className={`h-14 sm:h-16 bg-[#000000] border transition-all cursor-pointer flex flex-col items-center justify-center overflow-hidden relative ${
+                        leg.isSpent
+                          ? 'border-gray-900 opacity-50'
+                          : leg.isFaceUp
+                          ? 'border-[#FCEE0A] shadow-[0_0_10px_rgba(252,238,10,0.3)]'
+                          : 'border-gray-800 hover:border-[#0dfceb]'
+                      }`}
+                      title={
+                        isTurn1Penalty
+                          ? 'Penalización Turno 1: Esta leyenda empieza gastada por ir primero.'
+                          : leg.isFaceUp
+                          ? leg.name
+                          : 'Clic para llamar Leyenda (Coste: 1 €$)'
                       }
-                    }}
-                    className={`h-14 sm:h-16 bg-[#000000] border transition-all cursor-pointer flex flex-col items-center justify-center overflow-hidden relative ${
-                      leg.isSpent
-                        ? 'border-gray-900 opacity-40'
-                        : leg.isFaceUp
-                        ? 'border-[#FCEE0A] shadow-[0_0_10px_rgba(252,238,10,0.3)]'
-                        : 'border-gray-800 hover:border-[#0dfceb]'
-                    }`}
-                    title={leg.isFaceUp ? leg.name : 'Clic para revelar Leyenda'}
-                  >
-                    {leg.isFaceUp ? (
-                      <img src={leg.image} alt={leg.name} className="w-full h-full object-cover" />
-                    ) : (
-                      <CyberCardBack isLegend={true} className="w-full h-full text-[8px]" />
-                    )}
-                  </div>
-                ))}
+                    >
+                      {leg.isFaceUp ? (
+                        <img src={leg.image} alt={leg.name} className="w-full h-full object-cover" />
+                      ) : (
+                        <CyberCardBack isLegend={true} className="w-full h-full text-[8px]" />
+                      )}
+
+                      {/* Indicador de Penalización de Turno 1 o Gastada */}
+                      {leg.isSpent && (
+                        <div className="absolute inset-0 bg-black/60 flex items-center justify-center p-0.5 pointer-events-none">
+                          <span className="px-1 bg-black border border-gray-700 text-gray-400 font-mono font-bold text-[7px] uppercase tracking-tighter text-center">
+                            {isTurn1Penalty ? 'PENALIZACIÓN T1' : 'GASTADA'}
+                          </span>
+                        </div>
+                      )}
+
+                      {/* Indicador de Llamar si está disponible */}
+                      {!leg.isFaceUp && !leg.isSpent && isMyTurn && !p.hasCalledLegendThisTurn && availableEddies >= 1 && (
+                        <div className="absolute bottom-0 inset-x-0 bg-[#0dfceb]/90 text-black font-mono font-black text-[7px] uppercase text-center py-0.5">
+                          LLAMAR 1€$
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             </div>
           </div>
@@ -999,11 +1034,13 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                         onClick={() => {
                           if (canAttackThisUnit) {
                             pushHistory();
+                            const botBlocker = decideBotBlocker(bot, selectedFieldUnit.currentPower, false);
                             fightRivalUnit(
                               gameState,
                               'player',
                               selectedFieldUnit.instanceId,
-                              unit.instanceId
+                              unit.instanceId,
+                              botBlocker ? botBlocker.instanceId : null
                             );
                             setSelectedFieldUnit(null);
                             setGameState({ ...gameState });
@@ -1025,6 +1062,25 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                           alt={unit.name}
                           className="w-full h-full object-cover object-center"
                         />
+
+                        {/* Badges de Palabras Clave Oficiales (Rival) */}
+                        <div className="absolute top-1 left-1 flex flex-col gap-0.5 z-10 pointer-events-none">
+                          {hasKeyword(unit, 'Blocker') && (
+                            <span className="px-1 py-0.5 bg-[#0dfceb] text-black font-mono font-black text-[7px] sm:text-[8px] uppercase shadow">
+                              🛡️ BLOCKER
+                            </span>
+                          )}
+                          {hasKeyword(unit, 'Adrenaline') && (
+                            <span className="px-1 py-0.5 bg-[#FCEE0A] text-black font-mono font-black text-[7px] sm:text-[8px] uppercase shadow">
+                              ⚡ ADRENALINE
+                            </span>
+                          )}
+                          {hasKeyword(unit, 'Go Solo') && (
+                            <span className="px-1 py-0.5 bg-[#FF003C] text-white font-mono font-black text-[7px] sm:text-[8px] uppercase shadow">
+                              🔥 GO SOLO
+                            </span>
+                          )}
+                        </div>
 
                         {/* Insignia de Poder GIGANTE */}
                         <div className="absolute bottom-1 right-1 px-2 py-0.5 bg-[#FF003C] text-white font-mono font-black text-xs shadow-md">
@@ -1065,22 +1121,39 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                 {isMyTurn ? 'TU TURNO // FASE PRINCIPAL' : 'IA PENSANDO ACCIONES...'}
               </span>
 
-              {/* Botón rápido para Asaltar Gigs rivales cuando hay unidad seleccionada */}
-              {selectedFieldUnit && !selectedFieldUnit.isSpent && !selectedFieldUnit.isLagging && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    pushHistory();
-                    attackRivalGigs(gameState, 'player', selectedFieldUnit.instanceId);
-                    setSelectedFieldUnit(null);
-                    setGameState({ ...gameState });
-                  }}
-                  style={{ clipPath: CYBER_BUTTON }}
-                  className="ml-2 px-3 py-1 bg-[#FF003C] hover:bg-[#FCEE0A] hover:text-[#070a10] text-white font-black text-xs uppercase animate-pulse cursor-pointer shadow-[0_0_20px_rgba(255,0,60,0.85)] transition-colors"
-                >
-                  ⚡ ¡ASALTAR Y ROBAR GIGS RIVALES!
-                </button>
-              )}
+              {/* Botón oficial para Asaltar Gigs rivales según tabla de poder */}
+              {selectedFieldUnit && !selectedFieldUnit.isSpent && !selectedFieldUnit.isLagging && (() => {
+                const gigsToSteal = calculateGigsToSteal(selectedFieldUnit.currentPower);
+                const hasGigs = bot.gigs.length > 0;
+
+                return (
+                  <button
+                    type="button"
+                    disabled={!hasGigs || gigsToSteal <= 0}
+                    onClick={() => {
+                      pushHistory();
+                      const botBlocker = decideBotBlocker(bot, selectedFieldUnit.currentPower, true);
+                      attackRivalGigs(
+                        gameState,
+                        'player',
+                        selectedFieldUnit.instanceId,
+                        botBlocker ? botBlocker.instanceId : null
+                      );
+                      setSelectedFieldUnit(null);
+                      setGameState({ ...gameState });
+                    }}
+                    style={{ clipPath: CYBER_BUTTON }}
+                    className="ml-2 px-3 py-1 bg-[#FF003C] hover:bg-[#FCEE0A] hover:text-[#070a10] text-white font-black text-xs uppercase animate-pulse cursor-pointer shadow-[0_0_20px_rgba(255,0,60,0.85)] transition-colors disabled:opacity-40"
+                    title={
+                      !hasGigs
+                        ? 'El rival no tiene Gigs para robar'
+                        : `Robarás ${gigsToSteal} Gig(s) según tu poder de ${selectedFieldUnit.currentPower}`
+                    }
+                  >
+                    ⚡ ¡ASALTAR GIGS ({gigsToSteal} {gigsToSteal === 1 ? 'GIG' : 'GIGS'})!
+                  </button>
+                );
+              })()}
             </div>
           </div>
 
@@ -1148,6 +1221,30 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                           className="w-full h-full object-cover object-center"
                         />
 
+                        {/* Badges de Palabras Clave Oficiales (Jugador) */}
+                        <div className="absolute top-1 left-1 flex flex-col gap-0.5 z-10 pointer-events-none">
+                          {hasKeyword(unit, 'Blocker') && (
+                            <span className="px-1 py-0.5 bg-[#0dfceb] text-black font-mono font-black text-[7px] sm:text-[8px] uppercase shadow">
+                              🛡️ BLOCKER
+                            </span>
+                          )}
+                          {hasKeyword(unit, 'Adrenaline') && (
+                            <span className="px-1 py-0.5 bg-[#FCEE0A] text-black font-mono font-black text-[7px] sm:text-[8px] uppercase shadow">
+                              ⚡ ADRENALINE
+                            </span>
+                          )}
+                          {hasKeyword(unit, 'Go Solo') && (
+                            <span className="px-1 py-0.5 bg-[#FF003C] text-white font-mono font-black text-[7px] sm:text-[8px] uppercase shadow">
+                              🔥 GO SOLO
+                            </span>
+                          )}
+                          {unit.isLagging && (
+                            <span className="px-1.5 py-0.5 bg-[#FF003C] text-white font-mono font-bold text-[8px] uppercase shadow">
+                              LAG
+                            </span>
+                          )}
+                        </div>
+
                         {/* Insignia de Poder GIGANTE */}
                         <div className="absolute bottom-1 right-1 px-2 py-0.5 bg-[#FCEE0A] text-[#070a10] font-mono font-black text-xs shadow-md">
                           {unit.currentPower}
@@ -1159,13 +1256,6 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                             <span className="px-2 py-0.5 bg-black border border-gray-600 text-gray-300 font-mono font-black text-[11px] uppercase tracking-wider">
                               GASTADA
                             </span>
-                          </div>
-                        )}
-
-                        {/* Estado: LAG (Mareo de invocación) */}
-                        {unit.isLagging && (
-                          <div className="absolute top-1 left-1 px-1.5 py-0.5 bg-[#FF003C] text-white font-mono font-bold text-[9px] uppercase">
-                            LAG
                           </div>
                         )}
                       </motion.div>
@@ -1382,7 +1472,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
             </div>
 
             <p className="text-xs text-gray-300 leading-relaxed">
-              ¿Deseas conservar esta mano de apertura o prefieres realizar un <strong>MULLIGAN</strong> para barajarla en el mazo y robar 5 cartas nuevas?
+              Según el reglamento oficial de Cyberpunk TCG, ambos jugadores roban 6 cartas de apertura. Tienes derecho a un único <strong>MULLIGAN</strong> por partida para barajar tu mano entera en el mazo y robar 6 cartas nuevas.
             </p>
 
             {/* Vista previa de las cartas iniciales */}
@@ -1411,7 +1501,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                 style={{ clipPath: CYBER_BUTTON }}
                 className="py-3.5 bg-[#0dfceb] hover:bg-[#FCEE0A] text-[#070a10] font-black text-xs uppercase tracking-widest cursor-pointer transition-all shadow-[0_0_20px_rgba(13,252,235,0.4)]"
               >
-                MANTENER MANO (KEEP)
+                CONSERVAR (KEEP)
               </button>
 
               <button
@@ -1423,7 +1513,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                 style={{ clipPath: CYBER_BUTTON }}
                 className="py-3.5 bg-[#000000] border border-[#FF003C] hover:bg-[#FF003C] hover:text-white text-[#FF003C] font-black text-xs uppercase tracking-widest cursor-pointer transition-colors shadow-[0_0_15px_rgba(255,0,60,0.4)]"
               >
-                MULLIGAN (CAMBIAR)
+                MULLIGAN (6 NUEVAS)
               </button>
             </div>
           </div>
@@ -1562,7 +1652,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
         </div>
       )}
 
-      {/* 4. MODAL FLOTANTE DE REGLAS RÁPIDAS */}
+      {/* 4. MODAL FLOTANTE DE REGLAS RÁPIDAS (REGLAMENTO OFICIAL) */}
       {showRulesModal && (
         <div
           className="fixed inset-0 z-50 bg-[#000000]/85 backdrop-blur-md flex items-center justify-center p-4 font-mono text-xs"
@@ -1571,12 +1661,12 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
           <div
             onClick={(e) => e.stopPropagation()}
             style={{ clipPath: CYBER_CLIP }}
-            className="max-w-xl w-full bg-[#070a10]/95 border-2 border-[#FCEE0A] p-6 space-y-4 max-h-[85vh] flex flex-col backdrop-blur-md shadow-[0_0_50px_rgba(252,238,10,0.4)]"
+            className="max-w-2xl w-full bg-[#070a10]/95 border-2 border-[#FCEE0A] p-6 space-y-4 max-h-[85vh] flex flex-col backdrop-blur-md shadow-[0_0_50px_rgba(252,238,10,0.4)]"
           >
             <div className="flex items-center justify-between border-b border-[#FCEE0A]/30 pb-3">
               <span className="font-bold text-[#FCEE0A] uppercase flex items-center gap-2">
                 <HelpCircle className="w-4 h-4 text-[#0dfceb]" />
-                <span>REGLAS RÁPIDAS // CYBERPUNK TCG</span>
+                <span>REGLAS OFICIALES NIGHT CITY // CYBERPUNK TCG</span>
               </span>
               <button
                 type="button"
@@ -1589,20 +1679,68 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
 
             <div className="flex-1 overflow-y-auto space-y-3 pr-2 text-gray-300 leading-relaxed text-[11px]">
               <div>
-                <strong className="text-[#0dfceb] block uppercase">1. Condición de Victoria:</strong>
-                Ganas si al comienzo de tu turno controlas al menos <strong>7 Gigs</strong> (dados). Como empiezas con 6, debes asaltar y robarle al menos 1 Gig a tu oponente.
+                <strong className="text-[#0dfceb] block uppercase">1. Preparación de Partida:</strong>
+                Ambos jugadores tiran un D20; quien saque más alto decide si va primero o segundo. Se baraja el mazo (40-50 cartas) y las 3 Leyendas van boca abajo.
+                <br />
+                <span className="text-[#FCEE0A]">Penalización del Jugador 1:</span> El jugador que empieza gira (spends) sus dos leyendas más a la izquierda y <em>NO se enderezan en el Turno 1</em> (tiene menos Eddies para equilibrar el turno inicial).
+                <br />
+                Ambos colocan sus 6 dados de Gig en el Fixer (D4 abajo hasta D20 arriba) y roban una mano de <strong>6 cartas</strong>. Cada jugador puede hacer 1 Mulligan (barajar las 6 y robar 6 nuevas).
               </div>
+
               <div>
-                <strong className="text-[#0dfceb] block uppercase">2. Eddies (€$):</strong>
-                Puedes vender 1 carta de tu mano por turno colocándola en la pila de Eddies para obtener 1 €$ recurrente. Cada Leyenda lista también produce 1 €$.
+                <strong className="text-[#0dfceb] block uppercase">2. Estructura de Turno:</strong>
+                Cada turno consta de <strong>Fase de Inicio (Start Phase)</strong> y <strong>Fase Principal (Main Phase)</strong>.
+                <ul className="list-disc pl-4 mt-1 space-y-0.5 text-gray-400">
+                  <li><strong className="text-white">Start Phase (Obligatoria):</strong> Comprobar victoria (7+ Gigs) ➔ Efectos de inicio ➔ Enderezar todas las cartas (Eddies, Leyendas y Campo) ➔ Robar 1 carta ➔ Rodar un Gig del Fixer a la zona de Gigs (el D20 siempre el último).</li>
+                  <li><strong className="text-white">Main Phase (Opcional y en cualquier orden):</strong>
+                    <br />• <em>Vender por Turno (1/turno):</em> Coloca 1 carta boca abajo en Eddies (+1 €$ recurrente).
+                    <br />• <em>Llamar una Leyenda (1/turno):</em> Paga <strong>1 €$</strong> para poner una Leyenda boca arriba.
+                    <br />• <em>Jugar cartas:</em> Paga el coste en Eddies. Las unidades entran con <strong>Lag</strong> (no pueden atacar este turno) a menos que tengan <strong>Adrenaline</strong>.
+                    <br />• <em>Atacar:</em> Con unidades listas una a una a unidades enemigas gastadas o a los Gigs rivales.
+                  </li>
+                </ul>
               </div>
+
               <div>
-                <strong className="text-[#0dfceb] block uppercase">3. Combate y Asalto a Gigs:</strong>
-                Una unidad lista puede atacar directamente la zona de Gigs rival para robar un dado de Gig, o pelear contra una unidad enemiga <em>GASTADA</em>. En una pelea de unidades, ambas infligen daño simultáneo igual a su poder.
+                <strong className="text-[#0dfceb] block uppercase">3. Tabla Oficial de Robo de Gigs (por Poder):</strong>
+                Al asaltar la zona de Gigs rival, la cantidad de dados que robas depende del Poder de tu atacante:
+                <table className="w-full text-left border border-gray-800 mt-1 mb-1 text-[10px]">
+                  <thead>
+                    <tr className="bg-[#000000] text-[#0dfceb]">
+                      <th className="p-1 border border-gray-800">Poder de la Unidad</th>
+                      <th className="p-1 border border-gray-800">Gigs Robados</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr><td className="p-1 border border-gray-800">0 Poder</td><td className="p-1 border border-gray-800">0 Gigs (no puede robar)</td></tr>
+                    <tr><td className="p-1 border border-gray-800">1 – 9 Poder</td><td className="p-1 border border-gray-800">1 Gig</td></tr>
+                    <tr><td className="p-1 border border-gray-800">10 – 19 Poder</td><td className="p-1 border border-gray-800">2 Gigs</td></tr>
+                    <tr><td className="p-1 border border-gray-800">20 – 29 Poder</td><td className="p-1 border border-gray-800">3 Gigs</td></tr>
+                  </tbody>
+                </table>
+                El atacante elige qué dados robar de la zona rival (se roban los de mayor valor).
               </div>
+
               <div>
-                <strong className="text-[#0dfceb] block uppercase">4. Street Cred (⭐):</strong>
-                La suma de los resultados de todos tus dados de Gig activos determina tu Street Cred. Ciertas cartas y habilidades aumentan su poder según este valor.
+                <strong className="text-[#0dfceb] block uppercase">4. Combate entre Unidades y Regla de Empate:</strong>
+                El mayor poder gana y derrota a la otra unidad enviándola a la Basura.
+                <br />
+                <span className="text-[#FF003C] font-bold">REGLA DE EMPATE:</span> Si ambas unidades tienen el mismo poder (&gt;0), <strong>AMBAS unidades pierden el combate y AMBAS van a la Basura</strong>. Una unidad con 0 de poder no puede derrotar nada.
+              </div>
+
+              <div>
+                <strong className="text-[#0dfceb] block uppercase">5. Palabras Clave Oficiales:</strong>
+                <ul className="list-disc pl-4 mt-1 space-y-1 text-gray-400">
+                  <li><strong className="text-[#0dfceb]">Blocker:</strong> Cuando una unidad rival ataca, puedes girar esta unidad para redirigir el ataque hacia ella. Si protege tus Gigs, se convierte en pelea contra el Blocker y <strong>no se roba ningún Gig</strong> aunque el atacante gane.</li>
+                  <li><strong className="text-[#FCEE0A]">Adrenaline:</strong> Esta unidad ignora el Lag y puede atacar en el mismo turno en que es jugada.</li>
+                  <li><strong className="text-[#FF003C]">Go Solo:</strong> Paga el coste de esta Leyenda para jugarla como una Unidad lista en el campo capaz de atacar este turno.</li>
+                  <li><strong className="text-white">Quick:</strong> Puedes activar este efecto o jugar este Programa en respuesta durante el ataque de un rival.</li>
+                </ul>
+              </div>
+
+              <div>
+                <strong className="text-[#0dfceb] block uppercase">6. Street Cred (⭐) y Overtime:</strong>
+                La suma de los valores de tus dados de Gig activos es tu Credibilidad en la Calle. Si ambos jugadores vacían sus Fixers, entra el Overtime: el primero que llegue a 7 Gigs gana la partida inmediatamente.
               </div>
             </div>
           </div>

@@ -14,7 +14,7 @@ export const DICE_CONFIG = {
   d20: { name: 'D20', max: 20, sides: 20 }
 };
 
-// Orden oficial de extracción de dados desde el Fixer (D4 primero, D20 el último)
+// Orden oficial de extracción de dados desde el Fixer (D4 primero, D20 siempre el último)
 export const FIXER_DICE_ORDER = ['d4', 'd6', 'd8', 'd10', 'd12', 'd20'];
 
 /**
@@ -23,6 +23,34 @@ export const FIXER_DICE_ORDER = ['d4', 'd6', 'd8', 'd10', 'd12', 'd20'];
 export function rollDie(dieType) {
   const config = DICE_CONFIG[dieType] || DICE_CONFIG.d6;
   return Math.floor(Math.random() * config.max) + 1;
+}
+
+/**
+ * Comprueba si una carta tiene una palabra clave oficial (Blocker, Adrenaline, Go Solo, Quick, etc.)
+ */
+export function hasKeyword(card, keyword) {
+  if (!card) return false;
+  const kw = (card.keywords || '').toLowerCase();
+  const target = keyword.toLowerCase();
+  if (kw.includes(target)) return true;
+  const traits = (card.traits || '').toLowerCase();
+  if (traits.includes(target)) return true;
+  const text = (card.rules || card.text || card.effect || '').toLowerCase();
+  return text.includes(target);
+}
+
+/**
+ * Tabla oficial de robo de Gigs según el Poder de la Unidad atacante:
+ * - Poder 0: 0 Gigs
+ * - Poder 1–9: 1 Gig
+ * - Poder 10–19: 2 Gigs
+ * - Poder 20–29: 3 Gigs
+ * (Fórmula: 1 + Math.floor(power / 10))
+ */
+export function calculateGigsToSteal(attackerPower) {
+  const p = Number(attackerPower) || 0;
+  if (p <= 0) return 0;
+  return 1 + Math.floor(p / 10);
 }
 
 /**
@@ -58,7 +86,13 @@ export function shuffleDeck(cards) {
 }
 
 /**
- * Inicializa un nuevo estado de partida para Jugador vs Bot
+ * Inicializa un nuevo estado de partida para Jugador vs Bot siguiendo las reglas oficiales:
+ * 1. Mazo de 40-50 cartas barajado.
+ * 2. 3 Leyendas barajadas y colocadas boca abajo.
+ * 3. El Jugador 1 gira (spends) sus dos leyendas de la izquierda como penalización de turno 1.
+ * 4. 6 dados en el Fixer (D4 en base hasta D20 en cúspide).
+ * 5. Mano inicial de 6 cartas.
+ * 6. Opción de 1 Mulligan por partida.
  */
 export function createInitialGameState(playerDeckInput, botDeckInput, allCards = []) {
   // 1. Preparar mazo y leyendas del jugador
@@ -66,7 +100,8 @@ export function createInitialGameState(playerDeckInput, botDeckInput, allCards =
     ...l,
     instanceId: `p-leg-${idx}-${Date.now()}`,
     isFaceUp: false,
-    isSpent: false
+    // REGLA OFICIAL: El jugador que va primero gira sus 2 leyendas más a la izquierda
+    isSpent: idx < 2
   }));
 
   // Expandir mazo del jugador por qty
@@ -84,7 +119,7 @@ export function createInitialGameState(playerDeckInput, botDeckInput, allCards =
   });
   const shuffledPlayerDeck = shuffleDeck(rawPlayerCards);
 
-  // 2. Preparar mazo y leyendas del Bot
+  // 2. Preparar mazo y leyendas del Bot (jugador 2: no sufre penalización de leyendas)
   const botLegends = (botDeckInput.legends || []).slice(0, 3).map((l, idx) => ({
     ...l,
     instanceId: `b-leg-${idx}-${Date.now()}`,
@@ -106,16 +141,17 @@ export function createInitialGameState(playerDeckInput, botDeckInput, allCards =
   });
   const shuffledBotDeck = shuffleDeck(rawBotCards);
 
-  // Mano inicial (5 cartas)
-  const playerHand = shuffledPlayerDeck.splice(0, 5);
-  const botHand = shuffledBotDeck.splice(0, 5);
+  // REGLA OFICIAL: Mano inicial de 6 CARTAS para ambos jugadores
+  const playerHand = shuffledPlayerDeck.splice(0, 6);
+  const botHand = shuffledBotDeck.splice(0, 6);
 
   const initialLog = [
     '// SISTEMA DE COMBATE NETWATCH INICIALIZADO',
-    '// FASE ALPHA 1.0 - REGLAMENTO OFICIAL NIGHT CITY',
-    'Partida iniciada: Jugador vs AI Netrunner.',
-    'Ambos jugadores colocan sus 6 dados de Gig en el Fixer (D4 a D20).',
-    'Robas 5 cartas iniciales.'
+    '// REGLAMENTO OFICIAL NIGHT CITY (SET 01)',
+    'Partida iniciada: Jugador 1 (Tú) vs Jugador 2 (Bot).',
+    'Penalización de Turno 1: Tus 2 leyendas de la izquierda empiezan giradas y no se enderezan en este primer turno.',
+    'Ambos jugadores tienen 6 dados en el Fixer (D4 hasta D20) y 6 cartas en mano.',
+    'Decide si conservar tu mano o realizar tu único Mulligan de 6 cartas.'
   ];
 
   const state = {
@@ -125,7 +161,7 @@ export function createInitialGameState(playerDeckInput, botDeckInput, allCards =
     isGameOver: false,
     winner: null,
     overtime: false,
-    combatEvent: null, // Si hay un ataque en curso
+    combatEvent: null, // Si hay un ataque o evento en curso
     mulliganDecided: false, // Control de fase inicial de Keep / Mulligan
     actionLog: initialLog,
 
@@ -137,16 +173,10 @@ export function createInitialGameState(playerDeckInput, botDeckInput, allCards =
       field: [], // Unidades en juego
       trash: [], // Cementerio
       legends: playerLegends, // 3 slots de leyendas
+      legendsDoNotReadyTurn1: true, // Penalización oficial del primer jugador
       eddies: [], // Cartas boca abajo que dan 1 €$ cada una
-      fixerDice: ['d6', 'd8', 'd10', 'd12', 'd20'], // d4 ya se saca en turno 1
-      gigs: [
-        {
-          die: 'd4',
-          value: rollDie('d4'),
-          stolenFrom: null,
-          id: `p-gig-0`
-        }
-      ],
+      fixerDice: ['d4', 'd6', 'd8', 'd10', 'd12', 'd20'],
+      gigs: [], // Empieza vacío hasta la fase de inicio
       hasSoldThisTurn: false,
       hasCalledLegendThisTurn: false
     },
@@ -159,16 +189,10 @@ export function createInitialGameState(playerDeckInput, botDeckInput, allCards =
       field: [],
       trash: [],
       legends: botLegends,
+      legendsDoNotReadyTurn1: false,
       eddies: [],
-      fixerDice: ['d6', 'd8', 'd10', 'd12', 'd20'],
-      gigs: [
-        {
-          die: 'd4',
-          value: rollDie('d4'),
-          stolenFrom: null,
-          id: `b-gig-0`
-        }
-      ],
+      fixerDice: ['d4', 'd6', 'd8', 'd10', 'd12', 'd20'],
+      gigs: [],
       hasSoldThisTurn: false,
       hasCalledLegendThisTurn: false
     }
@@ -185,7 +209,9 @@ export function calculateStreetCred(gigs = []) {
 }
 
 /**
- * Calcula los Eddies disponibles para gastar (Eddies no girados + Leyendas no giradas)
+ * Calcula los Eddies disponibles para gastar (€$):
+ * Cada carta de Eddies no girada aporta 1 €$.
+ * Cada Leyenda no girada (boca arriba o boca abajo) aporta 1 €$.
  */
 export function getAvailableEddies(playerState) {
   const readyEddies = playerState.eddies.filter((e) => !e.isSpent).length;
@@ -221,14 +247,12 @@ export function spendEddies(playerState, amount) {
 }
 
 /**
- * Comprueba las condiciones de victoria:
- * 1. Controlar 7 o más dados de Gig al inicio del turno (o en cualquier momento en Overtime).
+ * Comprueba las condiciones de victoria oficiales:
+ * 1. Controlar 7 o más dados de Gig al inicio del turno (Start Phase) o en Overtime.
  * 2. Quedarse sin cartas en el mazo cuando es obligatorio robar (Deck out).
  */
 export function checkWinCondition(state, targetPlayerKey) {
   const p = state[targetPlayerKey];
-  const rivalKey = targetPlayerKey === 'player' ? 'bot' : 'player';
-  const rival = state[rivalKey];
 
   // Victoria por 7 Gigs
   if (p.gigs.length >= 7) {
@@ -244,7 +268,8 @@ export function checkWinCondition(state, targetPlayerKey) {
 }
 
 /**
- * Vende una carta de la mano a la zona de Eddies boca abajo (1 vez por turno)
+ * Vende una carta de la mano a la zona de Eddies boca abajo (1 vez por turno).
+ * La carta entra lista (ready) para gastar 1 €$ inmediatamente.
  */
 export function sellCardForEddies(state, playerKey, cardInstanceId) {
   const p = state[playerKey];
@@ -269,7 +294,9 @@ export function sellCardForEddies(state, playerKey, cardInstanceId) {
 }
 
 /**
- * Juega una carta de Unidad desde la mano al campo
+ * Juega una carta de Unidad desde la mano al campo:
+ * - Requiere pagar su coste en Eddies (mínimo 1 €$).
+ * - Entra con LAG excepto si posee la palabra clave ADRENALINE.
  */
 export function playUnitCard(state, playerKey, cardInstanceId) {
   const p = state[playerKey];
@@ -291,11 +318,15 @@ export function playUnitCard(state, playerKey, cardInstanceId) {
   spendEddies(p, cost);
   p.hand.splice(cardIdx, 1);
 
-  // La unidad entra con LAG (no puede atacar el turno que entra)
+  // REGLA OFICIAL DE LAG Y ADRENALINE:
+  // "Every Unit enters the field with Lag... Units with Adrenaline can attack the turn they arrive."
+  const hasAdrenaline = hasKeyword(card, 'Adrenaline');
+
   const unitInstance = {
     ...card,
     isSpent: false,
-    isLagging: true, // Regla oficial de Lag
+    isLagging: !hasAdrenaline,
+    hasAdrenaline,
     turnEntered: state.turnNumber,
     currentPower: card.parsedPower || parseCardPower(card.power),
     gear: []
@@ -304,14 +335,17 @@ export function playUnitCard(state, playerKey, cardInstanceId) {
   p.field.push(unitInstance);
 
   state.actionLog.unshift(
-    `${p.name} paga ${cost} €$ y despliega a "${card.name}" [Fuerza: ${unitInstance.currentPower}] en el Campo.`
+    `${p.name} paga ${cost} €$ y despliega a "${card.name}" [Fuerza: ${unitInstance.currentPower}]${
+      hasAdrenaline ? ' ⚡ [ADRENALINE: Sin Lag, puede atacar ya!]' : ' [Con Lag]'
+    }.`
   );
 
   return { success: true, unit: unitInstance };
 }
 
 /**
- * Llama a una Leyenda boca arriba en la zona de Leyendas
+ * Llama a una Leyenda boca arriba en la zona de Leyendas:
+ * REGLA OFICIAL: "Call a Legend (once per turn): spend 1 €$ to flip a face-down Legend face-up."
  */
 export function callLegendFaceUp(state, playerKey, legendInstanceId) {
   const p = state[playerKey];
@@ -323,20 +357,39 @@ export function callLegendFaceUp(state, playerKey, legendInstanceId) {
   if (!leg) return { success: false, reason: 'Leyenda no encontrada.' };
   if (leg.isFaceUp) return { success: false, reason: 'Esta Leyenda ya está boca arriba.' };
 
+  // Comprobar coste oficial de 1 €$
+  const available = getAvailableEddies(p);
+  if (available < 1) {
+    return {
+      success: false,
+      reason: 'Llamar a una Leyenda cuesta 1 €$. No tienes Eddies disponibles.'
+    };
+  }
+
+  // Pagar 1 €$
+  spendEddies(p, 1);
   leg.isFaceUp = true;
   p.hasCalledLegendThisTurn = true;
 
   state.actionLog.unshift(
-    `👑 ${p.name} llama a su Leyenda "${leg.name}" boca arriba.`
+    `👑 ${p.name} paga 1 €$ y llama a su Leyenda "${leg.name}" boca arriba.`
   );
 
   return { success: true };
 }
 
 /**
- * Declara un ataque de una unidad contra los Gigs del rival (para robar un Gig)
+ * Declara un ataque de una unidad contra los Gigs del rival para robar dados de Gig:
+ * REGLA OFICIAL:
+ * - Solo unidades listas (ready) y sin Lag pueden atacar.
+ * - Cantidad de Gigs robados según la tabla de poder:
+ *     0 poder: 0 Gigs
+ *     1–9 poder: 1 Gig
+ *     10–19 poder: 2 Gigs
+ *     20–29 poder: 3 Gigs
+ * - Si el rival intercepta con Blocker, no se roba ningún Gig y se convierte en pelea contra el Blocker.
  */
-export function attackRivalGigs(state, attackerPlayerKey, attackerUnitId) {
+export function attackRivalGigs(state, attackerPlayerKey, attackerUnitId, blockerUnitId = null) {
   const attacker = state[attackerPlayerKey];
   const defenderKey = attackerPlayerKey === 'player' ? 'bot' : 'player';
   const defender = state[defenderKey];
@@ -344,35 +397,136 @@ export function attackRivalGigs(state, attackerPlayerKey, attackerUnitId) {
   const unit = attacker.field.find((u) => u.instanceId === attackerUnitId);
   if (!unit) return { success: false, reason: 'Unidad atacante no encontrada.' };
   if (unit.isSpent) return { success: false, reason: 'La unidad ya está girada (Spent).' };
-  if (unit.isLagging) return { success: false, reason: 'La unidad tiene Lag (entró este turno y no puede atacar aún).' };
+  if (unit.isLagging) return { success: false, reason: 'La unidad tiene Lag (no puede atacar este turno).' };
   if (defender.gigs.length === 0) return { success: false, reason: 'El rival no tiene Gigs para robar.' };
 
-  // Girar atacante
+  // Girar la unidad atacante
   unit.isSpent = true;
 
-  // Robar 1 dado de Gig al rival
-  const stolenDie = defender.gigs.pop();
-  stolenDie.stolenFrom = defenderKey;
-  attacker.gigs.push(stolenDie);
+  // Intercepción por BLOCKER:
+  if (blockerUnitId) {
+    const blocker = defender.field.find((u) => u.instanceId === blockerUnitId);
+    if (blocker && !blocker.isSpent && hasKeyword(blocker, 'Blocker')) {
+      blocker.isSpent = true;
+      state.actionLog.unshift(
+        `🛡️ ¡BLOCKER! ${defender.name} gira a "${blocker.name}" para interceptar el asalto a sus Gigs. ¡No se roba ningún Gig!`
+      );
+      // Resolver pelea contra el Blocker
+      return resolveFight(state, attackerPlayerKey, unit, defenderKey, blocker);
+    }
+  }
 
+  // Cálculo oficial de Gigs a robar según tabla de poder
+  const gigsToSteal = calculateGigsToSteal(unit.currentPower);
+  if (gigsToSteal <= 0) {
+    state.actionLog.unshift(
+      `⚠️ "${unit.name}" tiene 0 de poder y no puede robar ningún Gig.`
+    );
+    return { success: true, stolenCount: 0 };
+  }
+
+  // Se roban hasta gigsToSteal dados (robando los de mayor valor del rival)
+  const countToSteal = Math.min(gigsToSteal, defender.gigs.length);
+  const stolenDice = [];
+
+  for (let i = 0; i < countToSteal; i++) {
+    // Escoger el dado con mayor valor disponible
+    let bestIdx = 0;
+    for (let j = 1; j < defender.gigs.length; j++) {
+      if ((defender.gigs[j].value || 0) > (defender.gigs[bestIdx].value || 0)) {
+        bestIdx = j;
+      }
+    }
+    const [stolenDie] = defender.gigs.splice(bestIdx, 1);
+    stolenDie.stolenFrom = defenderKey;
+    attacker.gigs.push(stolenDie);
+    stolenDice.push(stolenDie);
+  }
+
+  const diceNames = stolenDice.map((d) => `${d.die.toUpperCase()} (Valor: ${d.value})`).join(', ');
   state.actionLog.unshift(
-    `⚔️ ¡ATAQUE EXITOSO! "${unit.name}" asalta los Gigs de ${defender.name} y ROBA su dado ${stolenDie.die.toUpperCase()} (Valor: ${stolenDie.value}).`
+    `⚔️ ¡ASALTO EXITOSO! "${unit.name}" [Fuerza: ${unit.currentPower}] asalta los Gigs de ${defender.name} y ROBA ${countToSteal} Gig(s): ${diceNames}.`
   );
 
-  // Comprobar si con este robo el atacante gana en Overtime
+  // Comprobar victoria inmediata en Overtime
   if (state.overtime && attacker.gigs.length >= 7) {
     state.isGameOver = true;
     state.winner = attackerPlayerKey;
     state.actionLog.unshift(`🏆 ¡OVERTIME WIN! ${attacker.name} alcanza 7 Gigs y gana la partida.`);
   }
 
-  return { success: true, stolenDie };
+  return { success: true, stolenCount: countToSteal, stolenDice };
+}
+
+/**
+ * Resuelve una pelea entre dos unidades según las reglas oficiales de combate:
+ * - Poder mayor derrota a poder menor.
+ * - EMPATE: "Both Units lose the fight and both are defeated. Defeated Units go to the trash."
+ * - "A Unit with 0 power can't defeat anything."
+ */
+function resolveFight(state, attPlayerKey, attUnit, defPlayerKey, defUnit) {
+  const attacker = state[attPlayerKey];
+  const defender = state[defPlayerKey];
+
+  const attPower = attUnit.currentPower || 0;
+  const defPower = defUnit.currentPower || 0;
+
+  state.actionLog.unshift(
+    `🥊 COMBATE: "${attUnit.name}" [Fuerza: ${attPower}] vs "${defUnit.name}" [Fuerza: ${defPower}].`
+  );
+
+  if (attPower > defPower) {
+    // Atacante gana
+    const idx = defender.field.findIndex((u) => u.instanceId === defUnit.instanceId);
+    if (idx !== -1) {
+      const [defeated] = defender.field.splice(idx, 1);
+      defender.trash.push(defeated);
+      state.actionLog.unshift(
+        `💀 "${defUnit.name}" de ${defender.name} es DERROTADA y enviada a la Basura.`
+      );
+    }
+  } else if (defPower > attPower) {
+    // Defensor gana (contraataque)
+    if (defPower > 0) {
+      const idx = attacker.field.findIndex((u) => u.instanceId === attUnit.instanceId);
+      if (idx !== -1) {
+        const [defeated] = attacker.field.splice(idx, 1);
+        attacker.trash.push(defeated);
+        state.actionLog.unshift(
+          `💥 ¡CONTRAATAQUE! "${attUnit.name}" fue superada en poder y enviada a la Basura.`
+        );
+      }
+    }
+  } else {
+    // REGLA OFICIAL DE EMPATE: Ambas unidades son derrotadas y van a la basura!
+    if (attPower > 0 && defPower > 0) {
+      const defIdx = defender.field.findIndex((u) => u.instanceId === defUnit.instanceId);
+      if (defIdx !== -1) {
+        const [defeatedDef] = defender.field.splice(defIdx, 1);
+        defender.trash.push(defeatedDef);
+      }
+      const attIdx = attacker.field.findIndex((u) => u.instanceId === attUnit.instanceId);
+      if (attIdx !== -1) {
+        const [defeatedAtt] = attacker.field.splice(attIdx, 1);
+        attacker.trash.push(defeatedAtt);
+      }
+      state.actionLog.unshift(
+        `☠️ ¡EMPATE LETAL (${attPower} vs ${defPower})! Ambas unidades pierden el combate y van a la Basura.`
+      );
+    } else {
+      state.actionLog.unshift(
+        `⚠️ Las unidades tienen 0 de poder y no pueden derrotar nada.`
+      );
+    }
+  }
+
+  return { success: true };
 }
 
 /**
  * Pelea directa de una unidad contra una unidad enemiga girada (Spent)
  */
-export function fightRivalUnit(state, attackerPlayerKey, attackerUnitId, targetUnitId) {
+export function fightRivalUnit(state, attackerPlayerKey, attackerUnitId, targetUnitId, blockerUnitId = null) {
   const attacker = state[attackerPlayerKey];
   const defenderKey = attackerPlayerKey === 'player' ? 'bot' : 'player';
   const defender = state[defenderKey];
@@ -383,147 +537,163 @@ export function fightRivalUnit(state, attackerPlayerKey, attackerUnitId, targetU
   if (!attUnit || !defUnit) return { success: false, reason: 'Unidades no encontradas.' };
   if (attUnit.isSpent) return { success: false, reason: 'Tu unidad está girada.' };
   if (attUnit.isLagging) return { success: false, reason: 'Tu unidad tiene Lag.' };
-  if (!defUnit.isSpent) {
+  if (!defUnit.isSpent && !blockerUnitId) {
     return { success: false, reason: 'Solo puedes atacar a unidades rivales giradas (Spent).' };
   }
 
   attUnit.isSpent = true;
 
-  const attPower = attUnit.currentPower;
-  const defPower = defUnit.currentPower;
+  // Intercepción por Blocker
+  if (blockerUnitId) {
+    const blocker = defender.field.find((u) => u.instanceId === blockerUnitId);
+    if (blocker && !blocker.isSpent && hasKeyword(blocker, 'Blocker')) {
+      blocker.isSpent = true;
+      state.actionLog.unshift(
+        `🛡️ ¡BLOCKER! "${blocker.name}" se interpone para proteger a "${defUnit.name}".`
+      );
+      return resolveFight(state, attackerPlayerKey, attUnit, defenderKey, blocker);
+    }
+  }
+
+  return resolveFight(state, attackerPlayerKey, attUnit, defenderKey, defUnit);
+}
+
+/**
+ * Ejecuta los pasos obligatorios de la FASE DE INICIO (Start Phase) de un jugador:
+ * 1. Comprobar victoria (7 o más dados de Gig).
+ * 2. Efectos de inicio de turno.
+ * 3. Enderezar (Ready) cartas de Leyendas, Campo y Eddies (respetando penalización turno 1).
+ * 4. Robar 1 carta del mazo (Derrota si no puede robar).
+ * 5. Roll in a Gig: sacar un dado del Fixer y rodarlo a la zona de Gigs (D20 siempre el último).
+ */
+export function executeStartPhase(state, playerKey) {
+  const p = state[playerKey];
 
   state.actionLog.unshift(
-    `🥊 COMBATE: "${attUnit.name}" [Fuerza: ${attPower}] lucha contra "${defUnit.name}" [Fuerza: ${defPower}].`
+    `// ==========================================`,
+    `// INICIO DE TURNO ${state.turnNumber} // ${p.name.toUpperCase()}`,
+    `// ==========================================`
   );
 
-  // Resolución por comparación de Poder
-  if (attPower >= defPower) {
-    // Defensor derrotado
-    const idx = defender.field.findIndex((u) => u.instanceId === targetUnitId);
-    if (idx !== -1) {
-      const [defeated] = defender.field.splice(idx, 1);
-      defender.trash.push(defeated);
-      state.actionLog.unshift(
-        `💀 "${defUnit.name}" de ${defender.name} es DERROTADA y enviada a la Basura (Trash).`
-      );
-    }
+  // 1. COMPROBAR VICTORIA AL INICIO DEL TURNO (7+ Gigs)
+  if (checkWinCondition(state, playerKey)) {
+    return state;
+  }
+
+  // 2. FASE DE PREPARACIÓN (READY STEP)
+  p.eddies.forEach((e) => (e.isSpent = false));
+
+  // Enderezar Leyendas:
+  if (p.legendsDoNotReadyTurn1) {
+    // En Turno 1 del Jugador 1: las dos de la izquierda no se enderezan
+    if (p.legends[2]) p.legends[2].isSpent = false;
+    p.legendsDoNotReadyTurn1 = false; // Se libera para su próximo turno
+    state.actionLog.unshift(
+      `🔒 Penalización de Turno 1: Tus 2 leyendas izquierdas permanecen giradas en este turno.`
+    );
   } else {
-    // Si el defensor tenía mayor poder, el atacante es repelido/derrotado
-    const idx = attacker.field.findIndex((u) => u.instanceId === attackerUnitId);
-    if (idx !== -1) {
-      const [defeated] = attacker.field.splice(idx, 1);
-      attacker.trash.push(defeated);
+    p.legends.forEach((l) => (l.isSpent = false));
+  }
+
+  // Enderezar Unidades y limpiar Lag
+  p.field.forEach((u) => {
+    u.isSpent = false;
+    u.isLagging = false;
+  });
+
+  p.hasSoldThisTurn = false;
+  p.hasCalledLegendThisTurn = false;
+
+  // 3. ROBO DE CARTA (DRAW 1 CARD)
+  if (p.deck.length > 0) {
+    const drawn = p.deck.shift();
+    p.hand.push(drawn);
+    state.actionLog.unshift(
+      `📥 ${p.name} roba 1 carta de su mazo (Mazo: ${p.deck.length} cartas restantes).`
+    );
+  } else {
+    // Deck out loss oficial
+    state.isGameOver = true;
+    state.winner = playerKey === 'player' ? 'bot' : 'player';
+    state.actionLog.unshift(
+      `💀 DECK OUT: ${p.name} no puede robar cartas de su mazo y pierde la partida.`
+    );
+    return state;
+  }
+
+  // 4. ROLL IN A GIG (Extraer y rodar dado del Fixer)
+  if (p.fixerDice.length > 0) {
+    const nextDieType = p.fixerDice.shift();
+    const rollValue = rollDie(nextDieType);
+    p.gigs.push({
+      die: nextDieType,
+      value: rollValue,
+      stolenFrom: null,
+      id: `${playerKey}-gig-${p.gigs.length}`
+    });
+
+    state.actionLog.unshift(
+      `🎲 ${p.name} lanza su dado ${nextDieType.toUpperCase()} del Fixer y saca un ${rollValue} (Credibilidad: ⭐ ${calculateStreetCred(p.gigs)}).`
+    );
+  } else {
+    // Si ambos han vaciado el Fixer, empieza el OVERTIME
+    const otherKey = playerKey === 'player' ? 'bot' : 'player';
+    if (state[otherKey].fixerDice.length === 0 && !state.overtime) {
+      state.overtime = true;
       state.actionLog.unshift(
-        `💥 ¡CONTRAATAQUE! "${attUnit.name}" fue superada en fuerza y enviada a la Basura.`
+        `⚡ ¡OVERTIME ACTIVADO! El primer jugador en controlar 7 Gigs gana inmediatamente.`
       );
     }
   }
 
-  return { success: true };
+  return state;
 }
 
 /**
- * Finaliza el turno actual y pasa el control al siguiente jugador
+ * Finaliza el turno actual y pasa el control al siguiente jugador ejecutando su Start Phase.
  */
 export function passTurn(state) {
   if (state.isGameOver) return state;
 
   const nextPlayerKey = state.activePlayer === 'player' ? 'bot' : 'player';
-  const nextPlayer = state[nextPlayerKey];
-
   state.activePlayer = nextPlayerKey;
   state.turnNumber += 1;
 
-  state.actionLog.unshift(
-    `// ==========================================`,
-    `// INICIO DE TURNO ${state.turnNumber} // ${nextPlayer.name.toUpperCase()}`,
-    `// ==========================================`
-  );
-
-  // 1. COMPROBAR CONDICIÓN DE VICTORIA AL INICIO DEL TURNO (7+ Gigs)
-  if (checkWinCondition(state, nextPlayerKey)) {
-    return state;
-  }
-
-  // 2. FASE DE PREPARACIÓN (READY STEP): Enderezar cartas y recursos
-  nextPlayer.eddies.forEach((e) => (e.isSpent = false));
-  nextPlayer.legends.forEach((l) => (l.isSpent = false));
-  nextPlayer.field.forEach((u) => {
-    u.isSpent = false;
-    u.isLagging = false; // Quitar Lag de unidades presentes
-  });
-  nextPlayer.hasSoldThisTurn = false;
-  nextPlayer.hasCalledLegendThisTurn = false;
-
-  // 3. FASE DE FIXER: Extraer y tirar 1 dado de Gig si quedan en el Fixer
-  if (nextPlayer.fixerDice.length > 0) {
-    const nextDieType = nextPlayer.fixerDice.shift();
-    const rollValue = rollDie(nextDieType);
-    nextPlayer.gigs.push({
-      die: nextDieType,
-      value: rollValue,
-      stolenFrom: null,
-      id: `${nextPlayerKey}-gig-${nextPlayer.gigs.length}`
-    });
-
-    state.actionLog.unshift(
-      `🎲 ${nextPlayer.name} saca su dado ${nextDieType.toUpperCase()} del Fixer y saca un ${rollValue} (Credibilidad: ⭐ ${calculateStreetCred(nextPlayer.gigs)}).`
-    );
-  } else {
-    // Si ambos han vaciado el Fixer, empieza el OVERTIME
-    const otherKey = nextPlayerKey === 'player' ? 'bot' : 'player';
-    if (state[otherKey].fixerDice.length === 0 && !state.overtime) {
-      state.overtime = true;
-      state.actionLog.unshift(
-        `⚡ ¡OVERTIME / MUERTE SÚBITA ACTIVADA! El primer jugador que alcance 7 Gigs gana inmediatamente.`
-      );
-    }
-  }
-
-  // 4. ROBO DE CARTA (DRAW STEP)
-  if (nextPlayer.deck.length > 0) {
-    const drawn = nextPlayer.deck.shift();
-    nextPlayer.hand.push(drawn);
-    state.actionLog.unshift(
-      `📥 ${nextPlayer.name} roba 1 carta (Mazo: ${nextPlayer.deck.length} restantes).`
-    );
-  } else {
-    // Deck out loss
-    state.isGameOver = true;
-    state.winner = nextPlayerKey === 'player' ? 'bot' : 'player';
-    state.actionLog.unshift(
-      `💀 DECK OUT: ${nextPlayer.name} no puede robar cartas de su mazo y pierde la partida.`
-    );
-    return state;
-  }
-
-  return state;
+  return executeStartPhase(state, nextPlayerKey);
 }
 
 /**
- * Realiza Mulligan de la mano inicial (baraja la mano y roba 5 cartas nuevas)
+ * Realiza Mulligan de la mano inicial:
+ * Baraja las 6 cartas iniciales de vuelta al mazo y roba 6 cartas nuevas.
+ * Luego ejecuta la Start Phase del Turno 1 para el jugador 1.
  */
 export function mulliganHand(state, playerKey = 'player') {
   const p = state[playerKey];
   p.deck = shuffleDeck([...p.deck, ...p.hand]);
-  p.hand = p.deck.splice(0, 5);
+  p.hand = p.deck.splice(0, 6);
   state.mulliganDecided = true;
   state.phase = 'MAIN';
+
   state.actionLog.unshift(
-    `🔄 ${p.name} realiza MULLIGAN y roba una nueva mano de 5 cartas.`
+    `🔄 ${p.name} realiza MULLIGAN: baraja su mano y roba 6 cartas nuevas.`
   );
-  return state;
+
+  // Ejecutar Start Phase del Jugador 1
+  return executeStartPhase(state, playerKey);
 }
 
 /**
- * Mantiene la mano inicial (KEEP)
+ * Mantiene la mano inicial (KEEP) y ejecuta la Start Phase del Turno 1.
  */
 export function keepHand(state, playerKey = 'player') {
   const p = state[playerKey];
   state.mulliganDecided = true;
   state.phase = 'MAIN';
+
   state.actionLog.unshift(
-    `✅ ${p.name} decide MANTENER (Keep) su mano inicial de ${p.hand.length} cartas.`
+    `✅ ${p.name} decide MANTENER (Keep) su mano inicial de 6 cartas.`
   );
-  return state;
+
+  // Ejecutar Start Phase del Jugador 1
+  return executeStartPhase(state, playerKey);
 }
