@@ -43,6 +43,8 @@ import {
   getEligibleFixerDice,
   rollInGig,
   rollDie,
+  isCardVendible,
+  toggleEddieSpent,
   DICE_CONFIG
 } from '../utils/cyberpunkEngine.js';
 import { runBotTurn, decideBotBlocker } from '../utils/botAi.js';
@@ -1014,133 +1016,193 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
 
         {/* ===============================================================
             CAMPO DE BATALLA CENTRAL:
-            - Dividido estrictamente en dos mitades (Campo Rival arriba / Tu Campo abajo)
-            - Las cartas gastadas se giran 90 grados
-            - Zona de Tu Campo habilitada como Drop-Zone para arrastrar cartas
+            - Dos zonas principales: CAMPO DE BATALLA (Unidades) y ZONA DE EDDIES (Cartas vendibles boca abajo)
+            - Tanto las unidades como los eddies gastados se giran 90 grados
+            - Ambas zonas cuentan con soporte Drag & Drop
            =============================================================== */}
         <main className="flex-1 flex flex-col justify-between overflow-y-auto relative p-2 sm:p-4 pb-52 gap-2">
-          {/* 1. CAMPO DEL RIVAL (MITAD SUPERIOR) */}
-          <div className="flex-1 min-h-[170px] sm:min-h-[200px] border border-dashed border-[#FF003C]/30 bg-[#000000]/60 p-3 flex flex-col justify-center items-center relative rounded-sm shadow-inner">
-            <div className="absolute top-1.5 left-2 flex items-center gap-1.5 text-[9px] font-mono text-[#FF003C] uppercase tracking-widest pointer-events-none opacity-80">
-              <span className="w-1.5 h-1.5 rounded-full bg-[#FF003C]" />
-              <span>CAMPO DEL RIVAL ({bot.field.length} UNIDADES)</span>
-            </div>
+          {/* 1. MITAD SUPERIOR: RIVAL (CAMPO + ZONA DE EDDIES RIVAL) */}
+          <div className="flex-1 flex flex-col md:flex-row gap-2 min-h-[175px] sm:min-h-[200px]">
+            {/* CAMPO DEL RIVAL (UNIDADES) */}
+            <div className="flex-1 border border-dashed border-[#FF003C]/30 bg-[#000000]/60 p-3 flex flex-col justify-center items-center relative rounded-sm shadow-inner min-h-[140px]">
+              <div className="absolute top-1.5 left-2 flex items-center gap-1.5 text-[9px] font-mono text-[#FF003C] uppercase tracking-widest pointer-events-none opacity-80">
+                <span className="w-1.5 h-1.5 rounded-full bg-[#FF003C]" />
+                <span>CAMPO DEL RIVAL ({bot.field.length} UNIDADES)</span>
+              </div>
 
-            {bot.field.length === 0 ? (
-              <span className="text-xs font-mono text-gray-600 italic">
-                [CAMPO DEL RIVAL VACÍO]
-              </span>
-            ) : (
-              <div className="flex flex-wrap items-center justify-center gap-3 w-full py-2">
-                {bot.field.map((unit) => {
-                  const canAttackThisUnit =
-                    selectedFieldUnit &&
-                    !selectedFieldUnit.isSpent &&
-                    !selectedFieldUnit.isLagging &&
-                    unit.isSpent;
+              {bot.field.length === 0 ? (
+                <span className="text-xs font-mono text-gray-600 italic">
+                  [CAMPO DEL RIVAL VACÍO]
+                </span>
+              ) : (
+                <div className="flex flex-wrap items-center justify-center gap-3 w-full py-2">
+                  {bot.field.map((unit) => {
+                    const canAttackThisUnit =
+                      selectedFieldUnit &&
+                      !selectedFieldUnit.isSpent &&
+                      !selectedFieldUnit.isLagging &&
+                      unit.isSpent;
 
-                  return (
-                    <div
-                      key={unit.instanceId}
-                      className={`transition-all duration-300 flex items-center justify-center shrink-0 ${
-                        unit.isSpent
-                          ? 'w-36 sm:w-40 md:w-44 h-24 sm:h-28 md:h-32 my-1'
-                          : 'w-24 sm:w-28 md:w-32 h-36 sm:h-40 md:h-44'
-                      }`}
-                    >
-                      <motion.div
-                        layout
-                        initial={{ opacity: 0, scale: 0.8 }}
-                        animate={{
-                          opacity: 1,
-                          scale: 1,
-                          boxShadow: canAttackThisUnit
-                            ? [
-                                '0 0 10px rgba(255, 0, 60, 0.5)',
-                                '0 0 25px rgba(255, 0, 60, 0.95)',
-                                '0 0 10px rgba(255, 0, 60, 0.5)'
-                              ]
-                            : unit.isSpent
-                            ? '0 0 15px rgba(255, 0, 60, 0.25)'
-                            : '0 0 0px rgba(0,0,0,0)'
-                        }}
-                        transition={{
-                          boxShadow: {
-                            repeat: canAttackThisUnit ? Infinity : 0,
-                            duration: 1.2
-                          }
-                        }}
-                        whileHover={{ scale: canAttackThisUnit ? 1.08 : 1.03 }}
-                        onClick={() => {
-                          if (canAttackThisUnit) {
-                            pushHistory();
-                            const botBlocker = decideBotBlocker(bot, selectedFieldUnit.currentPower, false);
-                            fightRivalUnit(
-                              gameState,
-                              'player',
-                              selectedFieldUnit.instanceId,
-                              unit.instanceId,
-                              botBlocker ? botBlocker.instanceId : null
-                            );
-                            setSelectedFieldUnit(null);
-                            setGameState({ ...gameState });
-                          } else {
-                            setInspectedCard(unit);
-                          }
-                        }}
-                        style={{ clipPath: CYBER_CARD_CLIP }}
-                        className={`w-24 sm:w-28 md:w-32 h-36 sm:h-40 md:h-44 bg-black border-2 transition-transform duration-300 cursor-pointer flex flex-col justify-between relative shadow-xl ${
-                          canAttackThisUnit
-                            ? 'border-[#FF003C] animate-pulse'
-                            : unit.isSpent
-                            ? 'border-gray-800 opacity-75 rotate-90'
-                            : 'border-[#FF003C]/80 hover:border-[#FF003C]'
+                    return (
+                      <div
+                        key={unit.instanceId}
+                        className={`transition-all duration-300 flex items-center justify-center shrink-0 ${
+                          unit.isSpent
+                            ? 'w-36 sm:w-40 md:w-44 h-24 sm:h-28 md:h-32 my-1'
+                            : 'w-24 sm:w-28 md:w-32 h-36 sm:h-40 md:h-44'
                         }`}
                       >
-                        <img
-                          src={unit.image}
-                          alt={unit.name}
-                          className="w-full h-full object-cover object-center"
-                        />
+                        <motion.div
+                          layout
+                          initial={{ opacity: 0, scale: 0.8 }}
+                          animate={{
+                            opacity: 1,
+                            scale: 1,
+                            boxShadow: canAttackThisUnit
+                              ? [
+                                  '0 0 10px rgba(255, 0, 60, 0.5)',
+                                  '0 0 25px rgba(255, 0, 60, 0.95)',
+                                  '0 0 10px rgba(255, 0, 60, 0.5)'
+                                ]
+                              : unit.isSpent
+                              ? '0 0 15px rgba(255, 0, 60, 0.25)'
+                              : '0 0 0px rgba(0,0,0,0)'
+                          }}
+                          transition={{
+                            boxShadow: {
+                              repeat: canAttackThisUnit ? Infinity : 0,
+                              duration: 1.2
+                            }
+                          }}
+                          whileHover={{ scale: canAttackThisUnit ? 1.08 : 1.03 }}
+                          onClick={() => {
+                            if (canAttackThisUnit) {
+                              pushHistory();
+                              const botBlocker = decideBotBlocker(bot, selectedFieldUnit.currentPower, false);
+                              fightRivalUnit(
+                                gameState,
+                                'player',
+                                selectedFieldUnit.instanceId,
+                                unit.instanceId,
+                                botBlocker ? botBlocker.instanceId : null
+                              );
+                              setSelectedFieldUnit(null);
+                              setGameState({ ...gameState });
+                            } else {
+                              setInspectedCard(unit);
+                            }
+                          }}
+                          style={{ clipPath: CYBER_CARD_CLIP }}
+                          className={`w-24 sm:w-28 md:w-32 h-36 sm:h-40 md:h-44 bg-black border-2 transition-transform duration-300 cursor-pointer flex flex-col justify-between relative shadow-xl ${
+                            canAttackThisUnit
+                              ? 'border-[#FF003C] animate-pulse'
+                              : unit.isSpent
+                              ? 'border-gray-800 opacity-75 rotate-90'
+                              : 'border-[#FF003C]/80 hover:border-[#FF003C]'
+                          }`}
+                        >
+                          <img
+                            src={unit.image}
+                            alt={unit.name}
+                            className="w-full h-full object-cover object-center"
+                          />
 
-                        {/* Badges de Palabras Clave Oficiales (Rival) */}
-                        <div className="absolute top-1 left-1 flex flex-col gap-0.5 z-10 pointer-events-none">
-                          {hasKeyword(unit, 'Blocker') && (
-                            <span className="px-1 py-0.5 bg-[#0dfceb] text-black font-mono font-black text-[7px] sm:text-[8px] uppercase shadow">
-                              🛡️ BLOCKER
-                            </span>
-                          )}
-                          {hasKeyword(unit, 'Adrenaline') && (
-                            <span className="px-1 py-0.5 bg-[#FCEE0A] text-black font-mono font-black text-[7px] sm:text-[8px] uppercase shadow">
-                              ⚡ ADRENALINE
-                            </span>
-                          )}
-                          {hasKeyword(unit, 'Go Solo') && (
-                            <span className="px-1 py-0.5 bg-[#FF003C] text-white font-mono font-black text-[7px] sm:text-[8px] uppercase shadow">
-                              🔥 GO SOLO
-                            </span>
-                          )}
-                        </div>
-
-                        {/* Insignia de Poder GIGANTE */}
-                        <div className="absolute bottom-1 right-1 px-2 py-0.5 bg-[#FF003C] text-white font-mono font-black text-xs shadow-md">
-                          {unit.currentPower}
-                        </div>
-
-                        {/* Estado: GASTADA (con texto contra-rotado para leerlo recto) */}
-                        {unit.isSpent && (
-                          <div className="absolute inset-0 bg-black/60 flex items-center justify-center z-20">
-                            <span className="px-2 py-0.5 bg-black border border-[#FF003C] text-[#FF003C] font-mono font-black text-[10px] uppercase tracking-wider -rotate-90">
-                              GASTADA
-                            </span>
+                          {/* Badges de Palabras Clave Oficiales (Rival) */}
+                          <div className="absolute top-1 left-1 flex flex-col gap-0.5 z-10 pointer-events-none">
+                            {hasKeyword(unit, 'Blocker') && (
+                              <span className="px-1 py-0.5 bg-[#0dfceb] text-black font-mono font-black text-[7px] sm:text-[8px] uppercase shadow">
+                                🛡️ BLOCKER
+                              </span>
+                            )}
+                            {hasKeyword(unit, 'Adrenaline') && (
+                              <span className="px-1 py-0.5 bg-[#FCEE0A] text-black font-mono font-black text-[7px] sm:text-[8px] uppercase shadow">
+                                ⚡ ADRENALINE
+                              </span>
+                            )}
+                            {hasKeyword(unit, 'Go Solo') && (
+                              <span className="px-1 py-0.5 bg-[#FF003C] text-white font-mono font-black text-[7px] sm:text-[8px] uppercase shadow">
+                                🔥 GO SOLO
+                              </span>
+                            )}
                           </div>
-                        )}
-                      </motion.div>
-                    </div>
-                  );
-                })}
+
+                          {/* Insignia de Poder GIGANTE */}
+                          <div className="absolute bottom-1 right-1 px-2 py-0.5 bg-[#FF003C] text-white font-mono font-black text-xs shadow-md">
+                            {unit.currentPower}
+                          </div>
+
+                          {/* Estado: GASTADA */}
+                          {unit.isSpent && (
+                            <div className="absolute inset-0 bg-black/60 flex items-center justify-center z-20">
+                              <span className="px-2 py-0.5 bg-black border border-[#FF003C] text-[#FF003C] font-mono font-black text-[10px] uppercase tracking-wider -rotate-90">
+                                GASTADA
+                              </span>
+                            </div>
+                          )}
+                        </motion.div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* ZONA DE EDDIES DEL RIVAL */}
+            <div
+              style={{ clipPath: CYBER_CLIP }}
+              className="w-full md:w-52 lg:w-60 shrink-0 border border-[#FF003C]/40 bg-[#000000]/70 flex flex-col justify-between p-2.5 relative shadow-md"
+            >
+              <div className="flex items-center justify-between border-b border-[#FF003C]/30 pb-1 mb-1">
+                <span className="text-[9px] font-mono text-[#FF003C] font-bold uppercase tracking-wider flex items-center gap-1">
+                  <Coins className="w-3 h-3" />
+                  <span>EDDIES RIVAL</span>
+                </span>
+                <span className="text-[10px] font-mono font-black text-[#FCEE0A]">
+                  {bot.eddies.filter((e) => !e.isSpent).length} €$ LISTOS
+                </span>
               </div>
-            )}
+
+              <div className="flex-1 flex flex-wrap items-center justify-center gap-2 overflow-y-auto py-1 min-h-[80px]">
+                {bot.eddies.length === 0 ? (
+                  <div className="text-center p-2 text-gray-600 font-mono text-[9px] leading-tight">
+                    Sin Eddies vendidos aún
+                  </div>
+                ) : (
+                  bot.eddies.map((ed, idx) => (
+                    <div
+                      key={ed.instanceId || idx}
+                      className={`transition-all duration-300 flex items-center justify-center shrink-0 ${
+                        ed.isSpent ? 'w-16 h-12 my-1' : 'w-12 h-16'
+                      }`}
+                      title={ed.isSpent ? 'Eddie del rival gastado' : '1 €$ del rival listo'}
+                    >
+                      <div
+                        className={`w-12 h-16 rounded-xs overflow-hidden border transition-transform duration-300 relative shadow-md ${
+                          ed.isSpent
+                            ? 'rotate-90 opacity-40 border-gray-800'
+                            : 'border-[#FF003C]/60 shadow-[0_0_10px_rgba(255,0,60,0.3)]'
+                        }`}
+                      >
+                        <CyberCardBack className="w-full h-full" />
+                        <div className="absolute inset-0 bg-black/30 flex items-center justify-center">
+                          <span
+                            className={`font-mono font-black text-[9px] px-1 bg-black/90 ${
+                              ed.isSpent ? '-rotate-90 text-gray-500' : 'text-[#FCEE0A]'
+                            }`}
+                          >
+                            {ed.isSpent ? 'USADO' : '1 €$'}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+
+              <span className="text-[8px] font-mono text-gray-600 text-center block border-t border-gray-900 pt-1">
+                TOTAL: {bot.eddies.length} CARTAS
+              </span>
+            </div>
           </div>
 
           {/* ===============================================================
@@ -1201,147 +1263,244 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
             </div>
           </div>
 
-          {/* 2. TU CAMPO DE BATALLA (MITAD INFERIOR - DROP ZONE PARA ARRASTRAR) */}
-          <div
-            onDragOver={(e) => {
-              e.preventDefault();
-              if (!isDragOverField) setIsDragOverField(true);
-            }}
-            onDragLeave={() => setIsDragOverField(false)}
-            onDrop={(e) => {
-              e.preventDefault();
-              setIsDragOverField(false);
-              const cardId = e.dataTransfer.getData('text/plain');
-              if (cardId) handlePlayCard(cardId);
-            }}
-            className={`flex-1 min-h-[170px] sm:min-h-[200px] border flex flex-col justify-center items-center relative rounded-sm transition-all p-3 shadow-inner ${
-              isDragOverField
-                ? 'border-[#0dfceb] bg-[#0dfceb]/15 shadow-[0_0_35px_rgba(13,252,235,0.45)]'
-                : 'border-dashed border-[#0dfceb]/35 bg-[#000000]/60'
-            }`}
-          >
-            <div className="absolute top-1.5 left-2 flex items-center gap-1.5 text-[9px] font-mono text-[#0dfceb] uppercase tracking-widest pointer-events-none">
-              <span className="w-1.5 h-1.5 rounded-full bg-[#0dfceb] animate-pulse" />
-              <span>TU CAMPO DE BATALLA ({p.field.length} UNIDADES)</span>
-              {isDragOverField && (
-                <span className="text-[#FCEE0A] font-black animate-bounce ml-2">
-                  ➔ ¡SUELTA LA CARTA AQUÍ PARA DESPLEGARLA!
+          {/* 2. MITAD INFERIOR: JUGADOR (CAMPO + ZONA DE EDDIES JUGADOR) */}
+          <div className="flex-1 flex flex-col md:flex-row gap-2 min-h-[175px] sm:min-h-[200px]">
+            {/* TU CAMPO DE BATALLA (UNIDADES - DROP ZONE PARA DESPLEGAR) */}
+            <div
+              onDragOver={(e) => {
+                e.preventDefault();
+                if (!isDragOverField) setIsDragOverField(true);
+              }}
+              onDragLeave={() => setIsDragOverField(false)}
+              onDrop={(e) => {
+                e.preventDefault();
+                setIsDragOverField(false);
+                const cardId = e.dataTransfer.getData('text/plain');
+                if (cardId) handlePlayCard(cardId);
+              }}
+              className={`flex-1 border flex flex-col justify-center items-center relative rounded-sm transition-all p-3 shadow-inner min-h-[140px] ${
+                isDragOverField
+                  ? 'border-[#0dfceb] bg-[#0dfceb]/15 shadow-[0_0_35px_rgba(13,252,235,0.45)]'
+                  : 'border-dashed border-[#0dfceb]/35 bg-[#000000]/60'
+              }`}
+            >
+              <div className="absolute top-1.5 left-2 flex items-center gap-1.5 text-[9px] font-mono text-[#0dfceb] uppercase tracking-widest pointer-events-none">
+                <span className="w-1.5 h-1.5 rounded-full bg-[#0dfceb] animate-pulse" />
+                <span>TU CAMPO DE BATALLA ({p.field.length} UNIDADES)</span>
+                {isDragOverField && (
+                  <span className="text-[#FCEE0A] font-black animate-bounce ml-2">
+                    ➔ ¡SUELTA LA CARTA AQUÍ PARA DESPLEGARLA!
+                  </span>
+                )}
+              </div>
+
+              {p.field.length === 0 ? (
+                <span className="text-xs font-mono text-gray-500 italic text-center">
+                  [CAMPO DE BATALLA VACÍO — ARRASTRA CARTAS DESDE TU MANO PARA JUGAR]
                 </span>
+              ) : (
+                <div className="flex flex-wrap items-center justify-center gap-3 w-full py-2">
+                  {p.field.map((unit) => {
+                    const isSelected = selectedFieldUnit?.instanceId === unit.instanceId;
+                    const canAttack = isMyTurn && !unit.isSpent && !unit.isLagging;
+
+                    return (
+                      <div
+                        key={unit.instanceId}
+                        className={`transition-all duration-300 flex items-center justify-center shrink-0 ${
+                          unit.isSpent
+                            ? 'w-36 sm:w-40 md:w-44 h-24 sm:h-28 md:h-32 my-1'
+                            : 'w-24 sm:w-28 md:w-32 h-36 sm:h-40 md:h-44'
+                        }`}
+                      >
+                        <motion.div
+                          layout
+                          initial={{ opacity: 0, scale: 0.8 }}
+                          animate={{
+                            opacity: 1,
+                            scale: 1,
+                            boxShadow: isSelected
+                              ? '0 0 30px rgba(252, 238, 10, 0.95), inset 0 0 15px rgba(252, 238, 10, 0.4)'
+                              : canAttack
+                              ? [
+                                  '0 0 10px rgba(13, 252, 235, 0.4)',
+                                  '0 0 25px rgba(252, 238, 10, 0.85)',
+                                  '0 0 10px rgba(13, 252, 235, 0.4)'
+                                ]
+                              : unit.isSpent
+                              ? '0 0 15px rgba(13, 252, 235, 0.25)'
+                              : '0 0 0px rgba(0,0,0,0)'
+                          }}
+                          transition={{
+                            boxShadow: {
+                              repeat: canAttack && !isSelected ? Infinity : 0,
+                              duration: 1.8,
+                              ease: 'easeInOut'
+                            }
+                          }}
+                          whileHover={{ scale: canAttack ? 1.08 : 1.03, y: -4 }}
+                          onClick={() => {
+                            if (canAttack) {
+                              setSelectedFieldUnit(isSelected ? null : unit);
+                            } else {
+                              setInspectedCard(unit);
+                            }
+                          }}
+                          style={{ clipPath: CYBER_CARD_CLIP }}
+                          className={`w-24 sm:w-28 md:w-32 h-36 sm:h-40 md:h-44 bg-black border-2 transition-transform duration-300 cursor-pointer flex flex-col justify-between relative shadow-xl ${
+                            isSelected
+                              ? 'border-[#FCEE0A] -translate-y-2 scale-105'
+                              : canAttack
+                              ? 'border-[#0dfceb] hover:border-[#FCEE0A]'
+                              : unit.isSpent
+                              ? 'border-gray-800 opacity-75 rotate-90'
+                              : 'border-gray-800'
+                          }`}
+                        >
+                          <img
+                            src={unit.image}
+                            alt={unit.name}
+                            className="w-full h-full object-cover object-center"
+                          />
+
+                          {/* Badges de Palabras Clave Oficiales (Jugador) */}
+                          <div className="absolute top-1 left-1 flex flex-col gap-0.5 z-10 pointer-events-none">
+                            {hasKeyword(unit, 'Blocker') && (
+                              <span className="px-1 py-0.5 bg-[#0dfceb] text-black font-mono font-black text-[7px] sm:text-[8px] uppercase shadow">
+                                🛡️ BLOCKER
+                              </span>
+                            )}
+                            {hasKeyword(unit, 'Adrenaline') && (
+                              <span className="px-1 py-0.5 bg-[#FCEE0A] text-black font-mono font-black text-[7px] sm:text-[8px] uppercase shadow">
+                                ⚡ ADRENALINE
+                              </span>
+                            )}
+                            {hasKeyword(unit, 'Go Solo') && (
+                              <span className="px-1 py-0.5 bg-[#FF003C] text-white font-mono font-black text-[7px] sm:text-[8px] uppercase shadow">
+                                🔥 GO SOLO
+                              </span>
+                            )}
+                            {unit.isLagging && (
+                              <span className="px-1.5 py-0.5 bg-[#FF003C] text-white font-mono font-bold text-[8px] uppercase shadow">
+                                LAG
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Insignia de Poder GIGANTE */}
+                          <div className="absolute bottom-1 right-1 px-2 py-0.5 bg-[#FCEE0A] text-[#070a10] font-mono font-black text-xs shadow-md">
+                            {unit.currentPower}
+                          </div>
+
+                          {/* Estado: GASTADA */}
+                          {unit.isSpent && (
+                            <div className="absolute inset-0 bg-black/60 flex items-center justify-center z-20">
+                              <span className="px-2 py-0.5 bg-black border border-gray-600 text-gray-300 font-mono font-black text-[10px] uppercase tracking-wider -rotate-90">
+                                GASTADA
+                              </span>
+                            </div>
+                          )}
+                        </motion.div>
+                      </div>
+                    );
+                  })}
+                </div>
               )}
             </div>
 
-            {p.field.length === 0 ? (
-              <span className="text-xs font-mono text-gray-500 italic text-center">
-                [TU CAMPO DE BATALLA ESTÁ VACÍO — ARRASTRA CARTAS DESDE TU MANO O SELECCIÓNALAS PARA JUGAR]
-              </span>
-            ) : (
-              <div className="flex flex-wrap items-center justify-center gap-3 w-full py-2">
-                {p.field.map((unit) => {
-                  const isSelected = selectedFieldUnit?.instanceId === unit.instanceId;
-                  const canAttack = isMyTurn && !unit.isSpent && !unit.isLagging;
+            {/* ZONA DE EDDIES DEL JUGADOR (DROP-ZONE PARA ARRASTRAR Y VENDER) */}
+            <div
+              onDragOver={(e) => {
+                e.preventDefault();
+                if (!isDragOverEddies) setIsDragOverEddies(true);
+              }}
+              onDragLeave={() => setIsDragOverEddies(false)}
+              onDrop={(e) => {
+                e.preventDefault();
+                setIsDragOverEddies(false);
+                const cardId = e.dataTransfer.getData('text/plain');
+                if (cardId) handleSellCard(cardId);
+              }}
+              style={{ clipPath: CYBER_CLIP }}
+              className={`w-full md:w-52 lg:w-60 shrink-0 border flex flex-col justify-between p-2.5 transition-all relative shadow-md ${
+                isDragOverEddies
+                  ? 'border-[#FCEE0A] bg-[#FCEE0A]/20 shadow-[0_0_35px_rgba(252,238,10,0.5)]'
+                  : 'border-[#0dfceb]/40 bg-[#000000]/70'
+              }`}
+            >
+              <div className="flex items-center justify-between border-b border-[#0dfceb]/30 pb-1 mb-1">
+                <span className="text-[9px] font-mono text-[#0dfceb] font-bold uppercase tracking-wider flex items-center gap-1">
+                  <Coins className="w-3 h-3 text-[#FCEE0A]" />
+                  <span>ZONA EDDIES</span>
+                </span>
+                <span className="text-[10px] font-mono font-black text-[#FCEE0A]">
+                  {p.eddies.filter((e) => !e.isSpent).length} €$ LISTOS
+                </span>
+              </div>
 
-                  return (
+              {/* Contenedor de cartas de Eddies boca abajo (girables con clic) */}
+              <div className="flex-1 flex flex-wrap items-center justify-center gap-2 overflow-y-auto py-1 min-h-[80px]">
+                {p.eddies.length === 0 ? (
+                  <div className="text-center p-2 text-gray-500 font-mono text-[9px] leading-tight">
+                    {isDragOverEddies ? (
+                      <span className="text-[#FCEE0A] font-bold animate-pulse">
+                        ¡SUELTA AQUÍ PARA VENDER!
+                      </span>
+                    ) : (
+                      <span>
+                        Arrastra aquí <strong>Programas, Gears o Flathead</strong> para vender (+1 €$)
+                      </span>
+                    )}
+                  </div>
+                ) : (
+                  p.eddies.map((ed, idx) => (
                     <div
-                      key={unit.instanceId}
-                      className={`transition-all duration-300 flex items-center justify-center shrink-0 ${
-                        unit.isSpent
-                          ? 'w-36 sm:w-40 md:w-44 h-24 sm:h-28 md:h-32 my-1'
-                          : 'w-24 sm:w-28 md:w-32 h-36 sm:h-40 md:h-44'
+                      key={ed.instanceId || idx}
+                      onClick={() => {
+                        pushHistory();
+                        toggleEddieSpent(gameState, 'player', ed.instanceId);
+                        setGameState({ ...gameState });
+                      }}
+                      className={`transition-all duration-300 flex items-center justify-center shrink-0 cursor-pointer ${
+                        ed.isSpent ? 'w-16 h-12 my-1' : 'w-12 h-16'
                       }`}
+                      title={
+                        ed.isSpent
+                          ? 'Eddie gastado este turno (clic para enderezar)'
+                          : '1 €$ listo para gastar (clic para girar 90°)'
+                      }
                     >
-                      <motion.div
-                        layout
-                        initial={{ opacity: 0, scale: 0.8 }}
-                        animate={{
-                          opacity: 1,
-                          scale: 1,
-                          boxShadow: isSelected
-                            ? '0 0 30px rgba(252, 238, 10, 0.95), inset 0 0 15px rgba(252, 238, 10, 0.4)'
-                            : canAttack
-                            ? [
-                                '0 0 10px rgba(13, 252, 235, 0.4)',
-                                '0 0 25px rgba(252, 238, 10, 0.85)',
-                                '0 0 10px rgba(13, 252, 235, 0.4)'
-                              ]
-                            : unit.isSpent
-                            ? '0 0 15px rgba(13, 252, 235, 0.25)'
-                            : '0 0 0px rgba(0,0,0,0)'
-                        }}
-                        transition={{
-                          boxShadow: {
-                            repeat: canAttack && !isSelected ? Infinity : 0,
-                            duration: 1.8,
-                            ease: 'easeInOut'
-                          }
-                        }}
-                        whileHover={{ scale: canAttack ? 1.08 : 1.03, y: -4 }}
-                        onClick={() => {
-                          if (canAttack) {
-                            setSelectedFieldUnit(isSelected ? null : unit);
-                          } else {
-                            setInspectedCard(unit);
-                          }
-                        }}
-                        style={{ clipPath: CYBER_CARD_CLIP }}
-                        className={`w-24 sm:w-28 md:w-32 h-36 sm:h-40 md:h-44 bg-black border-2 transition-transform duration-300 cursor-pointer flex flex-col justify-between relative shadow-xl ${
-                          isSelected
-                            ? 'border-[#FCEE0A] -translate-y-2 scale-105'
-                            : canAttack
-                            ? 'border-[#0dfceb] hover:border-[#FCEE0A]'
-                            : unit.isSpent
-                            ? 'border-gray-800 opacity-75 rotate-90'
-                            : 'border-gray-800'
+                      <div
+                        className={`w-12 h-16 rounded-xs overflow-hidden border transition-transform duration-300 relative shadow-md ${
+                          ed.isSpent
+                            ? 'rotate-90 opacity-40 border-gray-800'
+                            : 'border-[#0dfceb] hover:border-[#FCEE0A] hover:scale-105 shadow-[0_0_10px_rgba(13,252,235,0.4)]'
                         }`}
                       >
-                        <img
-                          src={unit.image}
-                          alt={unit.name}
-                          className="w-full h-full object-cover object-center"
-                        />
-
-                        {/* Badges de Palabras Clave Oficiales (Jugador) */}
-                        <div className="absolute top-1 left-1 flex flex-col gap-0.5 z-10 pointer-events-none">
-                          {hasKeyword(unit, 'Blocker') && (
-                            <span className="px-1 py-0.5 bg-[#0dfceb] text-black font-mono font-black text-[7px] sm:text-[8px] uppercase shadow">
-                              🛡️ BLOCKER
-                            </span>
-                          )}
-                          {hasKeyword(unit, 'Adrenaline') && (
-                            <span className="px-1 py-0.5 bg-[#FCEE0A] text-black font-mono font-black text-[7px] sm:text-[8px] uppercase shadow">
-                              ⚡ ADRENALINE
-                            </span>
-                          )}
-                          {hasKeyword(unit, 'Go Solo') && (
-                            <span className="px-1 py-0.5 bg-[#FF003C] text-white font-mono font-black text-[7px] sm:text-[8px] uppercase shadow">
-                              🔥 GO SOLO
-                            </span>
-                          )}
-                          {unit.isLagging && (
-                            <span className="px-1.5 py-0.5 bg-[#FF003C] text-white font-mono font-bold text-[8px] uppercase shadow">
-                              LAG
-                            </span>
-                          )}
+                        <CyberCardBack className="w-full h-full" />
+                        <div className="absolute inset-0 bg-black/30 flex items-center justify-center">
+                          <span
+                            className={`font-mono font-black text-[9px] px-1 bg-black/90 ${
+                              ed.isSpent ? '-rotate-90 text-gray-500' : 'text-[#0dfceb]'
+                            }`}
+                          >
+                            {ed.isSpent ? 'USADO' : '1 €$'}
+                          </span>
                         </div>
-
-                        {/* Insignia de Poder GIGANTE */}
-                        <div className="absolute bottom-1 right-1 px-2 py-0.5 bg-[#FCEE0A] text-[#070a10] font-mono font-black text-xs shadow-md">
-                          {unit.currentPower}
-                        </div>
-
-                        {/* Estado: GASTADA (con texto contra-rotado para leerlo recto) */}
-                        {unit.isSpent && (
-                          <div className="absolute inset-0 bg-black/60 flex items-center justify-center z-20">
-                            <span className="px-2 py-0.5 bg-black border border-gray-600 text-gray-300 font-mono font-black text-[10px] uppercase tracking-wider -rotate-90">
-                              GASTADA
-                            </span>
-                          </div>
-                        )}
-                      </motion.div>
+                      </div>
                     </div>
-                  );
-                })}
+                  ))
+                )}
               </div>
-            )}
+
+              <span className="text-[8px] font-mono text-gray-400 text-center block border-t border-gray-900 pt-1">
+                {isMyTurn && !p.hasSoldThisTurn ? (
+                  <span className="text-[#0dfceb] animate-pulse">[Arrastra carta vendible aquí]</span>
+                ) : (
+                  <span>[Clic en carta para girar/enderezar]</span>
+                )}
+              </span>
+            </div>
           </div>
         </main>
       </div>
@@ -1398,16 +1557,27 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                     const cardId = e.dataTransfer.getData('text/plain');
                     if (cardId) handleSellCard(cardId);
                   }}
-                  disabled={!isMyTurn || p.hasSoldThisTurn}
+                  disabled={!isMyTurn || p.hasSoldThisTurn || !isCardVendible(selectedHandCard)}
                   onClick={() => {
                     handleSellCard(selectedHandCard.instanceId);
                   }}
                   style={{ clipPath: CYBER_BUTTON }}
-                  className={`px-3 py-1 font-black text-xs uppercase cursor-pointer disabled:opacity-40 transition-colors shadow-[0_0_15px_rgba(252,238,10,0.4)] ${
-                    isDragOverEddies ? 'bg-white text-black animate-pulse' : 'bg-[#FCEE0A] hover:bg-white text-[#070a10]'
+                  className={`px-3 py-1 font-black text-xs uppercase cursor-pointer disabled:opacity-30 transition-colors shadow-[0_0_15px_rgba(252,238,10,0.4)] ${
+                    isDragOverEddies
+                      ? 'bg-white text-black animate-pulse'
+                      : !isCardVendible(selectedHandCard)
+                      ? 'bg-gray-800 text-gray-500 cursor-not-allowed'
+                      : 'bg-[#FCEE0A] hover:bg-white text-[#070a10]'
                   }`}
+                  title={
+                    !isCardVendible(selectedHandCard)
+                      ? 'Esta carta no tiene Sell Tag (Solo se venden Programas, Gears y MT0D12 Flathead)'
+                      : p.hasSoldThisTurn
+                      ? 'Ya has vendido una carta este turno'
+                      : 'Vender carta a la Zona de Eddies (+1 €$)'
+                  }
                 >
-                  VENDER (+1 €$)
+                  {!isCardVendible(selectedHandCard) ? 'NO VENDIBLE' : 'VENDER (+1 €$)'}
                 </button>
 
                 <button
@@ -1484,14 +1654,18 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                       className="w-full h-full object-cover object-center"
                     />
 
-                    {/* Coste y Poder visibles */}
-                    <div className="absolute top-0.5 left-0.5 px-1 bg-black/90 border border-[#0dfceb] text-[#0dfceb] text-[8px] sm:text-[9px] font-black">
-                      {card.parsedCost} €$
-                    </div>
+                    {/* Distintivo de Carta Vendible oficial (Programas, Gears y MT0D12 Flathead) */}
+                    {isCardVendible(card) && (
+                      <div className="absolute top-0.5 right-0.5 px-1 bg-[#FCEE0A] text-[#070a10] text-[7px] font-black uppercase tracking-tighter shadow z-10">
+                        €$ VENDIBLE
+                      </div>
+                    )}
 
-                    <div className="absolute bottom-0.5 right-0.5 px-1.5 bg-[#FCEE0A] text-[#070a10] text-[9px] sm:text-[10px] font-black shadow-md">
-                      {card.parsedPower}
-                    </div>
+                    {card.parsedPower > 0 && (
+                      <div className="absolute bottom-0.5 right-0.5 px-1.5 bg-[#FCEE0A] text-[#070a10] text-[9px] sm:text-[10px] font-black shadow-md z-10">
+                        {card.parsedPower}
+                      </div>
+                    )}
                   </motion.div>
                 );
               })}
@@ -1552,11 +1726,18 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                   className="w-28 sm:w-32 md:w-36 h-40 sm:h-48 md:h-52 bg-black border border-gray-700 shrink-0 relative overflow-hidden shadow-xl transition-transform hover:scale-105"
                 >
                   <img src={c.image} alt={c.name} className="w-full h-full object-cover" />
-                  <span className="absolute bottom-1 right-1 px-1.5 py-0.5 bg-[#FCEE0A] text-[#070a10] text-[10px] font-black shadow">
-                    {c.parsedCost} €$
-                  </span>
+                  {isCardVendible(c) && (
+                    <span className="absolute top-1 right-1 px-1.5 py-0.5 bg-[#FCEE0A] text-[#070a10] text-[8px] font-black uppercase shadow">
+                      €$ VENDIBLE
+                    </span>
+                  )}
+                  {c.parsedCost > 0 && (
+                    <span className="absolute bottom-1 right-1 px-1.5 py-0.5 bg-black/90 border border-[#0dfceb] text-[#0dfceb] text-[9px] font-black shadow">
+                      {c.parsedCost} €$
+                    </span>
+                  )}
                   {c.parsedPower > 0 && (
-                    <span className="absolute bottom-1 left-1 px-1.5 py-0.5 bg-[#FF003C] text-white text-[10px] font-black shadow">
+                    <span className="absolute bottom-1 left-1 px-1.5 py-0.5 bg-[#FF003C] text-white text-[9px] font-black shadow">
                       {c.parsedPower}
                     </span>
                   )}

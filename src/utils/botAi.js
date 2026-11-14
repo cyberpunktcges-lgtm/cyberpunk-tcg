@@ -14,7 +14,8 @@ import {
   fightRivalUnit,
   passTurn,
   hasKeyword,
-  calculateGigsToSteal
+  calculateGigsToSteal,
+  isCardVendible
 } from './cyberpunkEngine.js';
 
 /**
@@ -52,16 +53,19 @@ export async function runBotTurn(gameState, updateCallback, delayMs = 700) {
   const bot = gameState.bot;
   const player = gameState.player;
 
-  // Paso 1: Si tiene cartas en mano y aún no ha vendido este turno, vender para ganar +1 €$ recurrente
+  // Paso 1: Si tiene cartas en mano y aún no ha vendido este turno, vender una carta vendible (Programas, Gears o Flathead)
   if (bot.hand.length > 0 && !bot.hasSoldThisTurn) {
-    // Vender la carta más cara o redundante para expandir economía
-    const cardToSell =
-      bot.hand.find((c) => (c.parsedCost || 0) >= 6) ||
-      bot.hand[bot.hand.length - 1];
-    if (cardToSell) {
-      await wait(delayMs);
-      sellCardForEddies(gameState, 'bot', cardToSell.instanceId);
-      updateCallback({ ...gameState });
+    const vendibleCards = bot.hand.filter((c) => isCardVendible(c));
+    if (vendibleCards.length > 0) {
+      // Priorizar vender un programa o gear prescindible
+      const cardToSell =
+        vendibleCards.find((c) => (c.parsedCost || 0) >= 4) ||
+        vendibleCards[vendibleCards.length - 1];
+      if (cardToSell) {
+        await wait(delayMs);
+        sellCardForEddies(gameState, 'bot', cardToSell.instanceId);
+        updateCallback({ ...gameState });
+      }
     }
   }
 

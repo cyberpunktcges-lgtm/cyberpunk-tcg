@@ -54,6 +54,33 @@ export function calculateGigsToSteal(attackerPower) {
 }
 
 /**
+ * Regla oficial de Venta (Sell for Turn):
+ * "reveal a card with a Sell Tag from your hand and place it face-down in your Eddies area. It is now an Eddie."
+ * En Cyberpunk TCG (Set 01), sólo tienen Sell Tag:
+ * - Todos los PROGRAMAS (PROGRAM)
+ * - Todos los GEARS (GEAR)
+ * - La unidad especial MT0D12 FLATHEAD (y ninguna otra unidad o leyenda).
+ */
+export function isCardVendible(card) {
+  if (!card) return false;
+  const officialType = (card.officialType || '').toUpperCase();
+  const cardType = (card.cardType || card.type || '').toUpperCase();
+  const name = (card.name || '').toUpperCase();
+  const slug = (card.slug || '').toLowerCase();
+
+  // Programas y Gears son vendibles
+  if (officialType === 'PROGRAM' || cardType.includes('PROGRAM')) return true;
+  if (officialType === 'GEAR' || cardType.includes('GEAR')) return true;
+
+  // La unidad MT0D12 FLATHEAD es la única unidad vendible del juego
+  if (name.includes('FLATHEAD') || slug.includes('flathead') || card.id === 'CP-081') {
+    return true;
+  }
+
+  return false;
+}
+
+/**
  * Parsea el coste numérico en Eddies de una carta (ej: "4 EDDIES" -> 4)
  */
 export function parseCardCost(costStr) {
@@ -95,48 +122,84 @@ export function shuffleDeck(cards) {
  * 6. Opción de 1 Mulligan por partida.
  */
 export function createInitialGameState(playerDeckInput, botDeckInput, allCards = []) {
+  // Mapa de búsqueda rápida de la base de datos oficial
+  const cardLookup = new Map();
+  allCards.forEach((c) => {
+    if (c.id) cardLookup.set(String(c.id).toUpperCase(), c);
+    if (c.slug) cardLookup.set(String(c.slug).toLowerCase(), c);
+    if (c.name) cardLookup.set(String(c.name).toLowerCase().trim(), c);
+  });
+
+  const enrichCard = (c, prefix, idx) => {
+    const key = (c.id ? String(c.id).toUpperCase() : '') ||
+                (c.slug ? String(c.slug).toLowerCase() : '') ||
+                (c.name ? String(c.name).toLowerCase().trim() : '');
+    const found = cardLookup.get(key) ||
+                  (c.name ? cardLookup.get(String(c.name).toLowerCase().trim()) : null) ||
+                  (c.slug ? cardLookup.get(String(c.slug).toLowerCase()) : null);
+
+    const merged = found
+      ? {
+          ...found,
+          ...c,
+          cost: found.cost || c.cost,
+          power: found.power || c.power,
+          officialType: found.officialType || c.officialType,
+          keywords: found.keywords || c.keywords,
+          image: found.image || c.image
+        }
+      : c;
+
+    return {
+      ...merged,
+      instanceId: `${prefix}-c-${idx}-${Date.now()}`,
+      parsedCost: parseCardCost(merged.cost),
+      parsedPower: parseCardPower(merged.power)
+    };
+  };
+
+  const enrichLegend = (l, prefix, idx, isSpent) => {
+    const key = (l.id ? String(l.id).toUpperCase() : '') ||
+                (l.slug ? String(l.slug).toLowerCase() : '') ||
+                (l.name ? String(l.name).toLowerCase().trim() : '');
+    const found = cardLookup.get(key) ||
+                  (l.name ? cardLookup.get(String(l.name).toLowerCase().trim()) : null) ||
+                  (l.slug ? cardLookup.get(String(l.slug).toLowerCase()) : null);
+    const merged = found ? { ...found, ...l, image: found.image || l.image } : l;
+
+    return {
+      ...merged,
+      instanceId: `${prefix}-leg-${idx}-${Date.now()}`,
+      isFaceUp: false,
+      isSpent
+    };
+  };
+
   // 1. Preparar mazo y leyendas del jugador
-  const playerLegends = (playerDeckInput.legends || []).slice(0, 3).map((l, idx) => ({
-    ...l,
-    instanceId: `p-leg-${idx}-${Date.now()}`,
-    isFaceUp: false,
-    // REGLA OFICIAL: El jugador que va primero gira sus 2 leyendas más a la izquierda
-    isSpent: idx < 2
-  }));
+  const playerLegends = (playerDeckInput.legends || []).slice(0, 3).map((l, idx) =>
+    enrichLegend(l, 'p', idx, idx < 2)
+  );
 
   // Expandir mazo del jugador por qty
   const rawPlayerCards = [];
   (playerDeckInput.deckList || playerDeckInput.cards || []).forEach((c) => {
     const qty = c.qty || 1;
     for (let i = 0; i < qty; i++) {
-      rawPlayerCards.push({
-        ...c,
-        instanceId: `p-c-${rawPlayerCards.length}-${Date.now()}`,
-        parsedCost: parseCardCost(c.cost),
-        parsedPower: parseCardPower(c.power)
-      });
+      rawPlayerCards.push(enrichCard(c, 'p', rawPlayerCards.length));
     }
   });
   const shuffledPlayerDeck = shuffleDeck(rawPlayerCards);
 
   // 2. Preparar mazo y leyendas del Bot (jugador 2: no sufre penalización de leyendas)
-  const botLegends = (botDeckInput.legends || []).slice(0, 3).map((l, idx) => ({
-    ...l,
-    instanceId: `b-leg-${idx}-${Date.now()}`,
-    isFaceUp: false,
-    isSpent: false
-  }));
+  const botLegends = (botDeckInput.legends || []).slice(0, 3).map((l, idx) =>
+    enrichLegend(l, 'b', idx, false)
+  );
 
   const rawBotCards = [];
   (botDeckInput.deckList || botDeckInput.cards || []).forEach((c) => {
     const qty = c.qty || 1;
     for (let i = 0; i < qty; i++) {
-      rawBotCards.push({
-        ...c,
-        instanceId: `b-c-${rawBotCards.length}-${Date.now()}`,
-        parsedCost: parseCardCost(c.cost),
-        parsedPower: parseCardPower(c.power)
-      });
+      rawBotCards.push(enrichCard(c, 'b', rawBotCards.length));
     }
   });
   const shuffledBotDeck = shuffleDeck(rawBotCards);
@@ -269,6 +332,7 @@ export function checkWinCondition(state, targetPlayerKey) {
 
 /**
  * Vende una carta de la mano a la zona de Eddies boca abajo (1 vez por turno).
+ * REGLA OFICIAL: Solo se pueden vender cartas con Sell Tag (Programas, Gears y MT0D12 Flathead).
  * La carta entra lista (ready) para gastar 1 €$ inmediatamente.
  */
 export function sellCardForEddies(state, playerKey, cardInstanceId) {
@@ -278,7 +342,15 @@ export function sellCardForEddies(state, playerKey, cardInstanceId) {
   const cardIdx = p.hand.findIndex((c) => c.instanceId === cardInstanceId);
   if (cardIdx === -1) return { success: false, reason: 'Carta no encontrada en mano.' };
 
-  const [card] = p.hand.splice(cardIdx, 1);
+  const card = p.hand[cardIdx];
+  if (!isCardVendible(card)) {
+    return {
+      success: false,
+      reason: `"${card.name}" no tiene Sell Tag. Solo son vendibles los Programas, los Gears y la unidad MT0D12 Flathead.`
+    };
+  }
+
+  p.hand.splice(cardIdx, 1);
   p.eddies.push({
     ...card,
     isSpent: false, // Entra lista para usarse este turno
@@ -287,10 +359,26 @@ export function sellCardForEddies(state, playerKey, cardInstanceId) {
   p.hasSoldThisTurn = true;
 
   state.actionLog.unshift(
-    `${p.name} vende "${card.name}" a su zona de Eddies (+1 €$).`
+    `💰 ${p.name} vende "${card.name}" [${card.officialType || 'SELL TAG'}] a su Zona de Eddies (+1 €$).`
   );
 
   return { success: true };
+}
+
+/**
+ * Gira o endereza manualmente una carta en la Zona de Eddies para gastar o devolver 1 €$
+ */
+export function toggleEddieSpent(state, playerKey, eddieInstanceId) {
+  const p = state[playerKey];
+  const ed = p.eddies.find((e) => e.instanceId === eddieInstanceId);
+  if (!ed) return { success: false, reason: 'Eddie no encontrado.' };
+
+  ed.isSpent = !ed.isSpent;
+  state.actionLog.unshift(
+    `💶 ${p.name} ${ed.isSpent ? 'gira (-1 €$ gastado)' : 'endereza (+1 €$ disponible)'} una carta en su Zona de Eddies.`
+  );
+
+  return { success: true, isSpent: ed.isSpent };
 }
 
 /**
