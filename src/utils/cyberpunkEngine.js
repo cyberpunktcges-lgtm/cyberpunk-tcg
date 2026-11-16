@@ -6,9 +6,14 @@
 
 import {
   executeProgramEffect,
+  executeUnitPlayTrigger,
   executeUnitAttackTrigger,
   executeCombatWinTrigger,
-  executeCombatLossTrigger
+  executeCombatLossTrigger,
+  executeUnitDefeatedTrigger,
+  executeCallLegendTrigger,
+  executeStartOfTurnTriggers,
+  executeEndOfTurnTriggers
 } from './cardEffects.js';
 
 // Dados poliédricos de Gigs y sus valores máximos
@@ -638,6 +643,9 @@ export function playUnitCard(state, playerKey, cardInstanceId) {
     }.`
   );
 
+  // Ejecutar habilidades al entrar al campo (On-Play triggers)
+  executeUnitPlayTrigger(state, playerKey, unitInstance);
+
   return { success: true, type: 'UNIT', unit: unitInstance };
 }
 
@@ -693,6 +701,9 @@ export function callLegendFaceUp(state, playerKey, legendInstanceId) {
   state.actionLog.unshift(
     `👑 ${p.name} usa 1 €$ girado y llama a su Leyenda "${leg.name || 'Leyenda'}" boca arriba.`
   );
+
+  // Disparar habilidad CALL de la Leyenda si posee
+  executeCallLegendTrigger(state, playerKey, leg);
 
   return { success: true };
 }
@@ -836,6 +847,7 @@ export function resolveFight(state, attPlayerKey, attUnit, defPlayerKey, defUnit
       // Disparar habilidades de victoria y derrota (Johnny Silverhand, Satori, Safety Override)
       executeCombatWinTrigger(state, attPlayerKey, attUnit, defeated);
       executeCombatLossTrigger(state, defPlayerKey, defeated, attUnit);
+      executeUnitDefeatedTrigger(state, defPlayerKey, defeated);
     }
   } else if (defPower > attPower) {
     // Defensor gana (contraataque)
@@ -855,27 +867,32 @@ export function resolveFight(state, attPlayerKey, attUnit, defPlayerKey, defUnit
         // Disparar habilidades de victoria y derrota (Johnny Silverhand, Satori, Safety Override)
         executeCombatWinTrigger(state, defPlayerKey, defUnit, defeated);
         executeCombatLossTrigger(state, attPlayerKey, defeated, defUnit);
+        executeUnitDefeatedTrigger(state, attPlayerKey, defeated);
       }
     }
   } else {
     // REGLA OFICIAL DE EMPATE: Ambas unidades son derrotadas y van a la basura!
     if (attPower > 0 && defPower > 0) {
       const defIdx = defender.field.findIndex((u) => u.instanceId === defUnit.instanceId);
+      let defeatedDef = null;
       if (defIdx !== -1) {
-        const [defeatedDef] = defender.field.splice(defIdx, 1);
+        [defeatedDef] = defender.field.splice(defIdx, 1);
         defender.trash.push(defeatedDef);
         if (defeatedDef.gear && defeatedDef.gear.length > 0) {
           defeatedDef.gear.forEach((g) => defender.trash.push(g));
         }
       }
       const attIdx = attacker.field.findIndex((u) => u.instanceId === attUnit.instanceId);
+      let defeatedAtt = null;
       if (attIdx !== -1) {
-        const [defeatedAtt] = attacker.field.splice(attIdx, 1);
+        [defeatedAtt] = attacker.field.splice(attIdx, 1);
         attacker.trash.push(defeatedAtt);
         if (defeatedAtt.gear && defeatedAtt.gear.length > 0) {
           defeatedAtt.gear.forEach((g) => attacker.trash.push(g));
         }
       }
+      if (defeatedDef) executeUnitDefeatedTrigger(state, defPlayerKey, defeatedDef);
+      if (defeatedAtt) executeUnitDefeatedTrigger(state, attPlayerKey, defeatedAtt);
       state.actionLog.unshift(
         `☠️ ¡EMPATE LETAL (${attPower} vs ${defPower})! Ambas unidades pierden el combate y van a la Basura.`
       );
@@ -1049,6 +1066,9 @@ export function executeStartPhase(state, playerKey) {
     return state;
   }
 
+  // Disparar habilidades de inicio de turno (Start Phase Triggers)
+  executeStartOfTurnTriggers(state, playerKey);
+
   // 4. ROLL IN A GIG (Selección y lanzamiento de dado del Fixer)
   if (p.fixerDice.length > 0) {
     if (playerKey === 'player') {
@@ -1086,6 +1106,9 @@ export function executeStartPhase(state, playerKey) {
  */
 export function passTurn(state) {
   if (state.isGameOver) return state;
+
+  // Disparar habilidades de fin de turno (End of Turn Triggers)
+  executeEndOfTurnTriggers(state, state.activePlayer);
 
   const nextPlayerKey = state.activePlayer === 'player' ? 'bot' : 'player';
   state.activePlayer = nextPlayerKey;

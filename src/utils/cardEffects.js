@@ -1,142 +1,13 @@
 /**
  * MOTOR DE EFECTOS Y REGLAS DE CARTAS DE CYBERPUNK TCG (SET 01: WELCOME TO NIGHT CITY)
- * Contiene el texto oficial de cada carta y la lógica de ejecución de habilidades.
+ * Contiene el catálogo oficial completo de las 151 cartas y los manejadores
+ * de lógica para Programas, Unidades (On-Play, On-Attack, Combate, Derrota),
+ * Leyendas (Call, ↷ Spend) y Gears.
  */
 
-export const CARD_RULES_TEXT = {
-  // ==================== LEYENDAS ====================
-  'CP-002': {
-    name: 'Adam Smasher // Ender of Legends',
-    rulesText: 'GO SOLO (Pay this Legend\'s cost to play it as a ready Unit. It can attack this turn. If it leaves the field, remove it from the game.)\nPLAY Defeat a rival Unit.',
-    keywords: ['Go Solo', 'Play']
-  },
-  'CP-082': {
-    name: 'Muamar Reyes // El Capitán',
-    rulesText: 'CALL Choose one effect:\n- A friendly Unit can\'t be defeated in a fight this turn.\n- Draw 1.\n↷: Adjust a Gig by 1.',
-    keywords: ['Call']
-  },
-  'CP-104': {
-    name: 'River Ward // Detective on the Hunt',
-    rulesText: 'QUICK ↷: Play a Gear with cost 2 or less from your hand for free.\nWhen a friendly equipped Unit is defeated, search the top 2 cards of your deck and trash 1.',
-    keywords: ['Quick']
-  },
-  'CP-008': {
-    name: 'Alt Cunningham // Soulkiller Architect',
-    rulesText: 'Program cards you play cost 1 less for each friendly min Gig.\nOnce per turn, you may play a Program card from your trash as if it were in your hand.',
-    keywords: ['Discount']
-  },
-  'CP-045': {
-    name: 'Hanako Arasaka // Daughter of the Emperor',
-    rulesText: 'START At the start of your turn, if you control 2 or more Gigs with the same value, draw 1.',
-    keywords: ['Start']
-  },
-  'CP-051': {
-    name: 'Jackie Welles // Pour One Out for Me',
-    rulesText: 'When you play a Blue Unit or Gear, you may decrease a friendly Gig by 1.\nWhen a friendly Gig becomes a min Gig, draw 1.',
-    keywords: ['Trigger']
-  },
+import allCardRules from '../data/allCardRules.json' with { type: 'json' };
 
-  // ==================== PROGRAMAS ====================
-  'CP-014': {
-    name: 'Bootleg Black Sapphire Show',
-    rulesText: 'Sell the top card of your deck.\nIf you control a Gig with an even value and a Gig with an odd value, draw 2.',
-    keywords: []
-  },
-  'CP-025': {
-    name: 'Detonate',
-    rulesText: 'QUICK Defeat a rival Gear with power 2 or less.',
-    keywords: ['Quick']
-  },
-  'CP-063': {
-    name: 'Live With the Aftermath',
-    rulesText: 'Each player defeats one of their Units.',
-    keywords: []
-  },
-  'CP-112': {
-    name: 'Safety Override',
-    rulesText: 'QUICK The next time a friendly Unit loses a fight this turn, defeat the opposing rival Unit.',
-    keywords: ['Quick']
-  },
-  'CP-037': {
-    name: 'Fool on the Hill',
-    rulesText: 'Search your deck for a Merc Unit, reveal it, and add it to your hand. Shuffle your deck.',
-    keywords: []
-  },
-  'CP-094': {
-    name: 'Peace Offering',
-    rulesText: 'Draw 2 cards, then place 1 card from your hand on the bottom of your deck.',
-    keywords: []
-  },
-  'CP-074': {
-    name: 'Memory Relapse',
-    rulesText: 'Add 1 Program from your trash to your hand.',
-    keywords: []
-  },
-
-  // ==================== UNIDADES ====================
-  'CP-001': {
-    name: '6th Street Recruits',
-    rulesText: 'When a friendly Unit steals a d6, increase a Gig by up to 6.',
-    keywords: []
-  },
-  'CP-054': {
-    name: 'Johnny Silverhand // Never Stop Fighting',
-    rulesText: 'The first time this Unit wins a fight each turn, ready it.\nThis Unit wins all fights against CORPO Units.',
-    keywords: []
-  },
-  'CP-075': {
-    name: 'Meredith Stout // Stone-Cold Corpo',
-    rulesText: 'BLOCKER\nThis Unit has +2 power while fighting a Legend.\nWhen a Rival adjusts or swaps 1 or more friendly Gigs, you may add a card from your trash to your hand.',
-    keywords: ['Blocker']
-  },
-  'CP-105': {
-    name: 'Rockin\' Rockerboy',
-    rulesText: 'Scream your throat raw for something. Anything.',
-    keywords: []
-  },
-  'CP-119': {
-    name: 'Secondhand Bombus',
-    rulesText: 'BLOCKER (You may spend this Unit to redirect a rival Unit\'s attack to it instead.)\n(Units with power 0 don\'t steal Gigs.)',
-    keywords: ['Blocker']
-  },
-  'CP-121': {
-    name: 'Sketchy Ripper',
-    rulesText: 'ATTACK Search the top 3 cards of your deck. Reveal a Gear and add it to your hand. Bottom-deck the rest.\n(Units with power 0 don\'t steal Gigs.)',
-    keywords: ['Attack']
-  },
-  'CP-095': {
-    name: 'Pepe Najarro // Working Doubles',
-    rulesText: 'When this Unit enters the field, you may pay 1 €$ to draw 1.',
-    keywords: []
-  },
-
-  // ==================== GEARS ====================
-  'CP-004': {
-    name: 'Adrenaline Converter',
-    rulesText: '(Equip to a friendly Unit or face-up Legend.)\nIf a Rival controls at least 2 more Gigs than you, this Unit has ADRENALINE. (This Unit can attack the turn it\'s played.)',
-    keywords: ['Adrenaline']
-  },
-  'CP-068': {
-    name: 'Mandibular Upgrade',
-    rulesText: '(Equip to a friendly Unit or face-up Legend.)\nBLOCKER (You may spend this Unit to redirect a rival Unit\'s attack to it instead.)',
-    keywords: ['Blocker']
-  },
-  'CP-069': {
-    name: 'Mantis Blades',
-    rulesText: '(Equip to a friendly Unit or face-up Legend.)\n"One cut, one kill."',
-    keywords: []
-  },
-  'CP-116': {
-    name: 'Satori // Sword of Saburo',
-    rulesText: '(Equip to a friendly Unit or face-up Legend.)\nWhen this Unit wins a fight against a rival Unit, draw 1.',
-    keywords: []
-  },
-  'CP-151': {
-    name: 'Zetatech Faceplate',
-    rulesText: '(Equip to a friendly Unit or face-up Legend.)\nWhen this Unit or Legend is spent, adjust a Gig by up to 1. Then, if you control 3 or more Gigs with different values, draw 1.',
-    keywords: []
-  }
-};
+export const CARD_RULES_TEXT = allCardRules;
 
 /**
  * Retorna el texto de reglas oficial de una carta según su ID, slug o nombre.
@@ -144,22 +15,67 @@ export const CARD_RULES_TEXT = {
 export function getCardRulesText(card) {
   if (!card) return '';
   if (card.rulesText) return card.rulesText;
-  if (CARD_RULES_TEXT[card.id]) return CARD_RULES_TEXT[card.id].rulesText;
+  if (CARD_RULES_TEXT[card.id]?.rulesText) return CARD_RULES_TEXT[card.id].rulesText;
 
-  // Búsqueda por coincidencia de nombre o slug
-  const entry = Object.values(CARD_RULES_TEXT).find(
-    (item) => item.name && card.name && item.name.toLowerCase().trim() === card.name.toLowerCase().trim()
-  );
+  // Búsqueda por coincidencia normalizada de nombre
+  const clean = (s) =>
+    (s || '')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, '');
+
+  const cName = clean(card.name);
+  const entry = Object.values(CARD_RULES_TEXT).find((item) => clean(item.name) === cName);
   return entry ? entry.rulesText : (card.ability || '');
 }
 
 /**
- * EJECUTA EL EFECTO DE UN PROGRAMA AL LANZARSE
- * @param {Object} state - Estado completo del juego
- * @param {string} playerKey - 'player' | 'bot'
- * @param {Object} card - Objeto de la carta lanzada
- * @returns {Object} Resultado de la ejecución { executed: boolean, message: string }
+ * Helper para robar N cartas del mazo de un jugador
  */
+function drawCards(player, count, state, sourceName) {
+  if (!player.deck || player.deck.length === 0) return [];
+  const drawn = player.deck.splice(0, Math.min(count, player.deck.length));
+  if (!player.hand) player.hand = [];
+  player.hand.push(...drawn);
+  state.actionLog.unshift(
+    `🃏 [${sourceName}] ${player.name} roba ${drawn.length} carta(s): ${drawn.map((c) => c.name).join(', ')}.`
+  );
+  return drawn;
+}
+
+/**
+ * Helper para descartar N cartas de la mano
+ */
+function discardCards(player, count, state, sourceName) {
+  if (!player.hand || player.hand.length === 0) return [];
+  const discarded = player.hand.splice(0, Math.min(count, player.hand.length));
+  if (!player.trash) player.trash = [];
+  player.trash.push(...discarded);
+  state.actionLog.unshift(
+    `🗑️ [${sourceName}] ${player.name} descarta ${discarded.length} carta(s): ${discarded.map((c) => c.name).join(', ')}.`
+  );
+  return discarded;
+}
+
+/**
+ * Helper para enviar las N cartas superiores del mazo al Trash (Trash N)
+ */
+function trashFromDeck(player, count, state, sourceName) {
+  if (!player.deck || player.deck.length === 0) return [];
+  const trashed = player.deck.splice(0, Math.min(count, player.deck.length));
+  if (!player.trash) player.trash = [];
+  player.trash.push(...trashed);
+  state.actionLog.unshift(
+    `☣️ [${sourceName}] ${player.name} envía ${trashed.length} carta(s) del mazo a la Basura: ${trashed.map((c) => c.name).join(', ')}.`
+  );
+  return trashed;
+}
+
+// =========================================================================
+// 1. MOTOR DE PROGRAMAS (34 CARTAS)
+// =========================================================================
+
 export function executeProgramEffect(state, playerKey, card) {
   if (!state || !card) return { executed: false };
   const p = state[playerKey];
@@ -168,169 +84,469 @@ export function executeProgramEffect(state, playerKey, card) {
   const cardId = card.id || '';
   const cardName = card.name || 'Programa';
 
-  // 1. BOOTLEG BLACK SAPPHIRE SHOW (CP-014)
-  // "Sell the top card of your deck. If you control a Gig with an even value and a Gig with an odd value, draw 2."
-  if (cardId === 'CP-014' || cardName.includes('Black Sapphire')) {
-    // A) Sell the top card of your deck:
-    let soldCardName = '';
-    if (p.deck && p.deck.length > 0) {
-      const topCard = p.deck.shift();
-      soldCardName = topCard.name;
-      if (!p.eddies) p.eddies = [];
-      p.eddies.push({
-        ...topCard,
-        isSpent: false,
-        soldAtTurn: state.turnNumber
-      });
-      state.actionLog.unshift(
-        `💰 [${cardName}] Vende la carta superior "${topCard.name}" a la Zona de Eddies (+1 €$).`
-      );
-    } else {
-      state.actionLog.unshift(`⚠️ [${cardName}] No hay cartas en el mazo para vender.`);
+  // CP-005: Afterparty at Lizzie's
+  // "Adjust a Gig by up to 1. If you control 2 or more Gigs with different values, draw 1."
+  if (cardId === 'CP-005') {
+    if (p.gigs && p.gigs.length > 0) {
+      p.gigs[0].value = (p.gigs[0].value || 1) + 1;
+      state.actionLog.unshift(`🎉 [Afterparty at Lizzie's] Ajusta el Gig ${p.gigs[0].die.toUpperCase()} a ${p.gigs[0].value}.`);
     }
-
-    // B) Check even and odd Gigs:
-    const gigs = p.gigs || [];
-    const hasEven = gigs.some((g) => typeof g.value === 'number' && g.value % 2 === 0);
-    const hasOdd = gigs.some((g) => typeof g.value === 'number' && g.value % 2 !== 0);
-
-    if (hasEven && hasOdd) {
-      const drawn = p.deck.splice(0, 2);
-      p.hand.push(...drawn);
-      state.actionLog.unshift(
-        `🃏 [${cardName}] ¡Condición de Gig par e impar cumplida! ${p.name} roba 2 cartas: ${drawn.map((c) => c.name).join(', ')}.`
-      );
-    } else {
-      state.actionLog.unshift(
-        `ℹ️ [${cardName}] Requiere un Gig par y un Gig impar en juego para robar 2 cartas. (No se cumplió la condición).`
-      );
+    const values = (p.gigs || []).map((g) => g.value);
+    const uniqueValues = new Set(values);
+    if (uniqueValues.size >= 2) {
+      drawCards(p, 1, state, cardName);
     }
-
-    return { executed: true, message: `Efecto de "${cardName}" aplicado con éxito.` };
+    return { executed: true };
   }
 
-  // 2. DETONATE (CP-025)
+  // CP-006: All Is Lost
+  // "Trash 3. Add a Unit from among them to your hand."
+  if (cardId === 'CP-006') {
+    const trashed = trashFromDeck(p, 3, state, cardName);
+    const unitIdx = trashed.findIndex((c) => c.officialType === 'UNIT' || c.type?.includes('UNIT'));
+    if (unitIdx !== -1) {
+      const unit = trashed.splice(unitIdx, 1)[0];
+      p.hand.push(unit);
+      // Quitarlo del trash también
+      const tIdx = p.trash.lastIndexOf(unit);
+      if (tIdx !== -1) p.trash.splice(tIdx, 1);
+      state.actionLog.unshift(`🔎 [All Is Lost] Recupera la Unidad "${unit.name}" a la mano.`);
+    }
+    return { executed: true };
+  }
+
+  // CP-010: Appetite for Destruction
+  // "The next time a friendly Unit wins a fight by 3+ power this turn, it also steals a Gig."
+  if (cardId === 'CP-010') {
+    p.appetiteForDestructionActive = true;
+    state.actionLog.unshift(`🔥 [Appetite for Destruction] Activado: la próxima vez que una unidad gane por 3+ de poder, también robará un Gig.`);
+    return { executed: true };
+  }
+
+  // CP-013: Bonnie and Clyde
+  // "Defeat a rival Unit with power 4 or less. You may defeat 2 instead if a Rival controls at least 2 Gigs more than you."
+  if (cardId === 'CP-013') {
+    const rivalMoreGigs = (opp.gigs?.length || 0) >= (p.gigs?.length || 0) + 2;
+    const maxToDefeat = rivalMoreGigs ? 2 : 1;
+    let defeatedCount = 0;
+    for (let i = (opp.field?.length || 0) - 1; i >= 0 && defeatedCount < maxToDefeat; i--) {
+      if ((opp.field[i].currentPower || opp.field[i].power || 0) <= 4) {
+        const [dead] = opp.field.splice(i, 1);
+        if (!opp.trash) opp.trash = [];
+        opp.trash.push(dead);
+        defeatedCount++;
+        state.actionLog.unshift(`💥 [Bonnie and Clyde] Destruye a la unidad rival "${dead.name}" (Poder <= 4).`);
+      }
+    }
+    if (defeatedCount === 0) {
+      state.actionLog.unshift(`ℹ️ [Bonnie and Clyde] El rival no tenía unidades con poder 4 o menos.`);
+    }
+    return { executed: true };
+  }
+
+  // CP-014: Bootleg Black Sapphire Show
+  // "Sell the top card of your deck. If you control a Gig with an even value and a Gig with an odd value, draw 2."
+  if (cardId === 'CP-014' || cardName.includes('Black Sapphire')) {
+    if (p.deck && p.deck.length > 0) {
+      const topCard = p.deck.shift();
+      if (!p.eddies) p.eddies = [];
+      p.eddies.push({ ...topCard, isSpent: false, soldAtTurn: state.turnNumber });
+      state.actionLog.unshift(`💰 [${cardName}] Vende "${topCard.name}" a la Zona de Eddies (+1 €$).`);
+    }
+    const hasEven = (p.gigs || []).some((g) => typeof g.value === 'number' && g.value % 2 === 0);
+    const hasOdd = (p.gigs || []).some((g) => typeof g.value === 'number' && g.value % 2 !== 0);
+    if (hasEven && hasOdd) {
+      drawCards(p, 2, state, cardName);
+    } else {
+      state.actionLog.unshift(`ℹ️ [${cardName}] No se cumplió la condición de tener un Gig par y un Gig impar.`);
+    }
+    return { executed: true };
+  }
+
+  // CP-016: Carnage at the Colosseum
+  // "Defeat a rival Unit with less power than a friendly Unit."
+  if (cardId === 'CP-016') {
+    const maxFriendlyPower = Math.max(0, ...(p.field || []).map((u) => u.currentPower || 0));
+    const targetIdx = (opp.field || []).findIndex((u) => (u.currentPower || 0) < maxFriendlyPower);
+    if (targetIdx !== -1) {
+      const [dead] = opp.field.splice(targetIdx, 1);
+      if (!opp.trash) opp.trash = [];
+      opp.trash.push(dead);
+      state.actionLog.unshift(`⚔️ [Carnage at the Colosseum] Destruye a "${dead.name}" (su poder es menor que el de tus unidades).`);
+    } else {
+      state.actionLog.unshift(`ℹ️ [Carnage at the Colosseum] No hay unidades rivales con menor poder que tus unidades.`);
+    }
+    return { executed: true };
+  }
+
+  // CP-018: Chrome Reverie
+  // "A rival Unit can't attack until your next turn. If you control a min Gig, you may Call a Legend for free."
+  if (cardId === 'CP-018') {
+    if (opp.field && opp.field.length > 0) {
+      opp.field[0].cannotAttackUntilNextTurn = true;
+      state.actionLog.unshift(`🛑 [Chrome Reverie] "${opp.field[0].name}" no puede atacar hasta tu próximo turno.`);
+    }
+    const hasMinGig = (p.gigs || []).some((g) => g.value === 1);
+    if (hasMinGig) {
+      const faceDownLegend = (p.legends || []).find((l) => !l.isFaceUp);
+      if (faceDownLegend) {
+        faceDownLegend.isFaceUp = true;
+        state.actionLog.unshift(`👑 [Chrome Reverie] ¡Condición de Gig mínimo! Llama gratis a la Leyenda "${faceDownLegend.name}".`);
+      }
+    }
+    return { executed: true };
+  }
+
+  // CP-020: Corporate Surveillance
+  // "Spend a rival Unit with cost 4 or less."
+  if (cardId === 'CP-020') {
+    const target = (opp.field || []).find((u) => !u.isSpent && (u.costNum || u.cost || 0) <= 4);
+    if (target) {
+      target.isSpent = true;
+      state.actionLog.unshift(`👁️ [Corporate Surveillance] Gira (Spend) a la unidad rival "${target.name}".`);
+    }
+    return { executed: true };
+  }
+
+  // CP-021: Cyberpsychosis
+  // "Give an equipped Unit +3 power this turn for each of its equipped Gears."
+  if (cardId === 'CP-021') {
+    const target = (p.field || []).find((u) => u.gear && u.gear.length > 0);
+    if (target) {
+      const bonus = target.gear.length * 3;
+      target.currentPower = (target.currentPower || target.power || 0) + bonus;
+      state.actionLog.unshift(`⚡ [Cyberpsychosis] "${target.name}" gana +${bonus} de poder este turno.`);
+    }
+    return { executed: true };
+  }
+
+  // CP-025: Detonate
   // "QUICK Defeat a rival Gear with power 2 or less."
   if (cardId === 'CP-025' || cardName.toLowerCase() === 'detonate') {
-    let defeatedGear = null;
-    let fromTarget = '';
-
-    // Buscar en las unidades rivales un Gear con poder <= 2
+    let defeated = false;
     for (const unit of opp.field || []) {
       if (unit.gear && unit.gear.length > 0) {
         const idx = unit.gear.findIndex((g) => (g.powerBonus || g.parsedPower || 0) <= 2);
         if (idx !== -1) {
-          defeatedGear = unit.gear.splice(idx, 1)[0];
-          fromTarget = unit.name;
-          const loss = defeatedGear.powerBonus || defeatedGear.parsedPower || 0;
-          unit.currentPower = Math.max(0, (unit.currentPower || unit.power) - loss);
+          const [gear] = unit.gear.splice(idx, 1);
           if (!opp.trash) opp.trash = [];
-          opp.trash.push(defeatedGear);
+          opp.trash.push(gear);
+          state.actionLog.unshift(`💥 [Detonate] Destruye el Gear rival "${gear.name}" de "${unit.name}".`);
+          defeated = true;
           break;
         }
       }
     }
-
-    // Si no encontró en unidades, buscar en leyendas rivales
-    if (!defeatedGear) {
-      for (const leg of opp.legends || []) {
-        if (leg.gear && leg.gear.length > 0) {
-          const idx = leg.gear.findIndex((g) => (g.powerBonus || g.parsedPower || 0) <= 2);
-          if (idx !== -1) {
-            defeatedGear = leg.gear.splice(idx, 1)[0];
-            fromTarget = leg.name;
-            if (!opp.trash) opp.trash = [];
-            opp.trash.push(defeatedGear);
-            break;
-          }
-        }
-      }
+    if (!defeated) {
+      state.actionLog.unshift(`ℹ️ [Detonate] No se encontraron Gears rivales con poder 2 o menos.`);
     }
-
-    if (defeatedGear) {
-      state.actionLog.unshift(
-        `💥 [Detonate] ${p.name} destruye el Gear rival "${defeatedGear.name}" equipado en "${fromTarget}".`
-      );
-    } else {
-      state.actionLog.unshift(
-        `ℹ️ [Detonate] El rival no tiene ningún Gear con 2 de poder o menos equipado para destruir.`
-      );
-    }
-
     return { executed: true };
   }
 
-  // 3. LIVE WITH THE AFTERMATH (CP-063)
+  // CP-028: (Don't Fear) The Reaper
+  // "Spend all rival Units. Then, defeat a spent Unit."
+  if (cardId === 'CP-028') {
+    (opp.field || []).forEach((u) => (u.isSpent = true));
+    state.actionLog.unshift(`💀 [(Don't Fear) The Reaper] Gira a todas las unidades rivales.`);
+    if (opp.field && opp.field.length > 0) {
+      const [dead] = opp.field.splice(0, 1);
+      if (!opp.trash) opp.trash = [];
+      opp.trash.push(dead);
+      state.actionLog.unshift(`💀 [(Don't Fear) The Reaper] Destruye a la unidad girada "${dead.name}".`);
+    }
+    return { executed: true };
+  }
+
+  // CP-036: Floor It!
+  // "Give a rival Unit -1 power this turn. Draw 1."
+  if (cardId === 'CP-036') {
+    if (opp.field && opp.field.length > 0) {
+      opp.field[0].currentPower = Math.max(0, (opp.field[0].currentPower || 1) - 1);
+      state.actionLog.unshift(`🏎️ [Floor It!] Reduce el poder de "${opp.field[0].name}" en 1.`);
+    }
+    drawCards(p, 1, state, cardName);
+    return { executed: true };
+  }
+
+  // CP-037: Fool on the Hill
+  // "Reveal the top 2 cards of your deck. A Rival chooses whether you add them to your hand or trash them. If you trash them, draw 2."
+  if (cardId === 'CP-037') {
+    trashFromDeck(p, 2, state, cardName);
+    drawCards(p, 2, state, cardName);
+    return { executed: true };
+  }
+
+  // CP-043: Gunpoint Diplomacy
+  // "Give a friendly Unit +3 power this turn and may attack ready Units."
+  if (cardId === 'CP-043') {
+    if (p.field && p.field.length > 0) {
+      p.field[0].currentPower = (p.field[0].currentPower || 0) + 3;
+      p.field[0].canAttackReadyUnits = true;
+      state.actionLog.unshift(`🔫 [Gunpoint Diplomacy] "${p.field[0].name}" gana +3 de poder y puede atacar unidades enderezadas.`);
+    }
+    return { executed: true };
+  }
+
+  // CP-048: Industrial Assembly
+  // "Increase a Gig by up to 4. If you control a Gig with 8+ value, draw 1."
+  if (cardId === 'CP-048') {
+    if (p.gigs && p.gigs.length > 0) {
+      p.gigs[0].value = (p.gigs[0].value || 1) + 4;
+      state.actionLog.unshift(`🏭 [Industrial Assembly] Aumenta el Gig ${p.gigs[0].die.toUpperCase()} en +4 (Nuevo valor: ${p.gigs[0].value}).`);
+    }
+    if ((p.gigs || []).some((g) => g.value >= 8)) {
+      drawCards(p, 1, state, cardName);
+    }
+    return { executed: true };
+  }
+
+  // CP-062: Les Éléments
+  // "Bottom-deck a Rival's lowest-power Unit."
+  if (cardId === 'CP-062') {
+    if (opp.field && opp.field.length > 0) {
+      opp.field.sort((a, b) => (a.currentPower || 0) - (b.currentPower || 0));
+      const [lowest] = opp.field.splice(0, 1);
+      if (!opp.deck) opp.deck = [];
+      opp.deck.push(lowest);
+      state.actionLog.unshift(`🌊 [Les Éléments] Envía a "${lowest.name}" (la de menor poder) al fondo del mazo rival.`);
+    }
+    return { executed: true };
+  }
+
+  // CP-063: Live With the Aftermath
   // "Each player defeats one of their Units."
   if (cardId === 'CP-063' || cardName.includes('Aftermath')) {
-    // Jugador activo destruye una de sus unidades (la de menor poder si no se especifica)
     if (p.field && p.field.length > 0) {
-      p.field.sort((a, b) => (a.currentPower || a.power || 0) - (b.currentPower || b.power || 0));
-      const deadFriendly = p.field.shift();
+      const [deadFriendly] = p.field.splice(0, 1);
       if (!p.trash) p.trash = [];
       p.trash.push(deadFriendly);
-      state.actionLog.unshift(
-        `💀 [${cardName}] ${p.name} destruye a su propia Unidad "${deadFriendly.name}".`
-      );
-    } else {
-      state.actionLog.unshift(`ℹ️ [${cardName}] ${p.name} no tiene unidades en campo para destruir.`);
+      state.actionLog.unshift(`💀 [Live With the Aftermath] ${p.name} destruye a su unidad "${deadFriendly.name}".`);
     }
-
-    // Rival destruye una de sus unidades
     if (opp.field && opp.field.length > 0) {
-      opp.field.sort((a, b) => (a.currentPower || a.power || 0) - (b.currentPower || b.power || 0));
-      const deadRival = opp.field.shift();
+      const [deadRival] = opp.field.splice(0, 1);
       if (!opp.trash) opp.trash = [];
       opp.trash.push(deadRival);
-      state.actionLog.unshift(
-        `💀 [${cardName}] ${opp.name} destruye a su Unidad "${deadRival.name}".`
-      );
-    } else {
-      state.actionLog.unshift(`ℹ️ [${cardName}] ${opp.name} no tiene unidades en campo para destruir.`);
+      state.actionLog.unshift(`💀 [Live With the Aftermath] ${opp.name} destruye a su unidad "${deadRival.name}".`);
     }
-
     return { executed: true };
   }
 
-  // 4. SAFETY OVERRIDE (CP-112)
+  // CP-074: Memory Relapse
+  // "Spend a rival Unit. It can't ready until your next turn. If your Street Cred is an even number, draw 1."
+  if (cardId === 'CP-074') {
+    const target = (opp.field || []).find((u) => !u.isSpent) || opp.field?.[0];
+    if (target) {
+      target.isSpent = true;
+      target.cannotReadyUntilNextTurn = true;
+      state.actionLog.unshift(`🧠 [Memory Relapse] Gira a "${target.name}" y no podrá enderezarse hasta tu próximo turno.`);
+    }
+    const streetCred = (p.gigs || []).reduce((sum, g) => sum + (g.value || 0), 0);
+    if (streetCred % 2 === 0) {
+      drawCards(p, 1, state, cardName);
+    }
+    return { executed: true };
+  }
+
+  // CP-085: Nocturne Op55N1
+  // "Draw 2."
+  if (cardId === 'CP-085') {
+    drawCards(p, 2, state, cardName);
+    return { executed: true };
+  }
+
+  // CP-088: Over the Edge
+  // "Defeat a Unit with power equal to or less than the value of a friendly d20."
+  if (cardId === 'CP-088') {
+    const d20 = (p.gigs || []).find((g) => g.die.toLowerCase() === 'd20') || p.gigs?.[0];
+    const maxVal = d20 ? d20.value || 0 : 0;
+    const targetIdx = (opp.field || []).findIndex((u) => (u.currentPower || 0) <= maxVal);
+    if (targetIdx !== -1) {
+      const [dead] = opp.field.splice(targetIdx, 1);
+      if (!opp.trash) opp.trash = [];
+      opp.trash.push(dead);
+      state.actionLog.unshift(`💥 [Over the Edge] Destruye a "${dead.name}" (Poder <= ${maxVal} del Gig).`);
+    } else {
+      state.actionLog.unshift(`ℹ️ [Over the Edge] No hay unidades rivales con poder <= ${maxVal}.`);
+    }
+    return { executed: true };
+  }
+
+  // CP-094: Peace Offering
+  // "Set a Gig's value to the value of another Gig. Then, if you control a value-pair, draw 1."
+  if (cardId === 'CP-094') {
+    if (p.gigs && p.gigs.length >= 2) {
+      p.gigs[1].value = p.gigs[0].value;
+      state.actionLog.unshift(`🕊️ [Peace Offering] Iguala el Gig ${p.gigs[1].die.toUpperCase()} al valor de ${p.gigs[0].die.toUpperCase()} (${p.gigs[0].value}).`);
+      drawCards(p, 1, state, cardName);
+    }
+    return { executed: true };
+  }
+
+  // CP-098: Pyramid Song
+  // "Give a rival Unit -4 power this turn. Bottom-deck a rival Unit with power 0."
+  if (cardId === 'CP-098') {
+    if (opp.field && opp.field.length > 0) {
+      opp.field[0].currentPower = Math.max(0, (opp.field[0].currentPower || 0) - 4);
+      state.actionLog.unshift(`🌊 [Pyramid Song] Reduce el poder de "${opp.field[0].name}" en 4.`);
+      if (opp.field[0].currentPower === 0) {
+        const [dead] = opp.field.splice(0, 1);
+        if (!opp.deck) opp.deck = [];
+        opp.deck.push(dead);
+        state.actionLog.unshift(`🌊 [Pyramid Song] Al tener 0 de poder, "${dead.name}" va al fondo del mazo.`);
+      }
+    }
+    return { executed: true };
+  }
+
+  // CP-100: Reboot Optics
+  // "The next time a rival Unit fights this turn, it doesn't defeat the opposing friendly Unit."
+  if (cardId === 'CP-100') {
+    p.rebootOpticsActive = true;
+    state.actionLog.unshift(`👁️ [Reboot Optics] Activado: la próxima vez que una unidad rival luche este turno, no podrá derrotar a tu unidad.`);
+    return { executed: true };
+  }
+
+  // CP-112: Safety Override
   // "QUICK The next time a friendly Unit loses a fight this turn, defeat the opposing rival Unit."
   if (cardId === 'CP-112' || cardName.includes('Safety Override')) {
     p.safetyOverrideActive = true;
-    state.actionLog.unshift(
-      `🛡️ [Safety Override] Activado para ${p.name}: La próxima vez que una unidad tuya pierda un combate este turno, destruirá también a la unidad rival que combatió.`
-    );
+    state.actionLog.unshift(`🛡️ [Safety Override] Activado: la próxima vez que una unidad tuya pierda un combate este turno, destruirá también a la rival.`);
     return { executed: true };
   }
 
-  // 5. PEACE OFFERING (CP-094)
-  // "Draw 2 cards, then place 1 card from your hand on the bottom of your deck."
-  if (cardId === 'CP-094' || cardName.includes('Peace Offering')) {
-    const drawn = p.deck.splice(0, 2);
-    p.hand.push(...drawn);
-    if (p.hand.length > 0) {
-      const bottomCard = p.hand.pop();
-      p.deck.push(bottomCard);
-      state.actionLog.unshift(
-        `🕊️ [Peace Offering] ${p.name} roba 2 cartas y devuelve "${bottomCard.name}" al fondo del mazo.`
-      );
+  // CP-120: Shattered Memories
+  // "Each player discards their hand and may draw 5."
+  if (cardId === 'CP-120') {
+    discardCards(p, p.hand?.length || 0, state, cardName);
+    drawCards(p, 5, state, cardName);
+    discardCards(opp, opp.hand?.length || 0, state, cardName);
+    drawCards(opp, 5, state, cardName);
+    return { executed: true };
+  }
+
+  // CP-123: Synapse Burnout
+  // "A friendly Unit has +1 power for each friendly face-up Legend while fighting rival Units this turn."
+  if (cardId === 'CP-123') {
+    const faceUpLegends = (p.legends || []).filter((l) => l.isFaceUp).length;
+    if (p.field && p.field.length > 0) {
+      p.field[0].currentPower = (p.field[0].currentPower || 0) + faceUpLegends;
+      state.actionLog.unshift(`⚡ [Synapse Burnout] "${p.field[0].name}" gana +${faceUpLegends} de poder por tus Leyendas activas.`);
     }
     return { executed: true };
   }
 
-  // 6. MEMORY RELAPSE (CP-074)
-  // "Add 1 Program from your trash to your hand."
-  if (cardId === 'CP-074' || cardName.includes('Memory Relapse')) {
-    const progIdx = (p.trash || []).findIndex(
-      (c) => c.officialType === 'PROGRAM' || (c.type && c.type.includes('PROGRAM'))
-    );
-    if (progIdx !== -1) {
-      const recovered = p.trash.splice(progIdx, 1)[0];
-      p.hand.push(recovered);
-      state.actionLog.unshift(
-        `🧠 [Memory Relapse] ${p.name} recupera el Programa "${recovered.name}" del Trash a su mano.`
-      );
+  // CP-125: Take Control
+  // "A rival Unit steals 1 fewer Gig this turn. If that Unit is an AI, DRONE, or VEHICLE, draw 1."
+  if (cardId === 'CP-125') {
+    if (opp.field && opp.field.length > 0) {
+      opp.field[0].stolenReduction = 1;
+      state.actionLog.unshift(`🎮 [Take Control] "${opp.field[0].name}" robará 1 Gig menos este turno.`);
+    }
+    drawCards(p, 1, state, cardName);
+    return { executed: true };
+  }
+
+  // CP-127: The Heist
+  // "Trash 4. Add a Gear from among them to your hand."
+  if (cardId === 'CP-127') {
+    const trashed = trashFromDeck(p, 4, state, cardName);
+    const gearIdx = trashed.findIndex((c) => c.officialType === 'GEAR' || c.type?.includes('GEAR'));
+    if (gearIdx !== -1) {
+      const gear = trashed.splice(gearIdx, 1)[0];
+      p.hand.push(gear);
+      const tIdx = p.trash.lastIndexOf(gear);
+      if (tIdx !== -1) p.trash.splice(tIdx, 1);
+      state.actionLog.unshift(`💎 [The Heist] ¡Encontró el Gear "${gear.name}"! Añadido a la mano.`);
+    }
+    return { executed: true };
+  }
+
+  // CP-129: Three Mouths, One Desire
+  // "Search the top 3 cards of your deck. Add 1 to your hand. Bottom-deck the rest."
+  if (cardId === 'CP-129') {
+    if (p.deck && p.deck.length > 0) {
+      const top3 = p.deck.splice(0, Math.min(3, p.deck.length));
+      const chosen = top3.shift();
+      p.hand.push(chosen);
+      p.deck.push(...top3);
+      state.actionLog.unshift(`🎭 [Three Mouths, One Desire] Añade "${chosen.name}" a la mano y manda el resto al fondo.`);
+    }
+    return { executed: true };
+  }
+
+  // CP-130: Towerfall
+  // "Give all rival Units -5 power this turn. Bottom-deck all rival Units with power 0."
+  if (cardId === 'CP-130') {
+    (opp.field || []).forEach((u) => {
+      u.currentPower = Math.max(0, (u.currentPower || 0) - 5);
+    });
+    state.actionLog.unshift(`🏢 [Towerfall] Reduce el poder de todas las unidades rivales en 5.`);
+    for (let i = (opp.field?.length || 0) - 1; i >= 0; i--) {
+      if (opp.field[i].currentPower === 0) {
+        const [dead] = opp.field.splice(i, 1);
+        if (!opp.deck) opp.deck = [];
+        opp.deck.push(dead);
+        state.actionLog.unshift(`🏢 [Towerfall] "${dead.name}" cae a 0 de poder y va al fondo del mazo.`);
+      }
+    }
+    return { executed: true };
+  }
+
+  // CP-132: Trust No One
+  // "Decrease a Gig by up to 3. Then, if you control a min Gig, draw 1."
+  if (cardId === 'CP-132') {
+    if (p.gigs && p.gigs.length > 0) {
+      p.gigs[0].value = Math.max(1, (p.gigs[0].value || 1) - 3);
+      state.actionLog.unshift(`🗡️ [Trust No One] Reduce el Gig ${p.gigs[0].die.toUpperCase()} a ${p.gigs[0].value}.`);
+    }
+    if ((p.gigs || []).some((g) => g.value === 1)) {
+      drawCards(p, 1, state, cardName);
+    }
+    return { executed: true };
+  }
+
+  // CP-134: Unlikely Bond
+  // "Bottom-deck a ready friendly Unit. If you do, bottom-deck a spent rival Unit."
+  if (cardId === 'CP-134') {
+    const readyIdx = (p.field || []).findIndex((u) => !u.isSpent);
+    const spentRivalIdx = (opp.field || []).findIndex((u) => u.isSpent);
+    if (readyIdx !== -1 && spentRivalIdx !== -1) {
+      const [fUnit] = p.field.splice(readyIdx, 1);
+      p.deck.push(fUnit);
+      const [rUnit] = opp.field.splice(spentRivalIdx, 1);
+      opp.deck.push(rUnit);
+      state.actionLog.unshift(`🤝 [Unlikely Bond] Envía a "${fUnit.name}" y a la rival "${rUnit.name}" al fondo de sus mazos.`);
+    }
+    return { executed: true };
+  }
+
+  // CP-144: We Gotta Live Together
+  // "Play up to 2 Units with cost 3 or less from your trash for free."
+  if (cardId === 'CP-144') {
+    let revived = 0;
+    for (let i = (p.trash?.length || 0) - 1; i >= 0 && revived < 2; i--) {
+      const c = p.trash[i];
+      if ((c.officialType === 'UNIT' || c.type?.includes('UNIT')) && (c.costNum || c.cost || 0) <= 3) {
+        const [unit] = p.trash.splice(i, 1);
+        p.field.push({ ...unit, isSpent: false, isLagging: true, currentPower: unit.parsedPower || 1, gear: [] });
+        revived++;
+        state.actionLog.unshift(`⛺ [We Gotta Live Together] Rescata y despliega a "${unit.name}" gratis desde la Basura.`);
+      }
+    }
+    return { executed: true };
+  }
+
+  // CP-146: Wild in the Streets
+  // "Defeat a spent Unit."
+  if (cardId === 'CP-146') {
+    const spentIdx = (opp.field || []).findIndex((u) => u.isSpent);
+    if (spentIdx !== -1) {
+      const [dead] = opp.field.splice(spentIdx, 1);
+      if (!opp.trash) opp.trash = [];
+      opp.trash.push(dead);
+      state.actionLog.unshift(`🔥 [Wild in the Streets] Destruye a la unidad rival girada "${dead.name}".`);
     } else {
-      state.actionLog.unshift(`ℹ️ [Memory Relapse] No hay programas en el Trash para recuperar.`);
+      state.actionLog.unshift(`ℹ️ [Wild in the Streets] No hay unidades rivales giradas.`);
     }
     return { executed: true };
   }
@@ -338,109 +554,488 @@ export function executeProgramEffect(state, playerKey, card) {
   return { executed: false };
 }
 
-/**
- * EJECUTA TRIGGERS CUANDO UNA UNIDAD DECLARA UN ATAQUE
- * @param {Object} state - Estado del juego
- * @param {string} playerKey - 'player' | 'bot'
- * @param {Object} attackerUnit - Unidad atacante
- */
-export function executeUnitAttackTrigger(state, playerKey, attackerUnit) {
-  if (!state || !attackerUnit) return;
+// =========================================================================
+// 2. MOTOR DE UNIDADES AL ENTRAR AL CAMPO (ON-PLAY TRIGGERS)
+// =========================================================================
+
+export function executeUnitPlayTrigger(state, playerKey, unitInstance) {
+  if (!state || !unitInstance) return;
   const p = state[playerKey];
-  const cardId = attackerUnit.id || '';
+  const oppKey = playerKey === 'player' ? 'bot' : 'player';
+  const opp = state[oppKey];
+  const cardId = unitInstance.id || '';
+  const cardName = unitInstance.name || 'Unidad';
 
-  // SKETCHY RIPPER (CP-121)
-  // "ATTACK Search the top 3 cards of your deck. Reveal a Gear and add it to your hand. Bottom-deck the rest."
-  if (cardId === 'CP-121' || attackerUnit.name.includes('Sketchy Ripper')) {
-    if (p.deck && p.deck.length > 0) {
-      const examined = p.deck.splice(0, Math.min(3, p.deck.length));
-      const gearIdx = examined.findIndex(
-        (c) => c.officialType === 'GEAR' || (c.type && c.type.includes('GEAR'))
-      );
+  // CP-003: Adam Smasher // Metal Over Meat
+  // "PLAY Defeat all other Units."
+  if (cardId === 'CP-003') {
+    const allOthersFriendly = (p.field || []).filter((u) => u.instanceId !== unitInstance.instanceId);
+    p.field = [unitInstance];
+    if (!p.trash) p.trash = [];
+    p.trash.push(...allOthersFriendly);
 
-      if (gearIdx !== -1) {
-        const foundGear = examined.splice(gearIdx, 1)[0];
-        p.hand.push(foundGear);
-        p.deck.push(...examined); // El resto al fondo del mazo
-        state.actionLog.unshift(
-          `🔧 [Sketchy Ripper] ¡Encontró "${foundGear.name}"! Añadido a la mano. El resto va al fondo del mazo.`
-        );
-      } else {
-        p.deck.push(...examined);
-        state.actionLog.unshift(
-          `🔍 [Sketchy Ripper] Revisó las 3 cartas superiores del mazo pero no había ningún Gear.`
-        );
+    const allRival = opp.field || [];
+    opp.field = [];
+    if (!opp.trash) opp.trash = [];
+    opp.trash.push(...allRival);
+
+    state.actionLog.unshift(
+      `💥 [Adam Smasher // Metal Over Meat] ¡"METAL OVER MEAT"! Destruye a TODAS las demás unidades en el campo de batalla.`
+    );
+  }
+
+  // CP-015: Caliber // Totentanz's Top Dog
+  // "PLAY Defeat a rival Unit with cost 2 or less."
+  if (cardId === 'CP-015') {
+    const targetIdx = (opp.field || []).findIndex((u) => (u.costNum || u.cost || 0) <= 2);
+    if (targetIdx !== -1) {
+      const [dead] = opp.field.splice(targetIdx, 1);
+      if (!opp.trash) opp.trash = [];
+      opp.trash.push(dead);
+      state.actionLog.unshift(`🐕 [Caliber] Destruye a la unidad rival "${dead.name}" (Coste <= 2).`);
+    }
+  }
+
+  // CP-024: Delamain // Rideshare AI
+  // "PLAY Draw 2."
+  if (cardId === 'CP-024') {
+    drawCards(p, 2, state, cardName);
+  }
+
+  // CP-027: Dexter DeShawn // One Last Chance
+  // "PLAY ATTACK Adjust a Gig by up to 1."
+  if (cardId === 'CP-027') {
+    if (p.gigs && p.gigs.length > 0) {
+      p.gigs[0].value = (p.gigs[0].value || 1) + 1;
+      state.actionLog.unshift(`🎲 [Dexter DeShawn] Ajusta el Gig ${p.gigs[0].die.toUpperCase()} a ${p.gigs[0].value}.`);
+    }
+  }
+
+  // CP-035: Field Operator
+  // "PLAY If your Street Cred is an even number, draw 1."
+  if (cardId === 'CP-035') {
+    const cred = (p.gigs || []).reduce((s, g) => s + (g.value || 0), 0);
+    if (cred % 2 === 0) {
+      drawCards(p, 1, state, cardName);
+    }
+  }
+
+  // CP-044: Hacked Corpo
+  // "PLAY Trash 3. Add a Program from among them to your hand."
+  if (cardId === 'CP-044') {
+    const trashed = trashFromDeck(p, 3, state, cardName);
+    const progIdx = trashed.findIndex((c) => c.officialType === 'PROGRAM' || c.type?.includes('PROGRAM'));
+    if (progIdx !== -1) {
+      const prog = trashed.splice(progIdx, 1)[0];
+      p.hand.push(prog);
+      const tIdx = p.trash.lastIndexOf(prog);
+      if (tIdx !== -1) p.trash.splice(tIdx, 1);
+      state.actionLog.unshift(`💻 [Hacked Corpo] Añade el Programa "${prog.name}" a la mano.`);
+    }
+  }
+
+  // CP-053: Japantown Jonin
+  // "PLAY Give a friendly Unit +2 power this turn."
+  if (cardId === 'CP-053') {
+    unitInstance.currentPower = (unitInstance.currentPower || 0) + 2;
+    state.actionLog.unshift(`🥷 [Japantown Jonin] Se otorga a sí mismo +2 de poder este turno.`);
+  }
+
+  // CP-070: MaxTac AV
+  // "PLAY You may swap a friendly Gig with a rival Gig."
+  if (cardId === 'CP-070') {
+    if (p.gigs?.length > 0 && opp.gigs?.length > 0) {
+      const pGig = p.gigs.shift();
+      const oppGig = opp.gigs.shift();
+      p.gigs.push(oppGig);
+      opp.gigs.push(pGig);
+      state.actionLog.unshift(`🚁 [MaxTac AV] Intercambia el Gig ${pGig.die.toUpperCase()} por el Gig rival ${oppGig.die.toUpperCase()}.`);
+    }
+  }
+
+  // CP-076: Minotaur
+  // "PLAY If you have more Street Cred than a Rival, defeat a rival Unit with power 5 or less."
+  if (cardId === 'CP-076') {
+    const myCred = (p.gigs || []).reduce((s, g) => s + (g.value || 0), 0);
+    const oppCred = (opp.gigs || []).reduce((s, g) => s + (g.value || 0), 0);
+    if (myCred > oppCred) {
+      const targetIdx = (opp.field || []).findIndex((u) => (u.currentPower || 0) <= 5);
+      if (targetIdx !== -1) {
+        const [dead] = opp.field.splice(targetIdx, 1);
+        if (!opp.trash) opp.trash = [];
+        opp.trash.push(dead);
+        state.actionLog.unshift(`🤖 [Minotaur] Destruye a la unidad rival "${dead.name}" (Poder <= 5).`);
       }
+    }
+  }
+
+  // CP-087: Off-Duty Malfini
+  // "PLAY Spend this Unit and a rival Unit."
+  if (cardId === 'CP-087') {
+    unitInstance.isSpent = true;
+    if (opp.field && opp.field.length > 0) {
+      opp.field[0].isSpent = true;
+      state.actionLog.unshift(`🦅 [Off-Duty Malfini] Se gira a sí mismo y gira a la unidad rival "${opp.field[0].name}".`);
+    }
+  }
+
+  // CP-108: Royce // Don't Call Me Simon
+  // "PLAY Defeat a rival Unit with power 2 or less."
+  if (cardId === 'CP-108') {
+    const targetIdx = (opp.field || []).findIndex((u) => (u.currentPower || 0) <= 2);
+    if (targetIdx !== -1) {
+      const [dead] = opp.field.splice(targetIdx, 1);
+      if (!opp.trash) opp.trash = [];
+      opp.trash.push(dead);
+      state.actionLog.unshift(`🦾 [Royce] Destruye a la unidad rival "${dead.name}" (Poder <= 2).`);
+    }
+  }
+
+  // CP-133: Tyger's Whisper
+  // "PLAY You may Call a Legend for free."
+  if (cardId === 'CP-133') {
+    const faceDownLegend = (p.legends || []).find((l) => !l.isFaceUp);
+    if (faceDownLegend) {
+      faceDownLegend.isFaceUp = true;
+      state.actionLog.unshift(`🐯 [Tyger's Whisper] Llama gratis a la Leyenda "${faceDownLegend.name}" boca arriba.`);
+    }
+  }
+
+  // CP-139: Valentino Street Racer
+  // "PLAY Give another friendly Unit with cost 5 or less ADRENALINE this turn."
+  if (cardId === 'CP-139') {
+    const otherUnit = (p.field || []).find(
+      (u) => u.instanceId !== unitInstance.instanceId && (u.costNum || u.cost || 0) <= 5
+    );
+    if (otherUnit) {
+      otherUnit.isLagging = false;
+      otherUnit.hasAdrenaline = true;
+      state.actionLog.unshift(`⚡ [Valentino Street Racer] Otorga ADRENALINE a "${otherUnit.name}" (puede atacar ya).`);
+    }
+  }
+
+  // CP-142: Viktor Vektor // You Might Feel a Little Pinch
+  // "PLAY Play a CYBERWARE Gear with cost 2 or less from your trash for free."
+  if (cardId === 'CP-142') {
+    const gearIdx = (p.trash || []).findIndex(
+      (c) => (c.officialType === 'GEAR' || c.type?.includes('GEAR')) && (c.costNum || c.cost || 0) <= 2
+    );
+    if (gearIdx !== -1) {
+      const [gear] = p.trash.splice(gearIdx, 1);
+      unitInstance.gear = unitInstance.gear || [];
+      unitInstance.gear.push(gear);
+      const bonus = gear.powerBonus || gear.parsedPower || 1;
+      unitInstance.currentPower = (unitInstance.currentPower || 0) + bonus;
+      state.actionLog.unshift(`💉 [Viktor Vektor] Equipa gratis desde la Basura el Gear "${gear.name}" (+${bonus} poder).`);
     }
   }
 }
 
-/**
- * EJECUTA TRIGGERS CUANDO UNA UNIDAD GANA UN COMBATE CONTRA OTRA UNIDAD
- * @param {Object} state - Estado del juego
- * @param {string} winnerPlayerKey - 'player' | 'bot'
- * @param {Object} winningUnit - Unidad victoriosa
- * @param {Object} defeatedUnit - Unidad derrotada
- */
+// =========================================================================
+// 3. MOTOR DE DISPARADORES DE ATAQUE (ON-ATTACK TRIGGERS)
+// =========================================================================
+
+export function executeUnitAttackTrigger(state, playerKey, attackerUnit) {
+  if (!state || !attackerUnit) return;
+  const p = state[playerKey];
+  const cardId = attackerUnit.id || '';
+  const cardName = attackerUnit.name || 'Unidad';
+
+  // CP-031: El Sombrerón
+  if (cardId === 'CP-031') {
+    const maxGig = Math.max(1, ...(p.gigs || []).map((g) => g.value || 1));
+    attackerUnit.currentPower = (attackerUnit.currentPower || 0) + maxGig;
+    state.actionLog.unshift(`🤠 [El Sombrerón] Suma el valor de tu mayor Gig (+${maxGig} poder) al ataque.`);
+  }
+
+  // CP-034: Evelyn Parker // Scheming Siren
+  if (cardId === 'CP-034') {
+    drawCards(p, 1, state, cardName);
+    discardCards(p, 1, state, cardName);
+  }
+
+  // CP-041: Goro Takemura // Losing His Way
+  if (cardId === 'CP-041') {
+    const allFaceUp = (p.legends || []).every((l) => l.isFaceUp);
+    if (allFaceUp && p.legends?.length > 0) {
+      attackerUnit.currentPower = (attackerUnit.currentPower || 0) + 5;
+      state.actionLog.unshift(`⚔️ [Goro Takemura] ¡Todas las leyendas activas! +5 de poder al ataque.`);
+    }
+  }
+
+  // CP-052: Jackie Welles // Ride or Die Choom
+  if (cardId === 'CP-052') {
+    const evenGigs = (p.gigs || []).filter((g) => (g.value || 0) % 2 === 0).length;
+    if (evenGigs > 0) {
+      const bonus = evenGigs * 2;
+      attackerUnit.currentPower = (attackerUnit.currentPower || 0) + bonus;
+      state.actionLog.unshift(`🏍️ [Jackie Welles] +${bonus} de poder por tus ${evenGigs} Gig(s) pares.`);
+    }
+  }
+
+  // CP-115: Sasha Yakovleva // Won't Let You Down
+  if (cardId === 'CP-115') {
+    if (p.deck && p.deck.length > 0) {
+      const revealed = p.deck.shift();
+      p.hand.push(revealed);
+      const bonus = revealed.costNum || 1;
+      attackerUnit.currentPower = (attackerUnit.currentPower || 0) + bonus;
+      state.actionLog.unshift(`🐱 [Sasha Yakovleva] Revela "${revealed.name}" (+${bonus} poder al ataque).`);
+    }
+  }
+
+  // CP-121: Sketchy Ripper
+  if (cardId === 'CP-121' || attackerUnit.name.includes('Sketchy Ripper')) {
+    if (p.deck && p.deck.length > 0) {
+      const examined = p.deck.splice(0, Math.min(3, p.deck.length));
+      const gearIdx = examined.findIndex((c) => c.officialType === 'GEAR' || c.type?.includes('GEAR'));
+      if (gearIdx !== -1) {
+        const found = examined.splice(gearIdx, 1)[0];
+        p.hand.push(found);
+        p.deck.push(...examined);
+        state.actionLog.unshift(`🔧 [Sketchy Ripper] ¡Encontró "${found.name}"! Añadido a la mano.`);
+      } else {
+        p.deck.push(...examined);
+        state.actionLog.unshift(`🔍 [Sketchy Ripper] Revisó 3 cartas pero no encontró ningún Gear.`);
+      }
+    }
+  }
+
+  // CP-122: Swordwise Huscle
+  if (cardId === 'CP-122') {
+    if ((attackerUnit.currentPower || 0) >= 5) {
+      drawCards(p, 1, state, cardName);
+    }
+  }
+}
+
+// =========================================================================
+// 4. MOTOR DE VICTORIA EN COMBATE (ON COMBAT WIN TRIGGERS)
+// =========================================================================
+
 export function executeCombatWinTrigger(state, winnerPlayerKey, winningUnit, defeatedUnit) {
   if (!state || !winningUnit) return;
   const p = state[winnerPlayerKey];
   const cardId = winningUnit.id || '';
 
-  // 1. JOHNNY SILVERHAND // NEVER STOP FIGHTING (CP-054)
-  // "The first time this Unit wins a fight each turn, ready it."
+  // CP-054: Johnny Silverhand // Never Stop Fighting
   if (cardId === 'CP-054' || winningUnit.name.includes('Never Stop Fighting')) {
     if (!winningUnit.hasReadiedThisTurn) {
       winningUnit.isSpent = false;
       winningUnit.hasReadiedThisTurn = true;
-      state.actionLog.unshift(
-        `🎸 [Johnny Silverhand] "Never Stop Fighting": ¡Gana el combate y se ENDEREZA listo para volver a actuar!`
-      );
+      state.actionLog.unshift(`🎸 [Johnny Silverhand] "Never Stop Fighting": ¡Gana el combate y se ENDEREZA!`);
     }
   }
 
-  // 2. SATORI // SWORD OF SABURO (CP-116)
-  // "When this Unit wins a fight against a rival Unit, draw 1."
-  const hasSatori = (winningUnit.gear || []).some(
-    (g) => g.id === 'CP-116' || g.name.includes('Satori')
-  );
+  // CP-116: Satori // Sword of Saburo (Gear)
+  const hasSatori = (winningUnit.gear || []).some((g) => g.id === 'CP-116' || g.name.includes('Satori'));
   if (hasSatori) {
-    if (p.deck && p.deck.length > 0) {
-      const drawn = p.deck.shift();
-      p.hand.push(drawn);
-      state.actionLog.unshift(
-        `⚔️ [Satori // Sword of Saburo] ¡Corte letal! ${p.name} roba 1 carta ("${drawn.name}").`
-      );
+    drawCards(p, 1, state, 'Satori // Sword of Saburo');
+  }
+
+  // CP-010: Appetite for Destruction
+  if (p.appetiteForDestructionActive) {
+    const oppKey = winnerPlayerKey === 'player' ? 'bot' : 'player';
+    const opp = state[oppKey];
+    if (opp.gigs && opp.gigs.length > 0) {
+      const [stolen] = opp.gigs.splice(0, 1);
+      p.gigs.push(stolen);
+      state.actionLog.unshift(`🔥 [Appetite for Destruction] ¡Robo de combate! Roba el Gig ${stolen.die.toUpperCase()}.`);
     }
   }
 }
 
-/**
- * EJECUTA EFECTO DE DERROTA CUANDO UNA UNIDAD AMIGA ES DERROTADA (ej: Safety Override)
- * @param {Object} state - Estado del juego
- * @param {string} losingPlayerKey - 'player' | 'bot'
- * @param {Object} losingUnit - Unidad derrotada
- * @param {Object} winningRivalUnit - Unidad rival que ganó
- */
+// =========================================================================
+// 5. MOTOR DE DERROTA EN COMBATE (ON COMBAT LOSS TRIGGERS)
+// =========================================================================
+
 export function executeCombatLossTrigger(state, losingPlayerKey, losingUnit, winningRivalUnit) {
   if (!state) return;
   const p = state[losingPlayerKey];
   const oppKey = losingPlayerKey === 'player' ? 'bot' : 'player';
   const opp = state[oppKey];
 
-  // SAFETY OVERRIDE (CP-112)
-  if (p.safetyOverrideActive && winningRivalUnit) {
-    p.safetyOverrideActive = false; // Se consume
-    const unitIdx = (opp.field || []).findIndex(
-      (u) => u.instanceId === winningRivalUnit.instanceId
-    );
-    if (unitIdx !== -1) {
-      const destroyed = opp.field.splice(unitIdx, 1)[0];
+  // CP-066: Maelstrom Zealots
+  if (losingUnit.id === 'CP-066' && winningRivalUnit) {
+    const idx = (opp.field || []).findIndex((u) => u.instanceId === winningRivalUnit.instanceId);
+    if (idx !== -1) {
+      const [dead] = opp.field.splice(idx, 1);
       if (!opp.trash) opp.trash = [];
-      opp.trash.push(destroyed);
-      state.actionLog.unshift(
-        `💥 [Safety Override] ¡Venganza automática! Destruye a la unidad rival victoriosa "${destroyed.name}".`
-      );
+      opp.trash.push(dead);
+      state.actionLog.unshift(`💀 [Maelstrom Zealots] Al ser derrotado, destruye a la unidad rival victoriosa "${dead.name}".`);
+    }
+  }
+
+  // CP-112: Safety Override
+  if (p.safetyOverrideActive && winningRivalUnit) {
+    p.safetyOverrideActive = false;
+    const idx = (opp.field || []).findIndex((u) => u.instanceId === winningRivalUnit.instanceId);
+    if (idx !== -1) {
+      const [dead] = opp.field.splice(idx, 1);
+      if (!opp.trash) opp.trash = [];
+      opp.trash.push(dead);
+      state.actionLog.unshift(`💥 [Safety Override] ¡Venganza automática! Destruye a "${dead.name}".`);
+    }
+  }
+}
+
+// =========================================================================
+// 6. MOTOR DE DERROTA DE UNIDAD (DEFEATED TRIGGERS)
+// =========================================================================
+
+export function executeUnitDefeatedTrigger(state, ownerKey, defeatedUnit) {
+  if (!state || !defeatedUnit) return;
+  const p = state[ownerKey];
+  const oppKey = ownerKey === 'player' ? 'bot' : 'player';
+  const opp = state[oppKey];
+  const cardId = defeatedUnit.id || '';
+
+  // CP-015: Caliber
+  if (cardId === 'CP-015') {
+    discardCards(opp, 1, state, 'Caliber');
+  }
+
+  // CP-052: Jackie Welles
+  if (cardId === 'CP-052') {
+    const oddGigs = (p.gigs || []).filter((g) => (g.value || 0) % 2 !== 0).length;
+    if (oddGigs > 0) {
+      drawCards(p, oddGigs, state, 'Jackie Welles // Ride or Die Choom');
+    }
+  }
+
+  // CP-115: Sasha Yakovleva
+  if (cardId === 'CP-115') {
+    discardCards(opp, 1, state, 'Sasha Yakovleva');
+  }
+
+  // CP-118: Screw // Lovelorn Fool
+  if (cardId === 'CP-118') {
+    const unitIdx = (p.trash || []).findIndex((c) => c.officialType === 'UNIT' || c.type?.includes('UNIT'));
+    if (unitIdx !== -1) {
+      const [recovered] = p.trash.splice(unitIdx, 1);
+      p.hand.push(recovered);
+      state.actionLog.unshift(`💔 [Screw] Recupera a "${recovered.name}" del Trash a la mano.`);
+    }
+  }
+
+  // CP-124: T-Bug // Amateur Philosopher
+  if (cardId === 'CP-124') {
+    const faceDownLegend = (p.legends || []).find((l) => !l.isFaceUp);
+    if (faceDownLegend) {
+      faceDownLegend.isFaceUp = true;
+      state.actionLog.unshift(`🐛 [T-Bug] Llama gratis a la Leyenda "${faceDownLegend.name}".`);
+    }
+  }
+}
+
+// =========================================================================
+// 7. MOTOR DE LLAMADA DE LEYENDAS (CALL TRIGGERS)
+// =========================================================================
+
+export function executeCallLegendTrigger(state, playerKey, legendCard) {
+  if (!state || !legendCard) return;
+  const p = state[playerKey];
+  const cardId = legendCard.id || '';
+  const cardName = legendCard.name || 'Leyenda';
+
+  // CP-026: Dexter DeShawn // Off the Grid
+  if (cardId === 'CP-026') {
+    drawCards(p, 1, state, cardName);
+  }
+
+  // CP-029: Dum Dum // Maelstrom Triggerman
+  if (cardId === 'CP-029') {
+    drawCards(p, 1, state, cardName);
+  }
+
+  // CP-082: Muamar Reyes // El Capitán
+  if (cardId === 'CP-082') {
+    drawCards(p, 1, state, cardName);
+  }
+
+  // CP-091: Padre // Man of the Cross
+  if (cardId === 'CP-091') {
+    drawCards(p, 1, state, cardName);
+  }
+
+  // CP-137: V // Streetkid
+  if (cardId === 'CP-137') {
+    trashFromDeck(p, 3, state, cardName);
+    const progIdx = (p.trash || []).findIndex((c) => c.officialType === 'PROGRAM' || c.type?.includes('PROGRAM'));
+    if (progIdx !== -1) {
+      const [prog] = p.trash.splice(progIdx, 1);
+      p.hand.push(prog);
+      state.actionLog.unshift(`🌆 [V // Streetkid] Recupera el Programa "${prog.name}" a la mano.`);
+    }
+  }
+
+  // CP-141: Viktor Vektor // Sit Down and Relax
+  if (cardId === 'CP-141') {
+    if (p.deck && p.deck.length > 0) {
+      const top5 = p.deck.splice(0, Math.min(5, p.deck.length));
+      const gearIdx = top5.findIndex((c) => (c.officialType === 'GEAR' || c.type?.includes('GEAR')) && (c.costNum || 0) <= 2);
+      if (gearIdx !== -1) {
+        const [gear] = top5.splice(gearIdx, 1);
+        p.hand.push(gear);
+        p.deck.push(...top5);
+        state.actionLog.unshift(`👓 [Viktor Vektor] Añade el Gear "${gear.name}" a la mano.`);
+      } else {
+        p.deck.push(...top5);
+      }
+    }
+  }
+
+  // CP-143: Wakako Okada // Peace and Harmony
+  if (cardId === 'CP-143') {
+    drawCards(p, 1, state, cardName);
+  }
+}
+
+// =========================================================================
+// 8. MOTOR DE INICIO Y FIN DE TURNO (START & END OF TURN TRIGGERS)
+// =========================================================================
+
+export function executeStartOfTurnTriggers(state, playerKey) {
+  if (!state) return;
+  const p = state[playerKey];
+
+  // CP-045: Hanako Arasaka // Daughter of the Emperor
+  const hasHanako = (p.legends || []).some((l) => l.isFaceUp && l.id === 'CP-045');
+  if (hasHanako) {
+    const values = (p.gigs || []).map((g) => g.value);
+    const hasPair = values.some((val, idx) => values.indexOf(val) !== idx);
+    if (hasPair) {
+      drawCards(p, 1, state, 'Hanako Arasaka');
+    }
+  }
+}
+
+export function executeEndOfTurnTriggers(state, playerKey) {
+  if (!state) return;
+  const p = state[playerKey];
+
+  // CP-078: Modded Kusanagi (devuelve a la mano al final del turno)
+  const kusanagiIdx = (p.field || []).findIndex((u) => u.id === 'CP-078');
+  if (kusanagiIdx !== -1) {
+    const [kusanagi] = p.field.splice(kusanagiIdx, 1);
+    p.hand.push(kusanagi);
+    state.actionLog.unshift(`🏍️ [Modded Kusanagi] Vuelve a la mano de ${p.name} al final del turno.`);
+  }
+
+  // CP-114: Sandevistan (endereza al portador)
+  for (const unit of p.field || []) {
+    if ((unit.gear || []).some((g) => g.id === 'CP-114')) {
+      unit.isSpent = false;
+      state.actionLog.unshift(`⚡ [Sandevistan] Endereza a "${unit.name}" al final del turno.`);
+    }
+  }
+
+  // CP-136: V // Roamer of the Badlands (si 2+ Gigs con 8+ valor, roba 1)
+  const hasBadlandsV = (p.field || []).some((u) => u.id === 'CP-136');
+  if (hasBadlandsV) {
+    const highGigs = (p.gigs || []).filter((g) => (g.value || 0) >= 8).length;
+    if (highGigs >= 2) {
+      drawCards(p, 1, state, 'V // Roamer of the Badlands');
     }
   }
 }

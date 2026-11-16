@@ -1,0 +1,3239 @@
+{
+  "CP-001": {
+    "id": "CP-001",
+    "name": "6th Street Recruits",
+    "slug": "6th-street-recruits",
+    "officialType": "UNIT",
+    "aspect": "Red",
+    "costNum": 4,
+    "powerVal": "6",
+    "rulesText": "When a friendly Unit steals a d6, increase a Gig by up to 6.",
+    "keywords": [],
+    "classification": [
+      "6th Street",
+      "Ganger"
+    ],
+    "hasSpendAbility": false,
+    "triggers": [],
+    "rawRamCost": 1,
+    "rawEddieCost": 4,
+    "rawPower": 6
+  },
+  "CP-002": {
+    "id": "CP-002",
+    "name": "Adam Smasher // Ender of Legends",
+    "slug": "adam-smasher-ender-of-legends",
+    "officialType": "LEGEND",
+    "aspect": "Red",
+    "costNum": 9,
+    "powerVal": "9",
+    "rulesText": "GO SOLO (Pay this Legend's cost to play it as a ready Unit. It can attack this turn. If it leaves the field, remove it from the game.)\nPLAY Defeat a rival Unit.",
+    "keywords": [
+      "Go Solo",
+      "Play"
+    ],
+    "classification": [
+      "Arasaka",
+      "Merc"
+    ],
+    "hasSpendAbility": false,
+    "triggers": [
+      "play"
+    ],
+    "rawRamCost": null,
+    "rawEddieCost": 9,
+    "rawPower": 9
+  },
+  "CP-003": {
+    "id": "CP-003",
+    "name": "Adam Smasher // Metal Over Meat",
+    "slug": "adam-smasher-metal-over-meat",
+    "officialType": "UNIT",
+    "aspect": "Yellow",
+    "costNum": 9,
+    "powerVal": "15",
+    "rulesText": "PLAY Defeat all other Units.",
+    "keywords": [
+      "Play"
+    ],
+    "classification": [
+      "Arasaka",
+      "Merc"
+    ],
+    "hasSpendAbility": false,
+    "triggers": [
+      "play"
+    ],
+    "rawRamCost": 6,
+    "rawEddieCost": 9,
+    "rawPower": 15
+  },
+  "CP-004": {
+    "id": "CP-004",
+    "name": "Adrenaline Converter",
+    "slug": "adrenaline-converter",
+    "officialType": "GEAR",
+    "aspect": "Yellow",
+    "costNum": 2,
+    "powerVal": "+3",
+    "rulesText": "(Equip to a friendly Unit or face-up Legend.)\nIf a Rival controls at least 2 more Gigs than you, this Unit has ADRENALINE. (This Unit can attack the turn it's played.)",
+    "keywords": [
+      "Adrenaline"
+    ],
+    "classification": [
+      "Cyberware",
+      "Medtech"
+    ],
+    "hasSpendAbility": false,
+    "triggers": [],
+    "rawRamCost": 4,
+    "rawEddieCost": 2,
+    "rawPower": 3
+  },
+  "CP-005": {
+    "id": "CP-005",
+    "name": "Afterparty at Lizzie's",
+    "slug": "afterparty-at-lizzie-s",
+    "officialType": "PROGRAM",
+    "aspect": "Yellow",
+    "costNum": 1,
+    "powerVal": "4",
+    "rulesText": "Adjust a Gig by up to 1. If you control 2 or more Gigs with different values, draw 1.",
+    "keywords": [],
+    "classification": [
+      "Braindance",
+      "Mox"
+    ],
+    "hasSpendAbility": false,
+    "triggers": [],
+    "rawRamCost": 1,
+    "rawEddieCost": 1,
+    "rawPower": null
+  },
+  "CP-006": {
+    "id": "CP-006",
+    "name": "All Is Lost",
+    "slug": "all-is-lost",
+    "officialType": "PROGRAM",
+    "aspect": "Red",
+    "costNum": 1,
+    "powerVal": "4",
+    "rulesText": "Trash 3. Add a Unit from among them to your hand.",
+    "keywords": [],
+    "classification": [
+      "Zetatech"
+    ],
+    "hasSpendAbility": false,
+    "triggers": [],
+    "rawRamCost": 2,
+    "rawEddieCost": 1,
+    "rawPower": null
+  },
+  "CP-007": {
+    "id": "CP-007",
+    "name": "Alt Cunningham // Mother of Daemons",
+    "slug": "alt-cunningham-mother-of-daemons",
+    "officialType": "UNIT",
+    "aspect": "Yellow",
+    "costNum": 7,
+    "powerVal": "8",
+    "rulesText": "When a friendly equipped Unit or Legend is spent, draw 1.\nWhen a rival Unit would steal a Gig, you may discard 1 with cost equal to that Gig's value. If you do, the Gig isn't stolen.",
+    "keywords": [],
+    "classification": [
+      "Merc",
+      "Netrunner"
+    ],
+    "hasSpendAbility": false,
+    "triggers": [],
+    "rawRamCost": 3,
+    "rawEddieCost": 7,
+    "rawPower": 8
+  },
+  "CP-008": {
+    "id": "CP-008",
+    "name": "Alt Cunningham // Soulkiller Architect",
+    "slug": "alt-cunningham-soulkiller-architect",
+    "officialType": "LEGEND",
+    "aspect": "Blue",
+    "costNum": null,
+    "powerVal": "0",
+    "rulesText": "↷ Your next Program this turn plays for -1 €$ for each friendly min Gig, to a minimum of 1 €$.\n1 €$, ↷ Play a Program from your trash. Bottom-deck it after you play it. (You still pay its cost.)",
+    "keywords": [],
+    "classification": [
+      "Merc",
+      "Netrunner"
+    ],
+    "hasSpendAbility": true,
+    "triggers": [],
+    "rawRamCost": null,
+    "rawEddieCost": 0,
+    "rawPower": null
+  },
+  "CP-009": {
+    "id": "CP-009",
+    "name": "Animals Wrecker",
+    "slug": "animals-wrecker",
+    "officialType": "UNIT",
+    "aspect": "Red",
+    "costNum": 6,
+    "powerVal": "10",
+    "rulesText": "[Flavour Text] Takes a lot of juice to break bones like they do.",
+    "keywords": [],
+    "classification": [
+      "Animal",
+      "Ganger"
+    ],
+    "hasSpendAbility": false,
+    "triggers": [],
+    "rawRamCost": 3,
+    "rawEddieCost": 6,
+    "rawPower": 10
+  },
+  "CP-010": {
+    "id": "CP-010",
+    "name": "Appetite for Destruction",
+    "slug": "appetite-for-destruction",
+    "officialType": "PROGRAM",
+    "aspect": "Red",
+    "costNum": 3,
+    "powerVal": "4",
+    "rulesText": "The next time a friendly Unit wins a fight by 3+ power this turn, it also steals a Gig.",
+    "keywords": [],
+    "classification": [
+      "Ganger"
+    ],
+    "hasSpendAbility": false,
+    "triggers": [],
+    "rawRamCost": 4,
+    "rawEddieCost": 3,
+    "rawPower": null
+  },
+  "CP-011": {
+    "id": "CP-011",
+    "name": "Arasaka Emergency Radioport",
+    "slug": "arasaka-emergency-radioport",
+    "officialType": "GEAR",
+    "aspect": "Red",
+    "costNum": 2,
+    "powerVal": "+2",
+    "rulesText": "(Equip to a friendly Unit or face-up Legend.)\nWhen this Unit or Legend is spent, you may look at a friendly face-down Legend. If that Legend is ARASAKA or has GO SOLO, you may Call it for free. (You may only Call a Legend once per turn.)",
+    "keywords": [
+      "Go Solo"
+    ],
+    "classification": [
+      "Arasaka",
+      "Cyberware"
+    ],
+    "hasSpendAbility": false,
+    "triggers": [],
+    "rawRamCost": 2,
+    "rawEddieCost": 2,
+    "rawPower": 2
+  },
+  "CP-012": {
+    "id": "CP-012",
+    "name": "Augmented Negotiators",
+    "slug": "augmented-negotiators",
+    "officialType": "UNIT",
+    "aspect": "Yellow",
+    "costNum": 3,
+    "powerVal": "2",
+    "rulesText": "BLOCKER (You may spend this Unit to redirect a rival Unit's attack to it instead.)\nWhen this Unit uses BLOCKER, a Rival discards 1.",
+    "keywords": [
+      "Blocker"
+    ],
+    "classification": [
+      "Arasaka",
+      "Corpo"
+    ],
+    "hasSpendAbility": false,
+    "triggers": [],
+    "rawRamCost": 1,
+    "rawEddieCost": 3,
+    "rawPower": 2
+  },
+  "CP-013": {
+    "id": "CP-013",
+    "name": "Bonnie and Clyde",
+    "slug": "bonnie-and-clyde",
+    "officialType": "PROGRAM",
+    "aspect": "Red",
+    "costNum": 3,
+    "powerVal": "4",
+    "rulesText": "Defeat a rival Unit with power 4 or less. You may defeat 2 instead if a Rival controls at least 2 Gigs more than you.",
+    "keywords": [],
+    "classification": [
+      "Braindance"
+    ],
+    "hasSpendAbility": false,
+    "triggers": [],
+    "rawRamCost": 3,
+    "rawEddieCost": 3,
+    "rawPower": null
+  },
+  "CP-014": {
+    "id": "CP-014",
+    "name": "Bootleg Black Sapphire Show",
+    "slug": "bootleg-black-sapphire-show",
+    "officialType": "PROGRAM",
+    "aspect": "Yellow",
+    "costNum": 5,
+    "powerVal": "4",
+    "rulesText": "Sell the top card of your deck.\nIf you control a Gig with an even value and a Gig with an odd value, draw 2.",
+    "keywords": [],
+    "classification": [
+      "Braindance"
+    ],
+    "hasSpendAbility": false,
+    "triggers": [],
+    "rawRamCost": 4,
+    "rawEddieCost": 5,
+    "rawPower": null
+  },
+  "CP-015": {
+    "id": "CP-015",
+    "name": "Caliber // Totentanz's Top Dog",
+    "slug": "caliber-totentanz-s-top-dog",
+    "officialType": "UNIT",
+    "aspect": "Yellow",
+    "costNum": 4,
+    "powerVal": "4",
+    "rulesText": "PLAY Defeat a rival Unit with cost 2 or less.\nDEFEATED A Rival discards 1. If the card's cost equals the value of a friendly Gig, that Rival discards 1 more.",
+    "keywords": [
+      "Play"
+    ],
+    "classification": [
+      "Ganger",
+      "Maelstrom"
+    ],
+    "hasSpendAbility": false,
+    "triggers": [
+      "play",
+      "defeated"
+    ],
+    "rawRamCost": 2,
+    "rawEddieCost": 5,
+    "rawPower": 5
+  },
+  "CP-016": {
+    "id": "CP-016",
+    "name": "Carnage at the Colosseum",
+    "slug": "carnage-at-the-colosseum",
+    "officialType": "PROGRAM",
+    "aspect": "Red",
+    "costNum": 6,
+    "powerVal": "4",
+    "rulesText": "Play this Program for -1 €$ for each friendly Gig with 8+ value, to a minimum of 1 €$.\nDefeat a rival Unit with less power than a friendly Unit.",
+    "keywords": [],
+    "classification": [
+      "Braindance",
+      "Extreme"
+    ],
+    "hasSpendAbility": false,
+    "triggers": [],
+    "rawRamCost": 3,
+    "rawEddieCost": 6,
+    "rawPower": null
+  },
+  "CP-017": {
+    "id": "CP-017",
+    "name": "Chrome Fang",
+    "slug": "chrome-fang",
+    "officialType": "UNIT",
+    "aspect": "Red",
+    "costNum": 5,
+    "powerVal": "6",
+    "rulesText": "PLAY Until your next turn, rival Units can't steal friendly Gigs with value higher than their power.",
+    "keywords": [
+      "Play"
+    ],
+    "classification": [
+      "Ganger",
+      "Netrunner",
+      "Tyger Claws"
+    ],
+    "hasSpendAbility": false,
+    "triggers": [
+      "play"
+    ],
+    "rawRamCost": 1,
+    "rawEddieCost": 5,
+    "rawPower": 6
+  },
+  "CP-018": {
+    "id": "CP-018",
+    "name": "Chrome Reverie",
+    "slug": "chrome-reverie",
+    "officialType": "PROGRAM",
+    "aspect": "Blue",
+    "costNum": 3,
+    "powerVal": "4",
+    "rulesText": "A rival Unit can't attack until your next turn. If you control a min Gig, you may Call a Legend for free. (You can only Call a Legend once per turn.)",
+    "keywords": [],
+    "classification": [
+      "Braindance"
+    ],
+    "hasSpendAbility": false,
+    "triggers": [],
+    "rawRamCost": 1,
+    "rawEddieCost": 3,
+    "rawPower": null
+  },
+  "CP-019": {
+    "id": "CP-019",
+    "name": "Corpo Security",
+    "slug": "corpo-security",
+    "officialType": "UNIT",
+    "aspect": "Green",
+    "costNum": 2,
+    "powerVal": "2",
+    "rulesText": "This Unit can't attack.\nBLOCKER (You may spend this Unit to redirect a rival Unit's attack to it instead.)",
+    "keywords": [
+      "Blocker"
+    ],
+    "classification": [
+      "Corpo"
+    ],
+    "hasSpendAbility": false,
+    "triggers": [],
+    "rawRamCost": 1,
+    "rawEddieCost": 2,
+    "rawPower": 2
+  },
+  "CP-020": {
+    "id": "CP-020",
+    "name": "Corporate Surveillance",
+    "slug": "corporate-surveillance",
+    "officialType": "PROGRAM",
+    "aspect": "Green",
+    "costNum": 2,
+    "powerVal": "4",
+    "rulesText": "Spend a rival Unit with cost 4 or less.",
+    "keywords": [],
+    "classification": [
+      "Corpo"
+    ],
+    "hasSpendAbility": false,
+    "triggers": [],
+    "rawRamCost": 1,
+    "rawEddieCost": 2,
+    "rawPower": null
+  },
+  "CP-021": {
+    "id": "CP-021",
+    "name": "Cyberpsychosis",
+    "slug": "cyberpsychosis",
+    "officialType": "PROGRAM",
+    "aspect": "Yellow",
+    "costNum": 3,
+    "powerVal": "4",
+    "rulesText": "QUICK Give an equipped Unit +3 power this turn for each of its equipped Gears. If that Unit steals or fights, defeat it at the end of this turn.",
+    "keywords": [
+      "Quick"
+    ],
+    "classification": [
+      "Quickhack"
+    ],
+    "hasSpendAbility": false,
+    "triggers": [],
+    "rawRamCost": 2,
+    "rawEddieCost": 3,
+    "rawPower": null
+  },
+  "CP-022": {
+    "id": "CP-022",
+    "name": "Deadman Transmitter",
+    "slug": "deadman-transmitter",
+    "officialType": "GEAR",
+    "aspect": "Red",
+    "costNum": 3,
+    "powerVal": "+1",
+    "rulesText": "(Equip to a friendly Unit or face-up Legend.)\nIf this Unit would be defeated, defeat its \"DEADMAN TRANSMITTER\" instead.",
+    "keywords": [],
+    "classification": [
+      "Cyberware",
+      "Trauma Team"
+    ],
+    "hasSpendAbility": false,
+    "triggers": [],
+    "rawRamCost": 3,
+    "rawEddieCost": 3,
+    "rawPower": 1
+  },
+  "CP-023": {
+    "id": "CP-023",
+    "name": "Delamain Cab",
+    "slug": "delamain-cab",
+    "officialType": "UNIT",
+    "aspect": "Blue",
+    "costNum": 4,
+    "powerVal": "4",
+    "rulesText": "At the end of your turn, if this Unit stole a Gig this turn, ready 1 Eddie.",
+    "keywords": [],
+    "classification": [
+      "Vehicle"
+    ],
+    "hasSpendAbility": false,
+    "triggers": [],
+    "rawRamCost": 2,
+    "rawEddieCost": 4,
+    "rawPower": 4
+  },
+  "CP-024": {
+    "id": "CP-024",
+    "name": "Delamain // Rideshare AI",
+    "slug": "delamain-rideshare-ai",
+    "officialType": "UNIT",
+    "aspect": "Blue",
+    "costNum": 3,
+    "powerVal": "0",
+    "rulesText": "PLAY Draw 2.\n(Units with power 0 don't steal Gigs.)",
+    "keywords": [
+      "Play"
+    ],
+    "classification": [
+      "AI"
+    ],
+    "hasSpendAbility": false,
+    "triggers": [
+      "play"
+    ],
+    "rawRamCost": 3,
+    "rawEddieCost": 3,
+    "rawPower": 0
+  },
+  "CP-025": {
+    "id": "CP-025",
+    "name": "Detonate",
+    "slug": "detonate",
+    "officialType": "PROGRAM",
+    "aspect": "Red",
+    "costNum": 1,
+    "powerVal": "4",
+    "rulesText": "QUICK Defeat a rival Gear with power 2 or less.",
+    "keywords": [
+      "Quick"
+    ],
+    "classification": [
+      "Quickhack"
+    ],
+    "hasSpendAbility": false,
+    "triggers": [],
+    "rawRamCost": 2,
+    "rawEddieCost": 1,
+    "rawPower": null
+  },
+  "CP-026": {
+    "id": "CP-026",
+    "name": "Dexter DeShawn // Off the Grid",
+    "slug": "dexter-deshawn-off-the-grid",
+    "officialType": "LEGEND",
+    "aspect": "Red",
+    "costNum": null,
+    "powerVal": "0",
+    "rulesText": "CALL Choose one effect.\nGive a friendly Unit +2 power this turn. // Draw 1.\n↷: Increase a Gig by up to 2.",
+    "keywords": [
+      "Call"
+    ],
+    "classification": [
+      "Fixer"
+    ],
+    "hasSpendAbility": true,
+    "triggers": [
+      "call"
+    ],
+    "rawRamCost": null,
+    "rawEddieCost": 0,
+    "rawPower": null
+  },
+  "CP-027": {
+    "id": "CP-027",
+    "name": "Dexter DeShawn // One Last Chance",
+    "slug": "dexter-deshawn-one-last-chance",
+    "officialType": "UNIT",
+    "aspect": "Yellow",
+    "costNum": 3,
+    "powerVal": "4",
+    "rulesText": "PLAY ATTACK Adjust a Gig by up to 1.\nDEFEATED If your ☆ (Street Cred) differs from a Rival's by 10+, draw 2.",
+    "keywords": [
+      "Attack",
+      "Play"
+    ],
+    "classification": [
+      "Fixer"
+    ],
+    "hasSpendAbility": false,
+    "triggers": [
+      "play",
+      "attack",
+      "defeated"
+    ],
+    "rawRamCost": 2,
+    "rawEddieCost": 3,
+    "rawPower": 4
+  },
+  "CP-028": {
+    "id": "CP-028",
+    "name": "(Don't Fear) The Reaper",
+    "slug": "dont-fear-the-reaper",
+    "officialType": "PROGRAM",
+    "aspect": "Green",
+    "costNum": 7,
+    "powerVal": "4",
+    "rulesText": "Spend all rival Units. Then, defeat a spent Unit.",
+    "keywords": [],
+    "classification": [
+      "Samurai"
+    ],
+    "hasSpendAbility": false,
+    "triggers": [],
+    "rawRamCost": 3,
+    "rawEddieCost": 7,
+    "rawPower": null
+  },
+  "CP-029": {
+    "id": "CP-029",
+    "name": "Dum Dum // Maelstrom Triggerman",
+    "slug": "dum-dum-maelstrom-triggerman",
+    "officialType": "LEGEND",
+    "aspect": "Yellow",
+    "costNum": null,
+    "powerVal": "0",
+    "rulesText": "CALL You may defeat a friendly Gear. If you do, draw 2. Otherwise, draw 1.\nQUICK 1 €$, ↷ Give a friendly Unit +1 power this turn for each of its equipped Gear.",
+    "keywords": [
+      "Quick",
+      "Call"
+    ],
+    "classification": [
+      "Ganger",
+      "Maelstrom"
+    ],
+    "hasSpendAbility": true,
+    "triggers": [
+      "call"
+    ],
+    "rawRamCost": null,
+    "rawEddieCost": 0,
+    "rawPower": null
+  },
+  "CP-030": {
+    "id": "CP-030",
+    "name": "Dying Night // V's Pistol",
+    "slug": "dying-night-v-s-pistol",
+    "officialType": "GEAR",
+    "aspect": "Blue",
+    "costNum": 2,
+    "powerVal": "+2",
+    "rulesText": "(Equip to a friendly Unit or face-up Legend.)\nATTACK Decrease a Gig by up to 2. At the end of your turn, if this Unit is named \"V\", ready 2 Eddies.",
+    "keywords": [
+      "Attack"
+    ],
+    "classification": [
+      "Merc",
+      "Weapon"
+    ],
+    "hasSpendAbility": false,
+    "triggers": [
+      "attack"
+    ],
+    "rawRamCost": 2,
+    "rawEddieCost": 2,
+    "rawPower": 2
+  },
+  "CP-031": {
+    "id": "CP-031",
+    "name": "El Sombrerón // La Venganza Lenta",
+    "slug": "el-sombrero-n-la-venganza-lenta",
+    "officialType": "UNIT",
+    "aspect": "Red",
+    "costNum": 5,
+    "powerVal": "4",
+    "rulesText": "ATTACK You may pay 2 €$. If you do, this Unit gains power equal to a friendly max Gig this turn.",
+    "keywords": [
+      "Attack"
+    ],
+    "classification": [
+      "Ganger",
+      "Valentino"
+    ],
+    "hasSpendAbility": false,
+    "triggers": [
+      "attack"
+    ],
+    "rawRamCost": 4,
+    "rawEddieCost": 5,
+    "rawPower": 4
+  },
+  "CP-032": {
+    "id": "CP-032",
+    "name": "Emergency Atlus",
+    "slug": "emergency-atlus",
+    "officialType": "UNIT",
+    "aspect": "Green",
+    "costNum": 3,
+    "powerVal": "4",
+    "rulesText": "\"Grab the policyholder, leave the rest for the city meatwagon.\"",
+    "keywords": [],
+    "classification": [
+      "Trauma Team",
+      "Vehicle",
+      "Zetatech"
+    ],
+    "hasSpendAbility": false,
+    "triggers": [],
+    "rawRamCost": 1,
+    "rawEddieCost": 3,
+    "rawPower": 4
+  },
+  "CP-033": {
+    "id": "CP-033",
+    "name": "Evelyn Parker // Beautiful Enigma",
+    "slug": "evelyn-parker-beautiful-enigma",
+    "officialType": "LEGEND",
+    "aspect": "Blue",
+    "costNum": null,
+    "powerVal": "0",
+    "rulesText": "When a friendly CORPO or GANGER Unit steals 1 or more Gigs, ready 1 Eddie.\n1 €$, ↷ A rival Unit must attack next turn if it can.",
+    "keywords": [],
+    "classification": [
+      "Doll"
+    ],
+    "hasSpendAbility": true,
+    "triggers": [],
+    "rawRamCost": null,
+    "rawEddieCost": 0,
+    "rawPower": null
+  },
+  "CP-034": {
+    "id": "CP-034",
+    "name": "Evelyn Parker // Scheming Siren",
+    "slug": "evelyn-parker-scheming-siren",
+    "officialType": "UNIT",
+    "aspect": "Blue",
+    "costNum": 2,
+    "powerVal": "0",
+    "rulesText": "ATTACK Draw 1. Then, if you have more ☆ (Street Cred) than a Rival, discard 1.\n(Units with power 0 don't steal Gigs.)",
+    "keywords": [
+      "Attack"
+    ],
+    "classification": [
+      "Doll"
+    ],
+    "hasSpendAbility": false,
+    "triggers": [
+      "attack"
+    ],
+    "rawRamCost": 3,
+    "rawEddieCost": 2,
+    "rawPower": 0
+  },
+  "CP-035": {
+    "id": "CP-035",
+    "name": "Field Operator",
+    "slug": "field-operator",
+    "officialType": "UNIT",
+    "aspect": "Green",
+    "costNum": 3,
+    "powerVal": "2",
+    "rulesText": "PLAY If your ☆ (Street Cred) is an even number, draw 1.",
+    "keywords": [
+      "Play"
+    ],
+    "classification": [
+      "Arasaka",
+      "Corpo",
+      "Techie"
+    ],
+    "hasSpendAbility": false,
+    "triggers": [
+      "play"
+    ],
+    "rawRamCost": 2,
+    "rawEddieCost": 3,
+    "rawPower": 2
+  },
+  "CP-036": {
+    "id": "CP-036",
+    "name": "Floor It!",
+    "slug": "floor-it",
+    "officialType": "PROGRAM",
+    "aspect": "Blue",
+    "costNum": 1,
+    "powerVal": "4",
+    "rulesText": "QUICK Give a rival Unit -1 power this turn. Draw 1.",
+    "keywords": [
+      "Quick"
+    ],
+    "classification": [
+      "Merc",
+      "Quickhack"
+    ],
+    "hasSpendAbility": false,
+    "triggers": [],
+    "rawRamCost": 1,
+    "rawEddieCost": 1,
+    "rawPower": null
+  },
+  "CP-037": {
+    "id": "CP-037",
+    "name": "Fool on the Hill",
+    "slug": "fool-on-the-hill",
+    "officialType": "PROGRAM",
+    "aspect": "Green",
+    "costNum": 2,
+    "powerVal": "4",
+    "rulesText": "Reveal the top 2 cards of your deck. A Rival chooses whether you add them to your hand or trash them. If you trash them, draw 2.",
+    "keywords": [],
+    "classification": [
+      "Merc"
+    ],
+    "hasSpendAbility": false,
+    "triggers": [],
+    "rawRamCost": 3,
+    "rawEddieCost": 2,
+    "rawPower": null
+  },
+  "CP-038": {
+    "id": "CP-038",
+    "name": "Gilded Matón",
+    "slug": "gilded-mato-n",
+    "officialType": "UNIT",
+    "aspect": "Yellow",
+    "costNum": 4,
+    "powerVal": "3",
+    "rulesText": "PLAY You may defeat a friendly Gear. If you do, defeat a rival Unit with cost 3 or less.",
+    "keywords": [
+      "Play"
+    ],
+    "classification": [
+      "Ganger",
+      "Valentino"
+    ],
+    "hasSpendAbility": false,
+    "triggers": [
+      "play"
+    ],
+    "rawRamCost": 2,
+    "rawEddieCost": 4,
+    "rawPower": 3
+  },
+  "CP-039": {
+    "id": "CP-039",
+    "name": "Gorilla Arms",
+    "slug": "gorilla-arms",
+    "officialType": "GEAR",
+    "aspect": "Yellow",
+    "costNum": 4,
+    "powerVal": "+3",
+    "rulesText": "(Equip to a friendly Unit or face-up Legend.)\nThe first time this Unit steals 1 or more Gigs each turn, steal a rival Gig with a value not shared by a friendly Gig.",
+    "keywords": [],
+    "classification": [
+      "Cyberware"
+    ],
+    "hasSpendAbility": false,
+    "triggers": [],
+    "rawRamCost": 3,
+    "rawEddieCost": 4,
+    "rawPower": 3
+  },
+  "CP-040": {
+    "id": "CP-040",
+    "name": "Goro Takemura // Hands Unclean",
+    "slug": "goro-takemura-hands-unclean",
+    "officialType": "LEGEND",
+    "aspect": "Green",
+    "costNum": 5,
+    "powerVal": "7",
+    "rulesText": "GO SOLO (Pay this Legend's cost to play it as a ready Unit. It can attack this turn. If it leaves the field, remove it from the game.)\nBLOCKER (You may spend this Unit to redirect a rival Unit's attack to it instead.)",
+    "keywords": [
+      "Blocker",
+      "Go Solo"
+    ],
+    "classification": [
+      "Arasaka",
+      "Corpo"
+    ],
+    "hasSpendAbility": false,
+    "triggers": [],
+    "rawRamCost": null,
+    "rawEddieCost": 5,
+    "rawPower": 7
+  },
+  "CP-041": {
+    "id": "CP-041",
+    "name": "Goro Takemura // Losing His Way",
+    "slug": "goro-takemura-losing-his-way",
+    "officialType": "UNIT",
+    "aspect": "Green",
+    "costNum": 4,
+    "powerVal": "4",
+    "rulesText": "ATTACK If all friendly Legends are face-up, this Unit has +5 power this turn.",
+    "keywords": [
+      "Attack"
+    ],
+    "classification": [
+      "Arasaka",
+      "Corpo"
+    ],
+    "hasSpendAbility": false,
+    "triggers": [
+      "attack"
+    ],
+    "rawRamCost": 3,
+    "rawEddieCost": 4,
+    "rawPower": 4
+  },
+  "CP-042": {
+    "id": "CP-042",
+    "name": "Goro Takemura // Vengeful Bodyguard",
+    "slug": "goro-takemura-vengeful-bodyguard",
+    "officialType": "LEGEND",
+    "aspect": "Green",
+    "costNum": null,
+    "powerVal": "0",
+    "rulesText": "QUICK 1 €$, ↷ Give a friendly Unit with cost 4 or less BLOCKER this turn. If you control a value-pair of Gigs, also give it +1 power this turn.\nWhen a friendly Unit uses BLOCKER, you may discard 1. If you do, draw 1.",
+    "keywords": [
+      "Blocker",
+      "Quick"
+    ],
+    "classification": [
+      "Arasaka",
+      "Corpo"
+    ],
+    "hasSpendAbility": true,
+    "triggers": [],
+    "rawRamCost": null,
+    "rawEddieCost": 0,
+    "rawPower": null
+  },
+  "CP-043": {
+    "id": "CP-043",
+    "name": "Gunpoint Diplomacy",
+    "slug": "gunpoint-diplomacy",
+    "officialType": "PROGRAM",
+    "aspect": "Red",
+    "costNum": 4,
+    "powerVal": "4",
+    "rulesText": "Give a friendly Unit these effects. If you have less ☆ (Street Cred) than a Rival, they instead choose one effect for you.\nThe next time this Unit attacks this turn, it may attack ready Units. // Give this Unit +3 power this turn.",
+    "keywords": [],
+    "classification": [
+      "Ganger",
+      "Plan"
+    ],
+    "hasSpendAbility": false,
+    "triggers": [],
+    "rawRamCost": 3,
+    "rawEddieCost": 4,
+    "rawPower": null
+  },
+  "CP-044": {
+    "id": "CP-044",
+    "name": "Hacked Corpo",
+    "slug": "hacked-corpo",
+    "officialType": "UNIT",
+    "aspect": "Blue",
+    "costNum": 4,
+    "powerVal": "3",
+    "rulesText": "PLAY Trash 3. Add a Program from among them to your hand.",
+    "keywords": [
+      "Play"
+    ],
+    "classification": [
+      "AI",
+      "Corpo"
+    ],
+    "hasSpendAbility": false,
+    "triggers": [
+      "play"
+    ],
+    "rawRamCost": 1,
+    "rawEddieCost": 4,
+    "rawPower": 3
+  },
+  "CP-045": {
+    "id": "CP-045",
+    "name": "Hanako Arasaka // Daughter of the Emperor",
+    "slug": "hanako-arasaka-daughter-of-the-emperor",
+    "officialType": "LEGEND",
+    "aspect": "Green",
+    "costNum": null,
+    "powerVal": "0",
+    "rulesText": "↷ Swap a friendly Gig with a rival Gig.\nAt the start of your turn, draw 1 for each friendly value-pair of Gigs.",
+    "keywords": [],
+    "classification": [
+      "Arasaka",
+      "Corpo",
+      "Netrunner"
+    ],
+    "hasSpendAbility": true,
+    "triggers": [],
+    "rawRamCost": null,
+    "rawEddieCost": 0,
+    "rawPower": null
+  },
+  "CP-046": {
+    "id": "CP-046",
+    "name": "Hanako Arasaka // In a Gilded Cage",
+    "slug": "hanako-arasaka-in-a-gilded-cage",
+    "officialType": "UNIT",
+    "aspect": "Yellow",
+    "costNum": 4,
+    "powerVal": "1",
+    "rulesText": "PLAY Search the top 4 cards of your deck. Reveal any number of cards with cost equal to any friendly Gig values and add them to your hand. Bottom-deck the rest.",
+    "keywords": [
+      "Play"
+    ],
+    "classification": [
+      "Arasaka",
+      "Corpo",
+      "Netrunner"
+    ],
+    "hasSpendAbility": false,
+    "triggers": [
+      "play"
+    ],
+    "rawRamCost": 2,
+    "rawEddieCost": 4,
+    "rawPower": 1
+  },
+  "CP-047": {
+    "id": "CP-047",
+    "name": "Heywood Ripperdoc",
+    "slug": "heywood-ripperdoc",
+    "officialType": "UNIT",
+    "aspect": "Yellow",
+    "costNum": 6,
+    "powerVal": "8",
+    "rulesText": "PLAY You may defeat a Gear. If its cost equals the value of a friendly Gig, draw 1.",
+    "keywords": [
+      "Play"
+    ],
+    "classification": [
+      "Ripperdoc"
+    ],
+    "hasSpendAbility": false,
+    "triggers": [
+      "play"
+    ],
+    "rawRamCost": 1,
+    "rawEddieCost": 6,
+    "rawPower": 8
+  },
+  "CP-048": {
+    "id": "CP-048",
+    "name": "Industrial Assembly",
+    "slug": "industrial-assembly",
+    "officialType": "PROGRAM",
+    "aspect": "Red",
+    "costNum": 1,
+    "powerVal": "4",
+    "rulesText": "Increase a Gig by up to 4. If you control a Gig with 8+ value, draw 1.",
+    "keywords": [],
+    "classification": [
+      "Arasaka",
+      "Braindance"
+    ],
+    "hasSpendAbility": false,
+    "triggers": [],
+    "rawRamCost": 1,
+    "rawEddieCost": 1,
+    "rawPower": null
+  },
+  "CP-049": {
+    "id": "CP-049",
+    "name": "Jacked-In Voodoo Boy",
+    "slug": "jacked-in-voodoo-boy",
+    "officialType": "UNIT",
+    "aspect": "Blue",
+    "costNum": 2,
+    "powerVal": "2",
+    "rulesText": "This Unit can't attack unless you played a Program this turn.",
+    "keywords": [],
+    "classification": [
+      "Netrunner",
+      "Voodoo Boys"
+    ],
+    "hasSpendAbility": false,
+    "triggers": [],
+    "rawRamCost": 2,
+    "rawEddieCost": 2,
+    "rawPower": 2
+  },
+  "CP-050": {
+    "id": "CP-050",
+    "name": "Jackie Welles // Mama's Favorite",
+    "slug": "jackie-welles-mama-s-favorite",
+    "officialType": "LEGEND",
+    "aspect": "Green",
+    "costNum": 6,
+    "powerVal": "8",
+    "rulesText": "GO SOLO (Pay this Legend's cost to play it as a ready Unit. It can attack this turn. If it leaves the field, remove it from the game.)\nIf a friendly Unit would be defeated, you may pay 1 €$ to defeat this Legend instead. (Remove it from the game.)",
+    "keywords": [
+      "Go Solo"
+    ],
+    "classification": [
+      "Merc"
+    ],
+    "hasSpendAbility": false,
+    "triggers": [],
+    "rawRamCost": null,
+    "rawEddieCost": 6,
+    "rawPower": 8
+  },
+  "CP-051": {
+    "id": "CP-051",
+    "name": "Jackie Welles // Pour One Out for Me",
+    "slug": "jackie-welles-pour-one-out-for-me",
+    "officialType": "LEGEND",
+    "aspect": "Blue",
+    "costNum": 3,
+    "powerVal": "0",
+    "rulesText": "The first time you play a Blue Unit or Blue Gear each turn, you may decrease a friendly Gig by up to 2. If it becomes a min Gig, draw 1.",
+    "keywords": [],
+    "classification": [
+      "Merc"
+    ],
+    "hasSpendAbility": false,
+    "triggers": [],
+    "rawRamCost": null,
+    "rawEddieCost": 0,
+    "rawPower": null
+  },
+  "CP-052": {
+    "id": "CP-052",
+    "name": "Jackie Welles // Ride or Die Choom",
+    "slug": "jackie-welles-ride-or-die-choom",
+    "officialType": "UNIT",
+    "aspect": "Yellow",
+    "costNum": 6,
+    "powerVal": "8",
+    "rulesText": "ATTACK Give this Unit +2 power this turn for each friendly Gig with an even value.\nDEFEATED Draw 1 for each friendly Gig with an odd value.",
+    "keywords": [
+      "Attack"
+    ],
+    "classification": [
+      "Merc",
+      "Valentino"
+    ],
+    "hasSpendAbility": false,
+    "triggers": [
+      "attack",
+      "defeated"
+    ],
+    "rawRamCost": 2,
+    "rawEddieCost": 6,
+    "rawPower": 8
+  },
+  "CP-053": {
+    "id": "CP-053",
+    "name": "Japantown Jonin",
+    "slug": "japantown-jonin",
+    "officialType": "UNIT",
+    "aspect": "Red",
+    "costNum": 2,
+    "powerVal": "0",
+    "rulesText": "PLAY Give a friendly Unit +2 power this turn.\n(Units with power 0 don't steal Gigs.)",
+    "keywords": [
+      "Play"
+    ],
+    "classification": [
+      "Tyger Claws"
+    ],
+    "hasSpendAbility": false,
+    "triggers": [
+      "play"
+    ],
+    "rawRamCost": 2,
+    "rawEddieCost": 2,
+    "rawPower": 0
+  },
+  "CP-054": {
+    "id": "CP-054",
+    "name": "Johnny Silverhand // Never Stop Fighting",
+    "slug": "johnny-silverhand-never-stop-fighting",
+    "officialType": "UNIT",
+    "aspect": "Red",
+    "costNum": 6,
+    "powerVal": "8",
+    "rulesText": "The first time this Unit wins a fight each turn, ready it.\nThis Unit wins all fights against CORPO Units.",
+    "keywords": [],
+    "classification": [
+      "Merc",
+      "Rocker",
+      "Samurai"
+    ],
+    "hasSpendAbility": false,
+    "triggers": [],
+    "rawRamCost": 2,
+    "rawEddieCost": 6,
+    "rawPower": 8
+  },
+  "CP-055": {
+    "id": "CP-055",
+    "name": "Johnny Silverhand // Rocking Renegade",
+    "slug": "johnny-silverhand-rocking-renegade",
+    "officialType": "LEGEND",
+    "aspect": "Red",
+    "costNum": null,
+    "powerVal": "0",
+    "rulesText": "2 €$, ↷ A friendly Unit can attack spent rival Units the turn it's played. If it's a ROCKER Unit, also give it +2 power this turn. This effect costs -1 €$ for each friendly Gig with 8+ value.",
+    "keywords": [],
+    "classification": [
+      "Merc",
+      "Rocker",
+      "Samurai"
+    ],
+    "hasSpendAbility": true,
+    "triggers": [],
+    "rawRamCost": null,
+    "rawEddieCost": 0,
+    "rawPower": null
+  },
+  "CP-056": {
+    "id": "CP-056",
+    "name": "Judy Álvarez // Nothing to Doubt",
+    "slug": "judy-a-lvarez-nothing-to-doubt",
+    "officialType": "UNIT",
+    "aspect": "Blue",
+    "costNum": 6,
+    "powerVal": "6",
+    "rulesText": "1 €$, ↷ Reveal the top card of your deck. You may play it for free. Otherwise, add it to your hand.",
+    "keywords": [],
+    "classification": [
+      "Ganger",
+      "Mox",
+      "Techie"
+    ],
+    "hasSpendAbility": true,
+    "triggers": [],
+    "rawRamCost": 5,
+    "rawEddieCost": 6,
+    "rawPower": 6
+  },
+  "CP-057": {
+    "id": "CP-057",
+    "name": "Judy Álvarez // Braindance Maestro",
+    "slug": "judy-alvarez-braindance-maestro",
+    "officialType": "LEGEND",
+    "aspect": "Blue",
+    "costNum": null,
+    "powerVal": "0",
+    "rulesText": "When you play a BRAINDANCE Program, give a friendly Unit +1 power this turn.\n↷ Trash the top card of your deck. If it's a Program, you may add it to your hand.",
+    "keywords": [],
+    "classification": [
+      "Ganger",
+      "Mox",
+      "Techie"
+    ],
+    "hasSpendAbility": true,
+    "triggers": [],
+    "rawRamCost": null,
+    "rawEddieCost": 0,
+    "rawPower": null
+  },
+  "CP-058": {
+    "id": "CP-058",
+    "name": "Kerry Eurodyne // Axe, Attitude, Audience",
+    "slug": "kerry-eurodyne-axe-attitude-audience",
+    "officialType": "LEGEND",
+    "aspect": "Yellow",
+    "costNum": null,
+    "powerVal": "0",
+    "rulesText": "When you roll in a Gig from your fixer area, you may ignore the result and reroll it once.\nWhen you roll a min or max value on a Gig, draw 1. If it's a d20, draw 3 instead.",
+    "keywords": [],
+    "classification": [
+      "Rocker",
+      "Samurai"
+    ],
+    "hasSpendAbility": false,
+    "triggers": [],
+    "rawRamCost": null,
+    "rawEddieCost": 0,
+    "rawPower": null
+  },
+  "CP-059": {
+    "id": "CP-059",
+    "name": "Kerry Eurodyne // The Last Rockerboy",
+    "slug": "kerry-eurodyne-the-last-rockerboy",
+    "officialType": "UNIT",
+    "aspect": "Red",
+    "costNum": 4,
+    "powerVal": "5",
+    "rulesText": "↷ If you control a Gig with 8+ value, draw 2.",
+    "keywords": [],
+    "classification": [
+      "Rocker",
+      "Samurai"
+    ],
+    "hasSpendAbility": true,
+    "triggers": [],
+    "rawRamCost": 1,
+    "rawEddieCost": 4,
+    "rawPower": 5
+  },
+  "CP-060": {
+    "id": "CP-060",
+    "name": "Kiroshi Optics",
+    "slug": "kiroshi-optics",
+    "officialType": "GEAR",
+    "aspect": "Yellow",
+    "costNum": 1,
+    "powerVal": "+1",
+    "rulesText": "(Equip to a friendly Unit or face-up Legend.)\nATTACK Look at a friendly face-down Legend. (Don't reveal it.)",
+    "keywords": [
+      "Attack"
+    ],
+    "classification": [
+      "Cyberware"
+    ],
+    "hasSpendAbility": false,
+    "triggers": [
+      "attack"
+    ],
+    "rawRamCost": 1,
+    "rawEddieCost": 1,
+    "rawPower": 1
+  },
+  "CP-061": {
+    "id": "CP-061",
+    "name": "La Llorona // Ghost of the Past",
+    "slug": "la-llorona-ghost-of-the-past",
+    "officialType": "UNIT",
+    "aspect": "Red",
+    "costNum": 3,
+    "powerVal": "3",
+    "rulesText": "BLOCKER (You may spend this Unit to redirect a rival Unit's attack to it instead.)\nWhen this Unit uses BLOCKER, increase a Gig by up to 3.",
+    "keywords": [
+      "Blocker"
+    ],
+    "classification": [
+      "Ganger",
+      "Valentino"
+    ],
+    "hasSpendAbility": false,
+    "triggers": [],
+    "rawRamCost": 1,
+    "rawEddieCost": 3,
+    "rawPower": 3
+  },
+  "CP-062": {
+    "id": "CP-062",
+    "name": "Les Éléments",
+    "slug": "les-elemens",
+    "officialType": "PROGRAM",
+    "aspect": "Blue",
+    "costNum": 5,
+    "powerVal": "4",
+    "rulesText": "Bottom-deck a Rival's lowest-power Unit. (If there are multiple, choose 1.)",
+    "keywords": [],
+    "classification": [
+      "Corpo"
+    ],
+    "hasSpendAbility": false,
+    "triggers": [],
+    "rawRamCost": 4,
+    "rawEddieCost": 5,
+    "rawPower": null
+  },
+  "CP-063": {
+    "id": "CP-063",
+    "name": "Live With the Aftermath",
+    "slug": "live-with-the-aftermath",
+    "officialType": "PROGRAM",
+    "aspect": "Yellow",
+    "costNum": 3,
+    "powerVal": "4",
+    "rulesText": "Each player defeats one of their Units.",
+    "keywords": [],
+    "classification": [
+      "Plan"
+    ],
+    "hasSpendAbility": false,
+    "triggers": [],
+    "rawRamCost": 3,
+    "rawEddieCost": 3,
+    "rawPower": null
+  },
+  "CP-064": {
+    "id": "CP-064",
+    "name": "Lizzy Wizzy // Delicate Weapon",
+    "slug": "lizzy-wizzy-delicate-weapon",
+    "officialType": "UNIT",
+    "aspect": "Blue",
+    "costNum": 5,
+    "powerVal": "2",
+    "rulesText": "PLAY You may play a Program with cost 3 or less from your hand or trash for free. Bottom-deck it after you play it.\nBLOCKER",
+    "keywords": [
+      "Blocker",
+      "Play"
+    ],
+    "classification": [
+      "Rocker"
+    ],
+    "hasSpendAbility": false,
+    "triggers": [
+      "play"
+    ],
+    "rawRamCost": 2,
+    "rawEddieCost": 5,
+    "rawPower": 2
+  },
+  "CP-065": {
+    "id": "CP-065",
+    "name": "Maelstrom Goons",
+    "slug": "maelstrom-goons",
+    "officialType": "UNIT",
+    "aspect": "Yellow",
+    "costNum": 3,
+    "powerVal": "3",
+    "rulesText": "When this Unit steals a Gig, if it's equipped, a Rival discards 1.",
+    "keywords": [],
+    "classification": [
+      "Ganger",
+      "Maelstrom"
+    ],
+    "hasSpendAbility": false,
+    "triggers": [],
+    "rawRamCost": 2,
+    "rawEddieCost": 3,
+    "rawPower": 3
+  },
+  "CP-066": {
+    "id": "CP-066",
+    "name": "Maelstrom Zealots",
+    "slug": "maelstrom-zealots",
+    "officialType": "UNIT",
+    "aspect": "Green",
+    "costNum": 4,
+    "powerVal": "0",
+    "rulesText": "When this Unit loses a fight, defeat the opposing rival Unit.\n(Units with power 0 don't steal Gigs.)",
+    "keywords": [],
+    "classification": [
+      "Ganger",
+      "Maelstrom"
+    ],
+    "hasSpendAbility": false,
+    "triggers": [],
+    "rawRamCost": 1,
+    "rawEddieCost": 4,
+    "rawPower": 0
+  },
+  "CP-067": {
+    "id": "CP-067",
+    "name": "Maman Brigitte // Spirit of Death",
+    "slug": "maman-brigitte-spirit-of-death",
+    "officialType": "UNIT",
+    "aspect": "Blue",
+    "costNum": 5,
+    "powerVal": "3",
+    "rulesText": "PLAY You may discard 2 Programs. If you do, bottom-deck a rival unequipped Unit.",
+    "keywords": [
+      "Play"
+    ],
+    "classification": [
+      "Mystic",
+      "Netrunner",
+      "Voodoo Boys"
+    ],
+    "hasSpendAbility": false,
+    "triggers": [
+      "play"
+    ],
+    "rawRamCost": 4,
+    "rawEddieCost": 5,
+    "rawPower": 3
+  },
+  "CP-068": {
+    "id": "CP-068",
+    "name": "Mandibular Upgrade",
+    "slug": "mandibular-upgrade",
+    "officialType": "GEAR",
+    "aspect": "Yellow",
+    "costNum": 1,
+    "powerVal": "+0",
+    "rulesText": "(Equip to a friendly Unit or face-up Legend.)\nBLOCKER (You may spend this Unit to redirect a rival Unit's attack to it instead.)",
+    "keywords": [
+      "Blocker"
+    ],
+    "classification": [
+      "Cyberware"
+    ],
+    "hasSpendAbility": false,
+    "triggers": [],
+    "rawRamCost": 2,
+    "rawEddieCost": 1,
+    "rawPower": 0
+  },
+  "CP-069": {
+    "id": "CP-069",
+    "name": "Mantis Blades",
+    "slug": "mantis-blades",
+    "officialType": "GEAR",
+    "aspect": "Red",
+    "costNum": 1,
+    "powerVal": "+2",
+    "rulesText": "(Equip to a friendly Unit or face-up Legend.)\n\"One cut, one kill.\"",
+    "keywords": [],
+    "classification": [
+      "Cyberware"
+    ],
+    "hasSpendAbility": false,
+    "triggers": [],
+    "rawRamCost": 1,
+    "rawEddieCost": 1,
+    "rawPower": 2
+  },
+  "CP-070": {
+    "id": "CP-070",
+    "name": "MaxTac AV",
+    "slug": "maxtac-av",
+    "officialType": "UNIT",
+    "aspect": "Green",
+    "costNum": 5,
+    "powerVal": "8",
+    "rulesText": "PLAY You may swap a friendly Gig with a rival Gig.",
+    "keywords": [
+      "Play"
+    ],
+    "classification": [
+      "NCPD",
+      "Vehicle"
+    ],
+    "hasSpendAbility": false,
+    "triggers": [
+      "play"
+    ],
+    "rawRamCost": 2,
+    "rawEddieCost": 5,
+    "rawPower": 8
+  },
+  "CP-071": {
+    "id": "CP-071",
+    "name": "MaxTac Heavy",
+    "slug": "maxtac-heavy",
+    "officialType": "UNIT",
+    "aspect": "Green",
+    "costNum": 7,
+    "powerVal": "8",
+    "rulesText": "Play this Unit for -1 €$ for each of a Rival’s Units, to a minimum of 1 €$.",
+    "keywords": [],
+    "classification": [
+      "NCPD"
+    ],
+    "hasSpendAbility": false,
+    "triggers": [],
+    "rawRamCost": 3,
+    "rawEddieCost": 7,
+    "rawPower": 8
+  },
+  "CP-072": {
+    "id": "CP-072",
+    "name": "MaxTac Squadron",
+    "slug": "maxtac-squadron",
+    "officialType": "UNIT",
+    "aspect": "Green",
+    "costNum": 3,
+    "powerVal": "4",
+    "rulesText": "At the end of your turn, if this Unit is spent, ready a friendly face-up Legend.",
+    "keywords": [],
+    "classification": [
+      "NCPD"
+    ],
+    "hasSpendAbility": false,
+    "triggers": [],
+    "rawRamCost": 3,
+    "rawEddieCost": 3,
+    "rawPower": 4
+  },
+  "CP-073": {
+    "id": "CP-073",
+    "name": "MaxTac Suppression Team",
+    "slug": "maxtac-suppression-team",
+    "officialType": "UNIT",
+    "aspect": "Yellow",
+    "costNum": 5,
+    "powerVal": "7",
+    "rulesText": "Rival Units can't attack the turn they're played.",
+    "keywords": [],
+    "classification": [
+      "NCPD"
+    ],
+    "hasSpendAbility": false,
+    "triggers": [],
+    "rawRamCost": 1,
+    "rawEddieCost": 5,
+    "rawPower": 7
+  },
+  "CP-074": {
+    "id": "CP-074",
+    "name": "Memory Relapse",
+    "slug": "memory-relapse",
+    "officialType": "PROGRAM",
+    "aspect": "Green",
+    "costNum": 4,
+    "powerVal": "4",
+    "rulesText": "Spend a rival Unit. It can't ready until your next turn. If your ☆ (Street Cred) is an even number, draw 1.",
+    "keywords": [],
+    "classification": [
+      "Braindance"
+    ],
+    "hasSpendAbility": false,
+    "triggers": [],
+    "rawRamCost": 2,
+    "rawEddieCost": 4,
+    "rawPower": null
+  },
+  "CP-075": {
+    "id": "CP-075",
+    "name": "Meredith Stout // Stone-Cold Corpo",
+    "slug": "meredith-stout-stone-cold-corpo",
+    "officialType": "UNIT",
+    "aspect": "Red",
+    "costNum": 4,
+    "powerVal": "5",
+    "rulesText": "BLOCKER\nThis Unit has +2 power while fighting a Legend.\nWhen a Rival adjusts or swaps 1 or more friendly Gigs, you may add a card from your trash to your hand.",
+    "keywords": [
+      "Blocker"
+    ],
+    "classification": [
+      "Corpo",
+      "Militech"
+    ],
+    "hasSpendAbility": false,
+    "triggers": [],
+    "rawRamCost": 1,
+    "rawEddieCost": 4,
+    "rawPower": 5
+  },
+  "CP-076": {
+    "id": "CP-076",
+    "name": "Minotaur",
+    "slug": "minotaur",
+    "officialType": "UNIT",
+    "aspect": "Red",
+    "costNum": 7,
+    "powerVal": "9",
+    "rulesText": "PLAY If you have more ☆ (Street Cred) than a Rival, defeat a rival Unit with power 5 or less.",
+    "keywords": [
+      "Play"
+    ],
+    "classification": [
+      "Arasaka",
+      "Drone",
+      "Militech"
+    ],
+    "hasSpendAbility": false,
+    "triggers": [
+      "play"
+    ],
+    "rawRamCost": 2,
+    "rawEddieCost": 7,
+    "rawPower": 9
+  },
+  "CP-077": {
+    "id": "CP-077",
+    "name": "Misty Olszewski // Mender of Broken Spirits",
+    "slug": "misty-olszewski-mender-of-broken-spirits",
+    "officialType": "UNIT",
+    "aspect": "Blue",
+    "costNum": 3,
+    "powerVal": "0",
+    "rulesText": "This Unit can't attack.\nAt the end of your turn, choose a card type. Then, reveal the top card of your deck. If it's the chosen type, add it to your hand and ready 1 Eddie. Otherwise, trash it.\n(Unit, Gear, and Program are card types.)",
+    "keywords": [],
+    "classification": [
+      "Mystic"
+    ],
+    "hasSpendAbility": false,
+    "triggers": [],
+    "rawRamCost": 2,
+    "rawEddieCost": 3,
+    "rawPower": 0
+  },
+  "CP-078": {
+    "id": "CP-078",
+    "name": "Modded Kusanagi",
+    "slug": "modded-kusanagi",
+    "officialType": "UNIT",
+    "aspect": "Blue",
+    "costNum": 6,
+    "powerVal": "8",
+    "rulesText": "ADRENALINE (This Unit can attack the turn it's played.)\nAt the end of your turn, return this Unit to its owner's hand.",
+    "keywords": [
+      "Adrenaline"
+    ],
+    "classification": [
+      "Tyger Claws",
+      "Vehicle"
+    ],
+    "hasSpendAbility": false,
+    "triggers": [],
+    "rawRamCost": 2,
+    "rawEddieCost": 6,
+    "rawPower": 8
+  },
+  "CP-079": {
+    "id": "CP-079",
+    "name": "Modded Muramasa",
+    "slug": "modded-muramasa",
+    "officialType": "UNIT",
+    "aspect": "Blue",
+    "costNum": 5,
+    "powerVal": "4",
+    "rulesText": "At the end of your turn, if you have less ☆ (Street Cred) than a Rival, ready this Unit.",
+    "keywords": [],
+    "classification": [
+      "Vehicle"
+    ],
+    "hasSpendAbility": false,
+    "triggers": [],
+    "rawRamCost": 2,
+    "rawEddieCost": 5,
+    "rawPower": 4
+  },
+  "CP-080": {
+    "id": "CP-080",
+    "name": "Mox Inciters",
+    "slug": "mox-inciters",
+    "officialType": "UNIT",
+    "aspect": "Blue",
+    "costNum": 3,
+    "powerVal": "2",
+    "rulesText": "PLAY A rival Unit must attack next turn if it can.\nBLOCKER (You may spend this Unit to redirect a rival Unit's attack to it instead.)",
+    "keywords": [
+      "Blocker",
+      "Play"
+    ],
+    "classification": [
+      "Ganger",
+      "Mox"
+    ],
+    "hasSpendAbility": false,
+    "triggers": [
+      "play"
+    ],
+    "rawRamCost": 2,
+    "rawEddieCost": 3,
+    "rawPower": 2
+  },
+  "CP-081": {
+    "id": "CP-081",
+    "name": "MT0D12 Flathead",
+    "slug": "mt0d12-flathead",
+    "officialType": "UNIT",
+    "aspect": "Blue",
+    "costNum": 5,
+    "powerVal": "7",
+    "rulesText": "If you have less ☆ (Street Cred) than a Rival, this Unit can't be blocked.",
+    "keywords": [],
+    "classification": [
+      "Drone",
+      "Militech"
+    ],
+    "hasSpendAbility": false,
+    "triggers": [],
+    "rawRamCost": 3,
+    "rawEddieCost": 5,
+    "rawPower": 7
+  },
+  "CP-082": {
+    "id": "CP-082",
+    "name": "Muamar Reyes // El Capitán",
+    "slug": "muamar-reyes-el-capita-n",
+    "officialType": "LEGEND",
+    "aspect": "Yellow",
+    "costNum": null,
+    "powerVal": "0",
+    "rulesText": "CALL Choose one effect.\nA friendly Unit can't be defeated in a fight this turn. // Draw 1.\n↷ Adjust a Gig by 1.",
+    "keywords": [
+      "Call"
+    ],
+    "classification": [
+      "Fixer"
+    ],
+    "hasSpendAbility": true,
+    "triggers": [
+      "call"
+    ],
+    "rawRamCost": null,
+    "rawEddieCost": 0,
+    "rawPower": null
+  },
+  "CP-083": {
+    "id": "CP-083",
+    "name": "Nadia // Fighting Through Grief",
+    "slug": "nadia-fighting-through-grief",
+    "officialType": "UNIT",
+    "aspect": "Green",
+    "costNum": 6,
+    "powerVal": "8",
+    "rulesText": "If a Rival controls more Gigs than you, this Unit can attack their Gig area the turn it's played.",
+    "keywords": [],
+    "classification": [
+      "Medtech",
+      "Trauma Team"
+    ],
+    "hasSpendAbility": false,
+    "triggers": [],
+    "rawRamCost": 2,
+    "rawEddieCost": 6,
+    "rawPower": 8
+  },
+  "CP-084": {
+    "id": "CP-084",
+    "name": "NetWatch Netdriver",
+    "slug": "netwatch-netdriver",
+    "officialType": "GEAR",
+    "aspect": "Blue",
+    "costNum": 3,
+    "powerVal": "+2",
+    "rulesText": "(Equip to a friendly Unit or face-up Legend.)\nWhen this Unit or Legend is spent, draw 1.",
+    "keywords": [],
+    "classification": [
+      "Cyberware",
+      "Netrunner",
+      "Netwatch"
+    ],
+    "hasSpendAbility": false,
+    "triggers": [],
+    "rawRamCost": 2,
+    "rawEddieCost": 3,
+    "rawPower": 2
+  },
+  "CP-085": {
+    "id": "CP-085",
+    "name": "Nocturne Op55N1",
+    "slug": "nocturne-op55-n1",
+    "officialType": "PROGRAM",
+    "aspect": "Blue",
+    "costNum": 3,
+    "powerVal": "4",
+    "rulesText": "If your fixer area is empty, play this Program for 1 €$. Choose one effect.\nDraw 2. // A Unit can't attack until your next turn. // A friendly Legend may use GO SOLO for -2 €$ this turn, to a minimum of 1 €$.",
+    "keywords": [
+      "Go Solo"
+    ],
+    "classification": [
+      "Arasaka",
+      "Plan"
+    ],
+    "hasSpendAbility": false,
+    "triggers": [],
+    "rawRamCost": 2,
+    "rawEddieCost": 3,
+    "rawPower": null
+  },
+  "CP-086": {
+    "id": "CP-086",
+    "name": "Octant",
+    "slug": "octant",
+    "officialType": "UNIT",
+    "aspect": "Red",
+    "costNum": 7,
+    "powerVal": "8",
+    "rulesText": "Play this Unit for -1 €$ for each friendly Gig with 8+ value, to a minimum of 1 €$.",
+    "keywords": [],
+    "classification": [
+      "Drone",
+      "Militech",
+      "Zetatech"
+    ],
+    "hasSpendAbility": false,
+    "triggers": [],
+    "rawRamCost": 4,
+    "rawEddieCost": 7,
+    "rawPower": 8
+  },
+  "CP-087": {
+    "id": "CP-087",
+    "name": "Off-Duty Malfini",
+    "slug": "offduty-malfini",
+    "officialType": "UNIT",
+    "aspect": "Yellow",
+    "costNum": 4,
+    "powerVal": "5",
+    "rulesText": "PLAY Spend this Unit and a rival Unit.",
+    "keywords": [
+      "Play"
+    ],
+    "classification": [
+      "Ganger",
+      "Voodoo Boys"
+    ],
+    "hasSpendAbility": false,
+    "triggers": [
+      "play"
+    ],
+    "rawRamCost": 2,
+    "rawEddieCost": 4,
+    "rawPower": 5
+  },
+  "CP-088": {
+    "id": "CP-088",
+    "name": "Over the Edge",
+    "slug": "over-the-edge",
+    "officialType": "PROGRAM",
+    "aspect": "Red",
+    "costNum": 3,
+    "powerVal": "4",
+    "rulesText": "Defeat a Unit with power equal to or less than the value of a friendly d20.",
+    "keywords": [],
+    "classification": [
+      "Merc"
+    ],
+    "hasSpendAbility": false,
+    "triggers": [],
+    "rawRamCost": 2,
+    "rawEddieCost": 3,
+    "rawPower": null
+  },
+  "CP-089": {
+    "id": "CP-089",
+    "name": "Overwatch // Panam's Gift",
+    "slug": "overwatch-panams-gift",
+    "officialType": "GEAR",
+    "aspect": "Green",
+    "costNum": 4,
+    "powerVal": "+4",
+    "rulesText": "(Equip to a friendly Unit or face-up Legend.)\nQUICK 1 €$, ↷ Discard 1. Defeat a spent rival Unit with cost equal to or less than the discarded card's cost.",
+    "keywords": [
+      "Quick"
+    ],
+    "classification": [
+      "Weapon"
+    ],
+    "hasSpendAbility": true,
+    "triggers": [],
+    "rawRamCost": 4,
+    "rawEddieCost": 4,
+    "rawPower": 4
+  },
+  "CP-090": {
+    "id": "CP-090",
+    "name": "Pacifica Netrunner",
+    "slug": "pacifica-netrunner",
+    "officialType": "UNIT",
+    "aspect": "Green",
+    "costNum": 4,
+    "powerVal": "1",
+    "rulesText": "PLAY If your ☆ (Street Cred) is an even number, a rival Unit can't ready until your next turn.",
+    "keywords": [
+      "Play"
+    ],
+    "classification": [
+      "Netrunner"
+    ],
+    "hasSpendAbility": false,
+    "triggers": [
+      "play"
+    ],
+    "rawRamCost": 2,
+    "rawEddieCost": 4,
+    "rawPower": 1
+  },
+  "CP-091": {
+    "id": "CP-091",
+    "name": "Padre // Man of the Cross",
+    "slug": "padre-man-of-the-cross",
+    "officialType": "LEGEND",
+    "aspect": "Green",
+    "costNum": null,
+    "powerVal": "0",
+    "rulesText": "CALL Choose one effect.\nSpend a rival Unit. // Draw 1.\n↷ Set a player's Gig to the same value as another player's Gig.",
+    "keywords": [
+      "Call"
+    ],
+    "classification": [
+      "Fixer",
+      "Ganger",
+      "Valentino"
+    ],
+    "hasSpendAbility": true,
+    "triggers": [
+      "call"
+    ],
+    "rawRamCost": null,
+    "rawEddieCost": 0,
+    "rawPower": null
+  },
+  "CP-092": {
+    "id": "CP-092",
+    "name": "Panam Palmer // Nomad Cavalry",
+    "slug": "panam-palmer-nomad-cavalry",
+    "officialType": "LEGEND",
+    "aspect": "Green",
+    "costNum": null,
+    "powerVal": "0",
+    "rulesText": "2 €$, ↷ Move a Gear from this Legend to an unequipped friendly Unit. If you do, ready that Unit.\nAt the end of your turn, if 5 or more friendly Units and/or Legends are equipped, ready them.",
+    "keywords": [],
+    "classification": [
+      "Aldecaldo",
+      "Merc",
+      "Nomad"
+    ],
+    "hasSpendAbility": true,
+    "triggers": [],
+    "rawRamCost": null,
+    "rawEddieCost": 0,
+    "rawPower": null
+  },
+  "CP-093": {
+    "id": "CP-093",
+    "name": "Panam Palmer // Strength Through Family",
+    "slug": "panam-palmer-strength-through-family",
+    "officialType": "UNIT",
+    "aspect": "Green",
+    "costNum": 6,
+    "powerVal": "6",
+    "rulesText": "During your turn, you may Call a Legend for free.\nATTACK Discard 1. If you do, draw 1 for each friendly face-up Legend.",
+    "keywords": [
+      "Attack"
+    ],
+    "classification": [
+      "Aldecaldo",
+      "Merc",
+      "Nomad"
+    ],
+    "hasSpendAbility": false,
+    "triggers": [
+      "attack"
+    ],
+    "rawRamCost": 4,
+    "rawEddieCost": 6,
+    "rawPower": 6
+  },
+  "CP-094": {
+    "id": "CP-094",
+    "name": "Peace Offering",
+    "slug": "peace-offering",
+    "officialType": "PROGRAM",
+    "aspect": "Green",
+    "costNum": 1,
+    "powerVal": "4",
+    "rulesText": "You may set a Gig's value to the value of another Gig. Then, if you control a value-pair, draw 1.",
+    "keywords": [],
+    "classification": [
+      "Braindance"
+    ],
+    "hasSpendAbility": false,
+    "triggers": [],
+    "rawRamCost": 1,
+    "rawEddieCost": 1,
+    "rawPower": null
+  },
+  "CP-095": {
+    "id": "CP-095",
+    "name": "Pepe Najarro // Working Doubles",
+    "slug": "pepe-najarro-working-doubles",
+    "officialType": "UNIT",
+    "aspect": "Green",
+    "costNum": 4,
+    "powerVal": "6",
+    "rulesText": "ATTACK If you control a value-pair of Gigs, ready up to 2 MERC Legends in your Legends area.",
+    "keywords": [
+      "Attack"
+    ],
+    "classification": [
+      "Valentino"
+    ],
+    "hasSpendAbility": false,
+    "triggers": [
+      "attack"
+    ],
+    "rawRamCost": 2,
+    "rawEddieCost": 4,
+    "rawPower": 6
+  },
+  "CP-096": {
+    "id": "CP-096",
+    "name": "Placide // Voodoo Sentinel",
+    "slug": "placide-voodoo-sentinel",
+    "officialType": "UNIT",
+    "aspect": "Blue",
+    "costNum": 8,
+    "powerVal": "10",
+    "rulesText": "PLAY ATTACK You may discard 1 Program. If you do, bottom-deck a rival Unit.",
+    "keywords": [
+      "Attack",
+      "Play"
+    ],
+    "classification": [
+      "Ganger",
+      "Netrunner",
+      "Voodoo Boys"
+    ],
+    "hasSpendAbility": false,
+    "triggers": [
+      "play",
+      "attack"
+    ],
+    "rawRamCost": 2,
+    "rawEddieCost": 8,
+    "rawPower": 10
+  },
+  "CP-097": {
+    "id": "CP-097",
+    "name": "Psycho Squad",
+    "slug": "psycho-squad",
+    "officialType": "UNIT",
+    "aspect": "Blue",
+    "costNum": 4,
+    "powerVal": "6",
+    "rulesText": "[Flavour] Their protocol stops at “shoot first.”",
+    "keywords": [],
+    "classification": [
+      "NCPD"
+    ],
+    "hasSpendAbility": false,
+    "triggers": [],
+    "rawRamCost": 1,
+    "rawEddieCost": 4,
+    "rawPower": 6
+  },
+  "CP-098": {
+    "id": "CP-098",
+    "name": "Pyramid Song",
+    "slug": "pyramid-song",
+    "officialType": "PROGRAM",
+    "aspect": "Blue",
+    "costNum": 3,
+    "powerVal": "4",
+    "rulesText": "Choose one effect. If a friendly d4 is a min Gig, choose both instead.\nGive a rival Unit -4 power this turn. // Bottom-deck a rival Unit with power 0.",
+    "keywords": [],
+    "classification": [
+      "Braindance"
+    ],
+    "hasSpendAbility": false,
+    "triggers": [],
+    "rawRamCost": 3,
+    "rawEddieCost": 3,
+    "rawPower": null
+  },
+  "CP-099": {
+    "id": "CP-099",
+    "name": "Rebecca // Having a Moment",
+    "slug": "rebecca-having-a-moment",
+    "officialType": "LEGEND",
+    "aspect": "Red",
+    "costNum": 3,
+    "powerVal": "4",
+    "rulesText": "",
+    "keywords": [],
+    "classification": [],
+    "hasSpendAbility": false,
+    "triggers": [],
+    "rawRamCost": null,
+    "rawEddieCost": 0,
+    "rawPower": null
+  },
+  "CP-100": {
+    "id": "CP-100",
+    "name": "Reboot Optics",
+    "slug": "reboot-optics",
+    "officialType": "PROGRAM",
+    "aspect": "Blue",
+    "costNum": 2,
+    "powerVal": "4",
+    "rulesText": "QUICK The next time a rival Unit fights this turn, it doesn't defeat the opposing friendly Unit.",
+    "keywords": [
+      "Quick"
+    ],
+    "classification": [
+      "Quickhack"
+    ],
+    "hasSpendAbility": false,
+    "triggers": [],
+    "rawRamCost": 2,
+    "rawEddieCost": 2,
+    "rawPower": null
+  },
+  "CP-101": {
+    "id": "CP-101",
+    "name": "Riding Nomad",
+    "slug": "riding-nomad",
+    "officialType": "UNIT",
+    "aspect": "Green",
+    "costNum": 5,
+    "powerVal": "4",
+    "rulesText": "ADRENALINE (This Unit can attack the turn it's played.)",
+    "keywords": [
+      "Adrenaline"
+    ],
+    "classification": [
+      "Nomad"
+    ],
+    "hasSpendAbility": false,
+    "triggers": [],
+    "rawRamCost": 4,
+    "rawEddieCost": 5,
+    "rawPower": 4
+  },
+  "CP-102": {
+    "id": "CP-102",
+    "name": "Riot Shield",
+    "slug": "riot-shield",
+    "officialType": "GEAR",
+    "aspect": "Green",
+    "costNum": 2,
+    "powerVal": "+1",
+    "rulesText": "(Equip to a friendly Unit or face-up Legend.)\nBLOCKER (You may spend this Unit to redirect a rival Unit's attack to it instead.)\nRivals must pay +2 €$ to use GO SOLO.",
+    "keywords": [
+      "Blocker",
+      "Go Solo"
+    ],
+    "classification": [
+      "Weapon"
+    ],
+    "hasSpendAbility": false,
+    "triggers": [],
+    "rawRamCost": 2,
+    "rawEddieCost": 2,
+    "rawPower": 1
+  },
+  "CP-103": {
+    "id": "CP-103",
+    "name": "Rita Wheeler // No Stupid Questions",
+    "slug": "rita-wheeler-no-stupid-questions",
+    "officialType": "UNIT",
+    "aspect": "Blue",
+    "costNum": 4,
+    "powerVal": "4",
+    "rulesText": "BLOCKER (You may spend this Unit to redirect a rival Unit's attack to it instead.)\nThe first time this Unit is spent each turn, draw 1, then discard 1.",
+    "keywords": [
+      "Blocker"
+    ],
+    "classification": [
+      "Ganger",
+      "Mox"
+    ],
+    "hasSpendAbility": false,
+    "triggers": [],
+    "rawRamCost": 2,
+    "rawEddieCost": 4,
+    "rawPower": 4
+  },
+  "CP-104": {
+    "id": "CP-104",
+    "name": "River Ward // Detective on the Hunt",
+    "slug": "river-ward-detective-on-the-hunt",
+    "officialType": "LEGEND",
+    "aspect": "Yellow",
+    "costNum": null,
+    "powerVal": "0",
+    "rulesText": "QUICK ↷ Play a Gear with cost 2 or less from your hand for free.\nWhen a friendly equipped Unit is defeated, search the top 2 cards of your deck and trash 1.",
+    "keywords": [
+      "Quick"
+    ],
+    "classification": [
+      "NCPD"
+    ],
+    "hasSpendAbility": true,
+    "triggers": [],
+    "rawRamCost": null,
+    "rawEddieCost": 0,
+    "rawPower": null
+  },
+  "CP-105": {
+    "id": "CP-105",
+    "name": "Rockin' Rockerboy",
+    "slug": "rockn-rockerboy",
+    "officialType": "UNIT",
+    "aspect": "Yellow",
+    "costNum": 5,
+    "powerVal": "8",
+    "rulesText": "Scream your throat raw for something. Anything.",
+    "keywords": [],
+    "classification": [
+      "Rocker"
+    ],
+    "hasSpendAbility": false,
+    "triggers": [],
+    "rawRamCost": 1,
+    "rawEddieCost": 5,
+    "rawPower": 8
+  },
+  "CP-106": {
+    "id": "CP-106",
+    "name": "Rogue Amendiares // Preem Solo",
+    "slug": "rogue-amendiares-preem-solo",
+    "officialType": "LEGEND",
+    "aspect": "Yellow",
+    "costNum": 7,
+    "powerVal": "7",
+    "rulesText": "GO SOLO (Pay this Legend's cost to play it as a ready Unit. It can attack this turn. If it leaves the field, remove it from the game.)\nWhen a friendly Legend steals a Gig, if its value is even, draw 1. If its value is odd, a Rival discards 1.",
+    "keywords": [
+      "Go Solo"
+    ],
+    "classification": [
+      "Merc"
+    ],
+    "hasSpendAbility": false,
+    "triggers": [],
+    "rawRamCost": null,
+    "rawEddieCost": 7,
+    "rawPower": 7
+  },
+  "CP-107": {
+    "id": "CP-107",
+    "name": "Rogue Amendiares // Queen of the Afterlife",
+    "slug": "rogue-amendiares-queen-of-the-afterlife",
+    "officialType": "UNIT",
+    "aspect": "Blue",
+    "costNum": 5,
+    "powerVal": "4",
+    "rulesText": "The first time another friendly Unit steals a Gig with value less than its power each turn, ready 2 Eddies.\nQUICK 2 €$,  ↷ A rival Unit loses power equal to this Unit's power this turn.",
+    "keywords": [
+      "Quick"
+    ],
+    "classification": [
+      "Fixer",
+      "Merc"
+    ],
+    "hasSpendAbility": true,
+    "triggers": [],
+    "rawRamCost": 2,
+    "rawEddieCost": 5,
+    "rawPower": 4
+  },
+  "CP-108": {
+    "id": "CP-108",
+    "name": "Royce // Don't Call Me Simon",
+    "slug": "royce-dont-call-me-simon",
+    "officialType": "UNIT",
+    "aspect": "Red",
+    "costNum": 5,
+    "powerVal": "4",
+    "rulesText": "PLAY Defeat a rival Unit with power 2 or less. If you have more ☆ (Street Cred) than a Rival, defeat a rival Unit with power 3 or less instead.",
+    "keywords": [
+      "Play"
+    ],
+    "classification": [
+      "Ganger",
+      "Maelstrom"
+    ],
+    "hasSpendAbility": false,
+    "triggers": [
+      "play"
+    ],
+    "rawRamCost": 2,
+    "rawEddieCost": 5,
+    "rawPower": 4
+  },
+  "CP-109": {
+    "id": "CP-109",
+    "name": "Royce // Psycho on the Edge",
+    "slug": "royce-psycho-on-the-edge",
+    "officialType": "LEGEND",
+    "aspect": "Red",
+    "costNum": 6,
+    "powerVal": "6",
+    "rulesText": "GO SOLO (Pay this Legend's cost to play it as a ready Unit. It can attack this turn. If it leaves the field, remove it from the game.)\nDuring your turn, this Legend has +2 power for each of its equipped Gear.",
+    "keywords": [
+      "Go Solo"
+    ],
+    "classification": [
+      "Maelstrom",
+      "Ganger"
+    ],
+    "hasSpendAbility": false,
+    "triggers": [],
+    "rawRamCost": null,
+    "rawEddieCost": 6,
+    "rawPower": 6
+  },
+  "CP-110": {
+    "id": "CP-110",
+    "name": "Ruthless Lowlife",
+    "slug": "ruthless-lowlife",
+    "officialType": "UNIT",
+    "aspect": "Red",
+    "costNum": 2,
+    "powerVal": "4",
+    "rulesText": "This Unit can only attack rival Units. (It can't attack Gig areas.)",
+    "keywords": [],
+    "classification": [
+      "Ganger",
+      "Maelstrom"
+    ],
+    "hasSpendAbility": false,
+    "triggers": [],
+    "rawRamCost": 1,
+    "rawEddieCost": 2,
+    "rawPower": 4
+  },
+  "CP-111": {
+    "id": "CP-111",
+    "name": "Saburo Arasaka // Stubborn Patriarch",
+    "slug": "saburo-arasaka-stubborn-patriarch",
+    "officialType": "LEGEND",
+    "aspect": "Green",
+    "costNum": 3,
+    "powerVal": "0",
+    "rulesText": "Friendly ARASAKA Units have +1 power while attacking.\n(Units steal an extra Gig for every 10 power.)",
+    "keywords": [],
+    "classification": [
+      "Arasaka",
+      "Corpo"
+    ],
+    "hasSpendAbility": false,
+    "triggers": [],
+    "rawRamCost": null,
+    "rawEddieCost": 0,
+    "rawPower": null
+  },
+  "CP-112": {
+    "id": "CP-112",
+    "name": "Safety Override",
+    "slug": "safety-override",
+    "officialType": "PROGRAM",
+    "aspect": "Yellow",
+    "costNum": 2,
+    "powerVal": "4",
+    "rulesText": "QUICK The next time a friendly Unit loses a fight this turn, defeat the opposing rival Unit.",
+    "keywords": [
+      "Quick"
+    ],
+    "classification": [
+      "Quickhack"
+    ],
+    "hasSpendAbility": false,
+    "triggers": [],
+    "rawRamCost": 3,
+    "rawEddieCost": 2,
+    "rawPower": null
+  },
+  "CP-113": {
+    "id": "CP-113",
+    "name": "Sandayu Oda // Hanako's Guardian",
+    "slug": "sandayu-oda-hanakos-guardian",
+    "officialType": "UNIT",
+    "aspect": "Green",
+    "costNum": 7,
+    "powerVal": "8",
+    "rulesText": "PLAY Spend a rival Unit for each friendly value-pair of Gigs.\nThis Unit can attack rival Units the turn it's played.",
+    "keywords": [
+      "Play"
+    ],
+    "classification": [
+      "Arasaka",
+      "Corpo"
+    ],
+    "hasSpendAbility": false,
+    "triggers": [
+      "play"
+    ],
+    "rawRamCost": 2,
+    "rawEddieCost": 7,
+    "rawPower": 8
+  },
+  "CP-114": {
+    "id": "CP-114",
+    "name": "Sandevistan",
+    "slug": "sandevistan",
+    "officialType": "GEAR",
+    "aspect": "Green",
+    "costNum": 3,
+    "powerVal": "+2",
+    "rulesText": "(Equip to a friendly Unit or face-up Legend.)\nAt the end of your turn, ready this Unit or Legend.",
+    "keywords": [],
+    "classification": [
+      "Cyberware"
+    ],
+    "hasSpendAbility": false,
+    "triggers": [],
+    "rawRamCost": 3,
+    "rawEddieCost": 3,
+    "rawPower": 2
+  },
+  "CP-115": {
+    "id": "CP-115",
+    "name": "Sasha Yakovleva // Won't Let You Down",
+    "slug": "sasha-yakovleva-won-t-let-you-down",
+    "officialType": "LEGEND",
+    "aspect": "Blue",
+    "costNum": 5,
+    "powerVal": "0",
+    "rulesText": "GO SOLO\nATTACK Reveal the top card of your deck and add it to your hand. This Unit gains power equal to that card's cost this turn.\nDEFEATED A Rival discards 1.",
+    "keywords": [
+      "Go Solo",
+      "Attack"
+    ],
+    "classification": [
+      "Maine's Crew",
+      "Merc",
+      "Netrunner"
+    ],
+    "hasSpendAbility": false,
+    "triggers": [
+      "attack",
+      "defeated"
+    ],
+    "rawRamCost": null,
+    "rawEddieCost": 5,
+    "rawPower": 0
+  },
+  "CP-116": {
+    "id": "CP-116",
+    "name": "Satori // Sword of Saburo",
+    "slug": "satori-sword-of-saburo",
+    "officialType": "GEAR",
+    "aspect": "Red",
+    "costNum": 2,
+    "powerVal": "2",
+    "rulesText": "(Equip to a friendly Unit or face-up Legend.)\nWhen this Unit wins a fight against a rival Unit, draw 1.",
+    "keywords": [],
+    "classification": [
+      "Arasaka",
+      "Weapon"
+    ],
+    "hasSpendAbility": false,
+    "triggers": [],
+    "rawRamCost": 1,
+    "rawEddieCost": 2,
+    "rawPower": 2
+  },
+  "CP-117": {
+    "id": "CP-117",
+    "name": "Saul Bright // Stormrider",
+    "slug": "saul-bright-stormrider",
+    "officialType": "UNIT",
+    "aspect": "Green",
+    "costNum": 8,
+    "powerVal": "14",
+    "rulesText": "Other friendly Units have +2 power while attacking.\nAt the end of your turn, ready up to 3 friendly Units.",
+    "keywords": [],
+    "classification": [
+      "Aldecaldo",
+      "Nomad"
+    ],
+    "hasSpendAbility": false,
+    "triggers": [],
+    "rawRamCost": 2,
+    "rawEddieCost": 8,
+    "rawPower": 14
+  },
+  "CP-118": {
+    "id": "CP-118",
+    "name": "Screw // Lovelorn Fool",
+    "slug": "screw-lovelorn-fool",
+    "officialType": "UNIT",
+    "aspect": "Red",
+    "costNum": 5,
+    "powerVal": "7",
+    "rulesText": "DEFEATED Add another Unit from your trash to your hand.",
+    "keywords": [],
+    "classification": [
+      "Ganger",
+      "Maelstrom"
+    ],
+    "hasSpendAbility": false,
+    "triggers": [
+      "defeated"
+    ],
+    "rawRamCost": 2,
+    "rawEddieCost": 5,
+    "rawPower": 7
+  },
+  "CP-119": {
+    "id": "CP-119",
+    "name": "Secondhand Bombus",
+    "slug": "secondhand-bombus",
+    "officialType": "UNIT",
+    "aspect": "Yellow",
+    "costNum": 2,
+    "powerVal": "0",
+    "rulesText": "BLOCKER (You may spend this Unit to redirect a rival Unit's attack to it instead.)\n(Units with power 0 don't steal Gigs.)",
+    "keywords": [
+      "Blocker"
+    ],
+    "classification": [
+      "Drone",
+      "Zetatech"
+    ],
+    "hasSpendAbility": false,
+    "triggers": [],
+    "rawRamCost": 2,
+    "rawEddieCost": 2,
+    "rawPower": 0
+  },
+  "CP-120": {
+    "id": "CP-120",
+    "name": "Shattered Memories",
+    "slug": "shattered-memories",
+    "officialType": "PROGRAM",
+    "aspect": "Red",
+    "costNum": 4,
+    "powerVal": "4",
+    "rulesText": "Each player discards their hand and may draw 5.\nIf the total number of discarded cards equals the value of a friendly Gig, draw 2.",
+    "keywords": [],
+    "classification": [
+      "Braindance"
+    ],
+    "hasSpendAbility": false,
+    "triggers": [],
+    "rawRamCost": 2,
+    "rawEddieCost": 4,
+    "rawPower": null
+  },
+  "CP-121": {
+    "id": "CP-121",
+    "name": "Sketchy Ripper",
+    "slug": "sketchy-ripper",
+    "officialType": "UNIT",
+    "aspect": "Yellow",
+    "costNum": 2,
+    "powerVal": "0",
+    "rulesText": "ATTACK Search the top 3 cards of your deck. Reveal a Gear and add it to your hand. Bottom-deck the rest.\n(Units with power 0 don't steal Gigs.)",
+    "keywords": [
+      "Attack"
+    ],
+    "classification": [
+      "Ganger",
+      "Ripperdoc",
+      "Scavenger"
+    ],
+    "hasSpendAbility": false,
+    "triggers": [
+      "attack"
+    ],
+    "rawRamCost": 2,
+    "rawEddieCost": 2,
+    "rawPower": 0
+  },
+  "CP-122": {
+    "id": "CP-122",
+    "name": "Swordwise Huscle",
+    "slug": "swordwise-huscle",
+    "officialType": "UNIT",
+    "aspect": "Red",
+    "costNum": 3,
+    "powerVal": "3",
+    "rulesText": "ATTACK If this Unit has power 5+, draw 1.",
+    "keywords": [
+      "Attack"
+    ],
+    "classification": [
+      "Merc"
+    ],
+    "hasSpendAbility": false,
+    "triggers": [
+      "attack"
+    ],
+    "rawRamCost": 2,
+    "rawEddieCost": 3,
+    "rawPower": 3
+  },
+  "CP-123": {
+    "id": "CP-123",
+    "name": "Synapse Burnout",
+    "slug": "synapse-burnout",
+    "officialType": "PROGRAM",
+    "aspect": "Green",
+    "costNum": 1,
+    "powerVal": "4",
+    "rulesText": "QUICK A friendly Unit has +1 power for each friendly face-up Legend while fighting rival Units this turn.",
+    "keywords": [
+      "Quick"
+    ],
+    "classification": [
+      "Quickhack"
+    ],
+    "hasSpendAbility": false,
+    "triggers": [],
+    "rawRamCost": 1,
+    "rawEddieCost": 1,
+    "rawPower": null
+  },
+  "CP-124": {
+    "id": "CP-124",
+    "name": "T-Bug // Amateur Philosopher",
+    "slug": "t-bug-amateur-philosopher",
+    "officialType": "UNIT",
+    "aspect": "Yellow",
+    "costNum": 4,
+    "powerVal": "4",
+    "rulesText": "DEFEATED Look at all friendly face-down Legends. Then, you may Call a Legend for free. (You can only Call a Legend once per turn.)",
+    "keywords": [],
+    "classification": [
+      "Merc",
+      "Netrunner"
+    ],
+    "hasSpendAbility": false,
+    "triggers": [
+      "defeated"
+    ],
+    "rawRamCost": 2,
+    "rawEddieCost": 4,
+    "rawPower": 4
+  },
+  "CP-125": {
+    "id": "CP-125",
+    "name": "Take Control",
+    "slug": "take-control",
+    "officialType": "PROGRAM",
+    "aspect": "Green",
+    "costNum": 2,
+    "powerVal": "4",
+    "rulesText": "QUICK A rival Unit steals 1 fewer Gig this turn. If that Unit is an AI, DRONE, or VEHICLE, draw 1.",
+    "keywords": [
+      "Quick"
+    ],
+    "classification": [
+      "Quickhack"
+    ],
+    "hasSpendAbility": false,
+    "triggers": [],
+    "rawRamCost": 2,
+    "rawEddieCost": 2,
+    "rawPower": null
+  },
+  "CP-126": {
+    "id": "CP-126",
+    "name": "Tetratronic Rippler",
+    "slug": "tetratronic-rippler",
+    "officialType": "GEAR",
+    "aspect": "Blue",
+    "costNum": 1,
+    "powerVal": "+1",
+    "rulesText": "(Equip to a friendly Unit or face-up Legend.)\nWhen this Unit or Legend is spent, search the top card of your deck. You may trash it. (Otherwise, keep it on the top of your deck.)",
+    "keywords": [],
+    "classification": [
+      "Cyberware"
+    ],
+    "hasSpendAbility": false,
+    "triggers": [],
+    "rawRamCost": 2,
+    "rawEddieCost": 1,
+    "rawPower": 1
+  },
+  "CP-127": {
+    "id": "CP-127",
+    "name": "The Heist",
+    "slug": "the-heist",
+    "officialType": "PROGRAM",
+    "aspect": "Yellow",
+    "costNum": 2,
+    "powerVal": "4",
+    "rulesText": "Trash 4. Add a Gear from among them to your hand. If that Gear's cost equals the value of a friendly Gig, you may play it for free instead.",
+    "keywords": [],
+    "classification": [
+      "Merc"
+    ],
+    "hasSpendAbility": false,
+    "triggers": [],
+    "rawRamCost": 2,
+    "rawEddieCost": 2,
+    "rawPower": null
+  },
+  "CP-128": {
+    "id": "CP-128",
+    "name": "The Relic // Experimental Biochip",
+    "slug": "the-relic-experimental-biochip",
+    "officialType": "UNIT",
+    "aspect": "Yellow",
+    "costNum": 4,
+    "powerVal": "4",
+    "rulesText": "DEFEATED Play another Unit with cost 9 or less from your trash for free. Then, bottom-deck this Unit.",
+    "keywords": [],
+    "classification": [
+      "Arasaka",
+      "Cyberware"
+    ],
+    "hasSpendAbility": false,
+    "triggers": [
+      "defeated"
+    ],
+    "rawRamCost": 4,
+    "rawEddieCost": 5,
+    "rawPower": 3
+  },
+  "CP-129": {
+    "id": "CP-129",
+    "name": "Three Mouths, One Desire",
+    "slug": "three-mouths-one-desire",
+    "officialType": "PROGRAM",
+    "aspect": "Blue",
+    "costNum": 2,
+    "powerVal": "4",
+    "rulesText": "Search the top 3 cards of your deck. Add 1 to your hand. You may add 1 more for each friendly min Gig. Bottom-deck the rest.",
+    "keywords": [],
+    "classification": [
+      "Braindance",
+      "Doll"
+    ],
+    "hasSpendAbility": false,
+    "triggers": [],
+    "rawRamCost": 3,
+    "rawEddieCost": 2,
+    "rawPower": null
+  },
+  "CP-130": {
+    "id": "CP-130",
+    "name": "Towerfall",
+    "slug": "towerfall",
+    "officialType": "PROGRAM",
+    "aspect": "Blue",
+    "costNum": 6,
+    "powerVal": "4",
+    "rulesText": "Choose one effect. If you have less ☆ (Street Cred) than a Rival, choose both instead.\nGive all rival Units -5 power this turn. // Bottom-deck all rival Units with power 0.",
+    "keywords": [],
+    "classification": [
+      "Braindance"
+    ],
+    "hasSpendAbility": false,
+    "triggers": [],
+    "rawRamCost": 4,
+    "rawEddieCost": 6,
+    "rawPower": null
+  },
+  "CP-131": {
+    "id": "CP-131",
+    "name": "Trauma Team Operatives",
+    "slug": "trauma-team-operatives",
+    "officialType": "UNIT",
+    "aspect": "Yellow",
+    "costNum": 6,
+    "powerVal": "7",
+    "rulesText": "Play this Unit for -1 €$ for each Unit in your trash, to a minimum of 1 €$.",
+    "keywords": [],
+    "classification": [
+      "Medtech",
+      "Trauma Team"
+    ],
+    "hasSpendAbility": false,
+    "triggers": [],
+    "rawRamCost": 2,
+    "rawEddieCost": 6,
+    "rawPower": 7
+  },
+  "CP-132": {
+    "id": "CP-132",
+    "name": "Trust No One",
+    "slug": "trust-no-one",
+    "officialType": "PROGRAM",
+    "aspect": "Blue",
+    "costNum": 1,
+    "powerVal": "4",
+    "rulesText": "Decrease a Gig by up to 3. Then, if you control a min Gig, draw 1.",
+    "keywords": [],
+    "classification": [
+      "Braindance"
+    ],
+    "hasSpendAbility": false,
+    "triggers": [],
+    "rawRamCost": 1,
+    "rawEddieCost": 1,
+    "rawPower": null
+  },
+  "CP-133": {
+    "id": "CP-133",
+    "name": "Tyger's Whisper",
+    "slug": "tyger-s-whisper",
+    "officialType": "UNIT",
+    "aspect": "Green",
+    "costNum": 2,
+    "powerVal": "0",
+    "rulesText": "PLAY You may Call a Legend for free. (You can only Call a Legend once per turn.)\n(Units with power 0 don't steal Gigs.)",
+    "keywords": [
+      "Play"
+    ],
+    "classification": [
+      "Fixer",
+      "Tyger Claws"
+    ],
+    "hasSpendAbility": false,
+    "triggers": [
+      "play"
+    ],
+    "rawRamCost": 1,
+    "rawEddieCost": 2,
+    "rawPower": 0
+  },
+  "CP-134": {
+    "id": "CP-134",
+    "name": "Unlikely Bond",
+    "slug": "unlikely-bond",
+    "officialType": "PROGRAM",
+    "aspect": "Blue",
+    "costNum": 4,
+    "powerVal": "4",
+    "rulesText": "Bottom-deck a ready friendly Unit. If you do, bottom-deck a spent rival Unit.",
+    "keywords": [],
+    "classification": [
+      "Maelstrom",
+      "Mox"
+    ],
+    "hasSpendAbility": false,
+    "triggers": [],
+    "rawRamCost": 2,
+    "rawEddieCost": 4,
+    "rawPower": null
+  },
+  "CP-135": {
+    "id": "CP-135",
+    "name": "V // Corporate Exile",
+    "slug": "v-corporate-exile",
+    "officialType": "LEGEND",
+    "aspect": "Blue",
+    "costNum": 5,
+    "powerVal": "8",
+    "rulesText": "GO SOLO (Pay this Legend's cost to play it as a ready Unit. It can attack this turn. When it leaves the field, remove it from the game.)",
+    "keywords": [
+      "Go Solo"
+    ],
+    "classification": [
+      "Corpo",
+      "Merc"
+    ],
+    "hasSpendAbility": false,
+    "triggers": [],
+    "rawRamCost": null,
+    "rawEddieCost": 5,
+    "rawPower": 8
+  },
+  "CP-136": {
+    "id": "CP-136",
+    "name": "V // Roamer of the Badlands",
+    "slug": "v-roamer-of-the-badlands",
+    "officialType": "UNIT",
+    "aspect": "Red",
+    "costNum": 5,
+    "powerVal": "6",
+    "rulesText": "When this Unit steals a Gig, increase it by up to 5.\nAt the end of your turn, if you control 2 or more Gigs with 8+ value, draw 1.",
+    "keywords": [],
+    "classification": [
+      "Merc",
+      "Nomad"
+    ],
+    "hasSpendAbility": false,
+    "triggers": [],
+    "rawRamCost": 2,
+    "rawEddieCost": 5,
+    "rawPower": 6
+  },
+  "CP-137": {
+    "id": "CP-137",
+    "name": "V // Streetkid",
+    "slug": "v-streetkid",
+    "officialType": "LEGEND",
+    "aspect": "Red",
+    "costNum": 5,
+    "powerVal": "6",
+    "rulesText": "CALL Trash 3. Then, add 1 BRAINDANCE Program from your trash to your hand.\nGO SOLO (Pay this Legend's cost to play it as a ready Unit. It can attack this turn. If it leaves the field, remove it from the game.)",
+    "keywords": [
+      "Go Solo",
+      "Call"
+    ],
+    "classification": [
+      "Merc"
+    ],
+    "hasSpendAbility": false,
+    "triggers": [
+      "call"
+    ],
+    "rawRamCost": null,
+    "rawEddieCost": 5,
+    "rawPower": 6
+  },
+  "CP-138": {
+    "id": "CP-138",
+    "name": "Valentino Guerrera",
+    "slug": "valentino-guerrera",
+    "officialType": "UNIT",
+    "aspect": "Red",
+    "costNum": 3,
+    "powerVal": "4",
+    "rulesText": "If you have more ☆ (Street Cred) than a Rival, this Unit can attack ready Units with BLOCKER.",
+    "keywords": [
+      "Blocker"
+    ],
+    "classification": [
+      "Ganger",
+      "Valentino"
+    ],
+    "hasSpendAbility": false,
+    "triggers": [],
+    "rawRamCost": 2,
+    "rawEddieCost": 3,
+    "rawPower": 4
+  },
+  "CP-139": {
+    "id": "CP-139",
+    "name": "Valentino Street Racer",
+    "slug": "valentino-street-racer",
+    "officialType": "UNIT",
+    "aspect": "Green",
+    "costNum": 3,
+    "powerVal": "3",
+    "rulesText": "PLAY Give another friendly Unit with cost 5 or less ADRENALINE this turn. (A Unit with Adrenaline can attack the turn it's played.)",
+    "keywords": [
+      "Adrenaline",
+      "Play"
+    ],
+    "classification": [
+      "Valentino",
+      "Vehicle"
+    ],
+    "hasSpendAbility": false,
+    "triggers": [
+      "play"
+    ],
+    "rawRamCost": 2,
+    "rawEddieCost": 3,
+    "rawPower": 3
+  },
+  "CP-140": {
+    "id": "CP-140",
+    "name": "Viktor Vektor // Drop Your Illusions",
+    "slug": "viktor-vektor-drop-your-illusions",
+    "officialType": "UNIT",
+    "aspect": "Yellow",
+    "costNum": 5,
+    "powerVal": "5",
+    "rulesText": "Play your first CYBERWARE Gear each turn for -3 €$, to a minimum of 1 €$.",
+    "keywords": [],
+    "classification": [
+      "Ripperdoc"
+    ],
+    "hasSpendAbility": false,
+    "triggers": [],
+    "rawRamCost": 2,
+    "rawEddieCost": 5,
+    "rawPower": 5
+  },
+  "CP-141": {
+    "id": "CP-141",
+    "name": "Viktor Vektor // Sit Down and Relax",
+    "slug": "viktor-vektor-sit-down-and-relax",
+    "officialType": "LEGEND",
+    "aspect": "Yellow",
+    "costNum": 3,
+    "powerVal": "0",
+    "rulesText": "CALL Search the top 5 cards of your deck. Reveal up to 2 Gears with cost 2 or less and add them to your hand. Bottom-deck the rest in a random order.",
+    "keywords": [
+      "Call"
+    ],
+    "classification": [
+      "Ripperdoc"
+    ],
+    "hasSpendAbility": false,
+    "triggers": [
+      "call"
+    ],
+    "rawRamCost": null,
+    "rawEddieCost": 0,
+    "rawPower": null
+  },
+  "CP-142": {
+    "id": "CP-142",
+    "name": "Viktor Vektor // You Might Feel a Little Pinch",
+    "slug": "viktor-vektor-you-might-feel-a-little-pinch",
+    "officialType": "UNIT",
+    "aspect": "Yellow",
+    "costNum": 3,
+    "powerVal": "3",
+    "rulesText": "PLAY Play a CYBERWARE Gear with cost 2 or less from your trash for free. Equip it only to another friendly Unit.",
+    "keywords": [
+      "Play"
+    ],
+    "classification": [
+      "Ripperdoc"
+    ],
+    "hasSpendAbility": false,
+    "triggers": [
+      "play"
+    ],
+    "rawRamCost": 2,
+    "rawEddieCost": 3,
+    "rawPower": 3
+  },
+  "CP-143": {
+    "id": "CP-143",
+    "name": "Wakako Okada // Peace and Harmony",
+    "slug": "wakako-okada-peace-and-harmony",
+    "officialType": "LEGEND",
+    "aspect": "Blue",
+    "costNum": null,
+    "powerVal": "0",
+    "rulesText": "CALL Choose one effect.\nGive a rival Unit -2 power this turn. // Draw 1.\n↷: Decrease a Gig by up to 2.",
+    "keywords": [
+      "Call"
+    ],
+    "classification": [
+      "Fixer",
+      "Tyger Claws"
+    ],
+    "hasSpendAbility": true,
+    "triggers": [
+      "call"
+    ],
+    "rawRamCost": null,
+    "rawEddieCost": 0,
+    "rawPower": null
+  },
+  "CP-144": {
+    "id": "CP-144",
+    "name": "We Gotta Live Together",
+    "slug": "we-gotta-live-together",
+    "officialType": "PROGRAM",
+    "aspect": "Green",
+    "costNum": 5,
+    "powerVal": "4",
+    "rulesText": "If a Rival controls at least 2 more Gigs than you, play this Program for 3 €$.\nPlay up to 2 Units with cost 3 or less from your trash for free.",
+    "keywords": [],
+    "classification": [
+      "Aldecaldo",
+      "Nomad"
+    ],
+    "hasSpendAbility": false,
+    "triggers": [],
+    "rawRamCost": 2,
+    "rawEddieCost": 5,
+    "rawPower": null
+  },
+  "CP-145": {
+    "id": "CP-145",
+    "name": "Westbrook Netrunner",
+    "slug": "westbrook-netrunner",
+    "officialType": "UNIT",
+    "aspect": "Blue",
+    "costNum": 4,
+    "powerVal": "5",
+    "rulesText": "PLAY Until your next turn, rival Legends can't steal friendly Gigs with value less than their power.",
+    "keywords": [
+      "Play"
+    ],
+    "classification": [
+      "Netrunner"
+    ],
+    "hasSpendAbility": false,
+    "triggers": [
+      "play"
+    ],
+    "rawRamCost": 2,
+    "rawEddieCost": 4,
+    "rawPower": 5
+  },
+  "CP-146": {
+    "id": "CP-146",
+    "name": "Wild in the Streets",
+    "slug": "wild-in-the-streets",
+    "officialType": "PROGRAM",
+    "aspect": "Green",
+    "costNum": 5,
+    "powerVal": "4",
+    "rulesText": "Defeat a spent Unit.",
+    "keywords": [],
+    "classification": [
+      "Ganger"
+    ],
+    "hasSpendAbility": false,
+    "triggers": [],
+    "rawRamCost": 4,
+    "rawEddieCost": 5,
+    "rawPower": null
+  },
+  "CP-147": {
+    "id": "CP-147",
+    "name": "Wraith Marauders",
+    "slug": "wraith-marauders",
+    "officialType": "UNIT",
+    "aspect": "Green",
+    "costNum": 5,
+    "powerVal": "4",
+    "rulesText": "When this Unit steals a Gig, ready another friendly Unit with power equal to the Gig's value.",
+    "keywords": [],
+    "classification": [
+      "Ganger",
+      "Nomad",
+      "Raffen Shiv"
+    ],
+    "hasSpendAbility": false,
+    "triggers": [],
+    "rawRamCost": 2,
+    "rawEddieCost": 5,
+    "rawPower": 4
+  },
+  "CP-148": {
+    "id": "CP-148",
+    "name": "Yorinobu Arasaka // Embracing Destruction",
+    "slug": "yorinobu-arasaka-embracing-destruction",
+    "officialType": "LEGEND",
+    "aspect": "Red",
+    "costNum": 3,
+    "powerVal": "0",
+    "rulesText": "The first time a friendly ARASAKA Unit attacks each turn, draw 1. Then, if you have less than 20 ☆ (Street Cred), discard 1.",
+    "keywords": [],
+    "classification": [
+      "Arasaka",
+      "Corpo"
+    ],
+    "hasSpendAbility": false,
+    "triggers": [],
+    "rawRamCost": null,
+    "rawEddieCost": 0,
+    "rawPower": null
+  },
+  "CP-149": {
+    "id": "CP-149",
+    "name": "Yorinobu Arasaka // Steel Dragon",
+    "slug": "yorinobu-arasaka-steel-dragon",
+    "officialType": "UNIT",
+    "aspect": "Red",
+    "costNum": 7,
+    "powerVal": "9",
+    "rulesText": "PLAY You may play a Unit with cost 4 or less from your hand or trash for free. It can attack rival Units this turn.\nThe first time an ARASAKA Unit is defeated each turn, draw 1.",
+    "keywords": [
+      "Play"
+    ],
+    "classification": [
+      "Arasaka",
+      "Corpo"
+    ],
+    "hasSpendAbility": false,
+    "triggers": [
+      "play"
+    ],
+    "rawRamCost": 3,
+    "rawEddieCost": 7,
+    "rawPower": 9
+  },
+  "CP-150": {
+    "id": "CP-150",
+    "name": "Zetatech Berserk",
+    "slug": "zetatech-berserk",
+    "officialType": "GEAR",
+    "aspect": "Green",
+    "costNum": 6,
+    "powerVal": "+3",
+    "rulesText": "Play this Gear for -1 €$ for each friendly face-up Legend, to a minimum of 1 €$.",
+    "keywords": [],
+    "classification": [
+      "Cyberware",
+      "Zetatech"
+    ],
+    "hasSpendAbility": false,
+    "triggers": [],
+    "rawRamCost": 2,
+    "rawEddieCost": 6,
+    "rawPower": 3
+  },
+  "CP-151": {
+    "id": "CP-151",
+    "name": "Zetatech Faceplate",
+    "slug": "zetatech-faceplate",
+    "officialType": "GEAR",
+    "aspect": "Yellow",
+    "costNum": 2,
+    "powerVal": "+2",
+    "rulesText": "(Equip to a friendly Unit or face-up Legend.)\nWhen this Unit or Legend is spent, adjust a Gig by up to 1. Then, if you control 3 or more Gigs with different values, draw 1.",
+    "keywords": [],
+    "classification": [
+      "Cyberware",
+      "Zetatech"
+    ],
+    "hasSpendAbility": false,
+    "triggers": [],
+    "rawRamCost": 2,
+    "rawEddieCost": 2,
+    "rawPower": 2
+  }
+}

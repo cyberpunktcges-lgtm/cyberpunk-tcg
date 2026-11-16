@@ -23,7 +23,9 @@
     "keywords": "",
     "aspect": "Red",
     "traits": "6th Street, Ganger",
-    "sourceSet": "Welcome to Night City"
+    "sourceSet": "Welcome to Night City",
+    "ability": "When a friendly Unit steals a d6, increase a Gig by up to 6.",
+    "rulesText": "When a friendly Unit steals a d6, increase a Gig by up to 6."
   },
   {
     "id": "CP-002",
@@ -49,7 +51,9 @@
     "keywords": "Go Solo, Play",
     "aspect": "Red",
     "traits": "Arasaka, Merc",
-    "sourceSet": "Welcome to Night City"
+    "sourceSet": "Welcome to Night City",
+    "ability": "GO SOLO (Pay this Legend's cost to play it as a ready Unit. It can attack this turn. If it leaves the field, remove it from the game.)\nPLAY Defeat a rival Unit.",
+    "rulesText": "GO SOLO (Pay this Legend's cost to play it as a ready Unit. It can attack this turn. If it leaves the field, remove it from the game.)\nPLAY Defeat a rival Unit."
   },
   {
     "id": "CP-003",
@@ -75,7 +79,9 @@
     "keywords": "Play",
     "aspect": "Yellow",
     "traits": "Arasaka, Merc",
-    "sourceSet": "Welcome to Night City"
+    "sourceSet": "Welcome to Night City",
+    "ability": "PLAY Defeat all other Units.",
+    "rulesText": "PLAY Defeat all other Units."
   },
   {
     "id": "CP-004",
@@ -101,7 +107,9 @@
     "keywords": "Adrenaline",
     "aspect": "Yellow",
     "traits": "Cyberware, Medtech",
-    "sourceSet": "Welcome to Night City"
+    "sourceSet": "Welcome to Night City",
+    "ability": "(Equip to a friendly Unit or face-up Legend.)\nIf a Rival controls at least 2 more Gigs than you, this Unit has ADRENALINE. (This Unit can attack the turn it's played.)",
+    "rulesText": "(Equip to a friendly Unit or face-up Legend.)\nIf a Rival controls at least 2 more Gigs than you, this Unit has ADRENALINE. (This Unit can attack the turn it's played.)"
   },
   {
     "id": "CP-005",
@@ -127,7 +135,9 @@
     "keywords": "",
     "aspect": "Yellow",
     "traits": "Braindance, Mox",
-    "sourceSet": "Welcome to Night City"
+    "sourceSet": "Welcome to Night City",
+    "ability": "Adjust a Gig by up to 1. If you control 2 or more Gigs with different values, draw 1.",
+    "rulesText": "Adjust a Gig by up to 1. If you control 2 or more Gigs with different values, draw 1."
   },
   {
     "id": "CP-006",
@@ -153,7 +163,9 @@
     "keywords": "",
     "aspect": "Red",
     "traits": "Zetatech",
-    "sourceSet": "Welcome to Night City"
+    "sourceSet": "Welcome to Night City",
+    "ability": "Trash 3. Add a Unit from among them to your hand.",
+    "rulesText": "Trash 3. Add a Unit from among them to your hand."
   },
   {
     "id": "CP-007",
@@ -179,7 +191,9 @@
     "keywords": "",
     "aspect": "Yellow",
     "traits": "Merc, Netrunner",
-    "sourceSet": "Welcome to Night City"
+    "sourceSet": "Welcome to Night City",
+    "ability": "When a friendly equipped Unit or Legend is spent, draw 1.\nWhen a rival Unit would steal a Gig, you may discard 1 with cost equal to that Gig's value. If you do, the Gig isn't stolen.",
+    "rulesText": "When a friendly equipped Unit or Legend is spent, draw 1.\nWhen a rival Unit would steal a Gig, you may discard 1 with cost equal to that Gig's value. If you do, the Gig isn't stolen."
   },
   {
     "id": "CP-008",
@@ -205,7 +219,9 @@
     "keywords": "",
     "aspect": "Blue",
     "traits": "Merc, Netrunner",
-    "sourceSet": "Welcome to Night City"
+    "sourceSet": "Welcome to Night City",
+    "ability": "↷ Your next Program this turn plays for -1 €$ for each friendly min Gig, to a minimum of 1 €$.\n1 €$, ↷ Play a Program from your trash. Bottom-deck it after you play it. (You still pay its cost.)",
+    "rulesText": "↷ Your next Program this turn plays for -1 €$ for each friendly min Gig, to a minimum of 1 €$.\n1 €$, ↷ Play a Program from your trash. Bottom-deck it after you play it. (You still pay its cost.)"
   },
   {
     "id": "CP-009",
@@ -231,7 +247,9 @@
     "keywords": "",
     "aspect": "Red",
     "traits": "Animal, Ganger",
-    "sourceSet": "Welcome to Night City"
+    "sourceSet": "Welcome to Night City",
+    "ability": "[Flavour Text] Takes a lot of juice to break bones like they do.",
+    "rulesText": "[Flavour Text] Takes a lot of juice to break bones like they do."
   },
   {
     "id": "CP-010",
@@ -257,7 +275,9 @@
     "keywords": "",
     "aspect": "Red",
     "traits": "Ganger",
-    "sourceSet": "Welcome to Night City"
+    "sourceSet": "Welcome to Night City",
+    "ability": "The next time a friendly Unit wins a fight by 3+ power this turn, it also steals a Gig.",
+    "rulesText": "The next time a friendly Unit wins a fight by 3+ power this turn, it also steals a Gig."
   },
   {
     "id": "CP-011",
@@ -280,10 +300,12 @@
     "power": "+2 FUERZA",
     "powerVal": "+2",
     "ram": "x2",
-    "keywords": "",
+    "keywords": "Go Solo",
     "aspect": "Red",
     "traits": "Arasaka, Cyberware",
-    "sourceSet": "Welcome to Night City"
+    "sourceSet": "Welcome to Night City",
+    "ability": "(Equip to a friendly Unit or face-up Legend.)\nWhen this Unit or Legend is spent, you may look at a friendly face-down Legend. If that Legend is ARASAKA or has GO SOLO, you may Call it for free. (You may only Call a Legend once per turn.)",
+    "rulesText": "(Equip to a friendly Unit or face-up Legend.)\nWhen this Unit or Legend is spent, you may look at a friendly face-down Legend. If that Legend is ARASAKA or has GO SOLO, you may Call it for free. (You may only Call a Legend once per turn.)"
   },
   {
     "id": "CP-012",
@@ -309,7 +331,9 @@
     "keywords": "Blocker",
     "aspect": "Yellow",
     "traits": "Arasaka Corpo",
-    "sourceSet": "Welcome to Night City"
+    "sourceSet": "Welcome to Night City",
+    "ability": "BLOCKER (You may spend this Unit to redirect a rival Unit's attack to it instead.)\nWhen this Unit uses BLOCKER, a Rival discards 1.",
+    "rulesText": "BLOCKER (You may spend this Unit to redirect a rival Unit's attack to it instead.)\nWhen this Unit uses BLOCKER, a Rival discards 1."
   },
   {
     "id": "CP-013",
@@ -335,7 +359,9 @@
     "keywords": "",
     "aspect": "Red",
     "traits": "Braindance",
-    "sourceSet": "Welcome to Night City"
+    "sourceSet": "Welcome to Night City",
+    "ability": "Defeat a rival Unit with power 4 or less. You may defeat 2 instead if a Rival controls at least 2 Gigs more than you.",
+    "rulesText": "Defeat a rival Unit with power 4 or less. You may defeat 2 instead if a Rival controls at least 2 Gigs more than you."
   },
   {
     "id": "CP-014",
@@ -361,7 +387,9 @@
     "keywords": "",
     "aspect": "Yellow",
     "traits": "Braindance",
-    "sourceSet": "Welcome to Night City"
+    "sourceSet": "Welcome to Night City",
+    "ability": "Sell the top card of your deck.\nIf you control a Gig with an even value and a Gig with an odd value, draw 2.",
+    "rulesText": "Sell the top card of your deck.\nIf you control a Gig with an even value and a Gig with an odd value, draw 2."
   },
   {
     "id": "CP-015",
@@ -384,10 +412,12 @@
     "power": "4 FUERZA",
     "powerVal": "4",
     "ram": "x2",
-    "keywords": "Defeated",
+    "keywords": "Play",
     "aspect": "Yellow",
     "traits": "Merc, Netrunner",
-    "sourceSet": "Welcome to Night City"
+    "sourceSet": "Welcome to Night City",
+    "ability": "PLAY Defeat a rival Unit with cost 2 or less.\nDEFEATED A Rival discards 1. If the card's cost equals the value of a friendly Gig, that Rival discards 1 more.",
+    "rulesText": "PLAY Defeat a rival Unit with cost 2 or less.\nDEFEATED A Rival discards 1. If the card's cost equals the value of a friendly Gig, that Rival discards 1 more."
   },
   {
     "id": "CP-016",
@@ -413,7 +443,9 @@
     "keywords": "",
     "aspect": "Red",
     "traits": "Braindance, Extreme",
-    "sourceSet": "Welcome to Night City"
+    "sourceSet": "Welcome to Night City",
+    "ability": "Play this Program for -1 €$ for each friendly Gig with 8+ value, to a minimum of 1 €$.\nDefeat a rival Unit with less power than a friendly Unit.",
+    "rulesText": "Play this Program for -1 €$ for each friendly Gig with 8+ value, to a minimum of 1 €$.\nDefeat a rival Unit with less power than a friendly Unit."
   },
   {
     "id": "CP-017",
@@ -439,7 +471,9 @@
     "keywords": "Play",
     "aspect": "Red",
     "traits": "Ganger, Netrunner, Tyger Claws",
-    "sourceSet": "Welcome to Night City"
+    "sourceSet": "Welcome to Night City",
+    "ability": "PLAY Until your next turn, rival Units can't steal friendly Gigs with value higher than their power.",
+    "rulesText": "PLAY Until your next turn, rival Units can't steal friendly Gigs with value higher than their power."
   },
   {
     "id": "CP-018",
@@ -465,7 +499,9 @@
     "keywords": "",
     "aspect": "Blue",
     "traits": "Braindance",
-    "sourceSet": "Welcome to Night City"
+    "sourceSet": "Welcome to Night City",
+    "ability": "A rival Unit can't attack until your next turn. If you control a min Gig, you may Call a Legend for free. (You can only Call a Legend once per turn.)",
+    "rulesText": "A rival Unit can't attack until your next turn. If you control a min Gig, you may Call a Legend for free. (You can only Call a Legend once per turn.)"
   },
   {
     "id": "CP-019",
@@ -491,7 +527,9 @@
     "keywords": "Blocker",
     "aspect": "Green",
     "traits": "Corpo",
-    "sourceSet": "Welcome to Night City"
+    "sourceSet": "Welcome to Night City",
+    "ability": "This Unit can't attack.\nBLOCKER (You may spend this Unit to redirect a rival Unit's attack to it instead.)",
+    "rulesText": "This Unit can't attack.\nBLOCKER (You may spend this Unit to redirect a rival Unit's attack to it instead.)"
   },
   {
     "id": "CP-020",
@@ -517,7 +555,9 @@
     "keywords": "",
     "aspect": "Green",
     "traits": "Corpo",
-    "sourceSet": "Welcome to Night City"
+    "sourceSet": "Welcome to Night City",
+    "ability": "Spend a rival Unit with cost 4 or less.",
+    "rulesText": "Spend a rival Unit with cost 4 or less."
   },
   {
     "id": "CP-021",
@@ -543,7 +583,9 @@
     "keywords": "Quick",
     "aspect": "Yellow",
     "traits": "Quickhack",
-    "sourceSet": "Welcome to Night City"
+    "sourceSet": "Welcome to Night City",
+    "ability": "QUICK Give an equipped Unit +3 power this turn for each of its equipped Gears. If that Unit steals or fights, defeat it at the end of this turn.",
+    "rulesText": "QUICK Give an equipped Unit +3 power this turn for each of its equipped Gears. If that Unit steals or fights, defeat it at the end of this turn."
   },
   {
     "id": "CP-022",
@@ -569,7 +611,9 @@
     "keywords": "",
     "aspect": "Red",
     "traits": "Cyberware, Trauma Team",
-    "sourceSet": "Welcome to Night City"
+    "sourceSet": "Welcome to Night City",
+    "ability": "(Equip to a friendly Unit or face-up Legend.)\nIf this Unit would be defeated, defeat its \"DEADMAN TRANSMITTER\" instead.",
+    "rulesText": "(Equip to a friendly Unit or face-up Legend.)\nIf this Unit would be defeated, defeat its \"DEADMAN TRANSMITTER\" instead."
   },
   {
     "id": "CP-023",
@@ -595,7 +639,9 @@
     "keywords": "",
     "aspect": "Blue",
     "traits": "Vehicle",
-    "sourceSet": "Welcome to Night City"
+    "sourceSet": "Welcome to Night City",
+    "ability": "At the end of your turn, if this Unit stole a Gig this turn, ready 1 Eddie.",
+    "rulesText": "At the end of your turn, if this Unit stole a Gig this turn, ready 1 Eddie."
   },
   {
     "id": "CP-024",
@@ -621,7 +667,9 @@
     "keywords": "Play",
     "aspect": "Blue",
     "traits": "AI",
-    "sourceSet": "Welcome to Night City"
+    "sourceSet": "Welcome to Night City",
+    "ability": "PLAY Draw 2.\n(Units with power 0 don't steal Gigs.)",
+    "rulesText": "PLAY Draw 2.\n(Units with power 0 don't steal Gigs.)"
   },
   {
     "id": "CP-025",
@@ -647,7 +695,9 @@
     "keywords": "Quick",
     "aspect": "Red",
     "traits": "Quickhack",
-    "sourceSet": "Welcome to Night City"
+    "sourceSet": "Welcome to Night City",
+    "ability": "QUICK Defeat a rival Gear with power 2 or less.",
+    "rulesText": "QUICK Defeat a rival Gear with power 2 or less."
   },
   {
     "id": "CP-026",
@@ -673,7 +723,9 @@
     "keywords": "Call",
     "aspect": "Red",
     "traits": "Fixer",
-    "sourceSet": "Welcome to Night City"
+    "sourceSet": "Welcome to Night City",
+    "ability": "CALL Choose one effect.\nGive a friendly Unit +2 power this turn. // Draw 1.\n↷: Increase a Gig by up to 2.",
+    "rulesText": "CALL Choose one effect.\nGive a friendly Unit +2 power this turn. // Draw 1.\n↷: Increase a Gig by up to 2."
   },
   {
     "id": "CP-027",
@@ -696,10 +748,12 @@
     "power": "4 FUERZA",
     "powerVal": "4",
     "ram": "x2",
-    "keywords": "Play, Attack, Defeated",
+    "keywords": "Attack, Play",
     "aspect": "Yellow",
     "traits": "Fixer",
-    "sourceSet": "The Heist Starter"
+    "sourceSet": "The Heist Starter",
+    "ability": "PLAY ATTACK Adjust a Gig by up to 1.\nDEFEATED If your ☆ (Street Cred) differs from a Rival's by 10+, draw 2.",
+    "rulesText": "PLAY ATTACK Adjust a Gig by up to 1.\nDEFEATED If your ☆ (Street Cred) differs from a Rival's by 10+, draw 2."
   },
   {
     "id": "CP-028",
@@ -725,7 +779,9 @@
     "keywords": "",
     "aspect": "Green",
     "traits": "Samurai",
-    "sourceSet": "Welcome to Night City"
+    "sourceSet": "Welcome to Night City",
+    "ability": "Spend all rival Units. Then, defeat a spent Unit.",
+    "rulesText": "Spend all rival Units. Then, defeat a spent Unit."
   },
   {
     "id": "CP-029",
@@ -748,10 +804,12 @@
     "power": "0 FUERZA",
     "powerVal": "0",
     "ram": "x2",
-    "keywords": "Call, Quick",
+    "keywords": "Quick, Call",
     "aspect": "Yellow",
     "traits": "Ganger, Maelstrom",
-    "sourceSet": "Welcome to Night City"
+    "sourceSet": "Welcome to Night City",
+    "ability": "CALL You may defeat a friendly Gear. If you do, draw 2. Otherwise, draw 1.\nQUICK 1 €$, ↷ Give a friendly Unit +1 power this turn for each of its equipped Gear.",
+    "rulesText": "CALL You may defeat a friendly Gear. If you do, draw 2. Otherwise, draw 1.\nQUICK 1 €$, ↷ Give a friendly Unit +1 power this turn for each of its equipped Gear."
   },
   {
     "id": "CP-030",
@@ -777,7 +835,9 @@
     "keywords": "Attack",
     "aspect": "Blue",
     "traits": "Merc, Weapon",
-    "sourceSet": "Welcome to Night City"
+    "sourceSet": "Welcome to Night City",
+    "ability": "(Equip to a friendly Unit or face-up Legend.)\nATTACK Decrease a Gig by up to 2. At the end of your turn, if this Unit is named \"V\", ready 2 Eddies.",
+    "rulesText": "(Equip to a friendly Unit or face-up Legend.)\nATTACK Decrease a Gig by up to 2. At the end of your turn, if this Unit is named \"V\", ready 2 Eddies."
   },
   {
     "id": "CP-031",
@@ -803,7 +863,9 @@
     "keywords": "Attack",
     "aspect": "Red",
     "traits": "Ganger, Valentino",
-    "sourceSet": "Welcome to Night City"
+    "sourceSet": "Welcome to Night City",
+    "ability": "ATTACK You may pay 2 €$. If you do, this Unit gains power equal to a friendly max Gig this turn.",
+    "rulesText": "ATTACK You may pay 2 €$. If you do, this Unit gains power equal to a friendly max Gig this turn."
   },
   {
     "id": "CP-032",
@@ -829,7 +891,9 @@
     "keywords": "",
     "aspect": "Green",
     "traits": "Trauma Team, Vehicle, Zetatech",
-    "sourceSet": "Welcome to Night City"
+    "sourceSet": "Welcome to Night City",
+    "ability": "\"Grab the policyholder, leave the rest for the city meatwagon.\"",
+    "rulesText": "\"Grab the policyholder, leave the rest for the city meatwagon.\""
   },
   {
     "id": "CP-033",
@@ -855,7 +919,9 @@
     "keywords": "",
     "aspect": "Blue",
     "traits": "Doll",
-    "sourceSet": "Welcome to Night City"
+    "sourceSet": "Welcome to Night City",
+    "ability": "When a friendly CORPO or GANGER Unit steals 1 or more Gigs, ready 1 Eddie.\n1 €$, ↷ A rival Unit must attack next turn if it can.",
+    "rulesText": "When a friendly CORPO or GANGER Unit steals 1 or more Gigs, ready 1 Eddie.\n1 €$, ↷ A rival Unit must attack next turn if it can."
   },
   {
     "id": "CP-034",
@@ -881,7 +947,9 @@
     "keywords": "Attack",
     "aspect": "Blue",
     "traits": "Doll",
-    "sourceSet": "Welcome to Night City"
+    "sourceSet": "Welcome to Night City",
+    "ability": "ATTACK Draw 1. Then, if you have more ☆ (Street Cred) than a Rival, discard 1.\n(Units with power 0 don't steal Gigs.)",
+    "rulesText": "ATTACK Draw 1. Then, if you have more ☆ (Street Cred) than a Rival, discard 1.\n(Units with power 0 don't steal Gigs.)"
   },
   {
     "id": "CP-035",
@@ -907,7 +975,9 @@
     "keywords": "Play",
     "aspect": "Green",
     "traits": "Arasaka, Corpo, Techie",
-    "sourceSet": "Welcome to Night City"
+    "sourceSet": "Welcome to Night City",
+    "ability": "PLAY If your ☆ (Street Cred) is an even number, draw 1.",
+    "rulesText": "PLAY If your ☆ (Street Cred) is an even number, draw 1."
   },
   {
     "id": "CP-036",
@@ -933,7 +1003,9 @@
     "keywords": "Quick",
     "aspect": "Blue",
     "traits": "Merc, Quickhack",
-    "sourceSet": "Welcome to Night City"
+    "sourceSet": "Welcome to Night City",
+    "ability": "QUICK Give a rival Unit -1 power this turn. Draw 1.",
+    "rulesText": "QUICK Give a rival Unit -1 power this turn. Draw 1."
   },
   {
     "id": "CP-037",
@@ -959,7 +1031,9 @@
     "keywords": "",
     "aspect": "Green",
     "traits": "Merc",
-    "sourceSet": "Welcome to Night City"
+    "sourceSet": "Welcome to Night City",
+    "ability": "Reveal the top 2 cards of your deck. A Rival chooses whether you add them to your hand or trash them. If you trash them, draw 2.",
+    "rulesText": "Reveal the top 2 cards of your deck. A Rival chooses whether you add them to your hand or trash them. If you trash them, draw 2."
   },
   {
     "id": "CP-038",
@@ -985,7 +1059,9 @@
     "keywords": "Play",
     "aspect": "Yellow",
     "traits": "Ganger, Valentino",
-    "sourceSet": "Welcome to Night City"
+    "sourceSet": "Welcome to Night City",
+    "ability": "PLAY You may defeat a friendly Gear. If you do, defeat a rival Unit with cost 3 or less.",
+    "rulesText": "PLAY You may defeat a friendly Gear. If you do, defeat a rival Unit with cost 3 or less."
   },
   {
     "id": "CP-039",
@@ -1011,7 +1087,9 @@
     "keywords": "",
     "aspect": "Yellow",
     "traits": "Cyberware",
-    "sourceSet": "Welcome to Night City"
+    "sourceSet": "Welcome to Night City",
+    "ability": "(Equip to a friendly Unit or face-up Legend.)\nThe first time this Unit steals 1 or more Gigs each turn, steal a rival Gig with a value not shared by a friendly Gig.",
+    "rulesText": "(Equip to a friendly Unit or face-up Legend.)\nThe first time this Unit steals 1 or more Gigs each turn, steal a rival Gig with a value not shared by a friendly Gig."
   },
   {
     "id": "CP-040",
@@ -1034,10 +1112,12 @@
     "power": "7 FUERZA",
     "powerVal": "7",
     "ram": "x2",
-    "keywords": "Go Solo, Blocker",
+    "keywords": "Blocker, Go Solo",
     "aspect": "Green",
     "traits": "Arasaka, Corpo",
-    "sourceSet": "Embracing Power Starter"
+    "sourceSet": "Embracing Power Starter",
+    "ability": "GO SOLO (Pay this Legend's cost to play it as a ready Unit. It can attack this turn. If it leaves the field, remove it from the game.)\nBLOCKER (You may spend this Unit to redirect a rival Unit's attack to it instead.)",
+    "rulesText": "GO SOLO (Pay this Legend's cost to play it as a ready Unit. It can attack this turn. If it leaves the field, remove it from the game.)\nBLOCKER (You may spend this Unit to redirect a rival Unit's attack to it instead.)"
   },
   {
     "id": "CP-041",
@@ -1063,7 +1143,9 @@
     "keywords": "Attack",
     "aspect": "Green",
     "traits": "Arasaka, Corpo",
-    "sourceSet": "Embracing Power Starter"
+    "sourceSet": "Embracing Power Starter",
+    "ability": "ATTACK If all friendly Legends are face-up, this Unit has +5 power this turn.",
+    "rulesText": "ATTACK If all friendly Legends are face-up, this Unit has +5 power this turn."
   },
   {
     "id": "CP-042",
@@ -1086,10 +1168,12 @@
     "power": "0 FUERZA",
     "powerVal": "0",
     "ram": "x2",
-    "keywords": "Quick",
+    "keywords": "Blocker, Quick",
     "aspect": "Green",
     "traits": "Arasaka, Corpo",
-    "sourceSet": "Welcome to Night City"
+    "sourceSet": "Welcome to Night City",
+    "ability": "QUICK 1 €$, ↷ Give a friendly Unit with cost 4 or less BLOCKER this turn. If you control a value-pair of Gigs, also give it +1 power this turn.\nWhen a friendly Unit uses BLOCKER, you may discard 1. If you do, draw 1.",
+    "rulesText": "QUICK 1 €$, ↷ Give a friendly Unit with cost 4 or less BLOCKER this turn. If you control a value-pair of Gigs, also give it +1 power this turn.\nWhen a friendly Unit uses BLOCKER, you may discard 1. If you do, draw 1."
   },
   {
     "id": "CP-043",
@@ -1115,7 +1199,9 @@
     "keywords": "",
     "aspect": "Red",
     "traits": "Ganger, Plan",
-    "sourceSet": "Welcome to Night City"
+    "sourceSet": "Welcome to Night City",
+    "ability": "Give a friendly Unit these effects. If you have less ☆ (Street Cred) than a Rival, they instead choose one effect for you.\nThe next time this Unit attacks this turn, it may attack ready Units. // Give this Unit +3 power this turn.",
+    "rulesText": "Give a friendly Unit these effects. If you have less ☆ (Street Cred) than a Rival, they instead choose one effect for you.\nThe next time this Unit attacks this turn, it may attack ready Units. // Give this Unit +3 power this turn."
   },
   {
     "id": "CP-044",
@@ -1141,7 +1227,9 @@
     "keywords": "Play",
     "aspect": "Blue",
     "traits": "AI, Corpo",
-    "sourceSet": "Welcome to Night City"
+    "sourceSet": "Welcome to Night City",
+    "ability": "PLAY Trash 3. Add a Program from among them to your hand.",
+    "rulesText": "PLAY Trash 3. Add a Program from among them to your hand."
   },
   {
     "id": "CP-045",
@@ -1167,7 +1255,9 @@
     "keywords": "",
     "aspect": "Green",
     "traits": "Arasaka, Corpo, Netrunner",
-    "sourceSet": "Welcome to Night City"
+    "sourceSet": "Welcome to Night City",
+    "ability": "↷ Swap a friendly Gig with a rival Gig.\nAt the start of your turn, draw 1 for each friendly value-pair of Gigs.",
+    "rulesText": "↷ Swap a friendly Gig with a rival Gig.\nAt the start of your turn, draw 1 for each friendly value-pair of Gigs."
   },
   {
     "id": "CP-046",
@@ -1193,7 +1283,9 @@
     "keywords": "Play",
     "aspect": "Yellow",
     "traits": "Arasaka, Corpo, Netrunner",
-    "sourceSet": "Welcome to Night City"
+    "sourceSet": "Welcome to Night City",
+    "ability": "PLAY Search the top 4 cards of your deck. Reveal any number of cards with cost equal to any friendly Gig values and add them to your hand. Bottom-deck the rest.",
+    "rulesText": "PLAY Search the top 4 cards of your deck. Reveal any number of cards with cost equal to any friendly Gig values and add them to your hand. Bottom-deck the rest."
   },
   {
     "id": "CP-047",
@@ -1219,7 +1311,9 @@
     "keywords": "Play",
     "aspect": "Yellow",
     "traits": "Ripperdoc",
-    "sourceSet": "Welcome to Night City"
+    "sourceSet": "Welcome to Night City",
+    "ability": "PLAY You may defeat a Gear. If its cost equals the value of a friendly Gig, draw 1.",
+    "rulesText": "PLAY You may defeat a Gear. If its cost equals the value of a friendly Gig, draw 1."
   },
   {
     "id": "CP-048",
@@ -1245,7 +1339,9 @@
     "keywords": "",
     "aspect": "Red",
     "traits": "Arasaka, Braindance",
-    "sourceSet": "Welcome to Night City"
+    "sourceSet": "Welcome to Night City",
+    "ability": "Increase a Gig by up to 4. If you control a Gig with 8+ value, draw 1.",
+    "rulesText": "Increase a Gig by up to 4. If you control a Gig with 8+ value, draw 1."
   },
   {
     "id": "CP-049",
@@ -1271,7 +1367,9 @@
     "keywords": "",
     "aspect": "Blue",
     "traits": "Netrunner, Voodoo Boys",
-    "sourceSet": "Welcome to Night City"
+    "sourceSet": "Welcome to Night City",
+    "ability": "This Unit can't attack unless you played a Program this turn.",
+    "rulesText": "This Unit can't attack unless you played a Program this turn."
   },
   {
     "id": "CP-050",
@@ -1297,7 +1395,9 @@
     "keywords": "Go Solo",
     "aspect": "Green",
     "traits": "Merc",
-    "sourceSet": "Welcome to Night City"
+    "sourceSet": "Welcome to Night City",
+    "ability": "GO SOLO (Pay this Legend's cost to play it as a ready Unit. It can attack this turn. If it leaves the field, remove it from the game.)\nIf a friendly Unit would be defeated, you may pay 1 €$ to defeat this Legend instead. (Remove it from the game.)",
+    "rulesText": "GO SOLO (Pay this Legend's cost to play it as a ready Unit. It can attack this turn. If it leaves the field, remove it from the game.)\nIf a friendly Unit would be defeated, you may pay 1 €$ to defeat this Legend instead. (Remove it from the game.)"
   },
   {
     "id": "CP-051",
@@ -1323,7 +1423,9 @@
     "keywords": "",
     "aspect": "Blue",
     "traits": "Merc",
-    "sourceSet": "The Heist Starter"
+    "sourceSet": "The Heist Starter",
+    "ability": "The first time you play a Blue Unit or Blue Gear each turn, you may decrease a friendly Gig by up to 2. If it becomes a min Gig, draw 1.",
+    "rulesText": "The first time you play a Blue Unit or Blue Gear each turn, you may decrease a friendly Gig by up to 2. If it becomes a min Gig, draw 1."
   },
   {
     "id": "CP-052",
@@ -1346,10 +1448,12 @@
     "power": "8 FUERZA",
     "powerVal": "8",
     "ram": "x2",
-    "keywords": "Attack, Defeated",
+    "keywords": "Attack",
     "aspect": "Yellow",
     "traits": "Merc, Valentino",
-    "sourceSet": "Welcome to Night City"
+    "sourceSet": "Welcome to Night City",
+    "ability": "ATTACK Give this Unit +2 power this turn for each friendly Gig with an even value.\nDEFEATED Draw 1 for each friendly Gig with an odd value.",
+    "rulesText": "ATTACK Give this Unit +2 power this turn for each friendly Gig with an even value.\nDEFEATED Draw 1 for each friendly Gig with an odd value."
   },
   {
     "id": "CP-053",
@@ -1375,7 +1479,9 @@
     "keywords": "Play",
     "aspect": "Red",
     "traits": "Tyger Claws",
-    "sourceSet": "Welcome to Night City"
+    "sourceSet": "Welcome to Night City",
+    "ability": "PLAY Give a friendly Unit +2 power this turn.\n(Units with power 0 don't steal Gigs.)",
+    "rulesText": "PLAY Give a friendly Unit +2 power this turn.\n(Units with power 0 don't steal Gigs.)"
   },
   {
     "id": "CP-054",
@@ -1401,7 +1507,9 @@
     "keywords": "",
     "aspect": "Red",
     "traits": "Merc, Rocker, Samurai",
-    "sourceSet": "Welcome to Night City"
+    "sourceSet": "Welcome to Night City",
+    "ability": "The first time this Unit wins a fight each turn, ready it.\nThis Unit wins all fights against CORPO Units.",
+    "rulesText": "The first time this Unit wins a fight each turn, ready it.\nThis Unit wins all fights against CORPO Units."
   },
   {
     "id": "CP-055",
@@ -1427,7 +1535,9 @@
     "keywords": "",
     "aspect": "Red",
     "traits": "Merc, Rocker, Samurai",
-    "sourceSet": "Welcome to Night City"
+    "sourceSet": "Welcome to Night City",
+    "ability": "2 €$, ↷ A friendly Unit can attack spent rival Units the turn it's played. If it's a ROCKER Unit, also give it +2 power this turn. This effect costs -1 €$ for each friendly Gig with 8+ value.",
+    "rulesText": "2 €$, ↷ A friendly Unit can attack spent rival Units the turn it's played. If it's a ROCKER Unit, also give it +2 power this turn. This effect costs -1 €$ for each friendly Gig with 8+ value."
   },
   {
     "id": "CP-056",
@@ -1453,7 +1563,9 @@
     "keywords": "",
     "aspect": "Blue",
     "traits": "Ganger, Mox, Techie",
-    "sourceSet": "Welcome to Night City"
+    "sourceSet": "Welcome to Night City",
+    "ability": "1 €$, ↷ Reveal the top card of your deck. You may play it for free. Otherwise, add it to your hand.",
+    "rulesText": "1 €$, ↷ Reveal the top card of your deck. You may play it for free. Otherwise, add it to your hand."
   },
   {
     "id": "CP-057",
@@ -1479,7 +1591,9 @@
     "keywords": "",
     "aspect": "Blue",
     "traits": "Ganger, Mox, Techie",
-    "sourceSet": "Welcome to Night City"
+    "sourceSet": "Welcome to Night City",
+    "ability": "When you play a BRAINDANCE Program, give a friendly Unit +1 power this turn.\n↷ Trash the top card of your deck. If it's a Program, you may add it to your hand.",
+    "rulesText": "When you play a BRAINDANCE Program, give a friendly Unit +1 power this turn.\n↷ Trash the top card of your deck. If it's a Program, you may add it to your hand."
   },
   {
     "id": "CP-058",
@@ -1505,7 +1619,9 @@
     "keywords": "",
     "aspect": "Yellow",
     "traits": "Rocker, Samurai",
-    "sourceSet": "Welcome to Night City"
+    "sourceSet": "Welcome to Night City",
+    "ability": "When you roll in a Gig from your fixer area, you may ignore the result and reroll it once.\nWhen you roll a min or max value on a Gig, draw 1. If it's a d20, draw 3 instead.",
+    "rulesText": "When you roll in a Gig from your fixer area, you may ignore the result and reroll it once.\nWhen you roll a min or max value on a Gig, draw 1. If it's a d20, draw 3 instead."
   },
   {
     "id": "CP-059",
@@ -1531,7 +1647,9 @@
     "keywords": "",
     "aspect": "Red",
     "traits": "Rocker, Samurai",
-    "sourceSet": "Welcome to Night City"
+    "sourceSet": "Welcome to Night City",
+    "ability": "↷ If you control a Gig with 8+ value, draw 2.",
+    "rulesText": "↷ If you control a Gig with 8+ value, draw 2."
   },
   {
     "id": "CP-060",
@@ -1557,7 +1675,9 @@
     "keywords": "Attack",
     "aspect": "Yellow",
     "traits": "Cyberware",
-    "sourceSet": "Welcome to Night City"
+    "sourceSet": "Welcome to Night City",
+    "ability": "(Equip to a friendly Unit or face-up Legend.)\nATTACK Look at a friendly face-down Legend. (Don't reveal it.)",
+    "rulesText": "(Equip to a friendly Unit or face-up Legend.)\nATTACK Look at a friendly face-down Legend. (Don't reveal it.)"
   },
   {
     "id": "CP-061",
@@ -1583,7 +1703,9 @@
     "keywords": "Blocker",
     "aspect": "Red",
     "traits": "Ganger, Valentino",
-    "sourceSet": "Welcome to Night City"
+    "sourceSet": "Welcome to Night City",
+    "ability": "BLOCKER (You may spend this Unit to redirect a rival Unit's attack to it instead.)\nWhen this Unit uses BLOCKER, increase a Gig by up to 3.",
+    "rulesText": "BLOCKER (You may spend this Unit to redirect a rival Unit's attack to it instead.)\nWhen this Unit uses BLOCKER, increase a Gig by up to 3."
   },
   {
     "id": "CP-062",
@@ -1609,7 +1731,9 @@
     "keywords": "",
     "aspect": "Blue",
     "traits": "Corpo",
-    "sourceSet": "Welcome to Night City"
+    "sourceSet": "Welcome to Night City",
+    "ability": "Bottom-deck a Rival's lowest-power Unit. (If there are multiple, choose 1.)",
+    "rulesText": "Bottom-deck a Rival's lowest-power Unit. (If there are multiple, choose 1.)"
   },
   {
     "id": "CP-063",
@@ -1635,7 +1759,9 @@
     "keywords": "",
     "aspect": "Yellow",
     "traits": "Plan",
-    "sourceSet": "Welcome to Night City"
+    "sourceSet": "Welcome to Night City",
+    "ability": "Each player defeats one of their Units.",
+    "rulesText": "Each player defeats one of their Units."
   },
   {
     "id": "CP-064",
@@ -1658,10 +1784,12 @@
     "power": "2 FUERZA",
     "powerVal": "2",
     "ram": "x2",
-    "keywords": "Play, Blocker",
+    "keywords": "Blocker, Play",
     "aspect": "Blue",
     "traits": "Rocker",
-    "sourceSet": "Welcome to Night City"
+    "sourceSet": "Welcome to Night City",
+    "ability": "PLAY You may play a Program with cost 3 or less from your hand or trash for free. Bottom-deck it after you play it.\nBLOCKER",
+    "rulesText": "PLAY You may play a Program with cost 3 or less from your hand or trash for free. Bottom-deck it after you play it.\nBLOCKER"
   },
   {
     "id": "CP-065",
@@ -1687,7 +1815,9 @@
     "keywords": "",
     "aspect": "Yellow",
     "traits": "Ganger, Maelstrom",
-    "sourceSet": "Welcome to Night City"
+    "sourceSet": "Welcome to Night City",
+    "ability": "When this Unit steals a Gig, if it's equipped, a Rival discards 1.",
+    "rulesText": "When this Unit steals a Gig, if it's equipped, a Rival discards 1."
   },
   {
     "id": "CP-066",
@@ -1713,7 +1843,9 @@
     "keywords": "",
     "aspect": "Green",
     "traits": "Ganger, Maelstrom",
-    "sourceSet": "Welcome to Night City"
+    "sourceSet": "Welcome to Night City",
+    "ability": "When this Unit loses a fight, defeat the opposing rival Unit.\n(Units with power 0 don't steal Gigs.)",
+    "rulesText": "When this Unit loses a fight, defeat the opposing rival Unit.\n(Units with power 0 don't steal Gigs.)"
   },
   {
     "id": "CP-067",
@@ -1739,7 +1871,9 @@
     "keywords": "Play",
     "aspect": "Blue",
     "traits": "Mystic, Netrunner, Voodoo Boys",
-    "sourceSet": "Welcome to Night City"
+    "sourceSet": "Welcome to Night City",
+    "ability": "PLAY You may discard 2 Programs. If you do, bottom-deck a rival unequipped Unit.",
+    "rulesText": "PLAY You may discard 2 Programs. If you do, bottom-deck a rival unequipped Unit."
   },
   {
     "id": "CP-068",
@@ -1765,7 +1899,9 @@
     "keywords": "Blocker",
     "aspect": "Yellow",
     "traits": "Cyberware",
-    "sourceSet": "Welcome to Night City"
+    "sourceSet": "Welcome to Night City",
+    "ability": "(Equip to a friendly Unit or face-up Legend.)\nBLOCKER (You may spend this Unit to redirect a rival Unit's attack to it instead.)",
+    "rulesText": "(Equip to a friendly Unit or face-up Legend.)\nBLOCKER (You may spend this Unit to redirect a rival Unit's attack to it instead.)"
   },
   {
     "id": "CP-069",
@@ -1791,7 +1927,9 @@
     "keywords": "",
     "aspect": "Red",
     "traits": "Cyberware",
-    "sourceSet": "Welcome to Night City"
+    "sourceSet": "Welcome to Night City",
+    "ability": "(Equip to a friendly Unit or face-up Legend.)\n\"One cut, one kill.\"",
+    "rulesText": "(Equip to a friendly Unit or face-up Legend.)\n\"One cut, one kill.\""
   },
   {
     "id": "CP-070",
@@ -1817,7 +1955,9 @@
     "keywords": "Play",
     "aspect": "Green",
     "traits": "NCPD, Vehicle",
-    "sourceSet": "Welcome to Night City"
+    "sourceSet": "Welcome to Night City",
+    "ability": "PLAY You may swap a friendly Gig with a rival Gig.",
+    "rulesText": "PLAY You may swap a friendly Gig with a rival Gig."
   },
   {
     "id": "CP-071",
@@ -1843,7 +1983,9 @@
     "keywords": "",
     "aspect": "Green",
     "traits": "NCPD",
-    "sourceSet": "Welcome to Night City"
+    "sourceSet": "Welcome to Night City",
+    "ability": "Play this Unit for -1 €$ for each of a Rival’s Units, to a minimum of 1 €$.",
+    "rulesText": "Play this Unit for -1 €$ for each of a Rival’s Units, to a minimum of 1 €$."
   },
   {
     "id": "CP-072",
@@ -1869,7 +2011,9 @@
     "keywords": "",
     "aspect": "Green",
     "traits": "NCPD",
-    "sourceSet": "Welcome to Night City"
+    "sourceSet": "Welcome to Night City",
+    "ability": "At the end of your turn, if this Unit is spent, ready a friendly face-up Legend.",
+    "rulesText": "At the end of your turn, if this Unit is spent, ready a friendly face-up Legend."
   },
   {
     "id": "CP-073",
@@ -1895,7 +2039,9 @@
     "keywords": "",
     "aspect": "Yellow",
     "traits": "NCPD",
-    "sourceSet": "Welcome to Night City"
+    "sourceSet": "Welcome to Night City",
+    "ability": "Rival Units can't attack the turn they're played.",
+    "rulesText": "Rival Units can't attack the turn they're played."
   },
   {
     "id": "CP-074",
@@ -1921,7 +2067,9 @@
     "keywords": "",
     "aspect": "Green",
     "traits": "Braindance",
-    "sourceSet": "Welcome to Night City"
+    "sourceSet": "Welcome to Night City",
+    "ability": "Spend a rival Unit. It can't ready until your next turn. If your ☆ (Street Cred) is an even number, draw 1.",
+    "rulesText": "Spend a rival Unit. It can't ready until your next turn. If your ☆ (Street Cred) is an even number, draw 1."
   },
   {
     "id": "CP-075",
@@ -1947,7 +2095,9 @@
     "keywords": "Blocker",
     "aspect": "Red",
     "traits": "Corpo, Militech",
-    "sourceSet": "Welcome to Night City"
+    "sourceSet": "Welcome to Night City",
+    "ability": "BLOCKER\nThis Unit has +2 power while fighting a Legend.\nWhen a Rival adjusts or swaps 1 or more friendly Gigs, you may add a card from your trash to your hand.",
+    "rulesText": "BLOCKER\nThis Unit has +2 power while fighting a Legend.\nWhen a Rival adjusts or swaps 1 or more friendly Gigs, you may add a card from your trash to your hand."
   },
   {
     "id": "CP-076",
@@ -1973,7 +2123,9 @@
     "keywords": "Play",
     "aspect": "Red",
     "traits": "Arasaka, Drone, Militech",
-    "sourceSet": "Embracing Power Starter"
+    "sourceSet": "Embracing Power Starter",
+    "ability": "PLAY If you have more ☆ (Street Cred) than a Rival, defeat a rival Unit with power 5 or less.",
+    "rulesText": "PLAY If you have more ☆ (Street Cred) than a Rival, defeat a rival Unit with power 5 or less."
   },
   {
     "id": "CP-077",
@@ -1999,7 +2151,9 @@
     "keywords": "",
     "aspect": "Blue",
     "traits": "Mystic",
-    "sourceSet": "Welcome to Night City"
+    "sourceSet": "Welcome to Night City",
+    "ability": "This Unit can't attack.\nAt the end of your turn, choose a card type. Then, reveal the top card of your deck. If it's the chosen type, add it to your hand and ready 1 Eddie. Otherwise, trash it.\n(Unit, Gear, and Program are card types.)",
+    "rulesText": "This Unit can't attack.\nAt the end of your turn, choose a card type. Then, reveal the top card of your deck. If it's the chosen type, add it to your hand and ready 1 Eddie. Otherwise, trash it.\n(Unit, Gear, and Program are card types.)"
   },
   {
     "id": "CP-078",
@@ -2025,7 +2179,9 @@
     "keywords": "Adrenaline",
     "aspect": "Blue",
     "traits": "Tyger Claws, Vehicle",
-    "sourceSet": "Welcome to Night City"
+    "sourceSet": "Welcome to Night City",
+    "ability": "ADRENALINE (This Unit can attack the turn it's played.)\nAt the end of your turn, return this Unit to its owner's hand.",
+    "rulesText": "ADRENALINE (This Unit can attack the turn it's played.)\nAt the end of your turn, return this Unit to its owner's hand."
   },
   {
     "id": "CP-079",
@@ -2051,7 +2207,9 @@
     "keywords": "",
     "aspect": "Blue",
     "traits": "Vehicle",
-    "sourceSet": "Welcome to Night City"
+    "sourceSet": "Welcome to Night City",
+    "ability": "At the end of your turn, if you have less ☆ (Street Cred) than a Rival, ready this Unit.",
+    "rulesText": "At the end of your turn, if you have less ☆ (Street Cred) than a Rival, ready this Unit."
   },
   {
     "id": "CP-080",
@@ -2074,10 +2232,12 @@
     "power": "2 FUERZA",
     "powerVal": "2",
     "ram": "x2",
-    "keywords": "Play, Blocker",
+    "keywords": "Blocker, Play",
     "aspect": "Blue",
     "traits": "Ganger, Mox",
-    "sourceSet": "Welcome to Night City"
+    "sourceSet": "Welcome to Night City",
+    "ability": "PLAY A rival Unit must attack next turn if it can.\nBLOCKER (You may spend this Unit to redirect a rival Unit's attack to it instead.)",
+    "rulesText": "PLAY A rival Unit must attack next turn if it can.\nBLOCKER (You may spend this Unit to redirect a rival Unit's attack to it instead.)"
   },
   {
     "id": "CP-081",
@@ -2103,7 +2263,9 @@
     "keywords": "",
     "aspect": "Blue",
     "traits": "Drone, Militech",
-    "sourceSet": "The Heist Starter"
+    "sourceSet": "The Heist Starter",
+    "ability": "If you have less ☆ (Street Cred) than a Rival, this Unit can't be blocked.",
+    "rulesText": "If you have less ☆ (Street Cred) than a Rival, this Unit can't be blocked."
   },
   {
     "id": "CP-082",
@@ -2129,7 +2291,9 @@
     "keywords": "Call",
     "aspect": "Yellow",
     "traits": "Fixer",
-    "sourceSet": "Welcome to Night City"
+    "sourceSet": "Welcome to Night City",
+    "ability": "CALL Choose one effect.\nA friendly Unit can't be defeated in a fight this turn. // Draw 1.\n↷ Adjust a Gig by 1.",
+    "rulesText": "CALL Choose one effect.\nA friendly Unit can't be defeated in a fight this turn. // Draw 1.\n↷ Adjust a Gig by 1."
   },
   {
     "id": "CP-083",
@@ -2155,7 +2319,9 @@
     "keywords": "",
     "aspect": "Green",
     "traits": "Medtech, Trauma Team",
-    "sourceSet": "Welcome to Night City"
+    "sourceSet": "Welcome to Night City",
+    "ability": "If a Rival controls more Gigs than you, this Unit can attack their Gig area the turn it's played.",
+    "rulesText": "If a Rival controls more Gigs than you, this Unit can attack their Gig area the turn it's played."
   },
   {
     "id": "CP-084",
@@ -2181,7 +2347,9 @@
     "keywords": "",
     "aspect": "Blue",
     "traits": "Cyberware, Netrunner, Netwatch",
-    "sourceSet": "Welcome to Night City"
+    "sourceSet": "Welcome to Night City",
+    "ability": "(Equip to a friendly Unit or face-up Legend.)\nWhen this Unit or Legend is spent, draw 1.",
+    "rulesText": "(Equip to a friendly Unit or face-up Legend.)\nWhen this Unit or Legend is spent, draw 1."
   },
   {
     "id": "CP-085",
@@ -2204,10 +2372,12 @@
     "power": "4 FUERZA",
     "powerVal": "4",
     "ram": "x2",
-    "keywords": "",
+    "keywords": "Go Solo",
     "aspect": "Blue",
     "traits": "Arasaka, Plan",
-    "sourceSet": "Welcome to Night City"
+    "sourceSet": "Welcome to Night City",
+    "ability": "If your fixer area is empty, play this Program for 1 €$. Choose one effect.\nDraw 2. // A Unit can't attack until your next turn. // A friendly Legend may use GO SOLO for -2 €$ this turn, to a minimum of 1 €$.",
+    "rulesText": "If your fixer area is empty, play this Program for 1 €$. Choose one effect.\nDraw 2. // A Unit can't attack until your next turn. // A friendly Legend may use GO SOLO for -2 €$ this turn, to a minimum of 1 €$."
   },
   {
     "id": "CP-086",
@@ -2233,7 +2403,9 @@
     "keywords": "",
     "aspect": "Red",
     "traits": "Drone, Militech, Zetatech",
-    "sourceSet": "Welcome to Night City"
+    "sourceSet": "Welcome to Night City",
+    "ability": "Play this Unit for -1 €$ for each friendly Gig with 8+ value, to a minimum of 1 €$.",
+    "rulesText": "Play this Unit for -1 €$ for each friendly Gig with 8+ value, to a minimum of 1 €$."
   },
   {
     "id": "CP-087",
@@ -2259,7 +2431,9 @@
     "keywords": "Play",
     "aspect": "Yellow",
     "traits": "Ganger, Voodoo Boys",
-    "sourceSet": "Welcome to Night City"
+    "sourceSet": "Welcome to Night City",
+    "ability": "PLAY Spend this Unit and a rival Unit.",
+    "rulesText": "PLAY Spend this Unit and a rival Unit."
   },
   {
     "id": "CP-088",
@@ -2285,7 +2459,9 @@
     "keywords": "",
     "aspect": "Red",
     "traits": "Merc",
-    "sourceSet": "Welcome to Night City"
+    "sourceSet": "Welcome to Night City",
+    "ability": "Defeat a Unit with power equal to or less than the value of a friendly d20.",
+    "rulesText": "Defeat a Unit with power equal to or less than the value of a friendly d20."
   },
   {
     "id": "CP-089",
@@ -2311,7 +2487,9 @@
     "keywords": "Quick",
     "aspect": "Green",
     "traits": "Weapon",
-    "sourceSet": "Welcome to Night City"
+    "sourceSet": "Welcome to Night City",
+    "ability": "(Equip to a friendly Unit or face-up Legend.)\nQUICK 1 €$, ↷ Discard 1. Defeat a spent rival Unit with cost equal to or less than the discarded card's cost.",
+    "rulesText": "(Equip to a friendly Unit or face-up Legend.)\nQUICK 1 €$, ↷ Discard 1. Defeat a spent rival Unit with cost equal to or less than the discarded card's cost."
   },
   {
     "id": "CP-090",
@@ -2337,7 +2515,9 @@
     "keywords": "Play",
     "aspect": "Green",
     "traits": "Netrunner",
-    "sourceSet": "Welcome to Night City"
+    "sourceSet": "Welcome to Night City",
+    "ability": "PLAY If your ☆ (Street Cred) is an even number, a rival Unit can't ready until your next turn.",
+    "rulesText": "PLAY If your ☆ (Street Cred) is an even number, a rival Unit can't ready until your next turn."
   },
   {
     "id": "CP-091",
@@ -2363,7 +2543,9 @@
     "keywords": "Call",
     "aspect": "Green",
     "traits": "Fixer, Ganger, Valentino",
-    "sourceSet": "Welcome to Night City"
+    "sourceSet": "Welcome to Night City",
+    "ability": "CALL Choose one effect.\nSpend a rival Unit. // Draw 1.\n↷ Set a player's Gig to the same value as another player's Gig.",
+    "rulesText": "CALL Choose one effect.\nSpend a rival Unit. // Draw 1.\n↷ Set a player's Gig to the same value as another player's Gig."
   },
   {
     "id": "CP-092",
@@ -2389,7 +2571,9 @@
     "keywords": "",
     "aspect": "Green",
     "traits": "Aldecado, Merc, Nomad",
-    "sourceSet": "Welcome to Night City"
+    "sourceSet": "Welcome to Night City",
+    "ability": "2 €$, ↷ Move a Gear from this Legend to an unequipped friendly Unit. If you do, ready that Unit.\nAt the end of your turn, if 5 or more friendly Units and/or Legends are equipped, ready them.",
+    "rulesText": "2 €$, ↷ Move a Gear from this Legend to an unequipped friendly Unit. If you do, ready that Unit.\nAt the end of your turn, if 5 or more friendly Units and/or Legends are equipped, ready them."
   },
   {
     "id": "CP-093",
@@ -2415,7 +2599,9 @@
     "keywords": "Attack",
     "aspect": "Green",
     "traits": "Aldecado, Merc, Nomad",
-    "sourceSet": "Welcome to Night City"
+    "sourceSet": "Welcome to Night City",
+    "ability": "During your turn, you may Call a Legend for free.\nATTACK Discard 1. If you do, draw 1 for each friendly face-up Legend.",
+    "rulesText": "During your turn, you may Call a Legend for free.\nATTACK Discard 1. If you do, draw 1 for each friendly face-up Legend."
   },
   {
     "id": "CP-094",
@@ -2441,7 +2627,9 @@
     "keywords": "",
     "aspect": "Green",
     "traits": "Braindance",
-    "sourceSet": "Welcome to Night City"
+    "sourceSet": "Welcome to Night City",
+    "ability": "You may set a Gig's value to the value of another Gig. Then, if you control a value-pair, draw 1.",
+    "rulesText": "You may set a Gig's value to the value of another Gig. Then, if you control a value-pair, draw 1."
   },
   {
     "id": "CP-095",
@@ -2467,7 +2655,9 @@
     "keywords": "Attack",
     "aspect": "Green",
     "traits": "Valentino",
-    "sourceSet": "Welcome to Night City"
+    "sourceSet": "Welcome to Night City",
+    "ability": "ATTACK If you control a value-pair of Gigs, ready up to 2 MERC Legends in your Legends area.",
+    "rulesText": "ATTACK If you control a value-pair of Gigs, ready up to 2 MERC Legends in your Legends area."
   },
   {
     "id": "CP-096",
@@ -2490,10 +2680,12 @@
     "power": "10 FUERZA",
     "powerVal": "10",
     "ram": "x2",
-    "keywords": "Play, Attack",
+    "keywords": "Attack, Play",
     "aspect": "Blue",
     "traits": "Ganger, Netrunner, Voodoo Boys",
-    "sourceSet": "Welcome to Night City"
+    "sourceSet": "Welcome to Night City",
+    "ability": "PLAY ATTACK You may discard 1 Program. If you do, bottom-deck a rival Unit.",
+    "rulesText": "PLAY ATTACK You may discard 1 Program. If you do, bottom-deck a rival Unit."
   },
   {
     "id": "CP-097",
@@ -2519,7 +2711,9 @@
     "keywords": "",
     "aspect": "Blue",
     "traits": "NCPD",
-    "sourceSet": "Welcome to Night City"
+    "sourceSet": "Welcome to Night City",
+    "ability": "[Flavour] Their protocol stops at “shoot first.”",
+    "rulesText": "[Flavour] Their protocol stops at “shoot first.”"
   },
   {
     "id": "CP-098",
@@ -2545,7 +2739,9 @@
     "keywords": "",
     "aspect": "Blue",
     "traits": "Braindance",
-    "sourceSet": "Welcome to Night City"
+    "sourceSet": "Welcome to Night City",
+    "ability": "Choose one effect. If a friendly d4 is a min Gig, choose both instead.\nGive a rival Unit -4 power this turn. // Bottom-deck a rival Unit with power 0.",
+    "rulesText": "Choose one effect. If a friendly d4 is a min Gig, choose both instead.\nGive a rival Unit -4 power this turn. // Bottom-deck a rival Unit with power 0."
   },
   {
     "id": "CP-099",
@@ -2571,7 +2767,9 @@
     "keywords": "",
     "aspect": "Red",
     "traits": "",
-    "sourceSet": "Promos"
+    "sourceSet": "Promos",
+    "ability": "",
+    "rulesText": ""
   },
   {
     "id": "CP-100",
@@ -2597,7 +2795,9 @@
     "keywords": "Quick",
     "aspect": "Blue",
     "traits": "Quickhack",
-    "sourceSet": "Welcome to Night City"
+    "sourceSet": "Welcome to Night City",
+    "ability": "QUICK The next time a rival Unit fights this turn, it doesn't defeat the opposing friendly Unit.",
+    "rulesText": "QUICK The next time a rival Unit fights this turn, it doesn't defeat the opposing friendly Unit."
   },
   {
     "id": "CP-101",
@@ -2623,7 +2823,9 @@
     "keywords": "Adrenaline",
     "aspect": "Green",
     "traits": "Nomad",
-    "sourceSet": "Welcome to Night City"
+    "sourceSet": "Welcome to Night City",
+    "ability": "ADRENALINE (This Unit can attack the turn it's played.)",
+    "rulesText": "ADRENALINE (This Unit can attack the turn it's played.)"
   },
   {
     "id": "CP-102",
@@ -2646,10 +2848,12 @@
     "power": "+1 FUERZA",
     "powerVal": "+1",
     "ram": "x2",
-    "keywords": "Blocker",
+    "keywords": "Blocker, Go Solo",
     "aspect": "Green",
     "traits": "Weapon",
-    "sourceSet": "Welcome to Night City"
+    "sourceSet": "Welcome to Night City",
+    "ability": "(Equip to a friendly Unit or face-up Legend.)\nBLOCKER (You may spend this Unit to redirect a rival Unit's attack to it instead.)\nRivals must pay +2 €$ to use GO SOLO.",
+    "rulesText": "(Equip to a friendly Unit or face-up Legend.)\nBLOCKER (You may spend this Unit to redirect a rival Unit's attack to it instead.)\nRivals must pay +2 €$ to use GO SOLO."
   },
   {
     "id": "CP-103",
@@ -2675,7 +2879,9 @@
     "keywords": "Blocker",
     "aspect": "Blue",
     "traits": "Ganger, Mox",
-    "sourceSet": "Welcome to Night City"
+    "sourceSet": "Welcome to Night City",
+    "ability": "BLOCKER (You may spend this Unit to redirect a rival Unit's attack to it instead.)\nThe first time this Unit is spent each turn, draw 1, then discard 1.",
+    "rulesText": "BLOCKER (You may spend this Unit to redirect a rival Unit's attack to it instead.)\nThe first time this Unit is spent each turn, draw 1, then discard 1."
   },
   {
     "id": "CP-104",
@@ -2701,7 +2907,9 @@
     "keywords": "Quick",
     "aspect": "Yellow",
     "traits": "NCPD",
-    "sourceSet": "Welcome to Night City"
+    "sourceSet": "Welcome to Night City",
+    "ability": "QUICK ↷ Play a Gear with cost 2 or less from your hand for free.\nWhen a friendly equipped Unit is defeated, search the top 2 cards of your deck and trash 1.",
+    "rulesText": "QUICK ↷ Play a Gear with cost 2 or less from your hand for free.\nWhen a friendly equipped Unit is defeated, search the top 2 cards of your deck and trash 1."
   },
   {
     "id": "CP-105",
@@ -2727,7 +2935,9 @@
     "keywords": "",
     "aspect": "Yellow",
     "traits": "Rocker",
-    "sourceSet": "Welcome to Night City"
+    "sourceSet": "Welcome to Night City",
+    "ability": "Scream your throat raw for something. Anything.",
+    "rulesText": "Scream your throat raw for something. Anything."
   },
   {
     "id": "CP-106",
@@ -2753,7 +2963,9 @@
     "keywords": "Go Solo",
     "aspect": "Yellow",
     "traits": "Merc",
-    "sourceSet": "Welcome to Night City"
+    "sourceSet": "Welcome to Night City",
+    "ability": "GO SOLO (Pay this Legend's cost to play it as a ready Unit. It can attack this turn. If it leaves the field, remove it from the game.)\nWhen a friendly Legend steals a Gig, if its value is even, draw 1. If its value is odd, a Rival discards 1.",
+    "rulesText": "GO SOLO (Pay this Legend's cost to play it as a ready Unit. It can attack this turn. If it leaves the field, remove it from the game.)\nWhen a friendly Legend steals a Gig, if its value is even, draw 1. If its value is odd, a Rival discards 1."
   },
   {
     "id": "CP-107",
@@ -2779,7 +2991,9 @@
     "keywords": "Quick",
     "aspect": "Blue",
     "traits": "Fixer, Merc",
-    "sourceSet": "Welcome to Night City"
+    "sourceSet": "Welcome to Night City",
+    "ability": "The first time another friendly Unit steals a Gig with value less than its power each turn, ready 2 Eddies.\nQUICK 2 €$,  ↷ A rival Unit loses power equal to this Unit's power this turn.",
+    "rulesText": "The first time another friendly Unit steals a Gig with value less than its power each turn, ready 2 Eddies.\nQUICK 2 €$,  ↷ A rival Unit loses power equal to this Unit's power this turn."
   },
   {
     "id": "CP-108",
@@ -2805,7 +3019,9 @@
     "keywords": "Play",
     "aspect": "Red",
     "traits": "Ganger, Maelstrom",
-    "sourceSet": "Welcome to Night City"
+    "sourceSet": "Welcome to Night City",
+    "ability": "PLAY Defeat a rival Unit with power 2 or less. If you have more ☆ (Street Cred) than a Rival, defeat a rival Unit with power 3 or less instead.",
+    "rulesText": "PLAY Defeat a rival Unit with power 2 or less. If you have more ☆ (Street Cred) than a Rival, defeat a rival Unit with power 3 or less instead."
   },
   {
     "id": "CP-109",
@@ -2831,7 +3047,9 @@
     "keywords": "Go Solo",
     "aspect": "Red",
     "traits": "Ganger, Maelstrom",
-    "sourceSet": "Welcome to Night City"
+    "sourceSet": "Welcome to Night City",
+    "ability": "GO SOLO (Pay this Legend's cost to play it as a ready Unit. It can attack this turn. If it leaves the field, remove it from the game.)\nDuring your turn, this Legend has +2 power for each of its equipped Gear.",
+    "rulesText": "GO SOLO (Pay this Legend's cost to play it as a ready Unit. It can attack this turn. If it leaves the field, remove it from the game.)\nDuring your turn, this Legend has +2 power for each of its equipped Gear."
   },
   {
     "id": "CP-110",
@@ -2857,7 +3075,9 @@
     "keywords": "",
     "aspect": "Red",
     "traits": "Ganger, Maelstrom",
-    "sourceSet": "Welcome to Night City"
+    "sourceSet": "Welcome to Night City",
+    "ability": "This Unit can only attack rival Units. (It can't attack Gig areas.)",
+    "rulesText": "This Unit can only attack rival Units. (It can't attack Gig areas.)"
   },
   {
     "id": "CP-111",
@@ -2883,7 +3103,9 @@
     "keywords": "",
     "aspect": "Green",
     "traits": "Arasaka, Corpo",
-    "sourceSet": "Embracing Power Starter"
+    "sourceSet": "Embracing Power Starter",
+    "ability": "Friendly ARASAKA Units have +1 power while attacking.\n(Units steal an extra Gig for every 10 power.)",
+    "rulesText": "Friendly ARASAKA Units have +1 power while attacking.\n(Units steal an extra Gig for every 10 power.)"
   },
   {
     "id": "CP-112",
@@ -2909,7 +3131,9 @@
     "keywords": "Quick",
     "aspect": "Yellow",
     "traits": "Quickhack",
-    "sourceSet": "Welcome to Night City"
+    "sourceSet": "Welcome to Night City",
+    "ability": "QUICK The next time a friendly Unit loses a fight this turn, defeat the opposing rival Unit.",
+    "rulesText": "QUICK The next time a friendly Unit loses a fight this turn, defeat the opposing rival Unit."
   },
   {
     "id": "CP-113",
@@ -2935,7 +3159,9 @@
     "keywords": "Play",
     "aspect": "Green",
     "traits": "Arasaka, Corpo",
-    "sourceSet": "Welcome to Night City"
+    "sourceSet": "Welcome to Night City",
+    "ability": "PLAY Spend a rival Unit for each friendly value-pair of Gigs.\nThis Unit can attack rival Units the turn it's played.",
+    "rulesText": "PLAY Spend a rival Unit for each friendly value-pair of Gigs.\nThis Unit can attack rival Units the turn it's played."
   },
   {
     "id": "CP-114",
@@ -2961,7 +3187,9 @@
     "keywords": "",
     "aspect": "Green",
     "traits": "Cyberware",
-    "sourceSet": "Welcome to Night City"
+    "sourceSet": "Welcome to Night City",
+    "ability": "(Equip to a friendly Unit or face-up Legend.)\nAt the end of your turn, ready this Unit or Legend.",
+    "rulesText": "(Equip to a friendly Unit or face-up Legend.)\nAt the end of your turn, ready this Unit or Legend."
   },
   {
     "id": "CP-115",
@@ -2984,10 +3212,12 @@
     "power": "0 FUERZA",
     "powerVal": "0",
     "ram": "x2",
-    "keywords": "Go Solo, Attack, Defeated",
+    "keywords": "Go Solo, Attack",
     "aspect": "Blue",
     "traits": "Maine's Crew, Merc, Netrunner",
-    "sourceSet": "Welcome to Night City"
+    "sourceSet": "Welcome to Night City",
+    "ability": "GO SOLO\nATTACK Reveal the top card of your deck and add it to your hand. This Unit gains power equal to that card's cost this turn.\nDEFEATED A Rival discards 1.",
+    "rulesText": "GO SOLO\nATTACK Reveal the top card of your deck and add it to your hand. This Unit gains power equal to that card's cost this turn.\nDEFEATED A Rival discards 1."
   },
   {
     "id": "CP-116",
@@ -3013,7 +3243,9 @@
     "keywords": "",
     "aspect": "Red",
     "traits": "Arasaka, Weapon",
-    "sourceSet": "Welcome to Night City"
+    "sourceSet": "Welcome to Night City",
+    "ability": "(Equip to a friendly Unit or face-up Legend.)\nWhen this Unit wins a fight against a rival Unit, draw 1.",
+    "rulesText": "(Equip to a friendly Unit or face-up Legend.)\nWhen this Unit wins a fight against a rival Unit, draw 1."
   },
   {
     "id": "CP-117",
@@ -3039,7 +3271,9 @@
     "keywords": "",
     "aspect": "Green",
     "traits": "Aldecado, Nomad",
-    "sourceSet": "Welcome to Night City"
+    "sourceSet": "Welcome to Night City",
+    "ability": "Other friendly Units have +2 power while attacking.\nAt the end of your turn, ready up to 3 friendly Units.",
+    "rulesText": "Other friendly Units have +2 power while attacking.\nAt the end of your turn, ready up to 3 friendly Units."
   },
   {
     "id": "CP-118",
@@ -3062,10 +3296,12 @@
     "power": "7 FUERZA",
     "powerVal": "7",
     "ram": "x2",
-    "keywords": "Defeated",
+    "keywords": "",
     "aspect": "Red",
     "traits": "Ganger, Maelstrom",
-    "sourceSet": "Welcome to Night City"
+    "sourceSet": "Welcome to Night City",
+    "ability": "DEFEATED Add another Unit from your trash to your hand.",
+    "rulesText": "DEFEATED Add another Unit from your trash to your hand."
   },
   {
     "id": "CP-119",
@@ -3091,7 +3327,9 @@
     "keywords": "Blocker",
     "aspect": "Yellow",
     "traits": "Drone, Zetatech",
-    "sourceSet": "Welcome to Night City"
+    "sourceSet": "Welcome to Night City",
+    "ability": "BLOCKER (You may spend this Unit to redirect a rival Unit's attack to it instead.)\n(Units with power 0 don't steal Gigs.)",
+    "rulesText": "BLOCKER (You may spend this Unit to redirect a rival Unit's attack to it instead.)\n(Units with power 0 don't steal Gigs.)"
   },
   {
     "id": "CP-120",
@@ -3117,7 +3355,9 @@
     "keywords": "",
     "aspect": "Red",
     "traits": "Braindance",
-    "sourceSet": "Welcome to Night City"
+    "sourceSet": "Welcome to Night City",
+    "ability": "Each player discards their hand and may draw 5.\nIf the total number of discarded cards equals the value of a friendly Gig, draw 2.",
+    "rulesText": "Each player discards their hand and may draw 5.\nIf the total number of discarded cards equals the value of a friendly Gig, draw 2."
   },
   {
     "id": "CP-121",
@@ -3143,7 +3383,9 @@
     "keywords": "Attack",
     "aspect": "Yellow",
     "traits": "Ganger, Ripperdoc, Scavenger",
-    "sourceSet": "Welcome to Night City"
+    "sourceSet": "Welcome to Night City",
+    "ability": "ATTACK Search the top 3 cards of your deck. Reveal a Gear and add it to your hand. Bottom-deck the rest.\n(Units with power 0 don't steal Gigs.)",
+    "rulesText": "ATTACK Search the top 3 cards of your deck. Reveal a Gear and add it to your hand. Bottom-deck the rest.\n(Units with power 0 don't steal Gigs.)"
   },
   {
     "id": "CP-122",
@@ -3169,7 +3411,9 @@
     "keywords": "Attack",
     "aspect": "Red",
     "traits": "Merc",
-    "sourceSet": "Welcome to Night City"
+    "sourceSet": "Welcome to Night City",
+    "ability": "ATTACK If this Unit has power 5+, draw 1.",
+    "rulesText": "ATTACK If this Unit has power 5+, draw 1."
   },
   {
     "id": "CP-123",
@@ -3195,7 +3439,9 @@
     "keywords": "Quick",
     "aspect": "Green",
     "traits": "Quickhack",
-    "sourceSet": "Welcome to Night City"
+    "sourceSet": "Welcome to Night City",
+    "ability": "QUICK A friendly Unit has +1 power for each friendly face-up Legend while fighting rival Units this turn.",
+    "rulesText": "QUICK A friendly Unit has +1 power for each friendly face-up Legend while fighting rival Units this turn."
   },
   {
     "id": "CP-124",
@@ -3218,10 +3464,12 @@
     "power": "4 FUERZA",
     "powerVal": "4",
     "ram": "x2",
-    "keywords": "Defeated",
+    "keywords": "",
     "aspect": "Yellow",
     "traits": "Merc, Netrunner",
-    "sourceSet": "Welcome to Night City"
+    "sourceSet": "Welcome to Night City",
+    "ability": "DEFEATED Look at all friendly face-down Legends. Then, you may Call a Legend for free. (You can only Call a Legend once per turn.)",
+    "rulesText": "DEFEATED Look at all friendly face-down Legends. Then, you may Call a Legend for free. (You can only Call a Legend once per turn.)"
   },
   {
     "id": "CP-125",
@@ -3247,7 +3495,9 @@
     "keywords": "Quick",
     "aspect": "Green",
     "traits": "Quickhack",
-    "sourceSet": "Welcome to Night City"
+    "sourceSet": "Welcome to Night City",
+    "ability": "QUICK A rival Unit steals 1 fewer Gig this turn. If that Unit is an AI, DRONE, or VEHICLE, draw 1.",
+    "rulesText": "QUICK A rival Unit steals 1 fewer Gig this turn. If that Unit is an AI, DRONE, or VEHICLE, draw 1."
   },
   {
     "id": "CP-126",
@@ -3273,7 +3523,9 @@
     "keywords": "",
     "aspect": "Blue",
     "traits": "Cyberware",
-    "sourceSet": "Welcome to Night City"
+    "sourceSet": "Welcome to Night City",
+    "ability": "(Equip to a friendly Unit or face-up Legend.)\nWhen this Unit or Legend is spent, search the top card of your deck. You may trash it. (Otherwise, keep it on the top of your deck.)",
+    "rulesText": "(Equip to a friendly Unit or face-up Legend.)\nWhen this Unit or Legend is spent, search the top card of your deck. You may trash it. (Otherwise, keep it on the top of your deck.)"
   },
   {
     "id": "CP-127",
@@ -3299,7 +3551,9 @@
     "keywords": "",
     "aspect": "Yellow",
     "traits": "Merc",
-    "sourceSet": "Welcome to Night City"
+    "sourceSet": "Welcome to Night City",
+    "ability": "Trash 4. Add a Gear from among them to your hand. If that Gear's cost equals the value of a friendly Gig, you may play it for free instead.",
+    "rulesText": "Trash 4. Add a Gear from among them to your hand. If that Gear's cost equals the value of a friendly Gig, you may play it for free instead."
   },
   {
     "id": "CP-128",
@@ -3322,10 +3576,12 @@
     "power": "4 FUERZA",
     "powerVal": "4",
     "ram": "x2",
-    "keywords": "Defeated",
+    "keywords": "",
     "aspect": "Yellow",
     "traits": "Merc, Netrunner",
-    "sourceSet": "Welcome to Night City"
+    "sourceSet": "Welcome to Night City",
+    "ability": "DEFEATED Play another Unit with cost 9 or less from your trash for free. Then, bottom-deck this Unit.",
+    "rulesText": "DEFEATED Play another Unit with cost 9 or less from your trash for free. Then, bottom-deck this Unit."
   },
   {
     "id": "CP-129",
@@ -3351,7 +3607,9 @@
     "keywords": "",
     "aspect": "Blue",
     "traits": "Braindance, Doll",
-    "sourceSet": "Welcome to Night City"
+    "sourceSet": "Welcome to Night City",
+    "ability": "Search the top 3 cards of your deck. Add 1 to your hand. You may add 1 more for each friendly min Gig. Bottom-deck the rest.",
+    "rulesText": "Search the top 3 cards of your deck. Add 1 to your hand. You may add 1 more for each friendly min Gig. Bottom-deck the rest."
   },
   {
     "id": "CP-130",
@@ -3377,7 +3635,9 @@
     "keywords": "",
     "aspect": "Blue",
     "traits": "Braindance",
-    "sourceSet": "Welcome to Night City"
+    "sourceSet": "Welcome to Night City",
+    "ability": "Choose one effect. If you have less ☆ (Street Cred) than a Rival, choose both instead.\nGive all rival Units -5 power this turn. // Bottom-deck all rival Units with power 0.",
+    "rulesText": "Choose one effect. If you have less ☆ (Street Cred) than a Rival, choose both instead.\nGive all rival Units -5 power this turn. // Bottom-deck all rival Units with power 0."
   },
   {
     "id": "CP-131",
@@ -3403,7 +3663,9 @@
     "keywords": "",
     "aspect": "Yellow",
     "traits": "Medtech, Trauma Team",
-    "sourceSet": "Welcome to Night City"
+    "sourceSet": "Welcome to Night City",
+    "ability": "Play this Unit for -1 €$ for each Unit in your trash, to a minimum of 1 €$.",
+    "rulesText": "Play this Unit for -1 €$ for each Unit in your trash, to a minimum of 1 €$."
   },
   {
     "id": "CP-132",
@@ -3429,7 +3691,9 @@
     "keywords": "",
     "aspect": "Blue",
     "traits": "Braindance",
-    "sourceSet": "Welcome to Night City"
+    "sourceSet": "Welcome to Night City",
+    "ability": "Decrease a Gig by up to 3. Then, if you control a min Gig, draw 1.",
+    "rulesText": "Decrease a Gig by up to 3. Then, if you control a min Gig, draw 1."
   },
   {
     "id": "CP-133",
@@ -3455,7 +3719,9 @@
     "keywords": "Play",
     "aspect": "Green",
     "traits": "Fixer, Tyger Claws",
-    "sourceSet": "Welcome to Night City"
+    "sourceSet": "Welcome to Night City",
+    "ability": "PLAY You may Call a Legend for free. (You can only Call a Legend once per turn.)\n(Units with power 0 don't steal Gigs.)",
+    "rulesText": "PLAY You may Call a Legend for free. (You can only Call a Legend once per turn.)\n(Units with power 0 don't steal Gigs.)"
   },
   {
     "id": "CP-134",
@@ -3481,7 +3747,9 @@
     "keywords": "",
     "aspect": "Blue",
     "traits": "Maelstrom, Mox",
-    "sourceSet": "Welcome to Night City"
+    "sourceSet": "Welcome to Night City",
+    "ability": "Bottom-deck a ready friendly Unit. If you do, bottom-deck a spent rival Unit.",
+    "rulesText": "Bottom-deck a ready friendly Unit. If you do, bottom-deck a spent rival Unit."
   },
   {
     "id": "CP-135",
@@ -3507,7 +3775,9 @@
     "keywords": "Go Solo",
     "aspect": "Blue",
     "traits": "Corpo, Merc",
-    "sourceSet": "The Heist Starter"
+    "sourceSet": "The Heist Starter",
+    "ability": "GO SOLO (Pay this Legend's cost to play it as a ready Unit. It can attack this turn. When it leaves the field, remove it from the game.)",
+    "rulesText": "GO SOLO (Pay this Legend's cost to play it as a ready Unit. It can attack this turn. When it leaves the field, remove it from the game.)"
   },
   {
     "id": "CP-136",
@@ -3533,7 +3803,9 @@
     "keywords": "",
     "aspect": "Red",
     "traits": "Merc, Nomad",
-    "sourceSet": "Welcome to Night City"
+    "sourceSet": "Welcome to Night City",
+    "ability": "When this Unit steals a Gig, increase it by up to 5.\nAt the end of your turn, if you control 2 or more Gigs with 8+ value, draw 1.",
+    "rulesText": "When this Unit steals a Gig, increase it by up to 5.\nAt the end of your turn, if you control 2 or more Gigs with 8+ value, draw 1."
   },
   {
     "id": "CP-137",
@@ -3556,10 +3828,12 @@
     "power": "6 FUERZA",
     "powerVal": "6",
     "ram": "x2",
-    "keywords": "Call, Go Solo",
+    "keywords": "Go Solo, Call",
     "aspect": "Red",
     "traits": "Merc",
-    "sourceSet": "Welcome to Night City"
+    "sourceSet": "Welcome to Night City",
+    "ability": "CALL Trash 3. Then, add 1 BRAINDANCE Program from your trash to your hand.\nGO SOLO (Pay this Legend's cost to play it as a ready Unit. It can attack this turn. If it leaves the field, remove it from the game.)",
+    "rulesText": "CALL Trash 3. Then, add 1 BRAINDANCE Program from your trash to your hand.\nGO SOLO (Pay this Legend's cost to play it as a ready Unit. It can attack this turn. If it leaves the field, remove it from the game.)"
   },
   {
     "id": "CP-138",
@@ -3582,10 +3856,12 @@
     "power": "4 FUERZA",
     "powerVal": "4",
     "ram": "x2",
-    "keywords": "",
+    "keywords": "Blocker",
     "aspect": "Red",
     "traits": "Ganger, Valentino",
-    "sourceSet": "Welcome to Night City"
+    "sourceSet": "Welcome to Night City",
+    "ability": "If you have more ☆ (Street Cred) than a Rival, this Unit can attack ready Units with BLOCKER.",
+    "rulesText": "If you have more ☆ (Street Cred) than a Rival, this Unit can attack ready Units with BLOCKER."
   },
   {
     "id": "CP-139",
@@ -3608,10 +3884,12 @@
     "power": "3 FUERZA",
     "powerVal": "3",
     "ram": "x2",
-    "keywords": "Play",
+    "keywords": "Adrenaline, Play",
     "aspect": "Green",
     "traits": "Valentino, Vehicle",
-    "sourceSet": "Welcome to Night City"
+    "sourceSet": "Welcome to Night City",
+    "ability": "PLAY Give another friendly Unit with cost 5 or less ADRENALINE this turn. (A Unit with Adrenaline can attack the turn it's played.)",
+    "rulesText": "PLAY Give another friendly Unit with cost 5 or less ADRENALINE this turn. (A Unit with Adrenaline can attack the turn it's played.)"
   },
   {
     "id": "CP-140",
@@ -3637,7 +3915,9 @@
     "keywords": "",
     "aspect": "Yellow",
     "traits": "Ripperdoc",
-    "sourceSet": "Welcome to Night City"
+    "sourceSet": "Welcome to Night City",
+    "ability": "Play your first CYBERWARE Gear each turn for -3 €$, to a minimum of 1 €$.",
+    "rulesText": "Play your first CYBERWARE Gear each turn for -3 €$, to a minimum of 1 €$."
   },
   {
     "id": "CP-141",
@@ -3663,7 +3943,9 @@
     "keywords": "Call",
     "aspect": "Yellow",
     "traits": "Ripperdoc",
-    "sourceSet": "The Heist Starter"
+    "sourceSet": "The Heist Starter",
+    "ability": "CALL Search the top 5 cards of your deck. Reveal up to 2 Gears with cost 2 or less and add them to your hand. Bottom-deck the rest in a random order.",
+    "rulesText": "CALL Search the top 5 cards of your deck. Reveal up to 2 Gears with cost 2 or less and add them to your hand. Bottom-deck the rest in a random order."
   },
   {
     "id": "CP-142",
@@ -3689,7 +3971,9 @@
     "keywords": "Play",
     "aspect": "Yellow",
     "traits": "Ripperdoc",
-    "sourceSet": "Welcome to Night City"
+    "sourceSet": "Welcome to Night City",
+    "ability": "PLAY Play a CYBERWARE Gear with cost 2 or less from your trash for free. Equip it only to another friendly Unit.",
+    "rulesText": "PLAY Play a CYBERWARE Gear with cost 2 or less from your trash for free. Equip it only to another friendly Unit."
   },
   {
     "id": "CP-143",
@@ -3715,7 +3999,9 @@
     "keywords": "Call",
     "aspect": "Blue",
     "traits": "Fixer, Tyger Claws",
-    "sourceSet": "Welcome to Night City"
+    "sourceSet": "Welcome to Night City",
+    "ability": "CALL Choose one effect.\nGive a rival Unit -2 power this turn. // Draw 1.\n↷: Decrease a Gig by up to 2.",
+    "rulesText": "CALL Choose one effect.\nGive a rival Unit -2 power this turn. // Draw 1.\n↷: Decrease a Gig by up to 2."
   },
   {
     "id": "CP-144",
@@ -3741,7 +4027,9 @@
     "keywords": "",
     "aspect": "Green",
     "traits": "Aldecado, Nomad",
-    "sourceSet": "Welcome to Night City"
+    "sourceSet": "Welcome to Night City",
+    "ability": "If a Rival controls at least 2 more Gigs than you, play this Program for 3 €$.\nPlay up to 2 Units with cost 3 or less from your trash for free.",
+    "rulesText": "If a Rival controls at least 2 more Gigs than you, play this Program for 3 €$.\nPlay up to 2 Units with cost 3 or less from your trash for free."
   },
   {
     "id": "CP-145",
@@ -3767,7 +4055,9 @@
     "keywords": "Play",
     "aspect": "Blue",
     "traits": "Netrunner",
-    "sourceSet": "Welcome to Night City"
+    "sourceSet": "Welcome to Night City",
+    "ability": "PLAY Until your next turn, rival Legends can't steal friendly Gigs with value less than their power.",
+    "rulesText": "PLAY Until your next turn, rival Legends can't steal friendly Gigs with value less than their power."
   },
   {
     "id": "CP-146",
@@ -3793,7 +4083,9 @@
     "keywords": "",
     "aspect": "Green",
     "traits": "Ganger",
-    "sourceSet": "Welcome to Night City"
+    "sourceSet": "Welcome to Night City",
+    "ability": "Defeat a spent Unit.",
+    "rulesText": "Defeat a spent Unit."
   },
   {
     "id": "CP-147",
@@ -3819,7 +4111,9 @@
     "keywords": "",
     "aspect": "Green",
     "traits": "Ganger, Nomad, Raffen Shiv",
-    "sourceSet": "Welcome to Night City"
+    "sourceSet": "Welcome to Night City",
+    "ability": "When this Unit steals a Gig, ready another friendly Unit with power equal to the Gig's value.",
+    "rulesText": "When this Unit steals a Gig, ready another friendly Unit with power equal to the Gig's value."
   },
   {
     "id": "CP-148",
@@ -3845,7 +4139,9 @@
     "keywords": "",
     "aspect": "Red",
     "traits": "Arasaka, Corpo",
-    "sourceSet": "Embracing Power Starter"
+    "sourceSet": "Embracing Power Starter",
+    "ability": "The first time a friendly ARASAKA Unit attacks each turn, draw 1. Then, if you have less than 20 ☆ (Street Cred), discard 1.",
+    "rulesText": "The first time a friendly ARASAKA Unit attacks each turn, draw 1. Then, if you have less than 20 ☆ (Street Cred), discard 1."
   },
   {
     "id": "CP-149",
@@ -3871,7 +4167,9 @@
     "keywords": "Play",
     "aspect": "Red",
     "traits": "Arasaka, Corpo",
-    "sourceSet": "Welcome to Night City"
+    "sourceSet": "Welcome to Night City",
+    "ability": "PLAY You may play a Unit with cost 4 or less from your hand or trash for free. It can attack rival Units this turn.\nThe first time an ARASAKA Unit is defeated each turn, draw 1.",
+    "rulesText": "PLAY You may play a Unit with cost 4 or less from your hand or trash for free. It can attack rival Units this turn.\nThe first time an ARASAKA Unit is defeated each turn, draw 1."
   },
   {
     "id": "CP-150",
@@ -3897,7 +4195,9 @@
     "keywords": "",
     "aspect": "Green",
     "traits": "Cyberware, Zetatech",
-    "sourceSet": "Welcome to Night City"
+    "sourceSet": "Welcome to Night City",
+    "ability": "Play this Gear for -1 €$ for each friendly face-up Legend, to a minimum of 1 €$.",
+    "rulesText": "Play this Gear for -1 €$ for each friendly face-up Legend, to a minimum of 1 €$."
   },
   {
     "id": "CP-151",
@@ -3923,6 +4223,8 @@
     "keywords": "",
     "aspect": "Yellow",
     "traits": "Cyberware, Zetatech",
-    "sourceSet": "Welcome to Night City"
+    "sourceSet": "Welcome to Night City",
+    "ability": "(Equip to a friendly Unit or face-up Legend.)\nWhen this Unit or Legend is spent, adjust a Gig by up to 1. Then, if you control 3 or more Gigs with different values, draw 1.",
+    "rulesText": "(Equip to a friendly Unit or face-up Legend.)\nWhen this Unit or Legend is spent, adjust a Gig by up to 1. Then, if you control 3 or more Gigs with different values, draw 1."
   }
 ]
