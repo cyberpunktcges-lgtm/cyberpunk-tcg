@@ -4,6 +4,13 @@
  * Basado en Figure 4 y Comprehensive Rules (WeirdCo / CD Projekt Red)
  */
 
+import {
+  executeProgramEffect,
+  executeUnitAttackTrigger,
+  executeCombatWinTrigger,
+  executeCombatLossTrigger
+} from './cardEffects.js';
+
 // Dados poliédricos de Gigs y sus valores máximos
 export const DICE_CONFIG = {
   d4: { name: 'D4', max: 4, sides: 4 },
@@ -489,6 +496,9 @@ export function playProgramCard(state, playerKey, cardInstanceId) {
     `💾 ${p.name} usa ${cost} €$ girados, lanza el Programa "${card.name}" y va al Descarte (Trash).`
   );
 
+  // Ejecuta la habilidad específica del Programa (ej: robar cartas, vender top del mazo, etc.)
+  executeProgramEffect(state, playerKey, card);
+
   return { success: true, type: 'PROGRAM', card };
 }
 
@@ -720,6 +730,9 @@ export function attackRivalGigs(
   // Girar la unidad atacante
   unit.isSpent = true;
 
+  // Disparar habilidades de ataque (ej: Sketchy Ripper)
+  executeUnitAttackTrigger(state, attackerPlayerKey, unit);
+
   // Intercepción por BLOCKER:
   if (blockerUnitId) {
     const blocker = defender.field.find((u) => u.instanceId === blockerUnitId);
@@ -820,6 +833,9 @@ export function resolveFight(state, attPlayerKey, attUnit, defPlayerKey, defUnit
           defeated.gear?.length ? ` junto con ${defeated.gear.length} Gear(s)` : ''
         }.`
       );
+      // Disparar habilidades de victoria y derrota (Johnny Silverhand, Satori, Safety Override)
+      executeCombatWinTrigger(state, attPlayerKey, attUnit, defeated);
+      executeCombatLossTrigger(state, defPlayerKey, defeated, attUnit);
     }
   } else if (defPower > attPower) {
     // Defensor gana (contraataque)
@@ -836,6 +852,9 @@ export function resolveFight(state, attPlayerKey, attUnit, defPlayerKey, defUnit
             defeated.gear?.length ? ` junto con ${defeated.gear.length} Gear(s)` : ''
           }.`
         );
+        // Disparar habilidades de victoria y derrota (Johnny Silverhand, Satori, Safety Override)
+        executeCombatWinTrigger(state, defPlayerKey, defUnit, defeated);
+        executeCombatLossTrigger(state, attPlayerKey, defeated, defUnit);
       }
     }
   } else {

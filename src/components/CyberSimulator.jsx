@@ -63,6 +63,7 @@ import {
   executeBotReaction,
   resolvePendingAttackAndContinueBot
 } from '../utils/botAi.js';
+import { getCardRulesText } from '../utils/cardEffects.js';
 
 // =========================================================================
 // CLIP-PATHS GEOMÉTRICOS CYBERPUNK (ESQUINAS RECORTADAS EN DIAGONAL)
@@ -1417,6 +1418,23 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                     )}
                   </div>
                 )}
+
+                {/* Texto de reglas oficial de la carta (Motor de Habilidades) */}
+                {(() => {
+                  const rules = getCardRulesText(displayCard);
+                  if (!rules) return null;
+                  return (
+                    <div className="w-full bg-[#030712] border border-[#0dfceb]/35 rounded p-1.5 text-[9px] font-mono space-y-1 text-gray-200 leading-snug shadow-sm">
+                      <div className="flex items-center gap-1 text-[8px] font-bold text-[#0dfceb] uppercase tracking-wider border-b border-[#0dfceb]/20 pb-0.5">
+                        <Sparkles className="w-2.5 h-2.5 text-[#FCEE0A]" />
+                        <span>REGLAS / HABILIDAD:</span>
+                      </div>
+                      <div className="whitespace-pre-line text-gray-300">
+                        {rules}
+                      </div>
+                    </div>
+                  );
+                })()}
 
                 {/* Si la carta mostrada es una Leyenda del jugador boca abajo, ofrecer botón directo de Call */}
                 {p.legends.some((l) => l.instanceId === displayCard.instanceId) && !displayCard.isFaceUp && (
