@@ -420,6 +420,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
   const [isInspectedFlipped, setIsInspectedFlipped] = useState(false);
   const [showLogModal, setShowLogModal] = useState(false);
   const [showRulesModal, setShowRulesModal] = useState(false);
+  const [showTurnGuideModal, setShowTurnGuideModal] = useState(false);
 
   // Estados para Drag & Drop y Animación de Dados
   const [isDragOverField, setIsDragOverField] = useState(false);
@@ -1995,49 +1996,149 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
           </div>
 
           {/* ===============================================================
-              2. BARRA DIVISORIA LUMINOSA CENTRAL CON INDICADORES DE FASE
+              2. SELECTOR E INDICADOR DE FASES EN TIEMPO REAL (HOW A TURN WORKS)
              =============================================================== */}
-          <div className="my-1 relative flex items-center justify-center shrink-0">
+          <div className="my-1 relative flex items-center justify-center shrink-0 w-full px-2">
             {/* Línea láser de neón con resplandor */}
             <div className="absolute inset-x-0 h-[2px] bg-gradient-to-r from-transparent via-[#FCEE0A] to-transparent shadow-[0_0_20px_#FCEE0A]" />
 
             {/* Contenedor flotante central con indicadores de fase */}
             <div
-              style={{ clipPath: CYBER_BUTTON }}
-              className="relative z-10 flex items-center gap-3 bg-[#070a10] border-2 border-[#FCEE0A] px-4 py-1.5 font-mono text-xs font-black uppercase shadow-[0_0_25px_rgba(252,238,10,0.5)]"
+              style={{ clipPath: CYBER_CLIP }}
+              className="relative z-10 flex flex-wrap items-center justify-between gap-2.5 bg-[#070a10]/95 border-2 border-[#FCEE0A] px-3 sm:px-4 py-1.5 font-mono text-xs shadow-[0_0_25px_rgba(252,238,10,0.5)] max-w-5xl w-full"
             >
-              <span className="text-[#0dfceb]">TURNO {gameState.turnNumber}</span>
-              <span className="text-gray-600">•</span>
-              <span className={isMyTurn ? 'text-[#FCEE0A]' : 'text-[#FF003C]'}>
-                {gameState.pendingGigRoll
-                  ? 'FASE DE INICIO // ELIGE DADO'
-                  : isMyTurn
-                  ? 'TU TURNO // FASE PRINCIPAL'
-                  : 'IA PENSANDO ACCIONES...'}
-              </span>
+              {/* Turno e Indicador Oficial */}
+              <div className="flex items-center gap-2">
+                <span className="text-[#0dfceb] font-black tracking-wider text-xs sm:text-sm">
+                  TURNO {gameState.turnNumber}
+                </span>
 
-              {/* Botón oficial para Asaltar Gigs rivales según tabla de poder */}
-              {selectedFieldUnit && !selectedFieldUnit.isSpent && !selectedFieldUnit.isLagging && (() => {
-                const gigsToSteal = calculateGigsToSteal(selectedFieldUnit.currentPower);
-                const hasGigs = bot.gigs.length > 0;
+                {/* Botón Guía de Fases oficial */}
+                <button
+                  type="button"
+                  onClick={() => setShowTurnGuideModal(true)}
+                  style={{ clipPath: CYBER_BUTTON }}
+                  className="px-2 py-0.5 bg-[#0dfceb]/10 hover:bg-[#0dfceb] text-[#0dfceb] hover:text-black border border-[#0dfceb]/50 text-[10px] font-black uppercase transition-all flex items-center gap-1 cursor-pointer"
+                  title="Ver infografía oficial de cómo funciona un turno (Rules 8.1–8.18)"
+                >
+                  <HelpCircle className="w-3 h-3" />
+                  <span className="hidden sm:inline">CÓMO FUNCIONA UN TURNO</span>
+                </button>
+              </div>
 
-                return (
+              {/* Stepper Oficial de Fases: 1. START PHASE -> 2. MAIN PHASE -> 3. END */}
+              <div className="flex items-center gap-1 sm:gap-2 text-[10px] font-bold">
+                {/* 1. START PHASE */}
+                <div
+                  className={`px-2 py-0.5 rounded flex items-center gap-1 transition-all ${
+                    gameState.pendingGigRoll || gameState.phase === 'START_GIG_SELECT'
+                      ? 'bg-[#FCEE0A] text-black font-black animate-pulse shadow-[0_0_10px_#FCEE0A]'
+                      : 'bg-black border border-[#0dfceb]/30 text-gray-400'
+                  }`}
+                  title="Paso 1 a 5 de Fase de Inicio: 1. Win check (7+ Gigs) -> 2. Triggers -> 3. Ready cartas -> 4. Robar -> 5. Rodar dado del Fixer"
+                >
+                  <span>{gameState.pendingGigRoll ? '⏳ 1. INICIO (RODAR DADO)' : '✓ 1. INICIO'}</span>
+                </div>
+
+                <span className="text-gray-600">➔</span>
+
+                {/* 2. MAIN PHASE */}
+                <div
+                  className={`px-2 py-0.5 rounded flex items-center gap-1 transition-all ${
+                    isMyTurn && !gameState.pendingGigRoll
+                      ? 'bg-[#0dfceb] text-black font-black shadow-[0_0_15px_#0dfceb]'
+                      : 'bg-black border border-gray-800 text-gray-500'
+                  }`}
+                >
+                  <Zap className="w-3 h-3" />
+                  <span>2. FASE PRINCIPAL</span>
+                </div>
+
+                {/* Chips tácticos de acciones en tiempo real (según la infografía oficial) */}
+                {isMyTurn && !gameState.pendingGigRoll && (
+                  <div className="hidden xl:flex items-center gap-1 text-[9px]">
+                    {/* Sell for Turn */}
+                    <span
+                      className={`px-1.5 py-0.5 rounded border ${
+                        p.hasSoldThisTurn
+                          ? 'border-gray-800 bg-black/60 text-gray-500'
+                          : 'border-[#FCEE0A]/60 bg-[#FCEE0A]/10 text-[#FCEE0A]'
+                      }`}
+                      title={p.hasSoldThisTurn ? 'Ya has vendido una carta este turno' : 'Venta de carta a Eddies disponible (1 vez por turno)'}
+                    >
+                      💰 VENTA: {p.hasSoldThisTurn ? '✓ USADO' : '1/1'}
+                    </span>
+
+                    {/* Call a Legend */}
+                    <span
+                      className={`px-1.5 py-0.5 rounded border ${
+                        p.hasCalledLegendThisTurn
+                          ? 'border-gray-800 bg-black/60 text-gray-500'
+                          : 'border-[#0dfceb]/60 bg-[#0dfceb]/10 text-[#0dfceb]'
+                      }`}
+                      title={p.hasCalledLegendThisTurn ? 'Ya has llamado a una leyenda este turno' : 'Llamar a una leyenda disponible (1 €$, 1 vez por turno)'}
+                    >
+                      👑 CALL: {p.hasCalledLegendThisTurn ? '✓ USADO' : '1 €$'}
+                    </span>
+
+                    {/* Attack tracker */}
+                    <span
+                      className={`px-1.5 py-0.5 rounded border ${
+                        selectedFieldUnit
+                          ? 'border-[#FF003C] bg-[#FF003C]/20 text-[#FF003C] animate-pulse font-black'
+                          : 'border-gray-800 bg-black/60 text-gray-400'
+                      }`}
+                    >
+                      ⚔️ {selectedFieldUnit ? `ATACANDO: ${selectedFieldUnit.name}` : 'ATAQUE (1 A LA VEZ)'}
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              {/* Botón de Asaltar Gigs o Acciones Rápidas */}
+              <div className="flex items-center gap-2">
+                {selectedFieldUnit && !selectedFieldUnit.isSpent && !selectedFieldUnit.isLagging && (() => {
+                  const gigsToSteal = calculateGigsToSteal(selectedFieldUnit.currentPower);
+                  const hasGigs = bot.gigs.length > 0;
+
+                  return (
+                    <button
+                      type="button"
+                      disabled={!hasGigs || gigsToSteal <= 0}
+                      onClick={() => handlePlayerAttack('GIGS')}
+                      style={{ clipPath: CYBER_BUTTON }}
+                      className="px-3 py-1 bg-[#FF003C] hover:bg-[#FCEE0A] hover:text-[#070a10] text-white font-black text-xs uppercase animate-pulse cursor-pointer shadow-[0_0_20px_rgba(255,0,60,0.85)] transition-colors disabled:opacity-40"
+                      title={
+                        !hasGigs
+                          ? 'El rival no tiene Gigs para robar'
+                          : `Robarás ${gigsToSteal} Gig(s) según tu poder de ${selectedFieldUnit.currentPower}`
+                      }
+                    >
+                      ⚡ ¡ASALTAR GIGS ({gigsToSteal} {gigsToSteal === 1 ? 'GIG' : 'GIGS'})!
+                    </button>
+                  );
+                })()}
+
+                {/* Si no hay unidad seleccionada, acceso directo a terminar turno */}
+                {isMyTurn && !selectedFieldUnit && !gameState.pendingGigRoll && (
                   <button
                     type="button"
-                    disabled={!hasGigs || gigsToSteal <= 0}
-                    onClick={() => handlePlayerAttack('GIGS')}
+                    onClick={() => {
+                      setSelectedHandCard(null);
+                      setSelectedFieldUnit(null);
+                      setHistory([]);
+                      passTurn(gameState);
+                      setGameState({ ...gameState });
+                    }}
                     style={{ clipPath: CYBER_BUTTON }}
-                    className="ml-2 px-3 py-1 bg-[#FF003C] hover:bg-[#FCEE0A] hover:text-[#070a10] text-white font-black text-xs uppercase animate-pulse cursor-pointer shadow-[0_0_20px_rgba(255,0,60,0.85)] transition-colors disabled:opacity-40"
-                    title={
-                      !hasGigs
-                        ? 'El rival no tiene Gigs para robar'
-                        : `Robarás ${gigsToSteal} Gig(s) según tu poder de ${selectedFieldUnit.currentPower}`
-                    }
+                    className="px-2.5 sm:px-3 py-1 bg-[#FCEE0A] hover:bg-[#0dfceb] text-black font-black text-[10px] sm:text-xs uppercase transition-all shadow-[0_0_10px_rgba(252,238,10,0.4)] cursor-pointer flex items-center gap-1"
+                    title="Terminar turno (Limpia Lag y efectos de turno)"
                   >
-                    ⚡ ¡ASALTAR GIGS ({gigsToSteal} {gigsToSteal === 1 ? 'GIG' : 'GIGS'})!
+                    <span>TERMINAR TURNO</span>
+                    <ChevronRight className="w-3.5 h-3.5" />
                   </button>
-                );
-              })()}
+                )}
+              </div>
             </div>
           </div>
 
@@ -3791,6 +3892,222 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
           </div>
         </div>
       )}
+
+      {/* 6.5. MODAL OFICIAL: CÓMO FUNCIONA UN TURNO (HOW A TURN WORKS - RULES 8.1–8.18) */}
+      <AnimatePresence>
+        {showTurnGuideModal && (
+          <div className="fixed inset-0 z-50 bg-[#000000]/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 font-mono select-none">
+            <motion.div
+              initial={{ scale: 0.92, opacity: 0, y: 15 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.92, opacity: 0, y: 15 }}
+              style={{ clipPath: CYBER_CLIP }}
+              className="max-w-4xl w-full bg-[#070a14] border-2 border-[#FCEE0A] p-4 sm:p-6 space-y-4 shadow-[0_0_60px_rgba(252,238,10,0.5)] relative text-white max-h-[92vh] overflow-y-auto"
+            >
+              {/* Cabecera */}
+              <div className="flex items-center justify-between border-b border-[#FCEE0A]/40 pb-3">
+                <div className="space-y-0.5">
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="w-5 h-5 text-[#FCEE0A]" />
+                    <h2 className="text-base sm:text-xl font-black uppercase tracking-wider text-white">
+                      HOW A TURN WORKS // CÓMO FUNCIONA UN TURNO
+                    </h2>
+                  </div>
+                  <p className="text-xs text-gray-400 font-sans">
+                    Start Phase steps happen in order. Main Phase actions are optional and in any order.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowTurnGuideModal(false)}
+                  className="w-8 h-8 rounded border border-gray-700 bg-black flex items-center justify-center text-gray-400 hover:text-white cursor-pointer transition-colors"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Contenido en 2 Columnas Enfrentadas */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* COLUMNA 1: 1. START PHASE */}
+                <div className="bg-[#05070e] border border-[#FCEE0A]/60 rounded-lg p-4 space-y-3 relative shadow-inner">
+                  <div className="flex items-center justify-between border-b border-[#FCEE0A]/30 pb-2">
+                    <div className="flex items-center gap-2">
+                      <span className="w-2.5 h-2.5 rounded-full bg-[#FCEE0A] animate-ping" />
+                      <span className="text-sm font-black text-[#FCEE0A] uppercase tracking-wider">
+                        1. START PHASE
+                      </span>
+                    </div>
+                    <span className="text-[10px] text-black font-black uppercase bg-[#FCEE0A] px-2 py-0.5 rounded">
+                      EN ORDEN (1 A 5)
+                    </span>
+                  </div>
+
+                  <ol className="space-y-2.5 text-xs text-gray-200">
+                    <li className="flex items-start gap-2.5 bg-black/40 p-2 rounded border border-gray-900">
+                      <span className="w-5 h-5 rounded-full bg-[#FCEE0A] text-black font-black text-[11px] flex items-center justify-center shrink-0 mt-0.5">
+                        1
+                      </span>
+                      <div>
+                        <strong className="text-white block font-bold">Check for a win (7+ Gig dice)</strong>
+                        <span className="text-[11px] text-gray-400 font-sans">
+                          Comprueba victoria automática si controlas 7 o más dados de Gig.
+                        </span>
+                      </div>
+                    </li>
+
+                    <li className="flex items-start gap-2.5 bg-black/40 p-2 rounded border border-gray-900">
+                      <span className="w-5 h-5 rounded-full bg-[#FCEE0A] text-black font-black text-[11px] flex items-center justify-center shrink-0 mt-0.5">
+                        2
+                      </span>
+                      <div>
+                        <strong className="text-white block font-bold">Resolve start-of-turn effects</strong>
+                        <span className="text-[11px] text-gray-400 font-sans">
+                          Dispara efectos automáticos de inicio (ej. Hanako Arasaka si tienes dados pares).
+                        </span>
+                      </div>
+                    </li>
+
+                    <li className="flex items-start gap-2.5 bg-black/40 p-2 rounded border border-gray-900">
+                      <span className="w-5 h-5 rounded-full bg-[#FCEE0A] text-black font-black text-[11px] flex items-center justify-center shrink-0 mt-0.5">
+                        3
+                      </span>
+                      <div>
+                        <strong className="text-white block font-bold">Ready all your spent cards</strong>
+                        <span className="text-[11px] text-gray-400 font-sans">
+                          Endereza todas tus cartas gastadas (Eddies, Leyendas y Unidades) y limpia Lag.
+                        </span>
+                      </div>
+                    </li>
+
+                    <li className="flex items-start gap-2.5 bg-black/40 p-2 rounded border border-gray-900">
+                      <span className="w-5 h-5 rounded-full bg-[#FCEE0A] text-black font-black text-[11px] flex items-center justify-center shrink-0 mt-0.5">
+                        4
+                      </span>
+                      <div>
+                        <strong className="text-white block font-bold">Draw 1 card</strong>
+                        <span className="text-[11px] text-gray-400 font-sans">
+                          Roba 1 carta de tu mazo (pierdes la partida si tu mazo se queda sin cartas).
+                        </span>
+                      </div>
+                    </li>
+
+                    <li className="flex items-start gap-2.5 bg-black/40 p-2 rounded border border-gray-900">
+                      <span className="w-5 h-5 rounded-full bg-[#FCEE0A] text-black font-black text-[11px] flex items-center justify-center shrink-0 mt-0.5">
+                        5
+                      </span>
+                      <div>
+                        <strong className="text-white block font-bold">Roll in a Gig die from the fixer</strong>
+                        <span className="text-[11px] text-gray-400 font-sans">
+                          Elige y rueda un dado (D4, D6, D8, D10, D12). <em className="text-[#FCEE0A]">El D20 solo se puede rodar una vez que los otros 5 dados ya están en juego.</em>
+                        </span>
+                      </div>
+                    </li>
+                  </ol>
+                </div>
+
+                {/* COLUMNA 2: 2. MAIN PHASE */}
+                <div className="bg-[#05070e] border border-[#0dfceb]/60 rounded-lg p-4 space-y-3 relative shadow-inner">
+                  <div className="flex items-center justify-between border-b border-[#0dfceb]/30 pb-2">
+                    <div className="flex items-center gap-2">
+                      <Zap className="w-4 h-4 text-[#0dfceb]" />
+                      <span className="text-sm font-black text-[#0dfceb] uppercase tracking-wider">
+                        2. MAIN PHASE
+                      </span>
+                    </div>
+                    <span className="text-[10px] text-black font-black uppercase bg-[#0dfceb] px-2 py-0.5 rounded">
+                      OPCIONAL / EN CUALQUIER ORDEN
+                    </span>
+                  </div>
+
+                  <div className="space-y-2 text-xs">
+                    <div className="flex items-center justify-between bg-black/50 p-2 rounded border border-gray-800">
+                      <div>
+                        <strong className="text-[#FCEE0A] block uppercase font-black text-xs">SELL FOR TURN</strong>
+                        <span className="text-[11px] text-gray-300 font-sans">
+                          Vender 1 carta de la mano a la zona de Eddies (+1 €$).
+                        </span>
+                      </div>
+                      <span className="text-[10px] font-black uppercase text-[#FCEE0A] bg-[#FCEE0A]/10 border border-[#FCEE0A]/40 px-2 py-0.5 rounded">
+                        once (1 vez)
+                      </span>
+                    </div>
+
+                    <div className="flex items-center justify-between bg-black/50 p-2 rounded border border-gray-800">
+                      <div>
+                        <strong className="text-[#0dfceb] block uppercase font-black text-xs">CALL A LEGEND</strong>
+                        <span className="text-[11px] text-gray-300 font-sans">
+                          Gastar 1 €$ para voltear una Leyenda boca arriba.
+                        </span>
+                      </div>
+                      <span className="text-[10px] font-black uppercase text-[#0dfceb] bg-[#0dfceb]/10 border border-[#0dfceb]/40 px-2 py-0.5 rounded">
+                        once, 1 €$
+                      </span>
+                    </div>
+
+                    <div className="flex items-center justify-between bg-black/50 p-2 rounded border border-gray-800">
+                      <div>
+                        <strong className="text-white block uppercase font-black text-xs">PLAY CARDS</strong>
+                        <span className="text-[11px] text-gray-300 font-sans">
+                          Pagar Eddies para desplegar Unidades, Gears o Programas.
+                        </span>
+                      </div>
+                      <span className="text-[10px] font-black uppercase text-gray-300 bg-gray-900 border border-gray-700 px-2 py-0.5 rounded">
+                        any number
+                      </span>
+                    </div>
+
+                    <div className="flex items-center justify-between bg-black/50 p-2 rounded border border-gray-800">
+                      <div>
+                        <strong className="text-white block uppercase font-black text-xs">ACTIVATE EFFECTS</strong>
+                        <span className="text-[11px] text-gray-300 font-sans">
+                          Activar habilidades de cartas o Leyendas boca arriba (↷ Spend).
+                        </span>
+                      </div>
+                      <span className="text-[10px] font-black uppercase text-gray-300 bg-gray-900 border border-gray-700 px-2 py-0.5 rounded">
+                        any number
+                      </span>
+                    </div>
+
+                    <div className="flex items-center justify-between bg-black/50 p-2 rounded border border-gray-800">
+                      <div>
+                        <strong className="text-[#FF003C] block uppercase font-black text-xs">ATTACK</strong>
+                        <span className="text-[11px] text-gray-300 font-sans">
+                          Girar unidad lista sin Lag para atacar unidad rival gastada (Spent) o asaltar Gigs.
+                        </span>
+                      </div>
+                      <span className="text-[10px] font-black uppercase text-[#FF003C] bg-[#FF003C]/10 border border-[#FF003C]/40 px-2 py-0.5 rounded">
+                        one Unit at a time
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Pie con la Regla de Cierre Oficial */}
+              <div className="p-3 bg-black/80 border border-gray-800 rounded-lg text-center text-xs text-gray-300 font-sans leading-relaxed">
+                <span className="text-white font-bold block mb-1">
+                  Then pass. At the end of the turn, "this turn" effects end and every Unit loses Lag. Your Rival's turn begins.
+                </span>
+                <span className="text-[10px] text-[#0dfceb] font-mono">
+                  Rules 8.1–8.18: WeirdCo Comprehensive Rules · PlayDreamz
+                </span>
+              </div>
+
+              {/* Botón de Cierre */}
+              <div className="flex justify-end pt-2 border-t border-gray-800">
+                <button
+                  type="button"
+                  onClick={() => setShowTurnGuideModal(false)}
+                  style={{ clipPath: CYBER_BUTTON }}
+                  className="px-6 py-2.5 bg-[#FCEE0A] hover:bg-[#0dfceb] text-black font-black text-xs uppercase cursor-pointer transition-all shadow-[0_0_20px_rgba(252,238,10,0.5)]"
+                >
+                  ENTENDIDO // CONTINUAR PARTIDA
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       {/* 7. POP-OUT FLOTANTE: CARTA A TAMAÑO COMPLETO AL HACER HOVER EN EL ESCÁNER KIROSHI */}
       <AnimatePresence>
