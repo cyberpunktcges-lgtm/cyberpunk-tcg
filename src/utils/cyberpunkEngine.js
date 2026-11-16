@@ -711,7 +711,9 @@ export function attackRivalGigs(
 
   const unit = attacker.field.find((u) => u.instanceId === attackerUnitId);
   if (!unit) return { success: false, reason: 'Unidad atacante no encontrada.' };
-  if (unit.isSpent) return { success: false, reason: 'La unidad ya está girada (Spent).' };
+  if (unit.isSpent && (!state.pendingReaction || state.pendingReaction.attackerUnitId !== attackerUnitId)) {
+    return { success: false, reason: 'La unidad ya está girada (Spent).' };
+  }
   if (unit.isLagging) return { success: false, reason: 'La unidad tiene Lag (no puede atacar este turno).' };
   if (defender.gigs.length === 0) return { success: false, reason: 'El rival no tiene Gigs para robar.' };
 
@@ -721,7 +723,7 @@ export function attackRivalGigs(
   // Intercepción por BLOCKER:
   if (blockerUnitId) {
     const blocker = defender.field.find((u) => u.instanceId === blockerUnitId);
-    if (blocker && !blocker.isSpent && hasKeyword(blocker, 'Blocker')) {
+    if (blocker && hasKeyword(blocker, 'Blocker')) {
       blocker.isSpent = true;
       state.actionLog.unshift(
         `🛡️ ¡BLOCKER! ${defender.name} gira a "${blocker.name}" para interceptar el asalto a sus Gigs. ¡No se roba ningún Gig!`
@@ -793,7 +795,7 @@ export function attackRivalGigs(
  * - EMPATE: "Both Units lose the fight and both are defeated. Defeated Units go to the trash."
  * - "A Unit with 0 power can't defeat anything."
  */
-function resolveFight(state, attPlayerKey, attUnit, defPlayerKey, defUnit) {
+export function resolveFight(state, attPlayerKey, attUnit, defPlayerKey, defUnit) {
   const attacker = state[attPlayerKey];
   const defender = state[defPlayerKey];
 
@@ -880,7 +882,9 @@ export function fightRivalUnit(state, attackerPlayerKey, attackerUnitId, targetU
   const defUnit = defender.field.find((u) => u.instanceId === targetUnitId);
 
   if (!attUnit || !defUnit) return { success: false, reason: 'Unidades no encontradas.' };
-  if (attUnit.isSpent) return { success: false, reason: 'Tu unidad está girada.' };
+  if (attUnit.isSpent && (!state.pendingReaction || state.pendingReaction.attackerUnitId !== attackerUnitId)) {
+    return { success: false, reason: 'Tu unidad está girada.' };
+  }
   if (attUnit.isLagging) return { success: false, reason: 'Tu unidad tiene Lag.' };
   if (!defUnit.isSpent && !blockerUnitId) {
     return { success: false, reason: 'Solo puedes atacar a unidades rivales giradas (Spent).' };
@@ -891,7 +895,7 @@ export function fightRivalUnit(state, attackerPlayerKey, attackerUnitId, targetU
   // Intercepción por Blocker
   if (blockerUnitId) {
     const blocker = defender.field.find((u) => u.instanceId === blockerUnitId);
-    if (blocker && !blocker.isSpent && hasKeyword(blocker, 'Blocker')) {
+    if (blocker && hasKeyword(blocker, 'Blocker')) {
       blocker.isSpent = true;
       state.actionLog.unshift(
         `🛡️ ¡BLOCKER! "${blocker.name}" se interpone para proteger a "${defUnit.name}".`

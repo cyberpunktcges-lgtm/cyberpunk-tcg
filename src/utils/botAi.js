@@ -13,6 +13,7 @@ import {
   callLegendFaceUp,
   attackRivalGigs,
   fightRivalUnit,
+  resolveFight,
   passTurn,
   hasKeyword,
   calculateGigsToSteal,
@@ -23,7 +24,7 @@ import {
  * Decide si el bot desea interceptar un ataque del jugador usando una de sus unidades con Blocker.
  */
 export function decideBotBlocker(botState, attackerPower, isGigAttack = false) {
-  const readyBlockers = botState.field.filter(
+  const readyBlockers = (botState.field || []).filter(
     (u) => !u.isSpent && !u.isLagging && hasKeyword(u, 'Blocker')
   );
 
@@ -31,16 +32,75 @@ export function decideBotBlocker(botState, attackerPower, isGigAttack = false) {
 
   // Si es un ataque a los Gigs del bot, bloquear es prioritario si el atacante va a robar Gigs valiosos
   if (isGigAttack) {
-    // Escoger el mejor blocker (el que pueda empatar o sobrevivir, o el más prescindible para salvar el Gig)
+    // Escoger el mejor blocker (el que pueda empatar o sobrevivir, o el más débil si salva el Gig)
     const winningBlocker = readyBlockers.find((b) => (b.currentPower || 0) >= attackerPower);
     if (winningBlocker) return winningBlocker;
-    // Si no tiene ganador, pero el atacante roba 2 o más Gigs, sacrificar el blocker más débil para anular el robo
-    if (calculateGigsToSteal(attackerPower) >= 1 && botState.gigs.length <= 3) {
-      return readyBlockers.sort((a, b) => (a.currentPower || 0) - (b.currentPower || 0))[0];
+    // Si no tiene ganador pero el atacante roba Gigs, bloquear con el más débil si le quedan pocos gigs
+    if (calculateGigsToSteal(attackerPower) >= 1 && botState.gigs.length <= 4) {
+      return [...readyBlockers].sort((a, b) => (a.currentPower || 0) - (b.currentPower || 0))[0];
     }
+  } else {
+    // Si ataca una unidad enemiga, bloquear si el blocker gana al atacante
+    const winningBlocker = readyBlockers.find((b) => (b.currentPower || 0) > attackerPower);
+    if (winningBlocker) return winningBlocker;
   }
 
   return null;
+}
+
+/**
+ * Evalúa y ejecuta la Fase de Respuesta (React Phase) del Bot cuando el Jugador declara un ataque:
+ * REGLAS OFICIALES:
+ * 1. Puede bloquear con una unidad (Blocker)
+ * 2. Puede llamar a una leyenda (si no ha llamado este turno y tiene 1 €$)
+ * 3. Puede jugar cartas o efectos con Quick
+ */
+export function executeBotReaction(gameState, attackerUnit, targetType, targetUnitId = null) {
+  const bot = gameState.bot;
+  let chosenBlocker = null;
+
+  // 1. Evaluar si el Bot llama a una Leyenda durante su reacción
+  if (!bot.hasCalledLegendThisTurn) {
+    const uncalledLeg = (bot.legends || []).find((l) => !l.isFaceUp && !l.isSpent);
+    const capacity = getBotMaxCapacity(bot);
+    if (uncalledLeg && capacity >= 1) {
+      botPrepareEddies(bot, 1);
+      callLegendFaceUp(gameState, 'bot', uncalledLeg.instanceId);
+      gameState.actionLog.unshift(
+        `🛡️ [Fase de Respuesta] ¡El rival responde llamando a su Leyenda "${uncalledLeg.name}" boca arriba!`
+      );
+    }
+  }
+
+  // 2. Evaluar si el Bot juega un Programa con Quick
+  const quickCards = (bot.hand || []).filter(
+    (c) => hasKeyword(c, 'Quick') && (c.parsedCost || 0) <= getBotMaxCapacity(bot)
+  );
+  if (quickCards.length > 0) {
+    const qCard = quickCards[0];
+    botPrepareEddies(bot, qCard.parsedCost || 0);
+    playCard(gameState, 'bot', qCard.instanceId);
+    gameState.actionLog.unshift(
+      `⚡ [Fase de Respuesta] ¡QUICK! El rival responde jugando "${qCard.name}".`
+    );
+  }
+
+  // 3. Evaluar si el Bot intercepta con una unidad Blocker
+  const isGigAttack = targetType === 'GIGS';
+  chosenBlocker = decideBotBlocker(bot, attackerUnit.currentPower, isGigAttack);
+
+  if (chosenBlocker) {
+    chosenBlocker.isSpent = true;
+    gameState.actionLog.unshift(
+      `🛡️ [Fase de Respuesta] ¡BLOCKER! El rival gira a "${chosenBlocker.name}" [Fuerza: ${chosenBlocker.currentPower}] para interceptar el ataque.`
+    );
+  } else {
+    gameState.actionLog.unshift(
+      `🛡️ [Fase de Respuesta] El rival no activa ningún Blocker para interceptar.`
+    );
+  }
+
+  return chosenBlocker;
 }
 
 /**
@@ -145,61 +205,145 @@ export async function runBotTurn(gameState, updateCallback, delayMs = 700) {
   }
 
   // Paso 4: Fase de Ataques con Unidades Listas (Ready y sin Lag)
-  const readyUnits = bot.field.filter((u) => !u.isSpent && !u.isLagging);
+  const readyUnits = (bot.field || []).filter((u) => !u.isSpent && !u.isLagging);
 
   for (const unit of readyUnits) {
     if (gameState.isGameOver) break;
-    await wait(delayMs);
 
     // Prioridad A: Destruir unidades enemigas giradas (Spent) donde el bot gana o empata favorablemente
-    const killableSpentEnemy = player.field.find(
+    const killableSpentEnemy = (player.field || []).find(
       (pu) => pu.isSpent && (pu.currentPower || 0) < (unit.currentPower || 0)
     );
 
     if (killableSpentEnemy) {
-      fightRivalUnit(gameState, 'bot', unit.instanceId, killableSpentEnemy.instanceId);
+      unit.isSpent = true;
+      gameState.pendingReaction = {
+        attackerPlayerKey: 'bot',
+        attackerUnitId: unit.instanceId,
+        attackerName: unit.name,
+        attackerPower: unit.currentPower,
+        attackerImage: unit.image,
+        targetType: 'UNIT',
+        targetUnitId: killableSpentEnemy.instanceId,
+        targetName: killableSpentEnemy.name,
+        targetPower: killableSpentEnemy.currentPower,
+        targetImage: killableSpentEnemy.image,
+        blockerUnitId: null
+      };
+      gameState.actionLog.unshift(
+        `⚔️ ¡ATAQUE DECLARADO! "${unit.name}" [Fuerza: ${unit.currentPower}] del rival ataca a "${killableSpentEnemy.name}". Se activa la Fase de Respuesta del jugador.`
+      );
       updateCallback({ ...gameState });
-      continue;
+      return; // Cede el control y espera la respuesta del jugador humano en la UI
     }
 
     // Prioridad B: Atacar los Gigs del jugador para robar dados de Gig según la tabla de poder
-    if (player.gigs.length > 0) {
-      // Comprobar si el jugador tiene Blocker listo
-      const playerBlocker = player.field.find(
-        (u) => !u.isSpent && !u.isLagging && hasKeyword(u, 'Blocker')
+    if (player.gigs && player.gigs.length > 0) {
+      unit.isSpent = true;
+      gameState.pendingReaction = {
+        attackerPlayerKey: 'bot',
+        attackerUnitId: unit.instanceId,
+        attackerName: unit.name,
+        attackerPower: unit.currentPower,
+        attackerImage: unit.image,
+        targetType: 'GIGS',
+        targetUnitId: null,
+        targetName: 'Tus Gigs',
+        targetPower: null,
+        targetImage: null,
+        blockerUnitId: null
+      };
+      gameState.actionLog.unshift(
+        `⚔️ ¡ATAQUE DECLARADO! "${unit.name}" [Fuerza: ${unit.currentPower}] del rival asalta tus Gigs. Se activa la Fase de Respuesta del jugador.`
       );
-
-      // Si el jugador tiene blocker con poder superior, evitar suicidarse a menos que el bot tenga ventaja
-      if (playerBlocker && (playerBlocker.currentPower || 0) > (unit.currentPower || 0)) {
-        // Atacar unidad enemiga o pasar
-        const tieSpentEnemy = player.field.find(
-          (pu) => pu.isSpent && (pu.currentPower || 0) === (unit.currentPower || 0)
-        );
-        if (tieSpentEnemy) {
-          fightRivalUnit(gameState, 'bot', unit.instanceId, tieSpentEnemy.instanceId);
-          updateCallback({ ...gameState });
-          continue;
-        }
-      }
-
-      attackRivalGigs(gameState, 'bot', unit.instanceId);
       updateCallback({ ...gameState });
-      continue;
+      return; // Cede el control y espera la respuesta del jugador humano en la UI
     }
 
     // Prioridad C: Empate contra unidad girada enemiga si es de alto poder
-    const tieEnemy = player.field.find(
+    const tieEnemy = (player.field || []).find(
       (pu) => pu.isSpent && (pu.currentPower || 0) === (unit.currentPower || 0) && (pu.currentPower || 0) >= 4
     );
     if (tieEnemy) {
-      fightRivalUnit(gameState, 'bot', unit.instanceId, tieEnemy.instanceId);
+      unit.isSpent = true;
+      gameState.pendingReaction = {
+        attackerPlayerKey: 'bot',
+        attackerUnitId: unit.instanceId,
+        attackerName: unit.name,
+        attackerPower: unit.currentPower,
+        attackerImage: unit.image,
+        targetType: 'UNIT',
+        targetUnitId: tieEnemy.instanceId,
+        targetName: tieEnemy.name,
+        targetPower: tieEnemy.currentPower,
+        targetImage: tieEnemy.image,
+        blockerUnitId: null
+      };
+      gameState.actionLog.unshift(
+        `⚔️ ¡ATAQUE DECLARADO! "${unit.name}" [Fuerza: ${unit.currentPower}] del rival ataca a "${tieEnemy.name}". Se activa la Fase de Respuesta del jugador.`
+      );
       updateCallback({ ...gameState });
-      continue;
+      return;
     }
   }
 
-  // Paso 5: Finalizar turno y devolver control al Jugador (Start Phase del Jugador)
+  // Paso 5: Finalizar turno si no quedan más ataques y devolver control al Jugador (Start Phase del Jugador)
   await wait(delayMs);
   passTurn(gameState);
   updateCallback({ ...gameState });
+}
+
+/**
+ * Resuelve el combate pendiente tras la Fase de Respuesta del Jugador,
+ * y continúa con los siguientes ataques del bot o finaliza el turno del bot.
+ */
+export async function resolvePendingAttackAndContinueBot(gameState, updateCallback, delayMs = 700) {
+  if (!gameState.pendingReaction) return;
+
+  const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+  const reaction = gameState.pendingReaction;
+  const bot = gameState.bot;
+  const player = gameState.player;
+  const attackerUnit = (bot.field || []).find((u) => u.instanceId === reaction.attackerUnitId);
+
+  if (attackerUnit) {
+    if (reaction.targetType === 'GIGS') {
+      if (reaction.blockerUnitId) {
+        const blocker = (player.field || []).find((u) => u.instanceId === reaction.blockerUnitId);
+        if (blocker) {
+          blocker.isSpent = true;
+          gameState.actionLog.unshift(
+            `🛡️ ¡BLOCKER! "${blocker.name}" intercepta el ataque a tus Gigs. ¡No se roba ningún Gig!`
+          );
+          resolveFight(gameState, 'bot', attackerUnit, 'player', blocker);
+        }
+      } else {
+        attackRivalGigs(gameState, 'bot', attackerUnit.instanceId);
+      }
+    } else if (reaction.targetType === 'UNIT') {
+      fightRivalUnit(
+        gameState,
+        'bot',
+        attackerUnit.instanceId,
+        reaction.targetUnitId,
+        reaction.blockerUnitId
+      );
+    }
+  }
+
+  gameState.pendingReaction = null;
+  updateCallback({ ...gameState });
+
+  if (gameState.isGameOver) return;
+
+  await wait(delayMs);
+
+  // Continuar con los siguientes ataques del bot si tiene más unidades listas
+  const remainingReadyUnits = (bot.field || []).filter((u) => !u.isSpent && !u.isLagging);
+  if (remainingReadyUnits.length > 0) {
+    return runBotTurn(gameState, updateCallback, delayMs);
+  } else {
+    passTurn(gameState);
+    updateCallback({ ...gameState });
+  }
 }
