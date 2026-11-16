@@ -389,6 +389,9 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
   // Popup de Transmisión Kiroshi (avisos de falta de Eddies, triggers, etc.)
   const [holocall, setHolocall] = useState(null);
 
+  // Menú contextual flotante sobre una Leyenda (elección entre HACER CALL y SACAR EDDIE)
+  const [legendMenuId, setLegendMenuId] = useState(null);
+
   // Estado para previsualización fija en la zona central izquierda del HUD (Kiroshi Scanner)
   const [hoveredCard, setHoveredCard] = useState(null);
   const [previewCard, setPreviewCard] = useState(null);
@@ -1820,128 +1823,221 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                 <div className="rounded-2xl border border-[#0dfceb]/30 bg-[#060b14]/80 p-1.5 sm:p-2 flex items-center justify-center gap-1.5 sm:gap-2 shrink-0">
                   {p.legends.map((leg, i) => {
                     const isTurn1Penalty = leg.isSpent && gameState.turnNumber === 1 && i < 2;
+                    const isMenuOpen = legendMenuId === leg.instanceId;
 
                     return (
-                      <div
-                        key={leg.instanceId || i}
-                        onMouseEnter={() => {
-                          if (leg.isFaceUp) {
-                            setHoveredCard(leg);
-                            setPreviewCard(leg);
+                      <div key={leg.instanceId || i} className="relative flex flex-col items-center">
+                        {/* VENTANA FLOTANTE PEQUEÑA ENCIMA DE LA LEYENDA (ELECCIÓN HACER CALL O SACAR EDDIE) */}
+                        {isMenuOpen && (
+                          <div
+                            onClick={(e) => e.stopPropagation()}
+                            style={{ clipPath: CYBER_CLIP }}
+                            className="absolute bottom-[calc(100%+10px)] left-1/2 -translate-x-1/2 z-40 w-44 sm:w-52 bg-[#070a10]/98 border-2 border-[#0dfceb] p-2.5 shadow-[0_0_30px_rgba(13,252,235,0.5)] backdrop-blur-md font-mono select-none"
+                          >
+                            {/* Cabecera del Popover */}
+                            <div className="flex items-center justify-between pb-1 mb-2 border-b border-[#0dfceb]/30 text-[9px]">
+                              <span className="font-black uppercase text-[#0dfceb] tracking-wider truncate max-w-[130px]">
+                                {leg.name || 'LEYENDA'}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => setLegendMenuId(null)}
+                                className="text-gray-400 hover:text-white px-1 font-bold cursor-pointer"
+                                title="Cerrar"
+                              >
+                                ✕
+                              </button>
+                            </div>
+
+                            {/* Opción 1: HACER CALL (si está boca abajo) */}
+                            {!leg.isFaceUp && (
+                              <button
+                                type="button"
+                                disabled={p.hasCalledLegendThisTurn}
+                                onClick={() => {
+                                  setLegendMenuId(null);
+                                  if (p.hasCalledLegendThisTurn) {
+                                    setHolocall({
+                                      title: 'ACCIÓN YA USADA',
+                                      message: 'Solo puedes llamar a 1 Leyenda boca arriba por turno.',
+                                      characterName: 'VIKTOR // RIPPERDOC',
+                                      type: 'warning'
+                                    });
+                                    return;
+                                  }
+                                  if (availableEddies < 1) {
+                                    setHolocall({
+                                      title: 'EDDIES INSUFICIENTES',
+                                      message: 'Llamar a una Leyenda boca arriba cuesta 1 €$. Gira primero una carta en tu Zona de Eddies o una de tus otras Leyendas para obtener el Eddie.',
+                                      characterName: 'VIKTOR // RIPPERDOC',
+                                      missingEddies: 1,
+                                      type: 'warning'
+                                    });
+                                    return;
+                                  }
+                                  pushHistory();
+                                  const res = callLegendFaceUp(gameState, 'player', leg.instanceId);
+                                  if (!res.success) {
+                                    alert(res.reason);
+                                  } else {
+                                    setPreviewCard(leg);
+                                  }
+                                  setGameState({ ...gameState });
+                                }}
+                                className={`w-full py-1.5 px-2 mb-1.5 text-left flex items-center justify-between rounded text-[10px] font-black uppercase transition-all ${
+                                  p.hasCalledLegendThisTurn
+                                    ? 'bg-gray-900 text-gray-500 border border-gray-800 cursor-not-allowed'
+                                    : 'bg-[#0dfceb]/20 hover:bg-[#0dfceb] text-[#0dfceb] hover:text-black border border-[#0dfceb]/60 shadow-[0_0_10px_rgba(13,252,235,0.3)] cursor-pointer'
+                                }`}
+                              >
+                                <span className="flex items-center gap-1.5">
+                                  <span>👑</span>
+                                  <span>HACER CALL</span>
+                                </span>
+                                <span className="text-[9px] font-bold">1 €$</span>
+                              </button>
+                            )}
+
+                            {/* Opción 2: SACAR EDDIE (si está enderezada) */}
+                            {!leg.isSpent && (
+                              <button
+                                type="button"
+                                disabled={isTurn1Penalty}
+                                onClick={() => {
+                                  setLegendMenuId(null);
+                                  if (isTurn1Penalty) return;
+                                  handleToggleLegend(leg.instanceId);
+                                }}
+                                className={`w-full py-1.5 px-2 text-left flex items-center justify-between rounded text-[10px] font-black uppercase transition-all ${
+                                  isTurn1Penalty
+                                    ? 'bg-gray-900 text-gray-500 border border-gray-800 cursor-not-allowed'
+                                    : 'bg-[#FCEE0A]/20 hover:bg-[#FCEE0A] text-[#FCEE0A] hover:text-black border border-[#FCEE0A]/60 shadow-[0_0_10px_rgba(252,238,10,0.3)] cursor-pointer'
+                                }`}
+                              >
+                                <span className="flex items-center gap-1.5">
+                                  <span>💶</span>
+                                  <span>SACAR EDDIE</span>
+                                </span>
+                                <span className="text-[9px] font-bold">+1 €$</span>
+                              </button>
+                            )}
+
+                            {/* Opción 3: Si ya está girada pero aún quedan eddies en reserva: ENDEREZAR */}
+                            {leg.isSpent && availableEddies > 0 && !isTurn1Penalty && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setLegendMenuId(null);
+                                  handleToggleLegend(leg.instanceId);
+                                }}
+                                className="w-full py-1.5 px-2 text-left flex items-center justify-between rounded text-[10px] font-black uppercase bg-[#0dfceb]/20 hover:bg-[#0dfceb] text-[#0dfceb] hover:text-black border border-[#0dfceb]/60 cursor-pointer shadow"
+                              >
+                                <span className="flex items-center gap-1.5">
+                                  <span>🔄</span>
+                                  <span>ENDEREZAR</span>
+                                </span>
+                                <span className="text-[9px] font-bold">-1 €$</span>
+                              </button>
+                            )}
+
+                            {/* Si está girada y ya fue consumida */}
+                            {leg.isSpent && availableEddies === 0 && !isTurn1Penalty && (
+                              <div className="text-[9px] text-gray-400 italic text-center py-1 bg-black/60 rounded border border-gray-800 mb-1">
+                                Eddie ya consumido en cartas
+                              </div>
+                            )}
+
+                            {/* Opción 4: Inspeccionar carta en grande */}
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setLegendMenuId(null);
+                                setInspectedCard(leg);
+                              }}
+                              className="w-full mt-1.5 py-1 px-2 text-center text-[9px] font-bold text-gray-400 hover:text-white hover:bg-gray-800 rounded transition-colors cursor-pointer border border-gray-800 hover:border-gray-600"
+                            >
+                              🔍 Ver en grande
+                            </button>
+
+                            {/* Flecha indicadora hacia la carta */}
+                            <div className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-[#070a10] border-r-2 border-b-2 border-[#0dfceb] rotate-45 pointer-events-none" />
+                          </div>
+                        )}
+
+                        {/* Carta de Leyenda */}
+                        <div
+                          onMouseEnter={() => {
+                            if (leg.isFaceUp) {
+                              setHoveredCard(leg);
+                              setPreviewCard(leg);
+                            }
+                          }}
+                          onMouseLeave={() => setHoveredCard(null)}
+                          onDragOver={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                          }}
+                          onDrop={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            const draggedCardId = e.dataTransfer.getData('text/plain');
+                            if (draggedCardId) {
+                              handlePlayCard(draggedCardId, leg.instanceId);
+                            }
+                          }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (!isMyTurn) {
+                              setInspectedCard(leg);
+                              return;
+                            }
+                            setLegendMenuId((prev) => (prev === leg.instanceId ? null : leg.instanceId));
+                          }}
+                          className={`w-11 sm:w-13 md:w-15 h-16 sm:h-20 md:h-24 rounded-lg overflow-hidden border transition-all cursor-pointer flex flex-col items-center justify-center relative shadow-md group ${
+                            isMenuOpen
+                              ? 'border-[#0dfceb] ring-2 ring-[#0dfceb] shadow-[0_0_18px_rgba(13,252,235,0.6)]'
+                              : leg.isSpent
+                              ? 'border-gray-800 opacity-60'
+                              : leg.isFaceUp
+                              ? 'border-[#FCEE0A] hover:border-[#0dfceb] shadow-[0_0_12px_rgba(252,238,10,0.4)]'
+                              : 'border-[#0dfceb]/40 hover:border-[#FCEE0A]'
+                          }`}
+                          title={
+                            isTurn1Penalty
+                              ? 'Penalización Turno 1: Esta leyenda empieza gastada por ir primero.'
+                              : leg.isSpent
+                              ? availableEddies > 0
+                                ? 'Leyenda girada (+1 €$ en reserva). Clic para opciones'
+                                : 'Leyenda consumida este turno en cartas'
+                              : leg.isFaceUp
+                              ? `${leg.name} (Clic para opciones: Sacar Eddie o Ver)`
+                              : 'Leyenda boca abajo (Clic para opciones: Hacer Call o Sacar Eddie)'
                           }
-                        }}
-                        onMouseLeave={() => setHoveredCard(null)}
-                        onDragOver={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                        }}
-                        onDrop={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          const draggedCardId = e.dataTransfer.getData('text/plain');
-                          if (draggedCardId) {
-                            handlePlayCard(draggedCardId, leg.instanceId);
-                          }
-                        }}
-                        onClick={() => {
-                          // Si la leyenda está boca arriba y no gastada: clic la gira (+1 €$)
-                          if (leg.isFaceUp && !leg.isSpent && isMyTurn) {
-                            handleToggleLegend(leg.instanceId);
-                          } else if (leg.isSpent && availableEddies > 0 && !isTurn1Penalty && isMyTurn) {
-                            // Si está girada pero tenemos eddies flotantes: enderezar (-1 €$)
-                            handleToggleLegend(leg.instanceId);
-                          } else if (leg.isFaceUp) {
-                            setInspectedCard(leg);
-                          }
-                        }}
-                        className={`w-11 sm:w-13 md:w-15 h-16 sm:h-20 md:h-24 rounded-lg overflow-hidden border transition-all cursor-pointer flex flex-col items-center justify-center relative shadow-md group ${
-                          leg.isSpent
-                            ? 'border-gray-800 opacity-60'
-                            : leg.isFaceUp
-                            ? 'border-[#FCEE0A] hover:border-[#0dfceb] shadow-[0_0_12px_rgba(252,238,10,0.4)]'
-                            : 'border-[#0dfceb]/40 hover:border-[#FCEE0A]'
-                        }`}
-                        title={
-                          isTurn1Penalty
-                            ? 'Penalización Turno 1: Esta leyenda empieza gastada por ir primero.'
-                            : leg.isSpent
-                            ? availableEddies > 0
-                              ? 'Leyenda girada (+1 €$ en reserva). Clic para enderezar (-1 €$)'
-                              : 'Leyenda consumida este turno en cartas'
-                            : leg.isFaceUp
-                            ? `${leg.name} (Clic para girar por +1 €$)`
-                            : 'Leyenda boca abajo (Girar por +1 €$ o Llamar por 1 €$)'
-                        }
-                      >
-                        <div className={`w-full h-full transition-transform duration-300 flex items-center justify-center ${leg.isSpent ? 'rotate-90 scale-75' : ''}`}>
-                          {leg.isFaceUp ? (
-                            <img src={leg.image} alt={leg.name} className="w-full h-full object-cover" />
-                          ) : (
-                            <CyberCardBack isLegend={true} className="w-full h-full" />
+                        >
+                          <div className={`w-full h-full transition-transform duration-300 flex items-center justify-center ${leg.isSpent ? 'rotate-90 scale-75' : ''}`}>
+                            {leg.isFaceUp ? (
+                              <img src={leg.image} alt={leg.name} className="w-full h-full object-cover" />
+                            ) : (
+                              <CyberCardBack isLegend={true} className="w-full h-full" />
+                            )}
+                          </div>
+
+                          {/* Indicador de Penalización Turno 1 o Gastada */}
+                          {leg.isSpent && (
+                            <div className="absolute inset-0 bg-black/60 flex items-center justify-center pointer-events-none">
+                              <span className="px-1 bg-black border border-gray-700 text-gray-400 font-mono font-bold text-[7px] uppercase tracking-tighter text-center">
+                                {isTurn1Penalty ? 'PENALIZACIÓN T1' : 'GASTADA'}
+                              </span>
+                            </div>
+                          )}
+
+                          {/* Badge de Gear del Jugador */}
+                          {leg.gear && leg.gear.length > 0 && (
+                            <div className="absolute top-0.5 right-0.5 px-1 py-0.2 bg-[#FCEE0A] text-black font-mono font-black text-[6px] sm:text-[7px] uppercase shadow z-10">
+                              🔧 {leg.gear.length}
+                            </div>
                           )}
                         </div>
-
-                        {/* Botón flotante para GIRAR leyenda boca abajo (+1 €$) */}
-                        {!leg.isFaceUp && !leg.isSpent && isMyTurn && !isTurn1Penalty && (
-                          <div
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleToggleLegend(leg.instanceId);
-                            }}
-                            className="absolute top-0 inset-x-0 bg-[#FCEE0A]/90 hover:bg-[#FCEE0A] text-black font-mono font-black text-[6px] sm:text-[7px] uppercase text-center py-0.5 shadow z-10 transition-colors"
-                            title="Girar esta Leyenda boca abajo para obtener +1 €$"
-                          >
-                            +1 €$ GIRAR
-                          </div>
-                        )}
-
-                        {/* Indicador de Penalización Turno 1 o Gastada */}
-                        {leg.isSpent && (
-                          <div className="absolute inset-0 bg-black/60 flex items-center justify-center pointer-events-none">
-                            <span className="px-1 bg-black border border-gray-700 text-gray-400 font-mono font-bold text-[7px] uppercase tracking-tighter text-center">
-                              {isTurn1Penalty ? 'PENALIZACIÓN T1' : 'GASTADA'}
-                            </span>
-                          </div>
-                        )}
-
-                        {/* Botón de LLAMAR a Leyenda si está boca abajo */}
-                        {!leg.isFaceUp && !leg.isSpent && isMyTurn && !p.hasCalledLegendThisTurn && (
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              if (availableEddies < 1) {
-                                setHolocall({
-                                  title: 'EDDIES INSUFICIENTES',
-                                  message: 'Llamar a una Leyenda boca arriba cuesta 1 €$. Gira primero 1 carta en tu Zona de Eddies o una de tus otras Leyendas para obtener el Eddie.',
-                                  characterName: 'VIKTOR // RIPPERDOC',
-                                  missingEddies: 1,
-                                  type: 'warning'
-                                });
-                                return;
-                              }
-                              pushHistory();
-                              const res = callLegendFaceUp(gameState, 'player', leg.instanceId);
-                              if (!res.success) {
-                                alert(res.reason);
-                              } else {
-                                setPreviewCard(leg);
-                              }
-                              setGameState({ ...gameState });
-                            }}
-                            className="absolute bottom-0 inset-x-0 bg-[#0dfceb] hover:bg-white text-black font-mono font-black text-[7px] uppercase text-center py-0.5 animate-pulse z-10 shadow"
-                            title="Gasta 1 €$ de tus Eddies girados para voltear esta Leyenda boca arriba"
-                          >
-                            LLAMAR 1€$
-                          </button>
-                        )}
-
-                        {/* Badge de Gear del Jugador */}
-                        {leg.gear && leg.gear.length > 0 && (
-                          <div className="absolute top-0.5 right-0.5 px-1 py-0.2 bg-[#FCEE0A] text-black font-mono font-black text-[6px] sm:text-[7px] uppercase shadow z-10">
-                            🔧 {leg.gear.length}
-                          </div>
-                        )}
                       </div>
                     );
                   })}
@@ -2784,6 +2880,14 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
             </button>
           </div>
         </div>
+      )}
+
+      {/* Fondo transparente para cerrar el menú flotante de Leyenda al hacer clic fuera */}
+      {legendMenuId && (
+        <div
+          className="fixed inset-0 z-30 pointer-events-auto"
+          onClick={() => setLegendMenuId(null)}
+        />
       )}
 
       {/* 6. MODAL DE TRANSMISIÓN / HOLOCALL DE PERSONAJE (AVISOS DE EDDIES Y TRIGGERS) */}
