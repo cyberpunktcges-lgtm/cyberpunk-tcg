@@ -37,6 +37,9 @@ function drawCards(player, count, state, sourceName) {
   if (!player.deck || player.deck.length === 0) return [];
   const drawn = player.deck.splice(0, Math.min(count, player.deck.length));
   if (!player.hand) player.hand = [];
+  drawn.forEach((c) => {
+    c.isJustDrawn = true;
+  });
   player.hand.push(...drawn);
   state.actionLog.unshift(
     `🃏 [${sourceName}] ${player.name} roba ${drawn.length} carta(s): ${drawn.map((c) => c.name).join(', ')}.`
@@ -466,10 +469,28 @@ export function executeProgramEffect(state, playerKey, card) {
   if (cardId === 'CP-129') {
     if (p.deck && p.deck.length > 0) {
       const top3 = p.deck.splice(0, Math.min(3, p.deck.length));
-      const chosen = top3.shift();
-      p.hand.push(chosen);
-      p.deck.push(...top3);
-      state.actionLog.unshift(`🎭 [Three Mouths, One Desire] Añade "${chosen.name}" a la mano y manda el resto al fondo.`);
+      if (playerKey === 'player') {
+        state.pendingCardChoice = {
+          type: 'SEARCH_AND_CHOOSE',
+          sourceCardId: 'CP-129',
+          sourceCardName: 'Three Mouths, One Desire',
+          sourceCardImage: card.image,
+          title: '🎭 THREE MOUTHS, ONE DESIRE // PROGRAM',
+          prompt: 'Se han revelado las 3 primeras cartas de tu mazo. Selecciona 1 carta para añadir a tu mano (el resto irá al fondo del mazo):',
+          cards: top3,
+          eligibleIds: top3.map((c) => c.instanceId),
+          maxChoices: 1,
+          minChoices: 1,
+          filterDescription: 'Cualquier carta',
+          remainingDestination: 'BOTTOM_DECK',
+          destination: 'HAND'
+        };
+      } else {
+        const chosen = top3.shift();
+        p.hand.push(chosen);
+        p.deck.push(...top3);
+        state.actionLog.unshift(`🎭 [Three Mouths, One Desire] El rival añade "${chosen.name}" a su mano.`);
+      }
     }
     return { executed: true };
   }
@@ -788,15 +809,36 @@ export function executeUnitAttackTrigger(state, playerKey, attackerUnit) {
   if (cardId === 'CP-121' || attackerUnit.name.includes('Sketchy Ripper')) {
     if (p.deck && p.deck.length > 0) {
       const examined = p.deck.splice(0, Math.min(3, p.deck.length));
-      const gearIdx = examined.findIndex((c) => c.officialType === 'GEAR' || c.type?.includes('GEAR'));
-      if (gearIdx !== -1) {
-        const found = examined.splice(gearIdx, 1)[0];
-        p.hand.push(found);
-        p.deck.push(...examined);
-        state.actionLog.unshift(`🔧 [Sketchy Ripper] ¡Encontró "${found.name}"! Añadido a la mano.`);
+      const gears = examined.filter((c) => c.officialType === 'GEAR' || c.type?.includes('GEAR'));
+
+      if (playerKey === 'player') {
+        state.pendingCardChoice = {
+          type: 'SEARCH_AND_CHOOSE',
+          sourceCardId: 'CP-121',
+          sourceCardName: attackerUnit.name,
+          sourceCardImage: attackerUnit.image,
+          title: '🔧 SKETCHY RIPPER // HABILIDAD ATTACK',
+          prompt: 'Se han revelado las 3 primeras cartas de tu mazo. Selecciona 1 Gear para añadir a tu mano (el resto irá al fondo de tu mazo):',
+          cards: examined,
+          eligibleIds: gears.map((g) => g.instanceId),
+          maxChoices: 1,
+          minChoices: gears.length > 0 ? 1 : 0,
+          filterDescription: 'Solo cartas de tipo Gear',
+          remainingDestination: 'BOTTOM_DECK',
+          destination: 'HAND'
+        };
       } else {
-        p.deck.push(...examined);
-        state.actionLog.unshift(`🔍 [Sketchy Ripper] Revisó 3 cartas pero no encontró ningún Gear.`);
+        // Bot auto-resolves
+        if (gears.length > 0) {
+          const found = gears[0];
+          const remaining = examined.filter((c) => c.instanceId !== found.instanceId);
+          p.hand.push(found);
+          p.deck.push(...remaining);
+          state.actionLog.unshift(`🔧 [Sketchy Ripper] ¡El rival encontró "${found.name}"! Añadido a su mano.`);
+        } else {
+          p.deck.push(...examined);
+          state.actionLog.unshift(`🔍 [Sketchy Ripper] El rival revisó 3 cartas pero no encontró ningún Gear.`);
+        }
       }
     }
   }
@@ -973,14 +1015,33 @@ export function executeCallLegendTrigger(state, playerKey, legendCard) {
   if (cardId === 'CP-141') {
     if (p.deck && p.deck.length > 0) {
       const top5 = p.deck.splice(0, Math.min(5, p.deck.length));
-      const gearIdx = top5.findIndex((c) => (c.officialType === 'GEAR' || c.type?.includes('GEAR')) && (c.costNum || 0) <= 2);
-      if (gearIdx !== -1) {
-        const [gear] = top5.splice(gearIdx, 1);
-        p.hand.push(gear);
-        p.deck.push(...top5);
-        state.actionLog.unshift(`👓 [Viktor Vektor] Añade el Gear "${gear.name}" a la mano.`);
+      const eligibleGears = top5.filter(
+        (c) => (c.officialType === 'GEAR' || c.type?.includes('GEAR')) && (c.costNum || 0) <= 2
+      );
+      if (playerKey === 'player') {
+        state.pendingCardChoice = {
+          type: 'SEARCH_AND_CHOOSE',
+          sourceCardId: 'CP-141',
+          sourceCardName: 'Viktor Vektor',
+          sourceCardImage: legendCard?.image || '',
+          title: '👓 VIKTOR VEKTOR // HABILIDAD CALL',
+          prompt: 'Se han examinado las 5 primeras cartas de tu mazo. Selecciona hasta 2 Gears con coste ≤ 2 €$ para añadir a tu mano (el resto irá al fondo del mazo):',
+          cards: top5,
+          eligibleIds: eligibleGears.map((g) => g.instanceId),
+          maxChoices: 2,
+          minChoices: 0,
+          filterDescription: 'Gears con coste ≤ 2 €$',
+          remainingDestination: 'BOTTOM_DECK',
+          destination: 'HAND'
+        };
       } else {
-        p.deck.push(...top5);
+        const chosen = eligibleGears.slice(0, 2);
+        const remaining = top5.filter((c) => !chosen.some((g) => g.instanceId === c.instanceId));
+        p.hand.push(...chosen);
+        p.deck.push(...remaining);
+        if (chosen.length > 0) {
+          state.actionLog.unshift(`👓 [Viktor Vektor] El rival añadió ${chosen.length} Gear(s) a su mano.`);
+        }
       }
     }
   }

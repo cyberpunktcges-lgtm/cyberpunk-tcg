@@ -1070,6 +1070,9 @@ export function executeStartPhase(state, playerKey) {
   // 3. ROBO DE CARTA (DRAW 1 CARD)
   if (p.deck.length > 0) {
     const drawn = p.deck.shift();
+    if (playerKey === 'player') {
+      drawn.isJustDrawn = true;
+    }
     p.hand.push(drawn);
     state.actionLog.unshift(
       `📥 ${p.name} roba 1 carta de su mazo (Mazo: ${p.deck.length} cartas restantes).`
