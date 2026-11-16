@@ -73,6 +73,16 @@ export function isLegendCard(card) {
   return false;
 }
 
+// Helper seguro para obtener array de palabras clave (soporta string separado por comas o array)
+export function getCardKeywordsArray(card) {
+  if (!card || !card.keywords) return [];
+  if (Array.isArray(card.keywords)) return card.keywords;
+  if (typeof card.keywords === 'string' && card.keywords.trim()) {
+    return card.keywords.split(',').map((k) => k.trim()).filter(Boolean);
+  }
+  return [];
+}
+
 // =========================================================================
 // COMPONENTE DADO POLIÉDRICO SVG (D4, D6, D8, D10, D12, D20)
 // =========================================================================
@@ -368,9 +378,10 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
   const [isDragOverEddies, setIsDragOverEddies] = useState(false);
   const [rollingAnimation, setRollingAnimation] = useState(null);
 
-  // Estado para previsualización flotante (Hover Card Preview) al pasar el ratón por el campo
+  // Estado para previsualización fija en la zona central izquierda del HUD (Kiroshi Scanner)
   const [hoveredCard, setHoveredCard] = useState(null);
-  const [hoverPos, setHoverPos] = useState({ x: 0, y: 0 });
+  const [previewCard, setPreviewCard] = useState(null);
+  const displayCard = hoveredCard || previewCard || selectedFieldUnit || selectedHandCard;
 
   // Pila de historial para la función "DESHACER" (Undo)
   const [history, setHistory] = useState([]);
@@ -844,8 +855,98 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
             </div>
           </div>
 
-          {/* SECCIÓN JUGADOR (TÚ) */}
-          <div className="space-y-2.5 pt-1">
+          {/* ===============================================================
+              ZONA CENTRAL IZQUIERDA: PREVISUALIZACIÓN DE CARTA EN GRANDE
+              (Encima de V // NETRUNNER y debajo de los dados del rival)
+             =============================================================== */}
+          <div
+            style={{ clipPath: CYBER_CLIP }}
+            className="my-1.5 p-2 bg-[#000000]/95 border border-[#0dfceb]/50 shadow-[0_0_20px_rgba(13,252,235,0.15)] flex flex-col items-center justify-between min-h-[270px] sm:min-h-[300px] relative transition-all"
+          >
+            {/* Cabecera del Escáner */}
+            <div className="w-full flex items-center justify-between pb-1 border-b border-[#0dfceb]/20 text-[9px] text-gray-400 font-bold uppercase tracking-widest mb-1.5">
+              <span className="text-[#0dfceb] flex items-center gap-1.5 font-black">
+                <span className="w-2 h-2 rounded-full bg-[#0dfceb] animate-ping" />
+                ESCÁNER KIROSHI
+              </span>
+              <span className="text-gray-500 text-[8px]">
+                {displayCard ? 'OBJETIVO FIJADO' : 'BUSCANDO CARTA'}
+              </span>
+            </div>
+
+            {displayCard ? (
+              <div className="w-full flex flex-col items-center gap-1.5">
+                {/* Imagen de la Carta en Grande */}
+                <div className="relative w-40 sm:w-48 aspect-[7/10] rounded overflow-hidden border-2 border-[#FCEE0A] shadow-[0_0_20px_rgba(252,238,10,0.4)] bg-black">
+                  <img
+                    src={displayCard.image}
+                    alt={displayCard.name}
+                    className="w-full h-full object-cover"
+                  />
+                  {displayCard.currentPower !== undefined && (
+                    <div className="absolute bottom-1 right-1 px-2 py-0.5 bg-[#FCEE0A] text-[#070a10] font-mono font-black text-xs shadow-md rounded">
+                      ⚡ {displayCard.currentPower}
+                    </div>
+                  )}
+                </div>
+
+                {/* Nombre y Coste */}
+                <div className="w-full flex items-center justify-between px-1 text-xs mt-0.5">
+                  <span className="font-black text-white truncate max-w-[170px] uppercase">
+                    {displayCard.name}
+                  </span>
+                  <span className="text-[#0dfceb] font-black shrink-0">
+                    {displayCard.parsedCost ? `${displayCard.parsedCost} €$` : 'LEYENDA'}
+                  </span>
+                </div>
+
+                {/* Palabras clave (100% seguro para string, array o undefined) */}
+                {(() => {
+                  const kws = getCardKeywordsArray(displayCard);
+                  if (kws.length === 0) return null;
+                  return (
+                    <div className="w-full flex flex-wrap gap-1 px-1">
+                      {kws.map((kw, idx) => (
+                        <span
+                          key={idx}
+                          className="px-1.5 py-0.2 bg-[#0dfceb]/20 text-[#0dfceb] border border-[#0dfceb]/40 text-[8px] font-bold uppercase rounded"
+                        >
+                          {kw}
+                        </span>
+                      ))}
+                    </div>
+                  );
+                })()}
+
+                {/* Estados especiales: Gastada o Lag */}
+                {(displayCard.isSpent || displayCard.isLagging) && (
+                  <div className="w-full flex items-center gap-2 px-1 text-[8px] font-bold">
+                    {displayCard.isSpent && (
+                      <span className="text-[#FF003C] uppercase">⚠ GASTADA</span>
+                    )}
+                    {displayCard.isLagging && (
+                      <span className="text-[#FF003C] uppercase">⚠ LAG (ESTE TURNO)</span>
+                    )}
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="flex-1 flex flex-col items-center justify-center text-center p-3 text-gray-500 py-6">
+                <div className="w-10 h-10 rounded-full border border-dashed border-[#0dfceb]/40 flex items-center justify-center mb-2 animate-pulse">
+                  <span className="text-[#0dfceb] text-base font-black">⊕</span>
+                </div>
+                <span className="text-[10px] text-gray-400 uppercase font-bold block mb-1">
+                  PASA EL RATÓN SOBRE UNA CARTA
+                </span>
+                <span className="text-[8px] text-gray-600 block max-w-[180px]">
+                  Pasa el cursor sobre cualquier carta boca arriba en el campo, leyendas o mano para verla en grande.
+                </span>
+              </div>
+            )}
+          </div>
+
+          {/* SECCIÓN JUGADOR (TÚ) — SITUADA EN LA PARTE INFERIOR */}
+          <div className="space-y-2.5 pt-1 mt-auto">
             {/* Avatar del Jugador */}
             <div
               style={{ clipPath: CYBER_AVATAR_CLIP }}
@@ -958,15 +1059,10 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                   {bot.legends.map((leg, i) => (
                     <div
                       key={leg.instanceId || i}
-                      onMouseEnter={(e) => {
+                      onMouseEnter={() => {
                         if (leg.isFaceUp) {
                           setHoveredCard(leg);
-                          setHoverPos({ x: e.clientX, y: e.clientY });
-                        }
-                      }}
-                      onMouseMove={(e) => {
-                        if (leg.isFaceUp) {
-                          setHoverPos({ x: e.clientX, y: e.clientY });
+                          setPreviewCard(leg);
                         }
                       }}
                       onMouseLeave={() => setHoveredCard(null)}
@@ -1123,12 +1219,9 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                     return (
                       <div
                         key={unit.instanceId}
-                        onMouseEnter={(e) => {
+                        onMouseEnter={() => {
                           setHoveredCard(unit);
-                          setHoverPos({ x: e.clientX, y: e.clientY });
-                        }}
-                        onMouseMove={(e) => {
-                          setHoverPos({ x: e.clientX, y: e.clientY });
+                          setPreviewCard(unit);
                         }}
                         onMouseLeave={() => setHoveredCard(null)}
                         className={`transition-all duration-300 flex items-center justify-center shrink-0 ${
@@ -1361,12 +1454,9 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                     return (
                       <div
                         key={unit.instanceId}
-                        onMouseEnter={(e) => {
+                        onMouseEnter={() => {
                           setHoveredCard(unit);
-                          setHoverPos({ x: e.clientX, y: e.clientY });
-                        }}
-                        onMouseMove={(e) => {
-                          setHoverPos({ x: e.clientX, y: e.clientY });
+                          setPreviewCard(unit);
                         }}
                         onMouseLeave={() => setHoveredCard(null)}
                         className={`transition-all duration-300 flex items-center justify-center shrink-0 ${
@@ -1529,15 +1619,10 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                     return (
                       <div
                         key={leg.instanceId || i}
-                        onMouseEnter={(e) => {
+                        onMouseEnter={() => {
                           if (leg.isFaceUp) {
                             setHoveredCard(leg);
-                            setHoverPos({ x: e.clientX, y: e.clientY });
-                          }
-                        }}
-                        onMouseMove={(e) => {
-                          if (leg.isFaceUp) {
-                            setHoverPos({ x: e.clientX, y: e.clientY });
+                            setPreviewCard(leg);
                           }
                         }}
                         onMouseLeave={() => setHoveredCard(null)}
@@ -1549,7 +1634,11 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                             }
                             pushHistory();
                             const res = callLegendFaceUp(gameState, 'player', leg.instanceId);
-                            if (!res.success) alert(res.reason);
+                            if (!res.success) {
+                              alert(res.reason);
+                            } else {
+                              setPreviewCard(leg);
+                            }
                             setGameState({ ...gameState });
                           } else {
                             setInspectedCard(leg);
@@ -1822,7 +1911,15 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                     }}
                     whileHover={{ y: -16, scale: 1.15, zIndex: 40 }}
                     whileTap={{ scale: 0.95 }}
-                    onClick={() => setSelectedHandCard(isSelected ? null : card)}
+                    onMouseEnter={() => {
+                      setHoveredCard(card);
+                      setPreviewCard(card);
+                    }}
+                    onMouseLeave={() => setHoveredCard(null)}
+                    onClick={() => {
+                      setSelectedHandCard(isSelected ? null : card);
+                      setPreviewCard(card);
+                    }}
                     style={{ clipPath: CYBER_CARD_CLIP }}
                     className={`w-16 sm:w-20 md:w-22 h-24 sm:h-28 md:h-30 bg-black border transition-all duration-150 cursor-grab active:cursor-grabbing shrink-0 relative shadow-lg ${
                       isSelected
@@ -2368,69 +2465,6 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
               JUGAR OTRA PARTIDA
             </button>
           </div>
-        </div>
-      )}
-
-      {/* 6. PREVISUALIZACIÓN FLOTANTE DE CARTA EN CAMPO (HOVER CARD PREVIEW) */}
-      {hoveredCard && (
-        <div
-          style={{
-            position: 'fixed',
-            left: Math.min(
-              Math.max(16, hoverPos.x + 18),
-              (typeof window !== 'undefined' ? window.innerWidth : 1200) - 270
-            ),
-            top: Math.min(
-              Math.max(16, hoverPos.y - 140),
-              (typeof window !== 'undefined' ? window.innerHeight : 800) - 390
-            ),
-            zIndex: 9999,
-            pointerEvents: 'none'
-          }}
-          className="w-56 sm:w-64 rounded-xl overflow-hidden border-2 border-[#FCEE0A] bg-[#070a10]/95 backdrop-blur-md shadow-[0_0_35px_rgba(252,238,10,0.65)] p-2.5 font-mono flex flex-col gap-2 transition-all duration-75"
-        >
-          <div className="relative aspect-[7/10] w-full rounded-lg overflow-hidden border border-[#0dfceb]/50 shadow-inner">
-            <img
-              src={hoveredCard.image}
-              alt={hoveredCard.name}
-              className="w-full h-full object-cover"
-            />
-            {hoveredCard.currentPower !== undefined && (
-              <div className="absolute bottom-1 right-1 px-2.5 py-0.5 bg-[#FCEE0A] text-[#070a10] font-black text-sm shadow-md rounded">
-                ⚡ {hoveredCard.currentPower}
-              </div>
-            )}
-          </div>
-          <div className="flex items-center justify-between text-xs px-0.5">
-            <span className="font-bold text-white truncate max-w-[170px] uppercase">
-              {hoveredCard.name}
-            </span>
-            <span className="text-[#0dfceb] font-black">
-              {hoveredCard.parsedCost ? `${hoveredCard.parsedCost} €$` : 'LEYENDA'}
-            </span>
-          </div>
-          {hoveredCard.keywords && hoveredCard.keywords.length > 0 && (
-            <div className="flex flex-wrap gap-1 px-0.5">
-              {hoveredCard.keywords.map((kw, i) => (
-                <span
-                  key={i}
-                  className="px-1.5 py-0.2 bg-[#0dfceb]/20 text-[#0dfceb] border border-[#0dfceb]/40 text-[9px] font-bold uppercase rounded"
-                >
-                  {kw}
-                </span>
-              ))}
-            </div>
-          )}
-          {hoveredCard.isSpent && (
-            <div className="text-[10px] text-[#FF003C] font-black uppercase px-0.5">
-              ⚠ GASTADA ESTE TURNO
-            </div>
-          )}
-          {hoveredCard.isLagging && (
-            <div className="text-[10px] text-[#FF003C] font-black uppercase px-0.5">
-              ⚠ LAG (No puede atacar este turno)
-            </div>
-          )}
         </div>
       )}
     </div>

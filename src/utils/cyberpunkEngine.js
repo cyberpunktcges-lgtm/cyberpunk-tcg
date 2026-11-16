@@ -287,9 +287,10 @@ export function getAvailableEddies(playerState) {
  */
 export function spendEddies(playerState, amount) {
   let needed = amount;
+  if (!playerState) return false;
 
   // 1. Gastar cartas de la zona de Eddies
-  for (const eddie of playerState.eddies) {
+  for (const eddie of (playerState.eddies || [])) {
     if (needed <= 0) break;
     if (!eddie.isSpent) {
       eddie.isSpent = true;
@@ -298,7 +299,7 @@ export function spendEddies(playerState, amount) {
   }
 
   // 2. Si aún falta, gastar Leyendas
-  for (const leg of playerState.legends) {
+  for (const leg of (playerState.legends || [])) {
     if (needed <= 0) break;
     if (!leg.isSpent) {
       leg.isSpent = true;
@@ -459,8 +460,9 @@ export function callLegendFaceUp(state, playerKey, legendInstanceId) {
   leg.isFaceUp = true;
   p.hasCalledLegendThisTurn = true;
 
+  if (!state.actionLog) state.actionLog = [];
   state.actionLog.unshift(
-    `👑 ${p.name} paga 1 €$ y llama a su Leyenda "${leg.name}" boca arriba.`
+    `👑 ${p.name} paga 1 €$ y llama a su Leyenda "${leg.name || 'Leyenda'}" boca arriba.`
   );
 
   return { success: true };
