@@ -1299,8 +1299,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
               (Encima de V // NETRUNNER y debajo de los dados del rival)
              =============================================================== */}
           <div
-            style={{ clipPath: CYBER_CLIP }}
-            className="my-1.5 p-2 bg-[#000000]/95 border border-[#0dfceb]/50 shadow-[0_0_20px_rgba(13,252,235,0.15)] flex flex-col items-center justify-between min-h-[270px] sm:min-h-[300px] relative transition-all"
+            className="my-1.5 p-2 bg-[#000000]/95 border border-[#0dfceb]/50 shadow-[0_0_20px_rgba(13,252,235,0.15)] flex flex-col items-center relative transition-all rounded-xl shrink-0"
           >
             {/* Cabecera del Escáner */}
             <div className="w-full flex items-center justify-between pb-1 border-b border-[#0dfceb]/20 text-[9px] text-gray-400 font-bold uppercase tracking-widest mb-1.5">
@@ -1315,12 +1314,12 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
 
             {displayCard ? (
               <div className="w-full flex flex-col items-center gap-1.5">
-                {/* Imagen de la Carta en Grande (al hacer hover sale a tamaño completo) */}
+                {/* Imagen de la Carta en Miniatura Compacta (al hacer hover sale a tamaño completo) */}
                 <div
                   onMouseEnter={() => setIsKiroshiHoverZoom(true)}
                   onMouseLeave={() => setIsKiroshiHoverZoom(false)}
                   onClick={() => setInspectedCard(displayCard)}
-                  className="relative w-40 sm:w-48 aspect-[7/10] rounded overflow-hidden border-2 border-[#FCEE0A] shadow-[0_0_20px_rgba(252,238,10,0.4)] bg-black cursor-pointer group transition-transform duration-200 hover:scale-[1.03]"
+                  className="relative w-28 sm:w-32 aspect-[7/10] rounded overflow-hidden border-2 border-[#FCEE0A] shadow-[0_0_15px_rgba(252,238,10,0.4)] bg-black cursor-pointer group transition-transform duration-200 hover:scale-[1.03] shrink-0"
                   title="Pasa el ratón para ver a tamaño completo // Clic para voltear"
                 >
                   <img
