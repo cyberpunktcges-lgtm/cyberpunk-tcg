@@ -477,7 +477,13 @@ export function callLegendFaceUp(state, playerKey, legendInstanceId) {
  *     20–29 poder: 3 Gigs
  * - Si el rival intercepta con Blocker, no se roba ningún Gig y se convierte en pelea contra el Blocker.
  */
-export function attackRivalGigs(state, attackerPlayerKey, attackerUnitId, blockerUnitId = null) {
+export function attackRivalGigs(
+  state,
+  attackerPlayerKey,
+  attackerUnitId,
+  blockerUnitId = null,
+  preferredDice = []
+) {
   const attacker = state[attackerPlayerKey];
   const defenderKey = attackerPlayerKey === 'player' ? 'bot' : 'player';
   const defender = state[defenderKey];
@@ -513,19 +519,33 @@ export function attackRivalGigs(state, attackerPlayerKey, attackerUnitId, blocke
     return { success: true, stolenCount: 0 };
   }
 
-  // Se roban hasta gigsToSteal dados (robando los de mayor valor del rival)
+  // Se roban hasta gigsToSteal dados (priorizando dados elegidos por el usuario)
   const countToSteal = Math.min(gigsToSteal, defender.gigs.length);
   const stolenDice = [];
+  const prefs = [...(preferredDice || [])];
 
   for (let i = 0; i < countToSteal; i++) {
-    // Escoger el dado con mayor valor disponible
-    let bestIdx = 0;
-    for (let j = 1; j < defender.gigs.length; j++) {
-      if ((defender.gigs[j].value || 0) > (defender.gigs[bestIdx].value || 0)) {
-        bestIdx = j;
+    let chosenIdx = -1;
+
+    // Si el usuario eligió un dado específico (ej: 'd20'), buscarlo en los gigs del defensor
+    if (prefs.length > 0) {
+      const targetDie = String(prefs.shift()).toLowerCase();
+      chosenIdx = defender.gigs.findIndex(
+        (g) => g.die.toLowerCase() === targetDie
+      );
+    }
+
+    // Si no se encontró el preferido o no quedan preferencias, escoger el de mayor valor
+    if (chosenIdx === -1) {
+      chosenIdx = 0;
+      for (let j = 1; j < defender.gigs.length; j++) {
+        if ((defender.gigs[j].value || 0) > (defender.gigs[chosenIdx].value || 0)) {
+          chosenIdx = j;
+        }
       }
     }
-    const [stolenDie] = defender.gigs.splice(bestIdx, 1);
+
+    const [stolenDie] = defender.gigs.splice(chosenIdx, 1);
     stolenDie.stolenFrom = defenderKey;
     attacker.gigs.push(stolenDie);
     stolenDice.push(stolenDie);

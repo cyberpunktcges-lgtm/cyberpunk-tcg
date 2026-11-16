@@ -368,6 +368,10 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
   const [isDragOverEddies, setIsDragOverEddies] = useState(false);
   const [rollingAnimation, setRollingAnimation] = useState(null);
 
+  // Estado para previsualización flotante (Hover Card Preview) al pasar el ratón por el campo
+  const [hoveredCard, setHoveredCard] = useState(null);
+  const [hoverPos, setHoverPos] = useState({ x: 0, y: 0 });
+
   // Pila de historial para la función "DESHACER" (Undo)
   const [history, setHistory] = useState([]);
 
@@ -456,6 +460,25 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
     } else {
       alert(res.reason);
     }
+  };
+
+  // Robar un dado de Gig específico del rival (al hacer clic sobre él en su barra de Gigs)
+  const handleStealSpecificDie = (dieName) => {
+    if (!selectedFieldUnit || selectedFieldUnit.isSpent || selectedFieldUnit.isLagging) return;
+    const gigsToSteal = calculateGigsToSteal(selectedFieldUnit.currentPower);
+    if (gigsToSteal <= 0 || !gameState.bot.gigs || gameState.bot.gigs.length === 0) return;
+
+    pushHistory();
+    const botBlocker = decideBotBlocker(gameState.bot, selectedFieldUnit.currentPower, true);
+    attackRivalGigs(
+      gameState,
+      'player',
+      selectedFieldUnit.instanceId,
+      botBlocker ? botBlocker.instanceId : null,
+      [dieName]
+    );
+    setSelectedFieldUnit(null);
+    setGameState({ ...gameState });
   };
 
   // Comprobar si ya había sesión en sessionStorage
@@ -598,6 +621,15 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
   const playerStreetCred = calculateStreetCred(p.gigs);
   const botStreetCred = calculateStreetCred(bot.gigs);
   const availableEddies = getAvailableEddies(p);
+
+  const canAttackGigs =
+    isMyTurn &&
+    selectedFieldUnit &&
+    !selectedFieldUnit.isSpent &&
+    !selectedFieldUnit.isLagging &&
+    bot.gigs &&
+    bot.gigs.length > 0;
+  const gigsToSteal = canAttackGigs ? calculateGigsToSteal(selectedFieldUnit.currentPower) : 0;
 
   return (
     <div className="min-h-screen max-h-screen h-screen bg-[#070a10] text-white font-sans select-none flex flex-col justify-between relative overflow-hidden">
@@ -908,24 +940,38 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
             - Tanto las unidades como los eddies gastados se giran 90 grados
             - Ambas zonas cuentan con soporte Drag & Drop
            =============================================================== */}
-        <main className="flex-1 flex flex-col justify-between overflow-y-auto relative p-2 sm:p-4 pb-52 gap-3">
+        <main className="flex-1 flex flex-col justify-between overflow-y-auto relative p-2 sm:p-3 pb-36 sm:pb-40 gap-2 font-mono">
           {/* ===============================================================
-              1. SECCIÓN SUPERIOR: TAPETE DEL RIVAL (BOT)
-              - Fila superior: Leyendas (3 slots) + Zona de Eddies + Trash
-              - Fila inferior: Campo de Batalla (Unidades) + Deck
+              1. SECCIÓN SUPERIOR: TAPETE DEL RIVAL (BOT) — MODO ESPEJO
+              - Fila superior (Backline): Leyendas (3 slots a la izquierda) + Zona de Eddies (a la derecha)
+              - Barra de Gigs con dados interactivos y Street Cred
+              - Campo de Batalla Rival (cartas compactas con hover preview)
+              - Columna Derecha: Trash (arriba) y Deck (abajo)
              =============================================================== */}
           <div className="flex gap-2 sm:gap-3 w-full items-stretch">
-            {/* Lado izquierdo: Leyendas + Eddies arriba, Campo abajo */}
-            <div className="flex-1 flex flex-col gap-2 min-w-0">
-              {/* FILA SUPERIOR: LEYENDAS RIVAL + ZONA DE EDDIES RIVAL */}
-              <div className="h-28 sm:h-32 md:h-36 flex gap-2 items-stretch w-full">
-                {/* LEYENDAS RIVAL (3 SLOTS) */}
-                <div className="rounded-2xl border border-[#FF003C]/30 bg-[#060b14]/80 p-2 sm:p-2.5 flex items-center justify-center gap-1.5 sm:gap-2 shrink-0">
+            {/* 1.A ZONA CENTRAL DEL RIVAL: BACKLINE (LEYENDAS + EDDIES) -> GIGS -> FRONTLINE (CAMPO) */}
+            <div className="flex-1 flex flex-col gap-1.5 min-w-0">
+              {/* FILA SUPERIOR (BACKLINE): LEYENDAS RIVAL A LA IZQUIERDA + EDDIES RIVAL A LA DERECHA */}
+              <div className="h-20 sm:h-24 md:h-28 flex gap-2 items-stretch w-full">
+                {/* LEYENDAS RIVAL (3 SLOTS) A LA IZQUIERDA */}
+                <div className="rounded-2xl border border-[#FF003C]/30 bg-[#060b14]/80 p-1.5 sm:p-2 flex items-center justify-center gap-1.5 sm:gap-2 shrink-0">
                   {bot.legends.map((leg, i) => (
                     <div
                       key={leg.instanceId || i}
+                      onMouseEnter={(e) => {
+                        if (leg.isFaceUp) {
+                          setHoveredCard(leg);
+                          setHoverPos({ x: e.clientX, y: e.clientY });
+                        }
+                      }}
+                      onMouseMove={(e) => {
+                        if (leg.isFaceUp) {
+                          setHoverPos({ x: e.clientX, y: e.clientY });
+                        }
+                      }}
+                      onMouseLeave={() => setHoveredCard(null)}
                       onClick={() => leg.isFaceUp && setInspectedCard(leg)}
-                      className={`w-14 sm:w-16 md:w-20 h-22 sm:h-26 md:h-28 rounded-lg overflow-hidden border transition-all flex flex-col items-center justify-center relative shadow-md ${
+                      className={`w-11 sm:w-13 md:w-15 h-16 sm:h-20 md:h-24 rounded-lg overflow-hidden border transition-all flex flex-col items-center justify-center relative shadow-md ${
                         leg.isSpent
                           ? 'border-gray-800 opacity-50'
                           : leg.isFaceUp
@@ -952,24 +998,24 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                   ))}
                 </div>
 
-                {/* ZONA DE EDDIES RIVAL */}
-                <div className="flex-1 rounded-2xl border border-[#FF003C]/30 bg-[#060b14]/80 p-3 sm:p-4 relative flex items-center overflow-hidden">
+                {/* ZONA DE EDDIES RIVAL (A LA DERECHA DE SUS LEYENDAS) */}
+                <div className="flex-1 rounded-2xl border border-[#FF003C]/30 bg-[#060b14]/80 p-2 sm:p-2.5 relative flex items-center overflow-hidden">
                   {bot.eddies.length === 0 ? (
-                    <div className="text-gray-500 font-mono text-sm select-none pl-2 sm:pl-3">
+                    <div className="text-gray-500 font-mono text-xs sm:text-sm select-none pl-2">
                       No Eddies yet.
                     </div>
                   ) : (
-                    <div className="flex flex-wrap items-center gap-2 sm:gap-3 py-1 pr-24 overflow-x-auto w-full">
+                    <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 py-0.5 pr-24 overflow-x-auto w-full">
                       {bot.eddies.map((ed, idx) => (
                         <div
                           key={ed.instanceId || idx}
                           className={`transition-all duration-300 flex items-center justify-center shrink-0 ${
-                            ed.isSpent ? 'w-20 sm:w-24 h-14 sm:h-16 my-1' : 'w-14 sm:w-16 h-20 sm:h-24'
+                            ed.isSpent ? 'w-14 sm:w-16 h-10 sm:h-12 my-0.5' : 'w-10 sm:w-12 h-14 sm:h-16'
                           }`}
                           title={ed.isSpent ? 'Eddie del rival gastado' : '1 €$ del rival disponible'}
                         >
                           <div
-                            className={`w-14 sm:w-16 h-20 sm:h-24 rounded-lg overflow-hidden border transition-transform duration-300 relative shadow-md ${
+                            className={`w-10 sm:w-12 h-14 sm:h-16 rounded-md overflow-hidden border transition-transform duration-300 relative shadow-md ${
                               ed.isSpent
                                 ? 'rotate-90 opacity-40 border-gray-800'
                                 : 'border-[#FF003C]/60 shadow-[0_0_10px_rgba(255,0,60,0.3)]'
@@ -978,7 +1024,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                             <CyberCardBack className="w-full h-full" />
                             <div className="absolute inset-0 bg-black/30 flex items-center justify-center">
                               <span
-                                className={`font-mono font-black text-[9px] px-1 bg-black/90 ${
+                                className={`font-mono font-black text-[8px] px-1 bg-black/90 ${
                                   ed.isSpent ? '-rotate-90 text-gray-500' : 'text-[#FCEE0A]'
                                 }`}
                               >
@@ -992,16 +1038,81 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                   )}
 
                   {/* Badge inferior derecho: Eddies X/Y Ⓐ del Rival */}
-                  <div className="absolute bottom-2.5 right-3 flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-[#031525]/90 border border-[#FF003C]/60 text-[#FF003C] font-mono text-[11px] sm:text-xs font-bold shadow-[0_0_10px_rgba(255,0,60,0.25)] select-none pointer-events-none">
+                  <div className="absolute bottom-1.5 right-2.5 flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-[#031525]/90 border border-[#FF003C]/60 text-[#FF003C] font-mono text-[10px] sm:text-xs font-bold shadow-[0_0_10px_rgba(255,0,60,0.25)] select-none pointer-events-none">
                     <span>Eddies {getAvailableEddies(bot)}/{bot.eddies.length + bot.legends.length}</span>
                     <span className="w-3.5 h-3.5 rounded-full border border-[#FF003C] flex items-center justify-center text-[9px] font-black leading-none">Ⓐ</span>
                   </div>
                 </div>
               </div>
 
-              {/* CAMPO DE BATALLA DEL RIVAL (FIELD) */}
-              <div className="flex-1 rounded-2xl border border-[#FF003C]/30 bg-[#060b14]/80 p-3 sm:p-4 min-h-[165px] sm:min-h-[195px] flex items-center relative overflow-x-auto">
-                <div className="flex items-center gap-3 sm:gap-4 w-full justify-start">
+              {/* BARRA DE GIGS DEL RIVAL (DADOS VISIBLES CON VALOR Y ELECCIÓN AL ASALTAR) */}
+              <div
+                className={`px-3 py-1 rounded-xl bg-[#070a10] border transition-all flex items-center justify-between ${
+                  canAttackGigs
+                    ? 'border-[#FCEE0A] bg-[#FCEE0A]/10 shadow-[0_0_20px_rgba(252,238,10,0.35)]'
+                    : 'border-[#FF003C]/35'
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] sm:text-[11px] font-mono font-bold text-[#FF003C] uppercase tracking-wider flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-[#FF003C] animate-pulse" />
+                    <span>GIGS RIVAL ({bot.gigs.length}/7):</span>
+                  </span>
+                  {canAttackGigs ? (
+                    <span className="text-[10px] sm:text-[11px] font-mono font-black text-[#FCEE0A] animate-pulse">
+                      ⚡ ¡HAZ CLIC EN EL DADO QUE QUIERES ROBAR! (Roba {gigsToSteal} Gig)
+                    </span>
+                  ) : (
+                    <span className="text-[9px] font-mono text-gray-500 hidden sm:inline">
+                      (Asalta esta zona con una unidad lista para robar dados)
+                    </span>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-2">
+                  {bot.gigs.length === 0 ? (
+                    <span className="text-[10px] font-mono text-gray-500 italic">
+                      Sin Gigs en juego aún
+                    </span>
+                  ) : (
+                    bot.gigs.map((gig, idx) => (
+                      <div
+                        key={idx}
+                        onClick={() => {
+                          if (canAttackGigs) {
+                            handleStealSpecificDie(gig.die.toLowerCase());
+                          }
+                        }}
+                        className={`transition-all duration-200 ${
+                          canAttackGigs
+                            ? 'cursor-pointer hover:scale-130 ring-2 ring-[#FF003C] hover:ring-[#FCEE0A] rounded-full p-0.5 animate-pulse'
+                            : ''
+                        }`}
+                        title={
+                          canAttackGigs
+                            ? `¡Haz clic para robar este dado ${gig.die.toUpperCase()} (Valor: ${gig.value})!`
+                            : `Dado ${gig.die.toUpperCase()} del Rival (Valor: ${gig.value})`
+                        }
+                      >
+                        <PolyhedralDie
+                          type={gig.die.toLowerCase()}
+                          value={gig.value}
+                          isWaiting={false}
+                          isStolen={Boolean(gig.stolenFrom)}
+                          size={canAttackGigs ? 32 : 26}
+                        />
+                      </div>
+                    ))
+                  )}
+                  <span className="text-xs font-mono font-black text-[#FF003C] ml-1.5">
+                    ⭐ {botStreetCred}
+                  </span>
+                </div>
+              </div>
+
+              {/* FRONTLINE: CAMPO DE BATALLA DEL RIVAL (FIELD) — CARTAS MÁS PEQUEÑAS CON HOVER PREVIEW */}
+              <div className="flex-1 rounded-2xl border border-[#FF003C]/30 bg-[#060b14]/80 p-2 sm:p-2.5 min-h-[90px] sm:min-h-[110px] flex items-center relative overflow-x-auto">
+                <div className="flex items-center gap-2.5 sm:gap-3 w-full justify-start">
                   {bot.field.map((unit) => {
                     const canAttackThisUnit =
                       selectedFieldUnit &&
@@ -1012,10 +1123,18 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                     return (
                       <div
                         key={unit.instanceId}
+                        onMouseEnter={(e) => {
+                          setHoveredCard(unit);
+                          setHoverPos({ x: e.clientX, y: e.clientY });
+                        }}
+                        onMouseMove={(e) => {
+                          setHoverPos({ x: e.clientX, y: e.clientY });
+                        }}
+                        onMouseLeave={() => setHoveredCard(null)}
                         className={`transition-all duration-300 flex items-center justify-center shrink-0 ${
                           unit.isSpent
-                            ? 'w-36 sm:w-40 md:w-44 h-24 sm:h-28 md:h-32 my-1'
-                            : 'w-24 sm:w-28 md:w-32 h-36 sm:h-40 md:h-44'
+                            ? 'w-24 sm:w-28 h-16 sm:h-20 my-0.5'
+                            : 'w-14 sm:w-16 md:w-20 h-20 sm:h-24 md:h-28'
                         }`}
                       >
                         <motion.div
@@ -1031,7 +1150,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                                   '0 0 10px rgba(255, 0, 60, 0.5)'
                                 ]
                               : unit.isSpent
-                              ? '0 0 15px rgba(255, 0, 60, 0.25)'
+                              ? '0 0 12px rgba(255, 0, 60, 0.25)'
                               : '0 0 0px rgba(0,0,0,0)'
                           }}
                           transition={{
@@ -1040,7 +1159,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                               duration: 1.2
                             }
                           }}
-                          whileHover={{ scale: canAttackThisUnit ? 1.08 : 1.03 }}
+                          whileHover={{ scale: canAttackThisUnit ? 1.08 : 1.04 }}
                           onClick={() => {
                             if (canAttackThisUnit) {
                               pushHistory();
@@ -1059,7 +1178,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                             }
                           }}
                           style={{ clipPath: CYBER_CARD_CLIP }}
-                          className={`w-24 sm:w-28 md:w-32 h-36 sm:h-40 md:h-44 bg-black border-2 transition-transform duration-300 cursor-pointer flex flex-col justify-between relative shadow-xl ${
+                          className={`w-14 sm:w-16 md:w-20 h-20 sm:h-24 md:h-28 bg-black border-2 transition-transform duration-300 cursor-pointer flex flex-col justify-between relative shadow-xl ${
                             canAttackThisUnit
                               ? 'border-[#FF003C] animate-pulse'
                               : unit.isSpent
@@ -1074,33 +1193,33 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                           />
 
                           {/* Badges de Palabras Clave Oficiales (Rival) */}
-                          <div className="absolute top-1 left-1 flex flex-col gap-0.5 z-10 pointer-events-none">
+                          <div className="absolute top-0.5 left-0.5 flex flex-col gap-0.5 z-10 pointer-events-none">
                             {hasKeyword(unit, 'Blocker') && (
-                              <span className="px-1 py-0.5 bg-[#0dfceb] text-black font-mono font-black text-[7px] sm:text-[8px] uppercase shadow">
-                                🛡️ BLOCKER
+                              <span className="px-1 py-0.2 bg-[#0dfceb] text-black font-mono font-black text-[6px] sm:text-[7px] uppercase shadow">
+                                🛡️
                               </span>
                             )}
                             {hasKeyword(unit, 'Adrenaline') && (
-                              <span className="px-1 py-0.5 bg-[#FCEE0A] text-black font-mono font-black text-[7px] sm:text-[8px] uppercase shadow">
-                                ⚡ ADRENALINE
+                              <span className="px-1 py-0.2 bg-[#FCEE0A] text-black font-mono font-black text-[6px] sm:text-[7px] uppercase shadow">
+                                ⚡
                               </span>
                             )}
                             {hasKeyword(unit, 'Go Solo') && (
-                              <span className="px-1 py-0.5 bg-[#FF003C] text-white font-mono font-black text-[7px] sm:text-[8px] uppercase shadow">
-                                🔥 GO SOLO
+                              <span className="px-1 py-0.2 bg-[#FF003C] text-white font-mono font-black text-[6px] sm:text-[7px] uppercase shadow">
+                                🔥
                               </span>
                             )}
                           </div>
 
-                          {/* Insignia de Poder GIGANTE */}
-                          <div className="absolute bottom-1 right-1 px-2 py-0.5 bg-[#FF003C] text-white font-mono font-black text-xs shadow-md">
+                          {/* Insignia de Poder */}
+                          <div className="absolute bottom-0.5 right-0.5 px-1.5 py-0.2 bg-[#FF003C] text-white font-mono font-black text-[9px] sm:text-[10px] shadow-md">
                             {unit.currentPower}
                           </div>
 
                           {/* Estado: GASTADA */}
                           {unit.isSpent && (
                             <div className="absolute inset-0 bg-black/60 flex items-center justify-center z-20">
-                              <span className="px-2 py-0.5 bg-black border border-[#FF003C] text-[#FF003C] font-mono font-black text-[10px] uppercase tracking-wider -rotate-90">
+                              <span className="px-1 py-0.5 bg-black border border-[#FF003C] text-[#FF003C] font-mono font-black text-[8px] uppercase tracking-wider -rotate-90">
                                 GASTADA
                               </span>
                             </div>
@@ -1110,37 +1229,37 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                     );
                   })}
 
-                  {/* Slots vacíos de cartas (diseño idéntico al playmat) */}
+                  {/* Slots vacíos de cartas (Rival) */}
                   {Array.from({ length: Math.max(0, 4 - bot.field.length) }).map((_, slotIdx) => (
                     <div
                       key={`bot-slot-${slotIdx}`}
-                      className="w-24 sm:w-28 md:w-32 h-36 sm:h-40 md:h-44 rounded-xl border border-[#FF003C]/20 bg-black/25 flex items-center justify-center pointer-events-none shrink-0"
+                      className="w-14 sm:w-16 md:w-20 h-20 sm:h-24 md:h-28 rounded-xl border border-[#FF003C]/20 bg-black/25 flex items-center justify-center pointer-events-none shrink-0"
                     />
                   ))}
                 </div>
               </div>
             </div>
 
-            {/* Columna Derecha del Rival: Trash arriba y Deck abajo */}
-            <div className="flex flex-col gap-2 shrink-0 w-20 sm:w-24 md:w-28">
+            {/* 1.B COLUMNA DERECHA: TRASH (ARRIBA) Y DECK (ABAJO) DEL RIVAL */}
+            <div className="flex flex-col gap-1.5 shrink-0 w-16 sm:w-20 md:w-24">
               {/* TRASH RIVAL */}
               <div
-                className="h-28 sm:h-32 md:h-36 rounded-2xl border border-[#FF003C]/30 bg-[#060b14]/80 flex flex-col items-center justify-center p-2 relative shadow-md select-none"
+                className="h-16 sm:h-20 rounded-2xl border border-[#FF003C]/30 bg-[#060b14]/80 flex flex-col items-center justify-center p-1 relative shadow-md select-none"
                 title={`Descartes del Rival (Trash): ${bot.trash.length} cartas`}
               >
-                <span className="text-[9px] font-mono text-gray-500 uppercase font-bold mb-1">TRASH</span>
-                <span className="text-xl sm:text-2xl font-black font-mono text-gray-500">
+                <span className="text-[8px] sm:text-[9px] font-mono text-gray-500 uppercase font-bold mb-0.5">TRASH</span>
+                <span className="text-base sm:text-lg font-black font-mono text-gray-500">
                   {bot.trash.length}
                 </span>
               </div>
 
               {/* DECK RIVAL */}
               <div
-                className="flex-1 rounded-2xl border border-[#FF003C]/30 bg-[#060b14]/80 flex flex-col items-center justify-center p-2 relative shadow-md select-none"
+                className="flex-1 rounded-2xl border border-[#FF003C]/30 bg-[#060b14]/80 flex flex-col items-center justify-center p-1.5 relative shadow-md select-none"
                 title={`Mazo del Rival (Deck): ${bot.deck.length} cartas`}
               >
-                <span className="text-[9px] font-mono text-gray-500 uppercase font-bold mb-1">DECK</span>
-                <span className="text-2xl sm:text-3xl font-black font-mono text-[#39FF14] drop-shadow-[0_0_8px_rgba(57,255,20,0.7)]">
+                <span className="text-[8px] sm:text-[9px] font-mono text-gray-500 uppercase font-bold mb-0.5">DECK</span>
+                <span className="text-xl sm:text-2xl font-black font-mono text-[#39FF14] drop-shadow-[0_0_8px_rgba(57,255,20,0.7)]">
                   {bot.deck.length}
                 </span>
               </div>
@@ -1206,14 +1325,15 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
           </div>
 
           {/* ===============================================================
-              3. SECCIÓN INFERIOR: TAPETE DEL JUGADOR (TÚ)
-              - Fila superior: Campo de Batalla (Unidades) + Deck
-              - Fila inferior: Leyendas (3 slots) + Zona de Eddies + Trash
-              - 100% IDÉNTICO AL PLAYMAT OFICIAL Y A LA IMAGEN DE REFERENCIA
+              3. SECCIÓN INFERIOR: TAPETE DEL JUGADOR (TÚ) — MODO ESPEJO
+              - Frontline: Campo de Batalla Jugador (cartas grandes con hover preview)
+              - Barra de Gigs del Jugador con dados activos y Street Cred
+              - Backline: Leyendas (3 slots a la izquierda) + Zona de Eddies (a la derecha)
+              - Columna Derecha: Deck (arriba) y Trash (abajo)
              =============================================================== */}
           <div className="flex gap-2 sm:gap-3 w-full items-stretch">
-            {/* Lado izquierdo: Campo arriba, Leyendas + Eddies abajo */}
-            <div className="flex-1 flex flex-col gap-2 min-w-0">
+            {/* 3.A ZONA CENTRAL DEL JUGADOR: FRONTLINE (CAMPO) -> GIGS -> BACKLINE (LEYENDAS + EDDIES) */}
+            <div className="flex-1 flex flex-col gap-1.5 min-w-0">
               {/* CAMPO DE BATALLA DEL JUGADOR (FIELD - DROP ZONE PARA DESPLEGAR) */}
               <div
                 onDragOver={(e) => {
@@ -1227,7 +1347,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                   const cardId = e.dataTransfer.getData('text/plain');
                   if (cardId) handlePlayCard(cardId);
                 }}
-                className={`flex-1 rounded-2xl border transition-all p-3 sm:p-4 min-h-[165px] sm:min-h-[195px] flex items-center relative overflow-x-auto ${
+                className={`flex-1 rounded-2xl border transition-all p-2.5 sm:p-3 min-h-[140px] sm:min-h-[160px] flex items-center relative overflow-x-auto ${
                   isDragOverField
                     ? 'border-[#0dfceb] bg-[#0dfceb]/15 shadow-[0_0_35px_rgba(13,252,235,0.45)]'
                     : 'border-[#0dfceb]/30 bg-[#060b14]/80'
@@ -1241,10 +1361,18 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                     return (
                       <div
                         key={unit.instanceId}
+                        onMouseEnter={(e) => {
+                          setHoveredCard(unit);
+                          setHoverPos({ x: e.clientX, y: e.clientY });
+                        }}
+                        onMouseMove={(e) => {
+                          setHoverPos({ x: e.clientX, y: e.clientY });
+                        }}
+                        onMouseLeave={() => setHoveredCard(null)}
                         className={`transition-all duration-300 flex items-center justify-center shrink-0 ${
                           unit.isSpent
-                            ? 'w-36 sm:w-40 md:w-44 h-24 sm:h-28 md:h-32 my-1'
-                            : 'w-24 sm:w-28 md:w-32 h-36 sm:h-40 md:h-44'
+                            ? 'w-32 sm:w-36 md:w-40 h-20 sm:h-24 md:h-28 my-1'
+                            : 'w-20 sm:w-24 md:w-28 h-28 sm:h-34 md:h-38'
                         }`}
                       >
                         <motion.div
@@ -1272,7 +1400,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                               ease: 'easeInOut'
                             }
                           }}
-                          whileHover={{ scale: canAttack ? 1.08 : 1.03, y: -4 }}
+                          whileHover={{ scale: canAttack ? 1.08 : 1.03, y: -3 }}
                           onClick={() => {
                             if (canAttack) {
                               setSelectedFieldUnit(isSelected ? null : unit);
@@ -1281,7 +1409,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                             }
                           }}
                           style={{ clipPath: CYBER_CARD_CLIP }}
-                          className={`w-24 sm:w-28 md:w-32 h-36 sm:h-40 md:h-44 bg-black border-2 transition-transform duration-300 cursor-pointer flex flex-col justify-between relative shadow-xl ${
+                          className={`w-20 sm:w-24 md:w-28 h-28 sm:h-34 md:h-38 bg-black border-2 transition-transform duration-300 cursor-pointer flex flex-col justify-between relative shadow-xl ${
                             isSelected
                               ? 'border-[#FCEE0A] -translate-y-2 scale-105'
                               : canAttack
@@ -1343,22 +1471,76 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                   {Array.from({ length: Math.max(0, 4 - p.field.length) }).map((_, slotIdx) => (
                     <div
                       key={`p-slot-${slotIdx}`}
-                      className="w-24 sm:w-28 md:w-32 h-36 sm:h-40 md:h-44 rounded-xl border border-[#0dfceb]/20 bg-black/25 flex items-center justify-center pointer-events-none shrink-0"
+                      className="w-20 sm:w-24 md:w-28 h-28 sm:h-34 md:h-38 rounded-xl border border-[#0dfceb]/20 bg-black/25 flex items-center justify-center pointer-events-none shrink-0"
                     />
                   ))}
                 </div>
               </div>
 
-              {/* FILA INFERIOR: LEYENDAS JUGADOR + ZONA DE EDDIES JUGADOR (100% FIEL A LA IMAGEN) */}
-              <div className="h-28 sm:h-32 md:h-36 flex gap-2 items-stretch w-full">
-                {/* 1. LEYENDAS (3 SLOTS) */}
-                <div className="rounded-2xl border border-[#0dfceb]/30 bg-[#060b14]/80 p-2 sm:p-2.5 flex items-center justify-center gap-1.5 sm:gap-2 shrink-0">
+              {/* BARRA DE GIGS DEL JUGADOR (DADOS ACTIVOS Y STREET CRED) */}
+              <div className="px-3 py-1 rounded-xl bg-[#070a10] border border-[#0dfceb]/35 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] sm:text-[11px] font-mono font-bold text-[#0dfceb] uppercase tracking-wider flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-[#0dfceb] animate-pulse" />
+                    <span>TUS GIGS ({p.gigs.length}/7):</span>
+                  </span>
+                  <span className="text-[9px] font-mono text-gray-400 hidden sm:inline">
+                    {p.gigs.length >= 7
+                      ? '¡7 GIGS ALCANZADOS! ¡VICTORIA!'
+                      : `Consigue ${7 - p.gigs.length} más para ganar la partida`}
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  {p.gigs.length === 0 ? (
+                    <span className="text-[10px] font-mono text-gray-500 italic">
+                      Sin Gigs en juego aún (tira un dado al inicio del turno)
+                    </span>
+                  ) : (
+                    p.gigs.map((gig, idx) => (
+                      <div
+                        key={idx}
+                        className="transition-transform hover:scale-110"
+                        title={`Dado ${gig.die.toUpperCase()} (Valor: ${gig.value})${gig.stolenFrom ? ' - ¡Robado al Rival!' : ''}`}
+                      >
+                        <PolyhedralDie
+                          type={gig.die.toLowerCase()}
+                          value={gig.value}
+                          isWaiting={false}
+                          isStolen={Boolean(gig.stolenFrom)}
+                          size={26}
+                        />
+                      </div>
+                    ))
+                  )}
+                  <span className="text-xs font-mono font-black text-[#0dfceb] ml-1.5">
+                    ⭐ {playerStreetCred}
+                  </span>
+                </div>
+              </div>
+
+              {/* FILA INFERIOR (BACKLINE): LEYENDAS JUGADOR A LA IZQUIERDA + ZONA DE EDDIES JUGADOR */}
+              <div className="h-20 sm:h-24 md:h-28 flex gap-2 items-stretch w-full">
+                {/* 1. LEYENDAS JUGADOR (3 SLOTS) A LA IZQUIERDA */}
+                <div className="rounded-2xl border border-[#0dfceb]/30 bg-[#060b14]/80 p-1.5 sm:p-2 flex items-center justify-center gap-1.5 sm:gap-2 shrink-0">
                   {p.legends.map((leg, i) => {
                     const isTurn1Penalty = leg.isSpent && gameState.turnNumber === 1 && i < 2;
 
                     return (
                       <div
                         key={leg.instanceId || i}
+                        onMouseEnter={(e) => {
+                          if (leg.isFaceUp) {
+                            setHoveredCard(leg);
+                            setHoverPos({ x: e.clientX, y: e.clientY });
+                          }
+                        }}
+                        onMouseMove={(e) => {
+                          if (leg.isFaceUp) {
+                            setHoverPos({ x: e.clientX, y: e.clientY });
+                          }
+                        }}
+                        onMouseLeave={() => setHoveredCard(null)}
                         onClick={() => {
                           if (!leg.isFaceUp && isMyTurn && !p.hasCalledLegendThisTurn) {
                             if (availableEddies < 1) {
@@ -1373,7 +1555,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                             setInspectedCard(leg);
                           }
                         }}
-                        className={`w-14 sm:w-16 md:w-20 h-22 sm:h-26 md:h-28 rounded-lg overflow-hidden border transition-all cursor-pointer flex flex-col items-center justify-center relative shadow-md ${
+                        className={`w-11 sm:w-13 md:w-15 h-16 sm:h-20 md:h-24 rounded-lg overflow-hidden border transition-all cursor-pointer flex flex-col items-center justify-center relative shadow-md ${
                           leg.isSpent
                             ? 'border-gray-800 opacity-60'
                             : leg.isFaceUp
@@ -1416,7 +1598,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                   })}
                 </div>
 
-                {/* 2. ZONA DE EDDIES (CON SOPORTE DRAG & DROP Y BADGE EDDIES X/Y Ⓐ) */}
+                {/* 2. ZONA DE EDDIES JUGADOR (CON SOPORTE DRAG & DROP Y BADGE EDDIES X/Y Ⓐ) */}
                 <div
                   onDragOver={(e) => {
                     e.preventDefault();
@@ -1429,7 +1611,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                     const cardId = e.dataTransfer.getData('text/plain');
                     if (cardId) handleSellCard(cardId);
                   }}
-                  className={`flex-1 rounded-2xl border transition-all relative flex items-center p-3 sm:p-4 overflow-hidden ${
+                  className={`flex-1 rounded-2xl border transition-all relative flex items-center p-2 sm:p-2.5 overflow-hidden ${
                     isDragOverEddies
                       ? 'border-[#FCEE0A] bg-[#FCEE0A]/15 shadow-[0_0_25px_rgba(252,238,10,0.4)]'
                       : 'border-[#0dfceb]/30 bg-[#060b14]/80'
@@ -1437,7 +1619,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                 >
                   {/* Contenido cuando no hay Eddies vs cuando hay Eddies vendidos */}
                   {p.eddies.length === 0 ? (
-                    <div className="text-gray-400 font-mono text-sm sm:text-base select-none pl-2 sm:pl-3">
+                    <div className="text-gray-400 font-mono text-xs sm:text-sm select-none pl-2 sm:pl-3">
                       {isDragOverEddies ? (
                         <span className="text-[#FCEE0A] font-bold animate-pulse">
                           ¡Suelta aquí para vender (+1 €$)!
@@ -1447,7 +1629,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                       )}
                     </div>
                   ) : (
-                    <div className="flex flex-wrap items-center gap-2 sm:gap-3 py-1 pr-24 overflow-x-auto w-full">
+                    <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 py-0.5 pr-24 overflow-x-auto w-full">
                       {p.eddies.map((ed, idx) => (
                         <div
                           key={ed.instanceId || idx}
@@ -1457,7 +1639,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                             setGameState({ ...gameState });
                           }}
                           className={`transition-all duration-300 flex items-center justify-center shrink-0 cursor-pointer ${
-                            ed.isSpent ? 'w-20 sm:w-24 h-14 sm:h-16 my-1' : 'w-14 sm:w-16 h-20 sm:h-24'
+                            ed.isSpent ? 'w-16 sm:w-20 h-10 sm:h-12 my-0.5' : 'w-10 sm:w-12 h-14 sm:h-16'
                           }`}
                           title={
                             ed.isSpent
@@ -1466,7 +1648,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                           }
                         >
                           <div
-                            className={`w-14 sm:w-16 h-20 sm:h-24 rounded-lg overflow-hidden border transition-transform duration-300 relative shadow-md ${
+                            className={`w-10 sm:w-12 h-14 sm:h-16 rounded-md overflow-hidden border transition-transform duration-300 relative shadow-md ${
                               ed.isSpent
                                 ? 'rotate-90 opacity-40 border-gray-800'
                                 : 'border-[#0dfceb] hover:border-[#FCEE0A] hover:scale-105 shadow-[0_0_10px_rgba(13,252,235,0.4)]'
@@ -1475,7 +1657,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                             <CyberCardBack className="w-full h-full" />
                             <div className="absolute inset-0 bg-black/30 flex items-center justify-center">
                               <span
-                                className={`font-mono font-black text-[9px] px-1 bg-black/90 ${
+                                className={`font-mono font-black text-[8px] px-1 bg-black/90 ${
                                   ed.isSpent ? '-rotate-90 text-gray-500' : 'text-[#0dfceb]'
                                 }`}
                               >
@@ -1489,7 +1671,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                   )}
 
                   {/* Badge inferior derecho: Eddies X/Y Ⓐ exactamente como en la imagen */}
-                  <div className="absolute bottom-2.5 right-3 flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-[#031525]/90 border border-[#00F0FF]/60 text-[#00F0FF] font-mono text-[11px] sm:text-xs font-bold shadow-[0_0_10px_rgba(0,240,255,0.25)] select-none pointer-events-none">
+                  <div className="absolute bottom-1.5 right-2.5 flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-[#031525]/90 border border-[#00F0FF]/60 text-[#00F0FF] font-mono text-[10px] sm:text-xs font-bold shadow-[0_0_10px_rgba(0,240,255,0.25)] select-none pointer-events-none">
                     <span>Eddies {availableEddies}/{p.eddies.length + p.legends.length}</span>
                     <span className="w-3.5 h-3.5 rounded-full border border-[#00F0FF] flex items-center justify-center text-[9px] font-black leading-none">Ⓐ</span>
                   </div>
@@ -1497,26 +1679,27 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
               </div>
             </div>
 
-            {/* Columna Derecha del Jugador: Deck arriba y Trash abajo (100% fiel a la imagen) */}
-            <div className="flex flex-col gap-2 shrink-0 w-20 sm:w-24 md:w-28">
+            {/* 3.B COLUMNA DERECHA DEL JUGADOR: DECK (ARRIBA) Y TRASH (ABAJO) */}
+            <div className="flex flex-col gap-1.5 shrink-0 w-16 sm:w-20 md:w-24">
               {/* DECK JUGADOR */}
               <div
-                className="flex-1 rounded-2xl border border-[#0dfceb]/30 bg-[#060b14]/80 flex flex-col items-center justify-center p-2 relative shadow-md select-none"
+                className="flex-1 rounded-2xl border border-[#0dfceb]/30 bg-[#060b14]/80 flex flex-col items-center justify-center p-1.5 relative shadow-md select-none"
                 title={`Mazo principal (Deck): ${p.deck.length} cartas restantes`}
               >
-                <span className="text-[9px] font-mono text-gray-400 uppercase font-bold mb-1">DECK</span>
-                <span className="text-2xl sm:text-3xl font-black font-mono text-[#39FF14] drop-shadow-[0_0_8px_rgba(57,255,20,0.7)]">
+                <span className="text-[8px] sm:text-[9px] font-mono text-gray-400 uppercase font-bold mb-0.5">DECK</span>
+                <span className="text-xl sm:text-2xl font-black font-mono text-[#39FF14] drop-shadow-[0_0_8px_rgba(57,255,20,0.7)]">
                   {p.deck.length}
                 </span>
               </div>
 
               {/* TRASH JUGADOR */}
               <div
-                className="h-28 sm:h-32 md:h-36 rounded-2xl border border-[#0dfceb]/30 bg-[#060b14]/80 flex flex-col items-center justify-center p-2 relative shadow-md select-none"
-                title={`Descartes (Trash): ${p.trash.length} cartas`}
+                onClick={() => p.trash.length > 0 && setInspectedCard(p.trash[p.trash.length - 1])}
+                className="h-16 sm:h-20 rounded-2xl border border-[#0dfceb]/30 bg-[#060b14]/80 flex flex-col items-center justify-center p-1 relative shadow-md select-none cursor-pointer hover:border-[#FCEE0A]"
+                title={`Descartes (Trash): ${p.trash.length} cartas (clic para inspeccionar última)`}
               >
-                <span className="text-[9px] font-mono text-gray-400 uppercase font-bold mb-1">TRASH</span>
-                <span className="text-xl sm:text-2xl font-black font-mono text-gray-400">
+                <span className="text-[8px] sm:text-[9px] font-mono text-gray-400 uppercase font-bold mb-0.5">TRASH</span>
+                <span className="text-base sm:text-lg font-black font-mono text-gray-400">
                   {p.trash.length}
                 </span>
               </div>
@@ -1621,28 +1804,10 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
           </div>
 
           {/* Fila Principal del Dock Inferior:
-              [PILAS DE MAZO Y TRASH IZQUIERDA] [CARRUSEL DE MANO AL CENTRO] [BOTÓN TERMINAR TURNO DERECHA] */}
+              [CARRUSEL DE MANO IZQUIERDA/CENTRO] [PILAS DE MAZO Y TRASH A LA DERECHA] [BOTÓN TERMINAR TURNO DERECHA] */}
           <div className="flex items-center justify-between gap-3">
-            {/* LADO IZQUIERDO: Pilas de Mazo (deck) y Descartes (trash) con reverso amarillo #FCEE0A diagonal */}
-            <div className="flex items-center gap-2 shrink-0">
-              <CyberDeckPile
-                label="TU MAZO"
-                count={p.deck.length}
-                isTrash={false}
-              />
-              <CyberDeckPile
-                label="DESCARTE"
-                count={p.trash.length}
-                isTrash={true}
-                topCard={p.trash.length > 0 ? p.trash[p.trash.length - 1] : null}
-                onClick={() =>
-                  p.trash.length > 0 && setInspectedCard(p.trash[p.trash.length - 1])
-                }
-              />
-            </div>
-
-            {/* CENTRO: Carrusel de cartas de la mano con Framer Motion (hover lift) */}
-            <div className="flex-1 flex items-center justify-center gap-2 overflow-x-auto py-1 px-2">
+            {/* IZQUIERDA/CENTRO: Carrusel de cartas de la mano con Framer Motion (hover lift) */}
+            <div className="flex-1 flex items-center justify-start sm:justify-center gap-2 overflow-x-auto py-1 px-2">
               {p.hand.map((card) => {
                 const isSelected = selectedHandCard?.instanceId === card.instanceId;
                 const canAfford = availableEddies >= (card.parsedCost || 0);
@@ -1691,8 +1856,25 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
               })}
             </div>
 
-            {/* LADO DERECHO: Botón de Acción Rápida "Terminar Turno" */}
-            <div className="shrink-0 flex flex-col gap-1.5">
+            {/* LADO DERECHO: Pilas de Mazo (deck) y Descartes (trash) + Botón de Terminar Turno */}
+            <div className="flex items-center gap-2.5 sm:gap-3 shrink-0">
+              <div className="flex items-center gap-1.5 sm:gap-2">
+                <CyberDeckPile
+                  label="TU MAZO"
+                  count={p.deck.length}
+                  isTrash={false}
+                />
+                <CyberDeckPile
+                  label="DESCARTE"
+                  count={p.trash.length}
+                  isTrash={true}
+                  topCard={p.trash.length > 0 ? p.trash[p.trash.length - 1] : null}
+                  onClick={() =>
+                    p.trash.length > 0 && setInspectedCard(p.trash[p.trash.length - 1])
+                  }
+                />
+              </div>
+
               <button
                 type="button"
                 disabled={!isMyTurn}
@@ -2186,6 +2368,69 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
               JUGAR OTRA PARTIDA
             </button>
           </div>
+        </div>
+      )}
+
+      {/* 6. PREVISUALIZACIÓN FLOTANTE DE CARTA EN CAMPO (HOVER CARD PREVIEW) */}
+      {hoveredCard && (
+        <div
+          style={{
+            position: 'fixed',
+            left: Math.min(
+              Math.max(16, hoverPos.x + 18),
+              (typeof window !== 'undefined' ? window.innerWidth : 1200) - 270
+            ),
+            top: Math.min(
+              Math.max(16, hoverPos.y - 140),
+              (typeof window !== 'undefined' ? window.innerHeight : 800) - 390
+            ),
+            zIndex: 9999,
+            pointerEvents: 'none'
+          }}
+          className="w-56 sm:w-64 rounded-xl overflow-hidden border-2 border-[#FCEE0A] bg-[#070a10]/95 backdrop-blur-md shadow-[0_0_35px_rgba(252,238,10,0.65)] p-2.5 font-mono flex flex-col gap-2 transition-all duration-75"
+        >
+          <div className="relative aspect-[7/10] w-full rounded-lg overflow-hidden border border-[#0dfceb]/50 shadow-inner">
+            <img
+              src={hoveredCard.image}
+              alt={hoveredCard.name}
+              className="w-full h-full object-cover"
+            />
+            {hoveredCard.currentPower !== undefined && (
+              <div className="absolute bottom-1 right-1 px-2.5 py-0.5 bg-[#FCEE0A] text-[#070a10] font-black text-sm shadow-md rounded">
+                ⚡ {hoveredCard.currentPower}
+              </div>
+            )}
+          </div>
+          <div className="flex items-center justify-between text-xs px-0.5">
+            <span className="font-bold text-white truncate max-w-[170px] uppercase">
+              {hoveredCard.name}
+            </span>
+            <span className="text-[#0dfceb] font-black">
+              {hoveredCard.parsedCost ? `${hoveredCard.parsedCost} €$` : 'LEYENDA'}
+            </span>
+          </div>
+          {hoveredCard.keywords && hoveredCard.keywords.length > 0 && (
+            <div className="flex flex-wrap gap-1 px-0.5">
+              {hoveredCard.keywords.map((kw, i) => (
+                <span
+                  key={i}
+                  className="px-1.5 py-0.2 bg-[#0dfceb]/20 text-[#0dfceb] border border-[#0dfceb]/40 text-[9px] font-bold uppercase rounded"
+                >
+                  {kw}
+                </span>
+              ))}
+            </div>
+          )}
+          {hoveredCard.isSpent && (
+            <div className="text-[10px] text-[#FF003C] font-black uppercase px-0.5">
+              ⚠ GASTADA ESTE TURNO
+            </div>
+          )}
+          {hoveredCard.isLagging && (
+            <div className="text-[10px] text-[#FF003C] font-black uppercase px-0.5">
+              ⚠ LAG (No puede atacar este turno)
+            </div>
+          )}
         </div>
       )}
     </div>
