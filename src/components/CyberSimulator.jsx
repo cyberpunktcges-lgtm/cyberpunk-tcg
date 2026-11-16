@@ -804,7 +804,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
   const handleResetGame = () => {
     if (
       window.confirm(
-        '¿Deseas reiniciar la partida?\nSe eliminará el progreso guardado de la partida actual y comenzará una nueva.'
+        '¿Deseas iniciar una nueva partida?\nSe reiniciará la mesa de combate y volverás a la fase inicial de elección de mano (Keep/Mulligan) y tirada de Gig en el Fixer.'
       )
     ) {
       try {
@@ -812,6 +812,13 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
           localStorage.removeItem(CP_SIM_STORAGE_KEY);
         }
       } catch {}
+      setSelectedHandCard(null);
+      setSelectedFieldUnit(null);
+      setLegendMenuId(null);
+      setHoveredCard(null);
+      setPreviewCard(null);
+      setHistory([]);
+      setHolocall(null);
       handleStartGame(selectedPlayerDeckIdx, selectedBotDeckIdx, true);
     }
   };
@@ -1170,15 +1177,16 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
             <HelpCircle className="w-4 h-4" />
           </button>
 
-          {/* Botón Reiniciar Partida */}
+          {/* Botón Nueva Partida */}
           <button
             type="button"
             onClick={handleResetGame}
             style={{ clipPath: CYBER_BUTTON }}
-            className="p-1.5 bg-[#000000] border border-gray-700 hover:border-[#FF003C] text-gray-400 hover:text-[#FF003C] cursor-pointer transition-all"
-            title="Reiniciar Partida (Comenzar nuevo combate)"
+            className="px-2.5 sm:px-3 py-1.5 bg-[#FF003C]/20 hover:bg-[#FF003C] text-[#FF003C] hover:text-white border border-[#FF003C]/60 hover:border-[#FF003C] font-mono font-black uppercase flex items-center gap-1.5 cursor-pointer text-xs transition-all shadow-[0_0_15px_rgba(255,0,60,0.3)] hover:shadow-[0_0_20px_rgba(255,0,60,0.7)]"
+            title="Iniciar una Nueva Partida limpia desde el Turno 1"
           >
-            <RotateCcw className="w-4 h-4" />
+            <RotateCcw className="w-3.5 h-3.5" />
+            <span>NUEVA PARTIDA</span>
           </button>
         </div>
       </header>
