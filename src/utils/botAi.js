@@ -8,6 +8,7 @@
 import {
   getAvailableEddies,
   sellCardForEddies,
+  playCard,
   playUnitCard,
   callLegendFaceUp,
   attackRivalGigs,
@@ -80,18 +81,18 @@ export async function runBotTurn(gameState, updateCallback, delayMs = 700) {
     }
   }
 
-  // Paso 3: Jugar unidades desde la mano (priorizando mayor relación poder/coste)
+  // Paso 3: Jugar cartas desde la mano (priorizando mayor relación poder/coste)
   let keepPlaying = true;
   while (keepPlaying && !gameState.isGameOver) {
     const availableEddies = getAvailableEddies(bot);
-    const playableUnits = bot.hand
+    const playableCards = bot.hand
       .filter((c) => (c.parsedCost || 0) <= availableEddies)
       .sort((a, b) => (b.parsedPower || 0) - (a.parsedPower || 0)); // Priorizar la más fuerte
 
-    if (playableUnits.length > 0) {
+    if (playableCards.length > 0) {
       await wait(delayMs);
-      const chosenUnit = playableUnits[0];
-      const res = playUnitCard(gameState, 'bot', chosenUnit.instanceId);
+      const chosenCard = playableCards[0];
+      const res = playCard(gameState, 'bot', chosenCard.instanceId);
       if (res.success) {
         updateCallback({ ...gameState });
       } else {

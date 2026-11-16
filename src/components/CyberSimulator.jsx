@@ -31,7 +31,11 @@ import {
   calculateStreetCred,
   getAvailableEddies,
   sellCardForEddies,
+  playCard,
   playUnitCard,
+  playProgramCard,
+  playGearCard,
+  getCardType,
   callLegendFaceUp,
   attackRivalGigs,
   fightRivalUnit,
@@ -43,6 +47,8 @@ import {
   getEligibleFixerDice,
   rollInGig,
   rollDie,
+  parseCardPower,
+  parseCardCost,
   isCardVendible,
   toggleEddieSpent,
   DICE_CONFIG
@@ -447,11 +453,11 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
     }, 65);
   };
 
-  // Jugar carta arrastrada o clicada
-  const handlePlayCard = (cardInstanceId) => {
+  // Jugar carta arrastrada o clicada (Unidad -> Campo, Programa -> Trash, Gear -> Equipa)
+  const handlePlayCard = (cardInstanceId, targetId = null) => {
     if (!gameState || gameState.activePlayer !== 'player' || gameState.isGameOver) return;
     pushHistory();
-    const res = playUnitCard(gameState, 'player', cardInstanceId);
+    const res = playCard(gameState, 'player', cardInstanceId, targetId);
     if (res.success) {
       setSelectedHandCard(null);
       setGameState({ ...gameState });
@@ -896,9 +902,46 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                     {displayCard.name}
                   </span>
                   <span className="text-[#0dfceb] font-black shrink-0">
-                    {displayCard.parsedCost ? `${displayCard.parsedCost} €$` : 'LEYENDA'}
+                    {displayCard.parsedCost !== undefined && displayCard.parsedCost !== null
+                      ? `${displayCard.parsedCost} €$`
+                      : 'LEYENDA'}
                   </span>
                 </div>
+
+                {/* Tipo oficial */}
+                {(() => {
+                  const type = getCardType(displayCard);
+                  const isProg = type === 'PROGRAM';
+                  const isGr = type === 'GEAR';
+                  return (
+                    <div className="w-full flex items-center gap-1.5 px-1 text-[8px] font-bold">
+                      <span className={`px-1.5 py-0.2 rounded uppercase ${
+                        isProg ? 'bg-[#0dfceb]/20 text-[#0dfceb] border border-[#0dfceb]/40' :
+                        isGr ? 'bg-[#FCEE0A]/20 text-[#FCEE0A] border border-[#FCEE0A]/40' :
+                        'bg-gray-800 text-gray-300'
+                      }`}>
+                        {isProg ? '💾 PROGRAMA (A TRASH TRAS LANZARSE)' :
+                         isGr ? '🔧 GEAR (EQUIPABLE A UNIDAD/LEYENDA)' :
+                         type}
+                      </span>
+                    </div>
+                  );
+                })()}
+
+                {/* Lista de Gears equipados si los tiene */}
+                {displayCard.gear && displayCard.gear.length > 0 && (
+                  <div className="w-full bg-[#070a10] border border-[#FCEE0A]/40 rounded p-1 text-[8px] space-y-0.5">
+                    <span className="text-[#FCEE0A] font-bold block uppercase">
+                      🔧 EQUIPO ANEXADO ({displayCard.gear.length}):
+                    </span>
+                    {displayCard.gear.map((g, gi) => (
+                      <div key={gi} className="flex justify-between text-gray-300">
+                        <span className="truncate max-w-[130px]">• {g.name}</span>
+                        <span className="text-[#0dfceb] font-bold">{g.powerVal || g.power || ''}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
 
                 {/* Palabras clave (100% seguro para string, array o undefined) */}
                 {(() => {
@@ -1088,6 +1131,13 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                           <span className="px-1 bg-black border border-gray-700 text-gray-500 font-mono font-bold text-[7px] uppercase tracking-tighter text-center">
                             GASTADA
                           </span>
+                        </div>
+                      )}
+
+                      {/* Badge de Gear si tiene equipo anexado */}
+                      {leg.gear && leg.gear.length > 0 && (
+                        <div className="absolute top-0.5 right-0.5 px-1 py-0.2 bg-[#FCEE0A] text-black font-mono font-black text-[6px] sm:text-[7px] uppercase shadow z-10">
+                          🔧 {leg.gear.length}
                         </div>
                       )}
                     </div>
@@ -1317,7 +1367,46 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                               </span>
                             </div>
                           )}
+
+                          {/* Badge de Gear del Rival */}
+                          {unit.gear && unit.gear.length > 0 && (
+                            <div className="absolute top-0.5 right-0.5 px-1 py-0.2 bg-[#FCEE0A] text-black font-mono font-black text-[6px] sm:text-[7px] uppercase shadow z-10 flex items-center gap-0.5">
+                              <span>🔧</span>
+                              <span>{unit.gear.length}</span>
+                            </div>
+                          )}
                         </motion.div>
+
+                        {/* GEARS EQUIPADOS AL RIVAL (Sobresaliendo por debajo de la unidad) */}
+                        {unit.gear && unit.gear.length > 0 && (
+                          <div className="w-full flex flex-col items-center -mt-1 z-0">
+                            {unit.gear.map((g, gIdx) => (
+                              <div
+                                key={g.instanceId || gIdx}
+                                onMouseEnter={(e) => {
+                                  e.stopPropagation();
+                                  setHoveredCard(g);
+                                  setPreviewCard(g);
+                                }}
+                                onMouseLeave={() => setHoveredCard(null)}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setInspectedCard(g);
+                                }}
+                                style={{ clipPath: CYBER_CARD_CLIP }}
+                                className="w-[92%] h-5 sm:h-6 bg-[#070a10] border border-[#FF003C]/80 flex items-center justify-between px-1 py-0.5 cursor-pointer shadow hover:border-[#FCEE0A] transition-all -mt-0.5 group"
+                                title={`Gear equipado: ${g.name} (${g.power || '+Fuerza'}) - Clic para ver`}
+                              >
+                                <span className="text-[6px] sm:text-[7px] text-[#FF003C] group-hover:text-white truncate font-bold">
+                                  🔧 {g.name}
+                                </span>
+                                <span className="text-[6px] sm:text-[7px] font-black text-[#FCEE0A] shrink-0">
+                                  {g.powerVal || g.power || 'GEAR'}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     );
                   })}
@@ -1459,7 +1548,19 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                           setPreviewCard(unit);
                         }}
                         onMouseLeave={() => setHoveredCard(null)}
-                        className={`transition-all duration-300 flex items-center justify-center shrink-0 ${
+                        onDragOver={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                        }}
+                        onDrop={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          const draggedCardId = e.dataTransfer.getData('text/plain');
+                          if (draggedCardId) {
+                            handlePlayCard(draggedCardId, unit.instanceId);
+                          }
+                        }}
+                        className={`transition-all duration-300 flex flex-col items-center justify-center shrink-0 ${
                           unit.isSpent
                             ? 'w-32 sm:w-36 md:w-40 h-20 sm:h-24 md:h-28 my-1'
                             : 'w-20 sm:w-24 md:w-28 h-28 sm:h-34 md:h-38'
@@ -1539,6 +1640,14 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                             )}
                           </div>
 
+                          {/* Badge de Gear del Jugador */}
+                          {unit.gear && unit.gear.length > 0 && (
+                            <div className="absolute top-1 right-1 px-1.5 py-0.5 bg-[#FCEE0A] text-black font-mono font-black text-[7px] sm:text-[8px] uppercase shadow z-10 flex items-center gap-0.5">
+                              <span>🔧</span>
+                              <span>{unit.gear.length}</span>
+                            </div>
+                          )}
+
                           {/* Insignia de Poder GIGANTE */}
                           <div className="absolute bottom-1 right-1 px-2 py-0.5 bg-[#FCEE0A] text-[#070a10] font-mono font-black text-xs shadow-md">
                             {unit.currentPower}
@@ -1553,6 +1662,39 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                             </div>
                           )}
                         </motion.div>
+
+                        {/* GEARS EQUIPADOS AL JUGADOR (Sobresaliendo por debajo de la unidad) */}
+                        {unit.gear && unit.gear.length > 0 && (
+                          <div className="w-full flex flex-col items-center -mt-2 z-0">
+                            {unit.gear.map((g, gIdx) => (
+                              <div
+                                key={g.instanceId || gIdx}
+                                onMouseEnter={(e) => {
+                                  e.stopPropagation();
+                                  setHoveredCard(g);
+                                  setPreviewCard(g);
+                                }}
+                                onMouseLeave={() => setHoveredCard(null)}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setInspectedCard(g);
+                                }}
+                                style={{ clipPath: CYBER_CARD_CLIP }}
+                                className="w-[92%] h-6 sm:h-7 bg-[#070a10] border border-[#FCEE0A] flex items-center justify-between px-1.5 py-0.5 cursor-pointer shadow-[0_4px_10px_rgba(0,0,0,0.8)] hover:border-[#0dfceb] transition-all -mt-1 group"
+                                title={`Gear equipado: ${g.name} (${g.power || '+Fuerza'}) - Clic para ver`}
+                              >
+                                <div className="flex items-center gap-1 min-w-0">
+                                  <span className="text-[7px] sm:text-[8px] text-[#FCEE0A] group-hover:text-white truncate font-bold">
+                                    🔧 {g.name}
+                                  </span>
+                                </div>
+                                <span className="text-[7px] sm:text-[8px] font-black text-[#0dfceb] shrink-0">
+                                  {g.powerVal || g.power || 'GEAR'}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     );
                   })}
@@ -1626,6 +1768,18 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                           }
                         }}
                         onMouseLeave={() => setHoveredCard(null)}
+                        onDragOver={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                        }}
+                        onDrop={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          const draggedCardId = e.dataTransfer.getData('text/plain');
+                          if (draggedCardId) {
+                            handlePlayCard(draggedCardId, leg.instanceId);
+                          }
+                        }}
                         onClick={() => {
                           if (!leg.isFaceUp && isMyTurn && !p.hasCalledLegendThisTurn) {
                             if (availableEddies < 1) {
@@ -1680,6 +1834,13 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                         {!leg.isFaceUp && !leg.isSpent && isMyTurn && !p.hasCalledLegendThisTurn && availableEddies >= 1 && (
                           <div className="absolute bottom-0 inset-x-0 bg-[#0dfceb]/90 text-black font-mono font-black text-[7px] uppercase text-center py-0.5 animate-pulse">
                             LLAMAR 1€$
+                          </div>
+                        )}
+
+                        {/* Badge de Gear del Jugador */}
+                        {leg.gear && leg.gear.length > 0 && (
+                          <div className="absolute top-0.5 right-0.5 px-1 py-0.2 bg-[#FCEE0A] text-black font-mono font-black text-[6px] sm:text-[7px] uppercase shadow z-10">
+                            🔧 {leg.gear.length}
                           </div>
                         )}
                       </div>
@@ -1817,24 +1978,56 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                   {selectedHandCard.name} ({selectedHandCard.parsedCost} €$)
                 </span>
 
-                <button
-                  type="button"
-                  disabled={!isMyTurn || availableEddies < selectedHandCard.parsedCost}
-                  onClick={() => {
-                    pushHistory();
-                    const res = playUnitCard(gameState, 'player', selectedHandCard.instanceId);
-                    if (res.success) {
-                      setSelectedHandCard(null);
-                      setGameState({ ...gameState });
+                {(() => {
+                  const cardType = getCardType(selectedHandCard);
+                  const isProgram = cardType === 'PROGRAM';
+                  const isGear = cardType === 'GEAR';
+                  const gearTarget = selectedFieldUnit?.instanceId || (p.field.length > 0 ? p.field[0].instanceId : (p.legends[0]?.instanceId || null));
+                  const canAfford = availableEddies >= selectedHandCard.parsedCost;
+                  const canPlay = isMyTurn && canAfford && (!isGear || Boolean(gearTarget));
+
+                  let actionLabel = `JUGAR UNIDAD (${selectedHandCard.parsedCost} €$)`;
+                  if (isProgram) {
+                    actionLabel = `LANZAR PROGRAMA (${selectedHandCard.parsedCost} €$)`;
+                  } else if (isGear) {
+                    if (selectedFieldUnit) {
+                      actionLabel = `EQUIPAR A ${selectedFieldUnit.name.split(' ')[0]} (${selectedHandCard.parsedCost} €$)`;
+                    } else if (gearTarget) {
+                      actionLabel = `EQUIPAR GEAR (${selectedHandCard.parsedCost} €$)`;
                     } else {
-                      alert(res.reason);
+                      actionLabel = 'GEAR (SIN OBJETIVO)';
                     }
-                  }}
-                  style={{ clipPath: CYBER_BUTTON }}
-                  className="px-3 py-1 bg-[#0dfceb] hover:bg-[#FCEE0A] text-[#070a10] font-black text-xs uppercase cursor-pointer disabled:opacity-40 transition-colors shadow-[0_0_15px_rgba(13,252,235,0.4)]"
-                >
-                  JUGAR UNIDAD ({selectedHandCard.parsedCost} €$)
-                </button>
+                  }
+
+                  return (
+                    <button
+                      type="button"
+                      disabled={!canPlay}
+                      onClick={() => {
+                        handlePlayCard(selectedHandCard.instanceId, isGear ? gearTarget : null);
+                      }}
+                      style={{ clipPath: CYBER_BUTTON }}
+                      className={`px-3 py-1 text-[#070a10] font-black text-xs uppercase cursor-pointer disabled:opacity-40 transition-colors shadow-[0_0_15px_rgba(13,252,235,0.4)] ${
+                        isProgram
+                          ? 'bg-[#0dfceb] hover:bg-white'
+                          : isGear
+                          ? 'bg-[#FCEE0A] hover:bg-white'
+                          : 'bg-[#0dfceb] hover:bg-[#FCEE0A]'
+                      }`}
+                      title={
+                        isProgram
+                          ? 'Lanza este programa: se pagan los Eddies y va directamente a la Basura (Trash)'
+                          : isGear
+                          ? selectedFieldUnit
+                            ? `Equipa este Gear a ${selectedFieldUnit.name}`
+                            : 'Equipa este Gear a una unidad o arrástralo directamente sobre una unidad/leyenda'
+                          : 'Despliega esta Unidad en el campo de batalla'
+                      }
+                    >
+                      {actionLabel}
+                    </button>
+                  );
+                })()}
 
                 <button
                   type="button"

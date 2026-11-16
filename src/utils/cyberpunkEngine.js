@@ -383,13 +383,145 @@ export function toggleEddieSpent(state, playerKey, eddieInstanceId) {
 }
 
 /**
+ * Identifica el tipo de carta (UNIT, PROGRAM, GEAR, LEGEND):
+ */
+export function getCardType(card) {
+  if (!card) return 'UNKNOWN';
+  const official = (card.officialType || '').toUpperCase();
+  if (official) return official;
+  const t = (card.type || card.cardType || '').toUpperCase();
+  if (t.includes('PROGRAM')) return 'PROGRAM';
+  if (t.includes('GEAR')) return 'GEAR';
+  if (t.includes('LEGEND')) return 'LEGEND';
+  if (t.includes('UNIT')) return 'UNIT';
+  return 'UNIT';
+}
+
+/**
+ * Lanza un PROGRAMA desde la mano:
+ * REGLA OFICIAL: "los programas cuando se lanzan, se van al trash"
+ * - Paga su coste en Eddies.
+ * - Va directamente a la Basura (Trash) tras lanzarse.
+ */
+export function playProgramCard(state, playerKey, cardInstanceId) {
+  const p = state[playerKey];
+  const cardIdx = (p.hand || []).findIndex((c) => c.instanceId === cardInstanceId);
+  if (cardIdx === -1) return { success: false, reason: 'Programa no encontrado en mano.' };
+
+  const card = p.hand[cardIdx];
+  const cost = card.parsedCost || parseCardCost(card.cost);
+  const available = getAvailableEddies(p);
+
+  if (available < cost) {
+    return {
+      success: false,
+      reason: `Eddies insuficientes. Requiere ${cost} €$ y tienes ${available} €$ disponibles.`
+    };
+  }
+
+  // Pagar coste
+  spendEddies(p, cost);
+  p.hand.splice(cardIdx, 1);
+
+  // El programa va directo al descarte (Trash)
+  if (!p.trash) p.trash = [];
+  p.trash.push(card);
+
+  (state.actionLog = state.actionLog || []).unshift(
+    `💾 ${p.name} paga ${cost} €$, ejecuta el Programa "${card.name}" y va al Descarte (Trash).`
+  );
+
+  return { success: true, type: 'PROGRAM', card };
+}
+
+/**
+ * Equipa un GEAR desde la mano a una Unidad o Leyenda:
+ * REGLA OFICIAL: "los gears se equipan a las unidades o las leyendas (se suelen poner por debajo de la unidad o leyenda sobresaliendo un poco)"
+ * - Paga su coste en Eddies.
+ * - Se anexa al objetivo (unidad o leyenda).
+ * - Otorga su bono de Fuerza (+X Fuerza) y palabras clave (ej: Adrenaline).
+ */
+export function playGearCard(state, playerKey, cardInstanceId, targetInstanceId = null) {
+  const p = state[playerKey];
+  const cardIdx = (p.hand || []).findIndex((c) => c.instanceId === cardInstanceId);
+  if (cardIdx === -1) return { success: false, reason: 'Gear no encontrado en mano.' };
+
+  const card = p.hand[cardIdx];
+  const cost = card.parsedCost || parseCardCost(card.cost);
+  const available = getAvailableEddies(p);
+
+  if (available < cost) {
+    return {
+      success: false,
+      reason: `Eddies insuficientes. Requiere ${cost} €$ y tienes ${available} €$ disponibles.`
+    };
+  }
+
+  // Buscar objetivo: Unidad en campo o Leyenda
+  let target = null;
+  let targetType = 'unit';
+
+  if (targetInstanceId) {
+    target = (p.field || []).find((u) => u.instanceId === targetInstanceId);
+    if (!target) {
+      target = (p.legends || []).find((l) => l.instanceId === targetInstanceId);
+      if (target) targetType = 'legend';
+    }
+  } else {
+    // Si no se especificó, auto-asignar a la primera unidad en campo o primera leyenda
+    if (p.field && p.field.length > 0) {
+      target = p.field[0];
+      targetType = 'unit';
+    } else if (p.legends && p.legends.length > 0) {
+      target = p.legends.find((l) => l.isFaceUp) || p.legends[0];
+      targetType = 'legend';
+    }
+  }
+
+  if (!target) {
+    return {
+      success: false,
+      reason: 'No hay ninguna Unidad ni Leyenda en juego a la que equipar este Gear.'
+    };
+  }
+
+  // Pagar coste
+  spendEddies(p, cost);
+  p.hand.splice(cardIdx, 1);
+
+  // Bono de Fuerza del Gear (ej: "+3 FUERZA" -> 3)
+  const powerBonus = card.powerVal
+    ? parseInt(card.powerVal, 10)
+    : parseCardPower(card.power);
+
+  if (!target.gear) target.gear = [];
+  target.gear.push(card);
+
+  if (powerBonus && target.currentPower !== undefined) {
+    target.currentPower = Math.max(0, target.currentPower + powerBonus);
+  }
+
+  if (hasKeyword(card, 'Adrenaline')) {
+    target.hasAdrenaline = true;
+    target.isLagging = false;
+  }
+
+  const bonusText = powerBonus > 0 ? ` (+${powerBonus} Fuerza)` : '';
+  (state.actionLog = state.actionLog || []).unshift(
+    `🔧 ${p.name} paga ${cost} €$ y equipa el Gear "${card.name}"${bonusText} a "${target.name}".`
+  );
+
+  return { success: true, type: 'GEAR', gear: card, target, targetType };
+}
+
+/**
  * Juega una carta de Unidad desde la mano al campo:
  * - Requiere pagar su coste en Eddies (mínimo 1 €$).
  * - Entra con LAG excepto si posee la palabra clave ADRENALINE.
  */
 export function playUnitCard(state, playerKey, cardInstanceId) {
   const p = state[playerKey];
-  const cardIdx = p.hand.findIndex((c) => c.instanceId === cardInstanceId);
+  const cardIdx = (p.hand || []).findIndex((c) => c.instanceId === cardInstanceId);
   if (cardIdx === -1) return { success: false, reason: 'Carta no encontrada en mano.' };
 
   const card = p.hand[cardIdx];
@@ -421,15 +553,35 @@ export function playUnitCard(state, playerKey, cardInstanceId) {
     gear: []
   };
 
+  if (!p.field) p.field = [];
   p.field.push(unitInstance);
 
-  state.actionLog.unshift(
+  (state.actionLog = state.actionLog || []).unshift(
     `${p.name} paga ${cost} €$ y despliega a "${card.name}" [Fuerza: ${unitInstance.currentPower}]${
       hasAdrenaline ? ' ⚡ [ADRENALINE: Sin Lag, puede atacar ya!]' : ' [Con Lag]'
     }.`
   );
 
-  return { success: true, unit: unitInstance };
+  return { success: true, type: 'UNIT', unit: unitInstance };
+}
+
+/**
+ * Función unificada para jugar cualquier carta desde la mano:
+ * Despacha según el tipo: PROGRAM -> va a Trash, GEAR -> se equipa, UNIT -> entra a Battlefield.
+ */
+export function playCard(state, playerKey, cardInstanceId, targetInstanceId = null) {
+  const p = state[playerKey];
+  const card = (p.hand || []).find((c) => c.instanceId === cardInstanceId);
+  if (!card) return { success: false, reason: 'Carta no encontrada en mano.' };
+
+  const type = getCardType(card);
+  if (type === 'PROGRAM') {
+    return playProgramCard(state, playerKey, cardInstanceId);
+  }
+  if (type === 'GEAR') {
+    return playGearCard(state, playerKey, cardInstanceId, targetInstanceId);
+  }
+  return playUnitCard(state, playerKey, cardInstanceId);
 }
 
 /**
@@ -591,8 +743,13 @@ function resolveFight(state, attPlayerKey, attUnit, defPlayerKey, defUnit) {
     if (idx !== -1) {
       const [defeated] = defender.field.splice(idx, 1);
       defender.trash.push(defeated);
+      if (defeated.gear && defeated.gear.length > 0) {
+        defeated.gear.forEach((g) => defender.trash.push(g));
+      }
       state.actionLog.unshift(
-        `💀 "${defUnit.name}" de ${defender.name} es DERROTADA y enviada a la Basura.`
+        `💀 "${defUnit.name}" de ${defender.name} es DERROTADA y enviada a la Basura${
+          defeated.gear?.length ? ` junto con ${defeated.gear.length} Gear(s)` : ''
+        }.`
       );
     }
   } else if (defPower > attPower) {
@@ -602,8 +759,13 @@ function resolveFight(state, attPlayerKey, attUnit, defPlayerKey, defUnit) {
       if (idx !== -1) {
         const [defeated] = attacker.field.splice(idx, 1);
         attacker.trash.push(defeated);
+        if (defeated.gear && defeated.gear.length > 0) {
+          defeated.gear.forEach((g) => attacker.trash.push(g));
+        }
         state.actionLog.unshift(
-          `💥 ¡CONTRAATAQUE! "${attUnit.name}" fue superada en poder y enviada a la Basura.`
+          `💥 ¡CONTRAATAQUE! "${attUnit.name}" fue superada en poder y enviada a la Basura${
+            defeated.gear?.length ? ` junto con ${defeated.gear.length} Gear(s)` : ''
+          }.`
         );
       }
     }
@@ -614,11 +776,17 @@ function resolveFight(state, attPlayerKey, attUnit, defPlayerKey, defUnit) {
       if (defIdx !== -1) {
         const [defeatedDef] = defender.field.splice(defIdx, 1);
         defender.trash.push(defeatedDef);
+        if (defeatedDef.gear && defeatedDef.gear.length > 0) {
+          defeatedDef.gear.forEach((g) => defender.trash.push(g));
+        }
       }
       const attIdx = attacker.field.findIndex((u) => u.instanceId === attUnit.instanceId);
       if (attIdx !== -1) {
         const [defeatedAtt] = attacker.field.splice(attIdx, 1);
         attacker.trash.push(defeatedAtt);
+        if (defeatedAtt.gear && defeatedAtt.gear.length > 0) {
+          defeatedAtt.gear.forEach((g) => attacker.trash.push(g));
+        }
       }
       state.actionLog.unshift(
         `☠️ ¡EMPATE LETAL (${attPower} vs ${defPower})! Ambas unidades pierden el combate y van a la Basura.`
