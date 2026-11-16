@@ -24,7 +24,8 @@ import {
   Undo2,
   Bot,
   User,
-  Radio
+  Radio,
+  Save
 } from 'lucide-react';
 import {
   createInitialGameState,
@@ -364,21 +365,68 @@ function CyberDeckPile({
 }
 
 // =========================================================================
+// GESTIÓN DE PERSISTENCIA LOCAL (F5 / CERRAR Y REABRIR NAVEGADOR)
+// =========================================================================
+const CP_SIM_STORAGE_KEY = 'cp_sim_save';
+const CP_SIM_AUTH_KEY = 'cp_sim_auth';
+
+function loadSavedGame() {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = localStorage.getItem(CP_SIM_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (
+      parsed &&
+      parsed.gameState &&
+      parsed.gameState.player &&
+      parsed.gameState.bot &&
+      Array.isArray(parsed.gameState.player.hand) &&
+      Array.isArray(parsed.gameState.player.legends) &&
+      Array.isArray(parsed.gameState.bot.legends)
+    ) {
+      return parsed;
+    }
+  } catch (err) {
+    console.warn('Error al leer partida guardada en localStorage:', err);
+  }
+  return null;
+}
+
+// =========================================================================
 // COMPONENTE PRINCIPAL DEL SIMULADOR
 // =========================================================================
 export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
-  // Autenticación de la ALPHA
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  // Autenticación de la ALPHA (persiste entre sesiones en localStorage y sessionStorage)
+  const [isAuthenticated, setIsAuthenticated] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    try {
+      return (
+        sessionStorage.getItem(CP_SIM_AUTH_KEY) === 'true' ||
+        localStorage.getItem(CP_SIM_AUTH_KEY) === 'true'
+      );
+    } catch {
+      return false;
+    }
+  });
   const [passwordInput, setPasswordInput] = useState('');
   const [authError, setAuthError] = useState(false);
 
   // Mazo seleccionado para Jugador y Bot
   const availableDecks = initialCms.decks || [];
-  const [selectedPlayerDeckIdx, setSelectedPlayerDeckIdx] = useState(0);
-  const [selectedBotDeckIdx, setSelectedBotDeckIdx] = useState(1);
 
-  // Estado del juego
-  const [gameState, setGameState] = useState(null);
+  // Partida guardada previamente en este navegador
+  const [initialSave] = useState(() => loadSavedGame());
+
+  const [selectedPlayerDeckIdx, setSelectedPlayerDeckIdx] = useState(
+    () => initialSave?.selectedPlayerDeckIdx ?? 0
+  );
+  const [selectedBotDeckIdx, setSelectedBotDeckIdx] = useState(
+    () => initialSave?.selectedBotDeckIdx ?? 1
+  );
+
+  // Estado del juego (se restaura automáticamente si existía una partida guardada)
+  const [gameState, setGameState] = useState(() => initialSave?.gameState ?? null);
   const [isBotThinking, setIsBotThinking] = useState(false);
   const [selectedHandCard, setSelectedHandCard] = useState(null);
   const [selectedFieldUnit, setSelectedFieldUnit] = useState(null);
@@ -405,7 +453,9 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
   const displayCard = hoveredCard || previewCard || selectedFieldUnit || selectedHandCard;
 
   // Pila de historial para la función "DESHACER" (Undo)
-  const [history, setHistory] = useState([]);
+  const [history, setHistory] = useState(() =>
+    Array.isArray(initialSave?.history) ? initialSave.history : []
+  );
 
   const pushHistory = () => {
     if (gameState) {
@@ -668,17 +718,39 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
     setIsBotThinking(false);
   };
 
-  // Comprobar si ya había sesión en sessionStorage
+  // Comprobar si ya había sesión en sessionStorage o localStorage
   useEffect(() => {
     try {
-      if (sessionStorage.getItem('cp_sim_auth') === 'true') {
+      if (
+        sessionStorage.getItem(CP_SIM_AUTH_KEY) === 'true' ||
+        localStorage.getItem(CP_SIM_AUTH_KEY) === 'true'
+      ) {
         setIsAuthenticated(true);
       }
     } catch {}
   }, []);
 
-  // Inicializar o reiniciar partida
-  const handleStartGame = (pDeckIdx = selectedPlayerDeckIdx, bDeckIdx = selectedBotDeckIdx) => {
+  // Inicializar o reiniciar partida (preserva guardado si forceNew es false)
+  const handleStartGame = (pDeckIdx = selectedPlayerDeckIdx, bDeckIdx = selectedBotDeckIdx, forceNew = false) => {
+    if (!forceNew) {
+      const saved = loadSavedGame();
+      if (saved && saved.gameState) {
+        setGameState(saved.gameState);
+        if (typeof saved.selectedPlayerDeckIdx === 'number') {
+          setSelectedPlayerDeckIdx(saved.selectedPlayerDeckIdx);
+        }
+        if (typeof saved.selectedBotDeckIdx === 'number') {
+          setSelectedBotDeckIdx(saved.selectedBotDeckIdx);
+        }
+        if (Array.isArray(saved.history)) {
+          setHistory(saved.history);
+        }
+        setSelectedHandCard(null);
+        setSelectedFieldUnit(null);
+        return;
+      }
+    }
+
     const pDeck = availableDecks[pDeckIdx] || availableDecks[0] || { deckList: [], legends: [] };
     const bDeck =
       availableDecks[bDeckIdx] || availableDecks[1] || availableDecks[0] || { deckList: [], legends: [] };
@@ -688,7 +760,57 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
     setHistory([]);
     setSelectedHandCard(null);
     setSelectedFieldUnit(null);
+
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem(
+          CP_SIM_STORAGE_KEY,
+          JSON.stringify({
+            gameState: initial,
+            selectedPlayerDeckIdx: pDeckIdx,
+            selectedBotDeckIdx: bDeckIdx,
+            history: [],
+            savedAt: Date.now()
+          })
+        );
+      } catch {}
+    }
   };
+
+  // Reiniciar partida con aviso de confirmación
+  const handleResetGame = () => {
+    if (
+      window.confirm(
+        '¿Deseas reiniciar la partida?\nSe eliminará el progreso guardado de la partida actual y comenzará una nueva.'
+      )
+    ) {
+      try {
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem(CP_SIM_STORAGE_KEY);
+        }
+      } catch {}
+      handleStartGame(selectedPlayerDeckIdx, selectedBotDeckIdx, true);
+    }
+  };
+
+  // Autoguardado continuo de la partida en localStorage ante cualquier cambio
+  useEffect(() => {
+    if (!gameState || typeof window === 'undefined') return;
+    try {
+      localStorage.setItem(
+        CP_SIM_STORAGE_KEY,
+        JSON.stringify({
+          gameState,
+          selectedPlayerDeckIdx,
+          selectedBotDeckIdx,
+          history: history.slice(-5),
+          savedAt: Date.now()
+        })
+      );
+    } catch (err) {
+      console.warn('Error al autoguardar en localStorage:', err);
+    }
+  }, [gameState, selectedPlayerDeckIdx, selectedBotDeckIdx, history]);
 
   // Comprobar contraseña
   const handleLogin = (e) => {
@@ -697,7 +819,8 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
       setIsAuthenticated(true);
       setAuthError(false);
       try {
-        sessionStorage.setItem('cp_sim_auth', 'true');
+        sessionStorage.setItem(CP_SIM_AUTH_KEY, 'true');
+        localStorage.setItem(CP_SIM_AUTH_KEY, 'true');
       } catch {}
       handleStartGame();
     } else {
@@ -915,6 +1038,16 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
             <span className="hidden sm:inline">LOGS ({gameState.actionLog.length})</span>
           </button>
 
+          {/* Indicador de Autoguardado Activo (Persiste en F5 o al cerrar pestaña) */}
+          <div
+            style={{ clipPath: CYBER_BUTTON }}
+            className="hidden lg:flex items-center gap-1.5 px-2.5 py-1.5 bg-[#000000] border border-[#0dfceb]/30 text-[#0dfceb] font-mono text-[10px] font-bold select-none shadow-[0_0_8px_rgba(13,252,235,0.15)]"
+            title="Tu partida se guarda automáticamente en este navegador. Si pulsas F5 o cierras la pestaña, se conservará todo tu progreso exactamente donde lo dejaste."
+          >
+            <Save className="w-3.5 h-3.5 text-[#0dfceb] animate-pulse" />
+            <span className="tracking-wider text-[9px] uppercase">AUTOGUARDADO</span>
+          </div>
+
           {/* Botón Reglas Rápidas */}
           <button
             type="button"
@@ -926,13 +1059,13 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
             <HelpCircle className="w-4 h-4" />
           </button>
 
-          {/* Botón Reiniciar */}
+          {/* Botón Reiniciar Partida */}
           <button
             type="button"
-            onClick={() => handleStartGame()}
+            onClick={handleResetGame}
             style={{ clipPath: CYBER_BUTTON }}
             className="p-1.5 bg-[#000000] border border-gray-700 hover:border-[#FF003C] text-gray-400 hover:text-[#FF003C] cursor-pointer transition-all"
-            title="Reiniciar Partida"
+            title="Reiniciar Partida (Comenzar nuevo combate)"
           >
             <RotateCcw className="w-4 h-4" />
           </button>
@@ -3122,7 +3255,14 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
 
             <button
               type="button"
-              onClick={() => handleStartGame()}
+              onClick={() => {
+                try {
+                  if (typeof window !== 'undefined') {
+                    localStorage.removeItem(CP_SIM_STORAGE_KEY);
+                  }
+                } catch {}
+                handleStartGame(selectedPlayerDeckIdx, selectedBotDeckIdx, true);
+              }}
               style={{ clipPath: CYBER_BUTTON }}
               className={`w-full py-3.5 font-black text-xs uppercase tracking-widest cursor-pointer transition-all ${
                 gameState.winner === 'player'
