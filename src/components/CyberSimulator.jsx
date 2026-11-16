@@ -397,36 +397,21 @@ function loadSavedGame() {
 // COMPONENTE PRINCIPAL DEL SIMULADOR
 // =========================================================================
 export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
+  // Control de hidratación segura en el cliente (evita crash en React 19)
+  const [isClient, setIsClient] = useState(false);
+
   // Autenticación de la ALPHA (persiste entre sesiones en localStorage y sessionStorage)
-  const [isAuthenticated, setIsAuthenticated] = useState(() => {
-    if (typeof window === 'undefined') return false;
-    try {
-      return (
-        sessionStorage.getItem(CP_SIM_AUTH_KEY) === 'true' ||
-        localStorage.getItem(CP_SIM_AUTH_KEY) === 'true'
-      );
-    } catch {
-      return false;
-    }
-  });
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [passwordInput, setPasswordInput] = useState('');
   const [authError, setAuthError] = useState(false);
 
   // Mazo seleccionado para Jugador y Bot
   const availableDecks = initialCms.decks || [];
+  const [selectedPlayerDeckIdx, setSelectedPlayerDeckIdx] = useState(0);
+  const [selectedBotDeckIdx, setSelectedBotDeckIdx] = useState(1);
 
-  // Partida guardada previamente en este navegador
-  const [initialSave] = useState(() => loadSavedGame());
-
-  const [selectedPlayerDeckIdx, setSelectedPlayerDeckIdx] = useState(
-    () => initialSave?.selectedPlayerDeckIdx ?? 0
-  );
-  const [selectedBotDeckIdx, setSelectedBotDeckIdx] = useState(
-    () => initialSave?.selectedBotDeckIdx ?? 1
-  );
-
-  // Estado del juego (se restaura automáticamente si existía una partida guardada)
-  const [gameState, setGameState] = useState(() => initialSave?.gameState ?? null);
+  // Estado del juego
+  const [gameState, setGameState] = useState(null);
   const [isBotThinking, setIsBotThinking] = useState(false);
   const [selectedHandCard, setSelectedHandCard] = useState(null);
   const [selectedFieldUnit, setSelectedFieldUnit] = useState(null);
@@ -453,9 +438,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
   const displayCard = hoveredCard || previewCard || selectedFieldUnit || selectedHandCard;
 
   // Pila de historial para la función "DESHACER" (Undo)
-  const [history, setHistory] = useState(() =>
-    Array.isArray(initialSave?.history) ? initialSave.history : []
-  );
+  const [history, setHistory] = useState([]);
 
   const pushHistory = () => {
     if (gameState) {
@@ -718,8 +701,9 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
     setIsBotThinking(false);
   };
 
-  // Comprobar si ya había sesión en sessionStorage o localStorage
+  // Inicialización segura en el cliente (evita hydration mismatch y render-loop en React 19)
   useEffect(() => {
+    setIsClient(true);
     try {
       if (
         sessionStorage.getItem(CP_SIM_AUTH_KEY) === 'true' ||
@@ -728,6 +712,25 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
         setIsAuthenticated(true);
       }
     } catch {}
+
+    const saved = loadSavedGame();
+    if (saved && saved.gameState) {
+      setGameState(saved.gameState);
+      if (typeof saved.selectedPlayerDeckIdx === 'number') {
+        setSelectedPlayerDeckIdx(saved.selectedPlayerDeckIdx);
+      }
+      if (typeof saved.selectedBotDeckIdx === 'number') {
+        setSelectedBotDeckIdx(saved.selectedBotDeckIdx);
+      }
+      if (Array.isArray(saved.history)) {
+        setHistory(saved.history);
+      }
+    } else {
+      const pDeck = availableDecks[0] || { deckList: [], legends: [] };
+      const bDeck = availableDecks[1] || availableDecks[0] || { deckList: [], legends: [] };
+      const initial = createInitialGameState(pDeck, bDeck, initialCards);
+      setGameState(initial);
+    }
   }, []);
 
   // Inicializar o reiniciar partida (preserva guardado si forceNew es false)
@@ -793,6 +796,83 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
     }
   };
 
+  // Acción directa para llamar a una Leyenda boca arriba gastando 1 €$
+  const handleCallLegendAction = (legendInstanceId) => {
+    if (!gameState) return;
+    const p = gameState.player;
+
+    if (p.hasCalledLegendThisTurn) {
+      setHolocall({
+        title: 'ACCIÓN YA USADA',
+        message: 'Solo puedes llamar a 1 Leyenda boca arriba por turno (límite oficial de Night City).',
+        characterName: 'VIKTOR // RIPPERDOC',
+        type: 'warning'
+      });
+      return;
+    }
+
+    const leg = (p.legends || []).find((l) => l.instanceId === legendInstanceId);
+    if (!leg) return;
+    if (leg.isFaceUp) return;
+
+    // Comprobar si hay 1 €$ disponible (en reserva o en cartas para girar)
+    const floating = p.floatingEddies || 0;
+    const totalAvail = getTotalAvailableEddies(p);
+
+    if (floating < 1 && totalAvail < 1) {
+      setHolocall({
+        title: 'EDDIES INSUFICIENTES',
+        message: 'Llamar a una Leyenda boca arriba cuesta 1 €$. No tienes Eddies en tu reserva ni cartas disponibles para girar en tu Zona de Eddies.',
+        characterName: 'VIKTOR // RIPPERDOC',
+        missingEddies: 1,
+        type: 'warning'
+      });
+      return;
+    }
+
+    pushHistory();
+
+    // Si no hay floating eddies en reserva, girar automáticamente 1 eddie de la zona de eddies u otra leyenda
+    if ((p.floatingEddies || 0) < 1) {
+      const unspentEddie = (p.eddies || []).find((e) => !e.isSpent);
+      if (unspentEddie) {
+        unspentEddie.isSpent = true;
+        p.floatingEddies = (p.floatingEddies || 0) + 1;
+        (gameState.actionLog = gameState.actionLog || []).unshift(
+          `💶 ${p.name} gira 1 carta en su Zona de Eddies para pagar la llamada (+1 €$).`
+        );
+      } else {
+        const otherUnspentLeg = (p.legends || []).find(
+          (l) => !l.isSpent && l.instanceId !== legendInstanceId
+        );
+        if (otherUnspentLeg) {
+          otherUnspentLeg.isSpent = true;
+          p.floatingEddies = (p.floatingEddies || 0) + 1;
+          (gameState.actionLog = gameState.actionLog || []).unshift(
+            `👑 ${p.name} gira a su Leyenda "${otherUnspentLeg.name}" para pagar la llamada (+1 €$).`
+          );
+        } else if (!leg.isSpent) {
+          leg.isSpent = true;
+          p.floatingEddies = (p.floatingEddies || 0) + 1;
+        }
+      }
+    }
+
+    const res = callLegendFaceUp(gameState, 'player', legendInstanceId);
+    if (!res.success) {
+      setHolocall({
+        title: 'FONDOS INSUFICIENTES',
+        message: res.reason || 'No se pudo llamar a la Leyenda.',
+        characterName: 'VIKTOR // RIPPERDOC',
+        type: 'warning'
+      });
+    } else {
+      setPreviewCard(leg);
+      setHoveredCard(leg);
+    }
+    setGameState({ ...gameState });
+  };
+
   // Autoguardado continuo de la partida en localStorage ante cualquier cambio
   useEffect(() => {
     if (!gameState || typeof window === 'undefined') return;
@@ -846,6 +926,23 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
     gameState?.mulliganDecided,
     gameState?.pendingReaction
   ]);
+
+  // Pantalla de carga mientras se hidrata en el cliente o se inicializa el estado
+  if (!isClient || !gameState) {
+    return (
+      <div className="min-h-screen bg-[#070a10] text-[#0dfceb] flex flex-col items-center justify-center font-mono gap-3 select-none">
+        <div className="flex items-center gap-2.5">
+          <span className="w-3 h-3 rounded-full bg-[#0dfceb] animate-ping" />
+          <span className="text-sm tracking-widest font-bold uppercase">
+            // CARGANDO SIMULADOR NIGHT CITY...
+          </span>
+        </div>
+        <span className="text-[10px] text-gray-500 uppercase tracking-wider">
+          SISTEMA COMBATE ALPHA 1.0
+        </span>
+      </div>
+    );
+  }
 
   // Si no está autenticado, mostrar terminal de acceso
   if (!isAuthenticated) {
@@ -923,12 +1020,6 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
         </div>
       </div>
     );
-  }
-
-  // Inicializar si ya autenticado pero sin gameState
-  if (!gameState) {
-    handleStartGame();
-    return null;
   }
 
   const p = gameState.player;
@@ -1464,45 +1555,36 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                         className={`w-full h-full transition-transform duration-500 flex items-center justify-center ${
                           leg.isSpent ? 'rotate-90 scale-75' : ''
                         }`}
-                        style={{ perspective: 1000 }}
                       >
-                        <motion.div
-                          className="w-full h-full relative"
-                          style={{ transformStyle: 'preserve-3d' }}
-                          animate={{ rotateY: leg.isFaceUp ? 180 : 0 }}
-                          transition={{ duration: 0.6, ease: [0.23, 1, 0.32, 1] }}
-                        >
-                          {/* Cara trasera (boca abajo) */}
-                          <div
-                            className="absolute inset-0 w-full h-full rounded-md overflow-hidden"
-                            style={{
-                              backfaceVisibility: 'hidden',
-                              WebkitBackfaceVisibility: 'hidden',
-                              transform: 'rotateY(0deg)'
-                            }}
-                          >
-                            <CyberCardBack isLegend={true} className="w-full h-full" />
-                          </div>
-
-                          {/* Cara delantera (boca arriba) */}
-                          <div
-                            className="absolute inset-0 w-full h-full rounded-md overflow-hidden bg-black flex items-center justify-center border border-[#FF003C]/50"
-                            style={{
-                              backfaceVisibility: 'hidden',
-                              WebkitBackfaceVisibility: 'hidden',
-                              transform: 'rotateY(180deg)'
-                            }}
-                          >
-                            <img
-                              src={leg.image}
-                              alt={leg.name}
-                              className="w-full h-full object-cover select-none pointer-events-none"
-                              onError={(e) => {
-                                e.target.style.display = 'none';
-                              }}
-                            />
-                          </div>
-                        </motion.div>
+                        <AnimatePresence mode="wait">
+                          {leg.isFaceUp ? (
+                            <motion.div
+                              key={`b-leg-up-${leg.instanceId}`}
+                              initial={{ rotateY: -90, opacity: 0.7 }}
+                              animate={{ rotateY: 0, opacity: 1 }}
+                              exit={{ rotateY: 90, opacity: 0 }}
+                              transition={{ duration: 0.35, ease: 'easeOut' }}
+                              className="w-full h-full rounded-md overflow-hidden bg-black flex items-center justify-center border border-[#FF003C]/50 shadow"
+                            >
+                              <img
+                                src={leg.image}
+                                alt={leg.name}
+                                className="w-full h-full object-cover select-none pointer-events-none"
+                              />
+                            </motion.div>
+                          ) : (
+                            <motion.div
+                              key={`b-leg-down-${leg.instanceId}`}
+                              initial={{ rotateY: 90, opacity: 0.7 }}
+                              animate={{ rotateY: 0, opacity: 1 }}
+                              exit={{ rotateY: -90, opacity: 0 }}
+                              transition={{ duration: 0.35, ease: 'easeOut' }}
+                              className="w-full h-full rounded-md overflow-hidden"
+                            >
+                              <CyberCardBack isLegend={true} className="w-full h-full" />
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
                       </div>
 
                       {/* Indicador sutil de girada sin tapar la ilustración */}
@@ -2164,7 +2246,13 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                           <div
                             onClick={(e) => e.stopPropagation()}
                             style={{ clipPath: CYBER_CLIP }}
-                            className="absolute bottom-[calc(100%+10px)] left-1/2 -translate-x-1/2 z-40 w-44 sm:w-52 bg-[#070a10]/98 border-2 border-[#0dfceb] p-2.5 shadow-[0_0_30px_rgba(13,252,235,0.5)] backdrop-blur-md font-mono select-none"
+                            className={`absolute bottom-[calc(100%+8px)] ${
+                              i === 0
+                                ? 'left-0'
+                                : i === 2
+                                ? 'right-0'
+                                : 'left-1/2 -translate-x-1/2'
+                            } z-50 w-48 sm:w-56 bg-[#070a10]/98 border-2 border-[#0dfceb] p-3 shadow-[0_0_35px_rgba(13,252,235,0.7)] backdrop-blur-md font-mono select-none`}
                           >
                             {/* Cabecera del Popover */}
                             <div className="flex items-center justify-between pb-1 mb-2 border-b border-[#0dfceb]/30 text-[9px]">
@@ -2181,68 +2269,31 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                               </button>
                             </div>
 
-                            {/* Opción 1: HACER CALL (si está boca abajo) */}
+                            {/* Opción 1: HACER CALL // DAR LA VUELTA */}
                             {!leg.isFaceUp && (
                               <button
                                 type="button"
                                 disabled={p.hasCalledLegendThisTurn}
-                                onClick={() => {
+                                onClick={(e) => {
+                                  e.stopPropagation();
                                   setLegendMenuId(null);
-                                  if (p.hasCalledLegendThisTurn) {
-                                    setHolocall({
-                                      title: 'ACCIÓN YA USADA',
-                                      message: 'Solo puedes llamar a 1 Leyenda boca arriba por turno.',
-                                      characterName: 'VIKTOR // RIPPERDOC',
-                                      type: 'warning'
-                                    });
-                                    return;
-                                  }
-                                  // Comprobar si hay 1 €$ en reserva o disponible para girar
-                                  if ((p.floatingEddies || 0) < 1) {
-                                    const totalAvail = getTotalAvailableEddies(p);
-                                    if (totalAvail < 1) {
-                                      setHolocall({
-                                        title: 'EDDIES INSUFICIENTES',
-                                        message: 'Llamar a una Leyenda boca arriba cuesta 1 €$. No tienes Eddies en tu reserva ni cartas disponibles para girar.',
-                                        characterName: 'VIKTOR // RIPPERDOC',
-                                        missingEddies: 1,
-                                        type: 'warning'
-                                      });
-                                      return;
-                                    }
-                                    // Pagar girando una carta de Eddies o una de las OTRAS leyendas (preservando el estado de esta leyenda)
-                                    const unspentEddie = (p.eddies || []).find((e) => !e.isSpent);
-                                    if (unspentEddie) {
-                                      toggleEddieSpent(gameState, 'player', unspentEddie.instanceId);
-                                    } else {
-                                      const otherUnspentLeg = (p.legends || []).find((l) => !l.isSpent && l.instanceId !== leg.instanceId);
-                                      if (otherUnspentLeg) {
-                                        toggleLegendSpent(gameState, 'player', otherUnspentLeg.instanceId);
-                                      } else if (!leg.isSpent) {
-                                        toggleLegendSpent(gameState, 'player', leg.instanceId);
-                                      }
-                                    }
-                                  }
-                                  pushHistory();
-                                  const res = callLegendFaceUp(gameState, 'player', leg.instanceId);
-                                  if (!res.success) {
-                                    alert(res.reason);
-                                  } else {
-                                    setPreviewCard(leg);
-                                  }
-                                  setGameState({ ...gameState });
+                                  handleCallLegendAction(leg.instanceId);
                                 }}
-                                className={`w-full py-1.5 px-2 mb-1.5 text-left flex items-center justify-between rounded text-[10px] font-black uppercase transition-all ${
+                                className={`w-full py-2 px-2.5 mb-1.5 text-left flex items-center justify-between rounded text-[10px] sm:text-[11px] font-black uppercase transition-all ${
                                   p.hasCalledLegendThisTurn
                                     ? 'bg-gray-900 text-gray-500 border border-gray-800 cursor-not-allowed'
+                                    : availableEddies > 0
+                                    ? 'bg-[#0dfceb] text-black border border-[#0dfceb] shadow-[0_0_15px_rgba(13,252,235,0.5)] cursor-pointer hover:bg-white'
                                     : 'bg-[#0dfceb]/20 hover:bg-[#0dfceb] text-[#0dfceb] hover:text-black border border-[#0dfceb]/60 shadow-[0_0_10px_rgba(13,252,235,0.3)] cursor-pointer'
                                 }`}
                               >
                                 <span className="flex items-center gap-1.5">
                                   <span>👑</span>
-                                  <span>HACER CALL</span>
+                                  <span>HACER CALL (DAR LA VUELTA)</span>
                                 </span>
-                                <span className="text-[9px] font-bold">1 €$</span>
+                                <span className="text-[9px] font-bold px-1.5 py-0.5 bg-black/60 text-[#0dfceb] rounded">
+                                  1 €$
+                                </span>
                               </button>
                             )}
 
@@ -2368,45 +2419,36 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                             className={`w-full h-full transition-transform duration-500 flex items-center justify-center ${
                               leg.isSpent ? 'rotate-90 scale-75' : ''
                             }`}
-                            style={{ perspective: 1000 }}
                           >
-                            <motion.div
-                              className="w-full h-full relative"
-                              style={{ transformStyle: 'preserve-3d' }}
-                              animate={{ rotateY: leg.isFaceUp ? 180 : 0 }}
-                              transition={{ duration: 0.6, ease: [0.23, 1, 0.32, 1] }}
-                            >
-                              {/* Cara trasera (boca abajo) */}
-                              <div
-                                className="absolute inset-0 w-full h-full rounded-md overflow-hidden"
-                                style={{
-                                  backfaceVisibility: 'hidden',
-                                  WebkitBackfaceVisibility: 'hidden',
-                                  transform: 'rotateY(0deg)'
-                                }}
-                              >
-                                <CyberCardBack isLegend={true} className="w-full h-full" />
-                              </div>
-
-                              {/* Cara delantera (boca arriba) */}
-                              <div
-                                className="absolute inset-0 w-full h-full rounded-md overflow-hidden bg-black flex items-center justify-center border border-[#FCEE0A]/50"
-                                style={{
-                                  backfaceVisibility: 'hidden',
-                                  WebkitBackfaceVisibility: 'hidden',
-                                  transform: 'rotateY(180deg)'
-                                }}
-                              >
-                                <img
-                                  src={leg.image}
-                                  alt={leg.name}
-                                  className="w-full h-full object-cover select-none pointer-events-none"
-                                  onError={(e) => {
-                                    e.target.style.display = 'none';
-                                  }}
-                                />
-                              </div>
-                            </motion.div>
+                            <AnimatePresence mode="wait">
+                              {leg.isFaceUp ? (
+                                <motion.div
+                                  key={`p-leg-up-${leg.instanceId}`}
+                                  initial={{ rotateY: -90, opacity: 0.7 }}
+                                  animate={{ rotateY: 0, opacity: 1 }}
+                                  exit={{ rotateY: 90, opacity: 0 }}
+                                  transition={{ duration: 0.35, ease: 'easeOut' }}
+                                  className="w-full h-full rounded-md overflow-hidden bg-black flex items-center justify-center border border-[#FCEE0A]/60 shadow"
+                                >
+                                  <img
+                                    src={leg.image}
+                                    alt={leg.name}
+                                    className="w-full h-full object-cover select-none pointer-events-none"
+                                  />
+                                </motion.div>
+                              ) : (
+                                <motion.div
+                                  key={`p-leg-down-${leg.instanceId}`}
+                                  initial={{ rotateY: 90, opacity: 0.7 }}
+                                  animate={{ rotateY: 0, opacity: 1 }}
+                                  exit={{ rotateY: -90, opacity: 0 }}
+                                  transition={{ duration: 0.35, ease: 'easeOut' }}
+                                  className="w-full h-full rounded-md overflow-hidden"
+                                >
+                                  <CyberCardBack isLegend={true} className="w-full h-full" />
+                                </motion.div>
+                              )}
+                            </AnimatePresence>
                           </div>
 
                           {/* Indicador elegante de Penalización Turno 1 o Gastada sin tapar la carta */}
