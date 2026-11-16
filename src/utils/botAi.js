@@ -60,11 +60,13 @@ export function executeBotReaction(gameState, attackerUnit, targetType, targetUn
   let chosenBlocker = null;
 
   // 1. Evaluar si el Bot llama a una Leyenda durante su reacción
+  // REGLA OFICIAL: Al hacer call a la leyenda se da la vuelta a la carta;
+  // si está girada se queda girada, y si no, se queda enderezada.
   if (!bot.hasCalledLegendThisTurn) {
-    const uncalledLeg = (bot.legends || []).find((l) => !l.isFaceUp && !l.isSpent);
+    const uncalledLeg = (bot.legends || []).find((l) => !l.isFaceUp);
     const capacity = getBotMaxCapacity(bot);
     if (uncalledLeg && capacity >= 1) {
-      botPrepareEddies(bot, 1);
+      botPrepareEddies(bot, 1, uncalledLeg.instanceId);
       callLegendFaceUp(gameState, 'bot', uncalledLeg.instanceId);
       gameState.actionLog.unshift(
         `🛡️ [Fase de Respuesta] ¡El rival responde llamando a su Leyenda "${uncalledLeg.name}" boca arriba!`
@@ -107,7 +109,7 @@ export function executeBotReaction(gameState, attackerUnit, targetType, targetUn
  * Ayudante para que la IA gire automáticamente sus cartas de Eddies o Leyendas
  * para reunir la cantidad necesaria de Eddies en bot.floatingEddies antes de pagar una acción.
  */
-function botPrepareEddies(bot, neededAmount) {
+function botPrepareEddies(bot, neededAmount, preserveLegendId = null) {
   let current = bot.floatingEddies || 0;
   if (current >= neededAmount) return true;
 
@@ -120,12 +122,20 @@ function botPrepareEddies(bot, neededAmount) {
     }
   }
 
-  // 2. Si todavía faltan, girar Leyendas del bot
+  // 2. Si todavía faltan, girar Leyendas del bot (evitando girar la leyenda que se desea llamar si hay otras opciones)
   if (current < neededAmount) {
     for (const leg of (bot.legends || [])) {
       if (current >= neededAmount) break;
-      if (!leg.isSpent) {
+      if (!leg.isSpent && leg.instanceId !== preserveLegendId) {
         leg.isSpent = true;
+        current++;
+      }
+    }
+    // Si aún falta y la única opción es la leyenda preservada
+    if (current < neededAmount && preserveLegendId) {
+      const presLeg = (bot.legends || []).find((l) => l.instanceId === preserveLegendId && !l.isSpent);
+      if (presLeg) {
+        presLeg.isSpent = true;
         current++;
       }
     }
@@ -175,7 +185,7 @@ export async function runBotTurn(gameState, updateCallback, delayMs = 700) {
     const maxCapacity = getBotMaxCapacity(bot);
     if (maxCapacity >= 1) {
       await wait(delayMs);
-      botPrepareEddies(bot, 1);
+      botPrepareEddies(bot, 1, faceDownLegend.instanceId);
       callLegendFaceUp(gameState, 'bot', faceDownLegend.instanceId);
       updateCallback({ ...gameState });
     }

@@ -602,14 +602,23 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
       });
       return;
     }
-    // Si no hay floating eddies, girar 1 eddie disponible
+    // Si no hay floating eddies, girar 1 eddie disponible (priorizando zona de eddies u otra leyenda para preservar el estado de esta leyenda)
     if (gameState.player.floatingEddies < 1) {
       const unspentEddie = (gameState.player.eddies || []).find((e) => !e.isSpent);
       if (unspentEddie) {
         toggleEddieSpent(gameState, 'player', unspentEddie.instanceId);
       } else {
-        const unspentLeg = (gameState.player.legends || []).find((l) => !l.isSpent);
-        if (unspentLeg) toggleLegendSpent(gameState, 'player', unspentLeg.instanceId);
+        const otherUnspentLeg = (gameState.player.legends || []).find(
+          (l) => !l.isSpent && l.instanceId !== legendInstanceId
+        );
+        if (otherUnspentLeg) {
+          toggleLegendSpent(gameState, 'player', otherUnspentLeg.instanceId);
+        } else {
+          const thisLeg = (gameState.player.legends || []).find((l) => l.instanceId === legendInstanceId);
+          if (thisLeg && !thisLeg.isSpent) {
+            toggleLegendSpent(gameState, 'player', thisLeg.instanceId);
+          }
+        }
       }
     }
     callLegendFaceUp(gameState, 'player', legendInstanceId);
@@ -1307,26 +1316,67 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                       }}
                       onMouseLeave={() => setHoveredCard(null)}
                       onClick={() => leg.isFaceUp && setInspectedCard(leg)}
-                      className={`w-11 sm:w-13 md:w-15 h-16 sm:h-20 md:h-24 rounded-lg overflow-hidden border transition-all flex flex-col items-center justify-center relative shadow-md ${
-                        leg.isSpent
-                          ? 'border-gray-800 opacity-50'
-                          : leg.isFaceUp
-                          ? 'border-[#FF003C] shadow-[0_0_12px_rgba(255,0,60,0.4)] cursor-pointer'
-                          : 'border-gray-800'
+                      className={`w-11 sm:w-13 md:w-15 h-16 sm:h-20 md:h-24 rounded-lg border transition-all flex flex-col items-center justify-center relative shadow-md ${
+                        leg.isFaceUp
+                          ? leg.isSpent
+                            ? 'border-[#FF003C]/70 shadow-[0_0_8px_rgba(255,0,60,0.3)] cursor-pointer'
+                            : 'border-[#FF003C] shadow-[0_0_12px_rgba(255,0,60,0.5)] cursor-pointer'
+                          : leg.isSpent
+                          ? 'border-gray-800 opacity-60'
+                          : 'border-[#FF003C]/40'
                       }`}
                       title={leg.isFaceUp ? leg.name : 'Leyenda boca abajo del Rival'}
                     >
-                      <div className={`w-full h-full transition-transform duration-300 flex items-center justify-center ${leg.isSpent ? 'rotate-90 scale-75' : ''}`}>
-                        {leg.isFaceUp ? (
-                          <img src={leg.image} alt={leg.name} className="w-full h-full object-cover" />
-                        ) : (
-                          <CyberCardBack isLegend={true} className="w-full h-full" />
-                        )}
+                      <div
+                        className={`w-full h-full transition-transform duration-500 flex items-center justify-center ${
+                          leg.isSpent ? 'rotate-90 scale-75' : ''
+                        }`}
+                        style={{ perspective: 1000 }}
+                      >
+                        <motion.div
+                          className="w-full h-full relative"
+                          style={{ transformStyle: 'preserve-3d' }}
+                          animate={{ rotateY: leg.isFaceUp ? 180 : 0 }}
+                          transition={{ duration: 0.6, ease: [0.23, 1, 0.32, 1] }}
+                        >
+                          {/* Cara trasera (boca abajo) */}
+                          <div
+                            className="absolute inset-0 w-full h-full rounded-md overflow-hidden"
+                            style={{
+                              backfaceVisibility: 'hidden',
+                              WebkitBackfaceVisibility: 'hidden',
+                              transform: 'rotateY(0deg)'
+                            }}
+                          >
+                            <CyberCardBack isLegend={true} className="w-full h-full" />
+                          </div>
+
+                          {/* Cara delantera (boca arriba) */}
+                          <div
+                            className="absolute inset-0 w-full h-full rounded-md overflow-hidden bg-black flex items-center justify-center border border-[#FF003C]/50"
+                            style={{
+                              backfaceVisibility: 'hidden',
+                              WebkitBackfaceVisibility: 'hidden',
+                              transform: 'rotateY(180deg)'
+                            }}
+                          >
+                            <img
+                              src={leg.image}
+                              alt={leg.name}
+                              className="w-full h-full object-cover select-none pointer-events-none"
+                              onError={(e) => {
+                                e.target.style.display = 'none';
+                              }}
+                            />
+                          </div>
+                        </motion.div>
                       </div>
+
+                      {/* Indicador sutil de girada sin tapar la ilustración */}
                       {leg.isSpent && (
-                        <div className="absolute inset-0 bg-black/60 flex items-center justify-center pointer-events-none">
-                          <span className="px-1 bg-black border border-gray-700 text-gray-500 font-mono font-bold text-[7px] uppercase tracking-tighter text-center">
-                            GASTADA
+                        <div className="absolute bottom-0.5 left-0.5 z-20 pointer-events-none">
+                          <span className="px-1 py-0.2 bg-black/90 border border-[#FF003C]/60 text-[#FF003C] font-mono font-black text-[6px] sm:text-[7px] uppercase tracking-tighter shadow">
+                            GIRADA
                           </span>
                         </div>
                       )}
@@ -2014,15 +2064,31 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                                     });
                                     return;
                                   }
-                                  if (availableEddies < 1) {
-                                    setHolocall({
-                                      title: 'EDDIES INSUFICIENTES',
-                                      message: 'Llamar a una Leyenda boca arriba cuesta 1 €$. Gira primero una carta en tu Zona de Eddies o una de tus otras Leyendas para obtener el Eddie.',
-                                      characterName: 'VIKTOR // RIPPERDOC',
-                                      missingEddies: 1,
-                                      type: 'warning'
-                                    });
-                                    return;
+                                  // Comprobar si hay 1 €$ en reserva o disponible para girar
+                                  if ((p.floatingEddies || 0) < 1) {
+                                    const totalAvail = getTotalAvailableEddies(p);
+                                    if (totalAvail < 1) {
+                                      setHolocall({
+                                        title: 'EDDIES INSUFICIENTES',
+                                        message: 'Llamar a una Leyenda boca arriba cuesta 1 €$. No tienes Eddies en tu reserva ni cartas disponibles para girar.',
+                                        characterName: 'VIKTOR // RIPPERDOC',
+                                        missingEddies: 1,
+                                        type: 'warning'
+                                      });
+                                      return;
+                                    }
+                                    // Pagar girando una carta de Eddies o una de las OTRAS leyendas (preservando el estado de esta leyenda)
+                                    const unspentEddie = (p.eddies || []).find((e) => !e.isSpent);
+                                    if (unspentEddie) {
+                                      toggleEddieSpent(gameState, 'player', unspentEddie.instanceId);
+                                    } else {
+                                      const otherUnspentLeg = (p.legends || []).find((l) => !l.isSpent && l.instanceId !== leg.instanceId);
+                                      if (otherUnspentLeg) {
+                                        toggleLegendSpent(gameState, 'player', otherUnspentLeg.instanceId);
+                                      } else if (!leg.isSpent) {
+                                        toggleLegendSpent(gameState, 'player', leg.instanceId);
+                                      }
+                                    }
                                   }
                                   pushHistory();
                                   const res = callLegendFaceUp(gameState, 'player', leg.instanceId);
@@ -2142,14 +2208,16 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                             }
                             setLegendMenuId((prev) => (prev === leg.instanceId ? null : leg.instanceId));
                           }}
-                          className={`w-11 sm:w-13 md:w-15 h-16 sm:h-20 md:h-24 rounded-lg overflow-hidden border transition-all cursor-pointer flex flex-col items-center justify-center relative shadow-md group ${
+                          className={`w-11 sm:w-13 md:w-15 h-16 sm:h-20 md:h-24 rounded-lg border transition-all cursor-pointer flex flex-col items-center justify-center relative shadow-md group ${
                             isMenuOpen
                               ? 'border-[#0dfceb] ring-2 ring-[#0dfceb] shadow-[0_0_18px_rgba(13,252,235,0.6)]'
-                              : leg.isSpent
-                              ? 'border-gray-800 opacity-60'
                               : leg.isFaceUp
-                              ? 'border-[#FCEE0A] hover:border-[#0dfceb] shadow-[0_0_12px_rgba(252,238,10,0.4)]'
-                              : 'border-[#0dfceb]/40 hover:border-[#FCEE0A]'
+                              ? leg.isSpent
+                                ? 'border-[#FCEE0A]/70 shadow-[0_0_8px_rgba(252,238,10,0.3)]'
+                                : 'border-[#FCEE0A] hover:border-[#0dfceb] shadow-[0_0_14px_rgba(252,238,10,0.5)]'
+                              : leg.isSpent
+                              ? 'border-[#0dfceb]/30 opacity-70'
+                              : 'border-[#0dfceb]/50 hover:border-[#FCEE0A] shadow-[0_0_8px_rgba(13,252,235,0.2)]'
                           }`}
                           title={
                             isTurn1Penalty
@@ -2163,19 +2231,56 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                               : 'Leyenda boca abajo (Clic para opciones: Hacer Call o Sacar Eddie)'
                           }
                         >
-                          <div className={`w-full h-full transition-transform duration-300 flex items-center justify-center ${leg.isSpent ? 'rotate-90 scale-75' : ''}`}>
-                            {leg.isFaceUp ? (
-                              <img src={leg.image} alt={leg.name} className="w-full h-full object-cover" />
-                            ) : (
-                              <CyberCardBack isLegend={true} className="w-full h-full" />
-                            )}
+                          <div
+                            className={`w-full h-full transition-transform duration-500 flex items-center justify-center ${
+                              leg.isSpent ? 'rotate-90 scale-75' : ''
+                            }`}
+                            style={{ perspective: 1000 }}
+                          >
+                            <motion.div
+                              className="w-full h-full relative"
+                              style={{ transformStyle: 'preserve-3d' }}
+                              animate={{ rotateY: leg.isFaceUp ? 180 : 0 }}
+                              transition={{ duration: 0.6, ease: [0.23, 1, 0.32, 1] }}
+                            >
+                              {/* Cara trasera (boca abajo) */}
+                              <div
+                                className="absolute inset-0 w-full h-full rounded-md overflow-hidden"
+                                style={{
+                                  backfaceVisibility: 'hidden',
+                                  WebkitBackfaceVisibility: 'hidden',
+                                  transform: 'rotateY(0deg)'
+                                }}
+                              >
+                                <CyberCardBack isLegend={true} className="w-full h-full" />
+                              </div>
+
+                              {/* Cara delantera (boca arriba) */}
+                              <div
+                                className="absolute inset-0 w-full h-full rounded-md overflow-hidden bg-black flex items-center justify-center border border-[#FCEE0A]/50"
+                                style={{
+                                  backfaceVisibility: 'hidden',
+                                  WebkitBackfaceVisibility: 'hidden',
+                                  transform: 'rotateY(180deg)'
+                                }}
+                              >
+                                <img
+                                  src={leg.image}
+                                  alt={leg.name}
+                                  className="w-full h-full object-cover select-none pointer-events-none"
+                                  onError={(e) => {
+                                    e.target.style.display = 'none';
+                                  }}
+                                />
+                              </div>
+                            </motion.div>
                           </div>
 
-                          {/* Indicador de Penalización Turno 1 o Gastada */}
+                          {/* Indicador elegante de Penalización Turno 1 o Gastada sin tapar la carta */}
                           {leg.isSpent && (
-                            <div className="absolute inset-0 bg-black/60 flex items-center justify-center pointer-events-none">
-                              <span className="px-1 bg-black border border-gray-700 text-gray-400 font-mono font-bold text-[7px] uppercase tracking-tighter text-center">
-                                {isTurn1Penalty ? 'PENALIZACIÓN T1' : 'GASTADA'}
+                            <div className="absolute bottom-0.5 left-0.5 z-20 pointer-events-none">
+                              <span className="px-1 py-0.2 bg-black/90 border border-[#FCEE0A]/60 text-[#FCEE0A] font-mono font-black text-[6px] sm:text-[7px] uppercase tracking-tighter shadow">
+                                {isTurn1Penalty ? 'T1 GIRADA' : 'GIRADA'}
                               </span>
                             </div>
                           )}
@@ -3038,7 +3143,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
           (u) => !u.isSpent && !u.isLagging && hasKeyword(u, 'Blocker')
         );
         const currentBlocker = (p.field || []).find((u) => u.instanceId === reaction.blockerUnitId);
-        const uncalledLegends = (p.legends || []).filter((l) => !l.isFaceUp && !l.isSpent);
+        const uncalledLegends = (p.legends || []).filter((l) => !l.isFaceUp);
         const totalEddies = getTotalAvailableEddies(p);
         const quickCards = (p.hand || []).filter(
           (c) => hasKeyword(c, 'Quick') && (c.parsedCost || 0) <= totalEddies
