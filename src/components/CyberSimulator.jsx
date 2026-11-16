@@ -614,18 +614,68 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
     if (targetType === 'GIGS') {
       if (botBlocker) {
         // Al haber bloqueador, se convierte en combate contra el bloqueador y no se roban Gigs
-        resolveFight(gameState, 'player', attackerUnit, 'bot', botBlocker);
+        const fightRes = resolveFight(gameState, 'player', attackerUnit, 'bot', botBlocker);
+        if (fightRes && fightRes.success) {
+          if (fightRes.isTie) {
+            setHolocall({
+              title: '🛡️ BLOQUEO CON EMPATE LETAL',
+              characterName: 'SISTEMA DE COMBATE // NC-PD',
+              message: `El bloqueador rival interceptó el asalto. ¡Empate de fuerzas (${fightRes.attPower} vs ${fightRes.defPower})! Ambas unidades han sido destruidas y enviadas a la Basura (Trash). ¡No se roba ningún Gig!`,
+              type: 'warning'
+            });
+          } else if (fightRes.winnerKey === 'player') {
+            setHolocall({
+              title: '🛡️ BLOQUEADOR DERROTADO',
+              characterName: 'SISTEMA DE COMBATE // NC-PD',
+              message: `"${attackerUnit.name}" [Fuerza ${fightRes.attPower}] derrotó al bloqueador "${fightRes.loserUnit?.name}" [Fuerza ${fightRes.defPower}]. El bloqueador va a la Basura (Trash). ¡No se roban Gigs por haber habido bloqueo!`,
+              type: 'success'
+            });
+          } else if (fightRes.winnerKey === 'bot') {
+            setHolocall({
+              title: '🛡️ BLOQUEADOR CONTRAGOLPEA',
+              characterName: 'SISTEMA DE COMBATE // NC-PD',
+              message: `El bloqueador "${botBlocker.name}" [Fuerza ${fightRes.defPower}] superó a tu unidad "${attackerUnit.name}" [Fuerza ${fightRes.attPower}]. Tu unidad va a la Basura (Trash).`,
+              type: 'danger'
+            });
+          }
+        }
       } else {
         attackRivalGigs(gameState, 'player', attackerUnit.instanceId, null, preferredDice);
       }
     } else if (targetType === 'UNIT') {
-      fightRivalUnit(
+      const fightRes = fightRivalUnit(
         gameState,
         'player',
         attackerUnit.instanceId,
         targetUnitId,
         botBlocker ? botBlocker.instanceId : null
       );
+
+      // Informar al jugador mediante Holocall visual del resultado del combate
+      if (fightRes && fightRes.success) {
+        if (fightRes.isTie) {
+          setHolocall({
+            title: '☠️ EMPATE LETAL EN COMBATE',
+            characterName: 'SISTEMA DE COMBATE // NC-PD',
+            message: `¡Empate de fuerzas (${fightRes.attPower} vs ${fightRes.defPower})! La unidad atacante y la unidad defensora tienen el mismo poder: ¡AMBAS VAN A LA BASURA (TRASH)!`,
+            type: 'warning'
+          });
+        } else if (fightRes.winnerKey === 'player') {
+          setHolocall({
+            title: '🥊 VICTORIA EN COMBATE',
+            characterName: 'SISTEMA DE COMBATE // NC-PD',
+            message: `"${fightRes.winnerUnit?.name}" [Fuerza ${fightRes.attPower}] superó a "${fightRes.loserUnit?.name}" [Fuerza ${fightRes.defPower}]. La unidad rival tiene menor fuerza y es enviada a la Basura (Trash).`,
+            type: 'success'
+          });
+        } else if (fightRes.winnerKey === 'bot') {
+          setHolocall({
+            title: '💥 CONTRAATAQUE // UNIDAD DERROTADA',
+            characterName: 'SISTEMA DE COMBATE // NC-PD',
+            message: `"${fightRes.winnerUnit?.name}" [Fuerza ${fightRes.defPower}] superó a "${fightRes.loserUnit?.name}" [Fuerza ${fightRes.attPower}]. Tu unidad tiene menor fuerza y es enviada a la Basura (Trash).`,
+            type: 'danger'
+          });
+        }
+      }
     }
 
     delete attackerUnit.hasTriggeredAttackThisDeclaration;
@@ -2010,7 +2060,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                           style={{ clipPath: CYBER_CARD_CLIP }}
                           className={`w-14 sm:w-16 md:w-20 h-20 sm:h-24 md:h-28 bg-black border-2 transition-transform duration-300 cursor-pointer flex flex-col justify-between relative shadow-xl ${
                             canAttackThisUnit
-                              ? 'border-[#FF003C] animate-pulse'
+                              ? 'border-[#FF003C] ring-2 ring-[#FF003C] shadow-[0_0_20px_rgba(255,0,60,0.9)] animate-pulse rotate-90'
                               : unit.isSpent
                               ? 'border-gray-800 opacity-75 rotate-90'
                               : 'border-[#FF003C]/80 hover:border-[#FF003C]'
@@ -2046,12 +2096,23 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                             {unit.currentPower}
                           </div>
 
-                          {/* Estado: GASTADA */}
+                          {/* Estado: GASTADA / OBJETIVO DE ATAQUE */}
                           {unit.isSpent && (
                             <div className="absolute inset-0 bg-black/60 flex items-center justify-center z-20">
-                              <span className="px-1 py-0.5 bg-black border border-[#FF003C] text-[#FF003C] font-mono font-black text-[8px] uppercase tracking-wider -rotate-90">
-                                GASTADA
-                              </span>
+                              {canAttackThisUnit ? (
+                                <div className="flex flex-col items-center justify-center -rotate-90">
+                                  <span className="px-2 py-0.5 bg-[#FF003C] text-white font-mono font-black text-[9px] uppercase tracking-wider shadow-[0_0_15px_#FF003C] animate-pulse">
+                                    ⚔️ ATACAR
+                                  </span>
+                                  <span className="text-[7px] text-[#FCEE0A] font-bold mt-0.5 bg-black/90 px-1 rounded whitespace-nowrap">
+                                    MENOR FUERZA AL TRASH
+                                  </span>
+                                </div>
+                              ) : (
+                                <span className="px-1 py-0.5 bg-black border border-[#FF003C] text-[#FF003C] font-mono font-black text-[8px] uppercase tracking-wider -rotate-90">
+                                  GASTADA
+                                </span>
+                              )}
                             </div>
                           )}
 
@@ -2229,7 +2290,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                           : 'border-gray-800 bg-black/60 text-gray-400'
                       }`}
                     >
-                      ⚔️ {selectedFieldUnit ? `ATACANDO: ${selectedFieldUnit.name}` : 'ATAQUE (1 A LA VEZ)'}
+                      ⚔️ {selectedFieldUnit ? `ATACANDO CON: ${selectedFieldUnit.name} (Clic en Gigs o Unidad rival gastada)` : 'ATAQUE (1 A LA VEZ)'}
                     </span>
                   </div>
                 )}

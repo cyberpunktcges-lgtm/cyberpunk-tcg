@@ -732,7 +732,7 @@ export function attackRivalGigs(
 
   const unit = attacker.field.find((u) => u.instanceId === attackerUnitId);
   if (!unit) return { success: false, reason: 'Unidad atacante no encontrada.' };
-  if (unit.isSpent && (!state.pendingReaction || state.pendingReaction.attackerUnitId !== attackerUnitId)) {
+  if (unit.isSpent && !unit.hasTriggeredAttackThisDeclaration && (!state.pendingReaction || state.pendingReaction.attackerUnitId !== attackerUnitId)) {
     return { success: false, reason: 'La unidad ya está girada (Spent).' };
   }
   if (unit.isLagging) return { success: false, reason: 'La unidad tiene Lag (no puede atacar este turno).' };
@@ -838,8 +838,16 @@ export function resolveFight(state, attPlayerKey, attUnit, defPlayerKey, defUnit
     `🥊 [FASE 3: COMBATE] "${attUnit.name}" [Fuerza: ${attPower}] vs "${defUnit.name}" [Fuerza: ${defPower}].`
   );
 
+  let result = {
+    success: true,
+    attPower,
+    defPower,
+    attUnitName: attUnit.name,
+    defUnitName: defUnit.name
+  };
+
   if (attPower > defPower) {
-    // Atacante gana
+    // Atacante tiene mayor fuerza: la unidad de menor fuerza (defensora) va al Trash
     const idx = defender.field.findIndex((u) => u.instanceId === defUnit.instanceId);
     if (idx !== -1) {
       const [defeated] = defender.field.splice(idx, 1);
@@ -848,39 +856,51 @@ export function resolveFight(state, attPlayerKey, attUnit, defPlayerKey, defUnit
         defeated.gear.forEach((g) => defender.trash.push(g));
       }
       state.actionLog.unshift(
-        `💀 [FASE 3: DERROTA] "${defUnit.name}" de ${defender.name} es DERROTADA y enviada a la Basura${
+        `💀 [FASE 3: DERROTA] "${defUnit.name}" tiene menor fuerza (${defPower} < ${attPower}) y es enviada a la Basura (Trash)${
           defeated.gear?.length ? ` junto con ${defeated.gear.length} Gear(s)` : ''
         }.`
       );
-      // Disparar habilidades de victoria y derrota (Johnny Silverhand, Satori, Safety Override)
       executeCombatWinTrigger(state, attPlayerKey, attUnit, defeated);
       executeCombatLossTrigger(state, defPlayerKey, defeated, attUnit);
       executeUnitDefeatedTrigger(state, defPlayerKey, defeated);
+      result = {
+        ...result,
+        winnerKey: attPlayerKey,
+        winnerUnit: attUnit,
+        loserKey: defPlayerKey,
+        loserUnit: defeated,
+        isTie: false
+      };
     }
   } else if (defPower > attPower) {
-    // Defensor gana (contraataque)
-    if (defPower > 0) {
-      const idx = attacker.field.findIndex((u) => u.instanceId === attUnit.instanceId);
-      if (idx !== -1) {
-        const [defeated] = attacker.field.splice(idx, 1);
-        attacker.trash.push(defeated);
-        if (defeated.gear && defeated.gear.length > 0) {
-          defeated.gear.forEach((g) => attacker.trash.push(g));
-        }
-        state.actionLog.unshift(
-          `💥 [FASE 3: CONTRAATAQUE] "${attUnit.name}" fue superada en poder y enviada a la Basura${
-            defeated.gear?.length ? ` junto con ${defeated.gear.length} Gear(s)` : ''
-          }.`
-        );
-        // Disparar habilidades de victoria y derrota (Johnny Silverhand, Satori, Safety Override)
-        executeCombatWinTrigger(state, defPlayerKey, defUnit, defeated);
-        executeCombatLossTrigger(state, attPlayerKey, defeated, defUnit);
-        executeUnitDefeatedTrigger(state, attPlayerKey, defeated);
+    // Defensor tiene mayor fuerza: la unidad de menor fuerza (atacante) va al Trash
+    const idx = attacker.field.findIndex((u) => u.instanceId === attUnit.instanceId);
+    if (idx !== -1) {
+      const [defeated] = attacker.field.splice(idx, 1);
+      attacker.trash.push(defeated);
+      if (defeated.gear && defeated.gear.length > 0) {
+        defeated.gear.forEach((g) => attacker.trash.push(g));
       }
+      state.actionLog.unshift(
+        `💥 [FASE 3: CONTRAATAQUE] "${attUnit.name}" tiene menor fuerza (${attPower} < ${defPower}) y es enviada a la Basura (Trash)${
+          defeated.gear?.length ? ` junto con ${defeated.gear.length} Gear(s)` : ''
+        }.`
+      );
+      executeCombatWinTrigger(state, defPlayerKey, defUnit, defeated);
+      executeCombatLossTrigger(state, attPlayerKey, defeated, defUnit);
+      executeUnitDefeatedTrigger(state, attPlayerKey, defeated);
+      result = {
+        ...result,
+        winnerKey: defPlayerKey,
+        winnerUnit: defUnit,
+        loserKey: attPlayerKey,
+        loserUnit: defeated,
+        isTie: false
+      };
     }
   } else {
-    // REGLA OFICIAL DE EMPATE: Ambas unidades son derrotadas y van a la basura!
-    if (attPower > 0 && defPower > 0) {
+    // REGLA OFICIAL DE EMPATE: ¡Ambas unidades tienen la misma fuerza y van al Trash!
+    if (attPower > 0 || defPower > 0) {
       const defIdx = defender.field.findIndex((u) => u.instanceId === defUnit.instanceId);
       let defeatedDef = null;
       if (defIdx !== -1) {
@@ -902,16 +922,26 @@ export function resolveFight(state, attPlayerKey, attUnit, defPlayerKey, defUnit
       if (defeatedDef) executeUnitDefeatedTrigger(state, defPlayerKey, defeatedDef);
       if (defeatedAtt) executeUnitDefeatedTrigger(state, attPlayerKey, defeatedAtt);
       state.actionLog.unshift(
-        `☠️ [FASE 3: EMPATE LETAL] (${attPower} vs ${defPower}): Ambas unidades pierden el combate y van a la Basura.`
+        `☠️ [FASE 3: EMPATE LETAL] (${attPower} vs ${defPower}): Ambas unidades tienen la misma fuerza: ¡AMBAS VAN A LA BASURA (TRASH)!`
       );
+      result = {
+        ...result,
+        isTie: true,
+        winnerKey: null,
+        defeatedUnits: [defeatedDef, defeatedAtt].filter(Boolean)
+      };
     } else {
       state.actionLog.unshift(
-        `⚠️ [FASE 3: COMBATE] Las unidades tienen 0 de poder y no pueden derrotar nada.`
+        `⚠️ [FASE 3: COMBATE] Ambas unidades tienen 0 de poder y no pueden derrotar nada.`
       );
+      result = {
+        ...result,
+        isZeroTie: true
+      };
     }
   }
 
-  return { success: true };
+  return result;
 }
 
 /**
@@ -926,7 +956,7 @@ export function fightRivalUnit(state, attackerPlayerKey, attackerUnitId, targetU
   const defUnit = defender.field.find((u) => u.instanceId === targetUnitId);
 
   if (!attUnit || !defUnit) return { success: false, reason: 'Unidades no encontradas.' };
-  if (attUnit.isSpent && (!state.pendingReaction || state.pendingReaction.attackerUnitId !== attackerUnitId)) {
+  if (attUnit.isSpent && !attUnit.hasTriggeredAttackThisDeclaration && (!state.pendingReaction || state.pendingReaction.attackerUnitId !== attackerUnitId)) {
     return { success: false, reason: 'Tu unidad está girada.' };
   }
   if (attUnit.isLagging) return { success: false, reason: 'Tu unidad tiene Lag.' };
