@@ -44,6 +44,45 @@ export function decideBotBlocker(botState, attackerPower, isGigAttack = false) {
 }
 
 /**
+ * Ayudante para que la IA gire automáticamente sus cartas de Eddies o Leyendas
+ * para reunir la cantidad necesaria de Eddies en bot.floatingEddies antes de pagar una acción.
+ */
+function botPrepareEddies(bot, neededAmount) {
+  let current = bot.floatingEddies || 0;
+  if (current >= neededAmount) return true;
+
+  // 1. Girar cartas de Eddies del bot
+  for (const ed of (bot.eddies || [])) {
+    if (current >= neededAmount) break;
+    if (!ed.isSpent) {
+      ed.isSpent = true;
+      current++;
+    }
+  }
+
+  // 2. Si todavía faltan, girar Leyendas del bot
+  if (current < neededAmount) {
+    for (const leg of (bot.legends || [])) {
+      if (current >= neededAmount) break;
+      if (!leg.isSpent) {
+        leg.isSpent = true;
+        current++;
+      }
+    }
+  }
+
+  bot.floatingEddies = current;
+  return current >= neededAmount;
+}
+
+function getBotMaxCapacity(bot) {
+  const current = bot.floatingEddies || 0;
+  const readyEddies = (bot.eddies || []).filter((e) => !e.isSpent).length;
+  const readyLegends = (bot.legends || []).filter((l) => !l.isSpent).length;
+  return current + readyEddies + readyLegends;
+}
+
+/**
  * Ejecuta el turno del Bot paso a paso con pequeños retrasos para que el jugador
  * pueda observar las acciones en pantalla.
  */
@@ -73,9 +112,10 @@ export async function runBotTurn(gameState, updateCallback, delayMs = 700) {
   // Paso 2: Llamar a una leyenda boca arriba si tiene alguna boca abajo y puede pagar el coste oficial de 1 €$
   const faceDownLegend = bot.legends.find((l) => !l.isFaceUp);
   if (faceDownLegend && !bot.hasCalledLegendThisTurn) {
-    const availableEddies = getAvailableEddies(bot);
-    if (availableEddies >= 1) {
+    const maxCapacity = getBotMaxCapacity(bot);
+    if (maxCapacity >= 1) {
       await wait(delayMs);
+      botPrepareEddies(bot, 1);
       callLegendFaceUp(gameState, 'bot', faceDownLegend.instanceId);
       updateCallback({ ...gameState });
     }
@@ -84,14 +124,15 @@ export async function runBotTurn(gameState, updateCallback, delayMs = 700) {
   // Paso 3: Jugar cartas desde la mano (priorizando mayor relación poder/coste)
   let keepPlaying = true;
   while (keepPlaying && !gameState.isGameOver) {
-    const availableEddies = getAvailableEddies(bot);
+    const maxCapacity = getBotMaxCapacity(bot);
     const playableCards = bot.hand
-      .filter((c) => (c.parsedCost || 0) <= availableEddies)
+      .filter((c) => (c.parsedCost || 0) <= maxCapacity)
       .sort((a, b) => (b.parsedPower || 0) - (a.parsedPower || 0)); // Priorizar la más fuerte
 
     if (playableCards.length > 0) {
       await wait(delayMs);
       const chosenCard = playableCards[0];
+      botPrepareEddies(bot, chosenCard.parsedCost || 0);
       const res = playCard(gameState, 'bot', chosenCard.instanceId);
       if (res.success) {
         updateCallback({ ...gameState });

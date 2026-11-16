@@ -30,6 +30,7 @@ import {
   createInitialGameState,
   calculateStreetCred,
   getAvailableEddies,
+  getTotalAvailableEddies,
   sellCardForEddies,
   playCard,
   playUnitCard,
@@ -51,6 +52,7 @@ import {
   parseCardCost,
   isCardVendible,
   toggleEddieSpent,
+  toggleLegendSpent,
   DICE_CONFIG
 } from '../utils/cyberpunkEngine.js';
 import { runBotTurn, decideBotBlocker } from '../utils/botAi.js';
@@ -384,6 +386,9 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
   const [isDragOverEddies, setIsDragOverEddies] = useState(false);
   const [rollingAnimation, setRollingAnimation] = useState(null);
 
+  // Popup de Transmisión Kiroshi (avisos de falta de Eddies, triggers, etc.)
+  const [holocall, setHolocall] = useState(null);
+
   // Estado para previsualización fija en la zona central izquierda del HUD (Kiroshi Scanner)
   const [hoveredCard, setHoveredCard] = useState(null);
   const [previewCard, setPreviewCard] = useState(null);
@@ -462,8 +467,50 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
       setSelectedHandCard(null);
       setGameState({ ...gameState });
     } else {
-      alert(res.reason);
+      if (res.missingEddies) {
+        setHolocall({
+          title: 'EDDIES INSUFICIENTES',
+          message: `¡Atención, Netrunner! Te faltan ${res.missingEddies} €$ para poder jugar "${res.cardName || 'esta carta'}". Haz clic en tus cartas de la Zona de Eddies o en tus Leyendas para girarlas antes de jugarla.`,
+          characterName: 'VIKTOR // RIPPERDOC',
+          missingEddies: res.missingEddies,
+          type: 'warning'
+        });
+      } else {
+        alert(res.reason);
+      }
     }
+  };
+
+  // Girar o enderezar carta en la Zona de Eddies (+1 €$ en reserva)
+  const handleToggleEddie = (eddieId) => {
+    if (!gameState || gameState.activePlayer !== 'player' || gameState.isGameOver) return;
+    pushHistory();
+    const res = toggleEddieSpent(gameState, 'player', eddieId);
+    if (!res.success) {
+      setHolocall({
+        title: 'EDDIE YA CONSUMIDO',
+        message: res.reason || 'Este Eddie ya fue consumido este turno para pagar cartas. Se enderezará en tu próxima Fase de Inicio.',
+        characterName: 'VIKTOR // RIPPERDOC',
+        type: 'warning'
+      });
+    }
+    setGameState({ ...gameState });
+  };
+
+  // Girar o enderezar Leyenda (+1 €$ en reserva)
+  const handleToggleLegend = (legendId) => {
+    if (!gameState || gameState.activePlayer !== 'player' || gameState.isGameOver) return;
+    pushHistory();
+    const res = toggleLegendSpent(gameState, 'player', legendId);
+    if (!res.success) {
+      setHolocall({
+        title: 'LEYENDA BLOQUEADA',
+        message: res.reason || 'Esta Leyenda no puede enderezarse o ya fue consumida este turno.',
+        characterName: 'VIKTOR // RIPPERDOC',
+        type: 'warning'
+      });
+    }
+    setGameState({ ...gameState });
   };
 
   // Vender carta arrastrada o clicada
@@ -638,6 +685,9 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
   const playerStreetCred = calculateStreetCred(p.gigs);
   const botStreetCred = calculateStreetCred(bot.gigs);
   const availableEddies = getAvailableEddies(p);
+  const unspentEddiesCount = (p.eddies || []).filter((e) => !e.isSpent).length;
+  const unspentLegendsCount = (p.legends || []).filter((l) => !l.isSpent).length;
+  const totalSpendableCapacity = availableEddies + unspentEddiesCount + unspentLegendsCount;
 
   const canAttackGigs =
     isMyTurn &&
@@ -1016,14 +1066,27 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
               {/* Marcador Eddies Jugador */}
               <div
                 style={{ clipPath: CYBER_CLIP }}
-                className="bg-[#000000] border border-[#0dfceb]/50 p-2"
+                className={`bg-[#000000] border p-2 transition-all ${
+                  availableEddies > 0
+                    ? 'border-[#0dfceb] shadow-[0_0_15px_rgba(13,252,235,0.4)]'
+                    : 'border-[#0dfceb]/40'
+                }`}
+                title={`${availableEddies} €$ girados listos para gastar (${unspentEddiesCount + unspentLegendsCount} cartas disponibles para girar)`}
               >
-                <span className="text-[9px] text-gray-400 uppercase block">TUS EDDIES</span>
-                <span className="text-xl font-black text-[#0dfceb]">
+                <span className="text-[9px] text-gray-400 uppercase block font-bold">TUS EDDIES</span>
+                <span
+                  className={`text-xl font-black font-mono transition-colors ${
+                    availableEddies > 0
+                      ? 'text-[#0dfceb] drop-shadow-[0_0_8px_rgba(13,252,235,0.8)]'
+                      : 'text-gray-500'
+                  }`}
+                >
                   {availableEddies} €$
                 </span>
-                <span className="text-[8px] text-gray-400 block">
-                  MANO: {p.hand.length}
+                <span className="text-[8px] text-gray-400 block font-mono">
+                  {unspentEddiesCount + unspentLegendsCount > 0
+                    ? `${unspentEddiesCount + unspentLegendsCount} POR GIRAR`
+                    : '0 DISPONIBLES'}
                 </span>
               </div>
 
@@ -1781,36 +1844,33 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                           }
                         }}
                         onClick={() => {
-                          if (!leg.isFaceUp && isMyTurn && !p.hasCalledLegendThisTurn) {
-                            if (availableEddies < 1) {
-                              alert('Llamar a una Leyenda boca arriba cuesta 1 €$. No tienes Eddies disponibles.');
-                              return;
-                            }
-                            pushHistory();
-                            const res = callLegendFaceUp(gameState, 'player', leg.instanceId);
-                            if (!res.success) {
-                              alert(res.reason);
-                            } else {
-                              setPreviewCard(leg);
-                            }
-                            setGameState({ ...gameState });
-                          } else {
+                          // Si la leyenda está boca arriba y no gastada: clic la gira (+1 €$)
+                          if (leg.isFaceUp && !leg.isSpent && isMyTurn) {
+                            handleToggleLegend(leg.instanceId);
+                          } else if (leg.isSpent && availableEddies > 0 && !isTurn1Penalty && isMyTurn) {
+                            // Si está girada pero tenemos eddies flotantes: enderezar (-1 €$)
+                            handleToggleLegend(leg.instanceId);
+                          } else if (leg.isFaceUp) {
                             setInspectedCard(leg);
                           }
                         }}
-                        className={`w-11 sm:w-13 md:w-15 h-16 sm:h-20 md:h-24 rounded-lg overflow-hidden border transition-all cursor-pointer flex flex-col items-center justify-center relative shadow-md ${
+                        className={`w-11 sm:w-13 md:w-15 h-16 sm:h-20 md:h-24 rounded-lg overflow-hidden border transition-all cursor-pointer flex flex-col items-center justify-center relative shadow-md group ${
                           leg.isSpent
                             ? 'border-gray-800 opacity-60'
                             : leg.isFaceUp
-                            ? 'border-[#FCEE0A] shadow-[0_0_12px_rgba(252,238,10,0.4)]'
+                            ? 'border-[#FCEE0A] hover:border-[#0dfceb] shadow-[0_0_12px_rgba(252,238,10,0.4)]'
                             : 'border-[#0dfceb]/40 hover:border-[#FCEE0A]'
                         }`}
                         title={
                           isTurn1Penalty
                             ? 'Penalización Turno 1: Esta leyenda empieza gastada por ir primero.'
+                            : leg.isSpent
+                            ? availableEddies > 0
+                              ? 'Leyenda girada (+1 €$ en reserva). Clic para enderezar (-1 €$)'
+                              : 'Leyenda consumida este turno en cartas'
                             : leg.isFaceUp
-                            ? leg.name
-                            : 'Clic para llamar Leyenda (Coste: 1 €$)'
+                            ? `${leg.name} (Clic para girar por +1 €$)`
+                            : 'Leyenda boca abajo (Girar por +1 €$ o Llamar por 1 €$)'
                         }
                       >
                         <div className={`w-full h-full transition-transform duration-300 flex items-center justify-center ${leg.isSpent ? 'rotate-90 scale-75' : ''}`}>
@@ -1821,6 +1881,20 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                           )}
                         </div>
 
+                        {/* Botón flotante para GIRAR leyenda boca abajo (+1 €$) */}
+                        {!leg.isFaceUp && !leg.isSpent && isMyTurn && !isTurn1Penalty && (
+                          <div
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleToggleLegend(leg.instanceId);
+                            }}
+                            className="absolute top-0 inset-x-0 bg-[#FCEE0A]/90 hover:bg-[#FCEE0A] text-black font-mono font-black text-[6px] sm:text-[7px] uppercase text-center py-0.5 shadow z-10 transition-colors"
+                            title="Girar esta Leyenda boca abajo para obtener +1 €$"
+                          >
+                            +1 €$ GIRAR
+                          </div>
+                        )}
+
                         {/* Indicador de Penalización Turno 1 o Gastada */}
                         {leg.isSpent && (
                           <div className="absolute inset-0 bg-black/60 flex items-center justify-center pointer-events-none">
@@ -1830,11 +1904,36 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                           </div>
                         )}
 
-                        {/* Indicador de Llamar si está disponible */}
-                        {!leg.isFaceUp && !leg.isSpent && isMyTurn && !p.hasCalledLegendThisTurn && availableEddies >= 1 && (
-                          <div className="absolute bottom-0 inset-x-0 bg-[#0dfceb]/90 text-black font-mono font-black text-[7px] uppercase text-center py-0.5 animate-pulse">
+                        {/* Botón de LLAMAR a Leyenda si está boca abajo */}
+                        {!leg.isFaceUp && !leg.isSpent && isMyTurn && !p.hasCalledLegendThisTurn && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (availableEddies < 1) {
+                                setHolocall({
+                                  title: 'EDDIES INSUFICIENTES',
+                                  message: 'Llamar a una Leyenda boca arriba cuesta 1 €$. Gira primero 1 carta en tu Zona de Eddies o una de tus otras Leyendas para obtener el Eddie.',
+                                  characterName: 'VIKTOR // RIPPERDOC',
+                                  missingEddies: 1,
+                                  type: 'warning'
+                                });
+                                return;
+                              }
+                              pushHistory();
+                              const res = callLegendFaceUp(gameState, 'player', leg.instanceId);
+                              if (!res.success) {
+                                alert(res.reason);
+                              } else {
+                                setPreviewCard(leg);
+                              }
+                              setGameState({ ...gameState });
+                            }}
+                            className="absolute bottom-0 inset-x-0 bg-[#0dfceb] hover:bg-white text-black font-mono font-black text-[7px] uppercase text-center py-0.5 animate-pulse z-10 shadow"
+                            title="Gasta 1 €$ de tus Eddies girados para voltear esta Leyenda boca arriba"
+                          >
                             LLAMAR 1€$
-                          </div>
+                          </button>
                         )}
 
                         {/* Badge de Gear del Jugador */}
@@ -1883,24 +1982,24 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                       {p.eddies.map((ed, idx) => (
                         <div
                           key={ed.instanceId || idx}
-                          onClick={() => {
-                            pushHistory();
-                            toggleEddieSpent(gameState, 'player', ed.instanceId);
-                            setGameState({ ...gameState });
-                          }}
+                          onClick={() => handleToggleEddie(ed.instanceId)}
                           className={`transition-all duration-300 flex items-center justify-center shrink-0 cursor-pointer ${
                             ed.isSpent ? 'w-16 sm:w-20 h-10 sm:h-12 my-0.5' : 'w-10 sm:w-12 h-14 sm:h-16'
                           }`}
                           title={
                             ed.isSpent
-                              ? 'Eddie gastado este turno (clic para enderezar)'
-                              : '1 €$ listo para gastar (clic para girar 90°)'
+                              ? availableEddies > 0
+                                ? 'Eddie girado (+1 €$ en reserva). Clic para enderezar (-1 €$)'
+                                : 'Eddie consumido este turno en cartas'
+                              : '1 €$ disponible. Haz clic para girar 90° y añadir +1 €$ a Tus Eddies'
                           }
                         >
                           <div
                             className={`w-10 sm:w-12 h-14 sm:h-16 rounded-md overflow-hidden border transition-transform duration-300 relative shadow-md ${
                               ed.isSpent
-                                ? 'rotate-90 opacity-40 border-gray-800'
+                                ? availableEddies > 0
+                                  ? 'rotate-90 border-[#0dfceb] opacity-80 shadow-[0_0_10px_rgba(13,252,235,0.3)]'
+                                  : 'rotate-90 opacity-40 border-gray-800'
                                 : 'border-[#0dfceb] hover:border-[#FCEE0A] hover:scale-105 shadow-[0_0_10px_rgba(13,252,235,0.4)]'
                             }`}
                           >
@@ -1908,10 +2007,14 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                             <div className="absolute inset-0 bg-black/30 flex items-center justify-center">
                               <span
                                 className={`font-mono font-black text-[8px] px-1 bg-black/90 ${
-                                  ed.isSpent ? '-rotate-90 text-gray-500' : 'text-[#0dfceb]'
+                                  ed.isSpent
+                                    ? availableEddies > 0
+                                      ? '-rotate-90 text-[#0dfceb]'
+                                      : '-rotate-90 text-gray-500'
+                                    : 'text-[#FCEE0A]'
                                 }`}
                               >
-                                {ed.isSpent ? 'USADO' : '1 €$'}
+                                {ed.isSpent ? (availableEddies > 0 ? '+1 €$' : 'USADO') : 'GIRAR 1€$'}
                               </span>
                             </div>
                           </div>
@@ -1921,7 +2024,10 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                   )}
 
                   {/* Badge inferior derecho: Eddies X/Y Ⓐ exactamente como en la imagen */}
-                  <div className="absolute bottom-1.5 right-2.5 flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-[#031525]/90 border border-[#00F0FF]/60 text-[#00F0FF] font-mono text-[10px] sm:text-xs font-bold shadow-[0_0_10px_rgba(0,240,255,0.25)] select-none pointer-events-none">
+                  <div
+                    className="absolute bottom-1.5 right-2.5 flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-[#031525]/90 border border-[#00F0FF]/60 text-[#00F0FF] font-mono text-[10px] sm:text-xs font-bold shadow-[0_0_10px_rgba(0,240,255,0.25)] select-none pointer-events-none"
+                    title={`${availableEddies} €$ girados listos para gastar`}
+                  >
                     <span>Eddies {availableEddies}/{p.eddies.length + p.legends.length}</span>
                     <span className="w-3.5 h-3.5 rounded-full border border-[#00F0FF] flex items-center justify-center text-[9px] font-black leading-none">Ⓐ</span>
                   </div>
@@ -1969,7 +2075,10 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
           {/* Barra Superior del Dock: Estado o Acciones de la Carta Seleccionada */}
           <div className="flex flex-wrap items-center justify-between text-xs border-b border-[#0dfceb]/20 pb-1.5 mb-1.5">
             <span className="text-gray-400 font-bold uppercase tracking-wider text-[11px]">
-              TU MANO ({p.hand.length} CARTAS) • EDDIES: <strong className="text-[#0dfceb]">{availableEddies} €$</strong>
+              TU MANO ({p.hand.length} CARTAS) • EDDIES GIRADOS: <strong className={`font-mono ${availableEddies > 0 ? 'text-[#0dfceb]' : 'text-gray-400'}`}>{availableEddies} €$</strong>
+              {unspentEddiesCount + unspentLegendsCount > 0 && (
+                <span className="text-[10px] text-gray-500 ml-2">({unspentEddiesCount + unspentLegendsCount} disponibles para girar)</span>
+              )}
             </span>
 
             {selectedHandCard && (
@@ -1983,17 +2092,21 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                   const isProgram = cardType === 'PROGRAM';
                   const isGear = cardType === 'GEAR';
                   const gearTarget = selectedFieldUnit?.instanceId || (p.field.length > 0 ? p.field[0].instanceId : (p.legends[0]?.instanceId || null));
-                  const canAfford = availableEddies >= selectedHandCard.parsedCost;
+                  const cardCost = selectedHandCard.parsedCost || 0;
+                  const canAfford = availableEddies >= cardCost;
+                  const missingEddies = Math.max(0, cardCost - availableEddies);
                   const canPlay = isMyTurn && canAfford && (!isGear || Boolean(gearTarget));
 
-                  let actionLabel = `JUGAR UNIDAD (${selectedHandCard.parsedCost} €$)`;
-                  if (isProgram) {
-                    actionLabel = `LANZAR PROGRAMA (${selectedHandCard.parsedCost} €$)`;
+                  let actionLabel = `JUGAR UNIDAD (${cardCost} €$)`;
+                  if (!canAfford) {
+                    actionLabel = `FALTAN ${missingEddies} €$ (GIRAR MÁS)`;
+                  } else if (isProgram) {
+                    actionLabel = `LANZAR PROGRAMA (${cardCost} €$)`;
                   } else if (isGear) {
                     if (selectedFieldUnit) {
-                      actionLabel = `EQUIPAR A ${selectedFieldUnit.name.split(' ')[0]} (${selectedHandCard.parsedCost} €$)`;
+                      actionLabel = `EQUIPAR A ${selectedFieldUnit.name.split(' ')[0]} (${cardCost} €$)`;
                     } else if (gearTarget) {
-                      actionLabel = `EQUIPAR GEAR (${selectedHandCard.parsedCost} €$)`;
+                      actionLabel = `EQUIPAR GEAR (${cardCost} €$)`;
                     } else {
                       actionLabel = 'GEAR (SIN OBJETIVO)';
                     }
@@ -2002,25 +2115,37 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                   return (
                     <button
                       type="button"
-                      disabled={!canPlay}
+                      disabled={isGear && canAfford && !gearTarget}
                       onClick={() => {
+                        if (!canAfford) {
+                          setHolocall({
+                            title: 'EDDIES INSUFICIENTES',
+                            message: `¡Atención, Netrunner! Necesitas ${cardCost} €$ para jugar "${selectedHandCard.name}", pero solo tienes ${availableEddies} €$ girados. Te faltan ${missingEddies} €$. Haz clic en tus cartas de la Zona de Eddies o Leyendas para girarlas antes de jugar.`,
+                            characterName: 'VIKTOR // RIPPERDOC',
+                            missingEddies,
+                            type: 'warning'
+                          });
+                          return;
+                        }
                         handlePlayCard(selectedHandCard.instanceId, isGear ? gearTarget : null);
                       }}
                       style={{ clipPath: CYBER_BUTTON }}
-                      className={`px-3 py-1 text-[#070a10] font-black text-xs uppercase cursor-pointer disabled:opacity-40 transition-colors shadow-[0_0_15px_rgba(13,252,235,0.4)] ${
-                        isProgram
-                          ? 'bg-[#0dfceb] hover:bg-white'
+                      className={`px-3 py-1 font-black text-xs uppercase cursor-pointer transition-all shadow-md ${
+                        !canAfford
+                          ? 'bg-[#FF003C]/20 border border-[#FF003C] text-[#FF003C] hover:bg-[#FF003C] hover:text-white animate-pulse'
+                          : isProgram
+                          ? 'bg-[#0dfceb] hover:bg-white text-[#070a10] shadow-[0_0_15px_rgba(13,252,235,0.4)]'
                           : isGear
-                          ? 'bg-[#FCEE0A] hover:bg-white'
-                          : 'bg-[#0dfceb] hover:bg-[#FCEE0A]'
+                          ? 'bg-[#FCEE0A] hover:bg-white text-[#070a10] shadow-[0_0_15px_rgba(252,238,10,0.4)]'
+                          : 'bg-[#0dfceb] hover:bg-[#FCEE0A] text-[#070a10] shadow-[0_0_15px_rgba(13,252,235,0.4)]'
                       }`}
                       title={
-                        isProgram
-                          ? 'Lanza este programa: se pagan los Eddies y va directamente a la Basura (Trash)'
+                        !canAfford
+                          ? `Te faltan ${missingEddies} €$. Haz clic para ver detalles o gira cartas de Eddies/Leyendas`
+                          : isProgram
+                          ? 'Lanza este programa: se descuentan los Eddies girados y va a Trash'
                           : isGear
-                          ? selectedFieldUnit
-                            ? `Equipa este Gear a ${selectedFieldUnit.name}`
-                            : 'Equipa este Gear a una unidad o arrástralo directamente sobre una unidad/leyenda'
+                          ? 'Equipa este Gear al objetivo seleccionado'
                           : 'Despliega esta Unidad en el campo de batalla'
                       }
                     >
@@ -2657,6 +2782,102 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
             >
               JUGAR OTRA PARTIDA
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* 6. MODAL DE TRANSMISIÓN / HOLOCALL DE PERSONAJE (AVISOS DE EDDIES Y TRIGGERS) */}
+      {holocall && (
+        <div
+          className="fixed inset-0 z-50 bg-[#000000]/85 backdrop-blur-md flex items-center justify-center p-4 font-mono select-none"
+          onClick={() => setHolocall(null)}
+        >
+          <div
+            style={{ clipPath: CYBER_CLIP }}
+            className={`max-w-lg w-full bg-[#070a10] border-2 p-6 flex flex-col space-y-4 relative overflow-hidden transition-all ${
+              holocall.type === 'warning'
+                ? 'border-[#FF003C] shadow-[0_0_50px_rgba(255,0,60,0.45)]'
+                : 'border-[#0dfceb] shadow-[0_0_50px_rgba(13,252,235,0.45)]'
+            }`}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Cabecera Holocall */}
+            <div className="flex items-center justify-between border-b border-gray-800 pb-2">
+              <div className="flex items-center gap-2">
+                <span
+                  className={`w-2.5 h-2.5 rounded-full animate-ping ${
+                    holocall.type === 'warning' ? 'bg-[#FF003C]' : 'bg-[#0dfceb]'
+                  }`}
+                />
+                <span
+                  className={`text-xs font-black uppercase tracking-widest ${
+                    holocall.type === 'warning' ? 'text-[#FF003C]' : 'text-[#0dfceb]'
+                  }`}
+                >
+                  // TRANSMISIÓN KIROSHI ENTRANTE //
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setHolocall(null)}
+                className="text-gray-500 hover:text-white text-base px-2 cursor-pointer font-bold"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Contenido Principal con Avatar y Mensaje */}
+            <div className="flex items-start gap-4">
+              {/* Avatar del Personaje (o fallback Netrunner) */}
+              <div className="shrink-0 w-20 h-20 sm:w-24 sm:h-24 rounded border-2 border-[#0dfceb]/60 bg-black flex items-center justify-center overflow-hidden relative shadow-[0_0_15px_rgba(13,252,235,0.3)]">
+                {holocall.characterImage ? (
+                  <img
+                    src={holocall.characterImage}
+                    alt={holocall.characterName || 'Personaje'}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-b from-[#0dfceb]/20 to-black text-[#0dfceb]">
+                    <User className="w-10 h-10 animate-pulse" />
+                    <span className="text-[7px] font-mono uppercase tracking-tighter mt-1 text-gray-400">
+                      KIROSHI COMM
+                    </span>
+                  </div>
+                )}
+                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent pointer-events-none" />
+              </div>
+
+              {/* Texto y Diálogo */}
+              <div className="flex-1 space-y-1.5 min-w-0">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-black text-[#FCEE0A] uppercase tracking-wider">
+                    {holocall.characterName || 'VIKTOR // RIPPERDOC'}
+                  </span>
+                  <span className="text-[9px] text-gray-400 font-mono">
+                    {holocall.title || 'AVISO'}
+                  </span>
+                </div>
+                <p className="text-xs sm:text-sm text-gray-200 leading-relaxed font-sans bg-black/50 p-2.5 rounded border border-gray-900 shadow-inner">
+                  "{holocall.message}"
+                </p>
+              </div>
+            </div>
+
+            {/* Botón de Aceptar */}
+            <div className="pt-2 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setHolocall(null)}
+                style={{ clipPath: CYBER_BUTTON }}
+                className={`px-5 py-2 text-xs font-black uppercase tracking-wider cursor-pointer transition-all shadow-[0_0_15px_rgba(13,252,235,0.4)] ${
+                  holocall.type === 'warning'
+                    ? 'bg-[#FF003C] hover:bg-white text-white hover:text-black'
+                    : 'bg-[#0dfceb] hover:bg-[#FCEE0A] text-[#070a10]'
+                }`}
+              >
+                ENTENDIDO // CONTINUAR
+              </button>
+            </div>
           </div>
         </div>
       )}

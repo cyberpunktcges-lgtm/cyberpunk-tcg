@@ -238,6 +238,7 @@ export function createInitialGameState(playerDeckInput, botDeckInput, allCards =
       legends: playerLegends, // 3 slots de leyendas
       legendsDoNotReadyTurn1: true, // Penalización oficial del primer jugador
       eddies: [], // Cartas boca abajo que dan 1 €$ cada una
+      floatingEddies: 0, // Eddies actualmente girados listos para gastar
       fixerDice: ['d4', 'd6', 'd8', 'd10', 'd12', 'd20'],
       gigs: [], // Empieza vacío hasta la fase de inicio
       hasSoldThisTurn: false,
@@ -254,6 +255,7 @@ export function createInitialGameState(playerDeckInput, botDeckInput, allCards =
       legends: botLegends,
       legendsDoNotReadyTurn1: false,
       eddies: [],
+      floatingEddies: 0,
       fixerDice: ['d4', 'd6', 'd8', 'd10', 'd12', 'd20'],
       gigs: [],
       hasSoldThisTurn: false,
@@ -272,42 +274,38 @@ export function calculateStreetCred(gigs = []) {
 }
 
 /**
- * Calcula los Eddies disponibles para gastar (€$):
- * Cada carta de Eddies no girada aporta 1 €$.
- * Cada Leyenda no girada (boca arriba o boca abajo) aporta 1 €$.
+ * Retorna los Eddies actualmente girados y listos en la reserva para gastar (€$):
+ * REGLA: "cuando gire eddies, haz que aparezcan en tus eddies"
  */
 export function getAvailableEddies(playerState) {
-  const readyEddies = playerState.eddies.filter((e) => !e.isSpent).length;
-  const readyLegends = playerState.legends.filter((l) => !l.isSpent).length;
-  return readyEddies + readyLegends;
+  if (!playerState) return 0;
+  return playerState.floatingEddies || 0;
 }
 
 /**
- * Gasta N Eddies del jugador priorizando cartas de Eddies y luego Leyendas
+ * Retorna la capacidad total de Eddies que el jugador puede llegar a gastar este turno:
+ * (Eddies ya girados + cartas de Eddies enderezadas + Leyendas enderezadas)
+ */
+export function getTotalAvailableEddies(playerState) {
+  if (!playerState) return 0;
+  const floating = playerState.floatingEddies || 0;
+  const readyEddies = (playerState.eddies || []).filter((e) => !e.isSpent).length;
+  const readyLegends = (playerState.legends || []).filter((l) => !l.isSpent).length;
+  return floating + readyEddies + readyLegends;
+}
+
+/**
+ * Gasta N Eddies de la reserva del jugador:
+ * REGLA SOLICITADA POR EL USUARIO:
+ * "cuando lanze un programa, unidad o gear, no gires automaticamente las leyendas, usa esos eddies."
+ * Los costes se descuentan directamente de los Eddies girados (floatingEddies), NUNCA giran automáticamente leyendas.
  */
 export function spendEddies(playerState, amount) {
-  let needed = amount;
   if (!playerState) return false;
-
-  // 1. Gastar cartas de la zona de Eddies
-  for (const eddie of (playerState.eddies || [])) {
-    if (needed <= 0) break;
-    if (!eddie.isSpent) {
-      eddie.isSpent = true;
-      needed--;
-    }
-  }
-
-  // 2. Si aún falta, gastar Leyendas
-  for (const leg of (playerState.legends || [])) {
-    if (needed <= 0) break;
-    if (!leg.isSpent) {
-      leg.isSpent = true;
-      needed--;
-    }
-  }
-
-  return needed === 0;
+  const current = playerState.floatingEddies || 0;
+  if (current < amount) return false;
+  playerState.floatingEddies = current - amount;
+  return true;
 }
 
 /**
@@ -367,19 +365,75 @@ export function sellCardForEddies(state, playerKey, cardInstanceId) {
 }
 
 /**
- * Gira o endereza manualmente una carta en la Zona de Eddies para gastar o devolver 1 €$
+ * Gira o endereza manualmente una carta en la Zona de Eddies para generar o devolver 1 €$:
+ * - Si está enderezada: se gira 90° y suma +1 €$ a floatingEddies.
+ * - Si está girada: si floatingEddies > 0 (no ha sido consumido), se endereza y resta 1 €$.
  */
 export function toggleEddieSpent(state, playerKey, eddieInstanceId) {
   const p = state[playerKey];
-  const ed = p.eddies.find((e) => e.instanceId === eddieInstanceId);
+  const ed = (p.eddies || []).find((e) => e.instanceId === eddieInstanceId);
   if (!ed) return { success: false, reason: 'Eddie no encontrado.' };
 
-  ed.isSpent = !ed.isSpent;
-  state.actionLog.unshift(
-    `💶 ${p.name} ${ed.isSpent ? 'gira (-1 €$ gastado)' : 'endereza (+1 €$ disponible)'} una carta en su Zona de Eddies.`
-  );
+  if (!ed.isSpent) {
+    // Girar para obtener 1 €$
+    ed.isSpent = true;
+    p.floatingEddies = (p.floatingEddies || 0) + 1;
+    (state.actionLog = state.actionLog || []).unshift(
+      `💶 ${p.name} gira 1 carta en su Zona de Eddies (+1 €$). Total listos: ${p.floatingEddies} €$.`
+    );
+    return { success: true, isSpent: true, floatingEddies: p.floatingEddies };
+  } else {
+    // Intentar enderezar (cancelar)
+    if ((p.floatingEddies || 0) > 0) {
+      ed.isSpent = false;
+      p.floatingEddies = Math.max(0, p.floatingEddies - 1);
+      (state.actionLog = state.actionLog || []).unshift(
+        `💶 ${p.name} endereza 1 carta en su Zona de Eddies (-1 €$). Total listos: ${p.floatingEddies} €$.`
+      );
+      return { success: true, isSpent: false, floatingEddies: p.floatingEddies };
+    } else {
+      return {
+        success: false,
+        reason: 'Esta carta de Eddies ya ha sido consumida este turno para pagar cartas.'
+      };
+    }
+  }
+}
 
-  return { success: true, isSpent: ed.isSpent };
+/**
+ * Gira o endereza manualmente una Leyenda para obtener o devolver 1 €$:
+ * Según reglas oficiales de Cyberpunk TCG:
+ * "To pay, you spend (turn sideways) Eddies and Legends, each worth 1 €$."
+ */
+export function toggleLegendSpent(state, playerKey, legendInstanceId) {
+  const p = state[playerKey];
+  const leg = (p.legends || []).find((l) => l.instanceId === legendInstanceId);
+  if (!leg) return { success: false, reason: 'Leyenda no encontrada.' };
+
+  if (!leg.isSpent) {
+    // Girar leyenda para obtener 1 €$
+    leg.isSpent = true;
+    p.floatingEddies = (p.floatingEddies || 0) + 1;
+    (state.actionLog = state.actionLog || []).unshift(
+      `👑 ${p.name} gira a su Leyenda "${leg.name}" (+1 €$). Total listos: ${p.floatingEddies} €$.`
+    );
+    return { success: true, isSpent: true, floatingEddies: p.floatingEddies };
+  } else {
+    // Intentar enderezar (cancelar)
+    if ((p.floatingEddies || 0) > 0) {
+      leg.isSpent = false;
+      p.floatingEddies = Math.max(0, p.floatingEddies - 1);
+      (state.actionLog = state.actionLog || []).unshift(
+        `👑 ${p.name} endereza a su Leyenda "${leg.name}" (-1 €$). Total listos: ${p.floatingEddies} €$.`
+      );
+      return { success: true, isSpent: false, floatingEddies: p.floatingEddies };
+    } else {
+      return {
+        success: false,
+        reason: 'Esta Leyenda ya ha sido consumida este turno para pagar cartas.'
+      };
+    }
+  }
 }
 
 /**
@@ -413,13 +467,17 @@ export function playProgramCard(state, playerKey, cardInstanceId) {
   const available = getAvailableEddies(p);
 
   if (available < cost) {
+    const missing = cost - available;
     return {
       success: false,
-      reason: `Eddies insuficientes. Requiere ${cost} €$ y tienes ${available} €$ disponibles.`
+      missingEddies: missing,
+      cardName: card.name,
+      cost,
+      reason: `Eddies insuficientes. "${card.name}" cuesta ${cost} €$ y solo has girado ${available} €$. Te faltan ${missing} €$ (gira más cartas de Eddies o Leyendas antes de jugar).`
     };
   }
 
-  // Pagar coste
+  // Pagar coste de los Eddies girados
   spendEddies(p, cost);
   p.hand.splice(cardIdx, 1);
 
@@ -428,7 +486,7 @@ export function playProgramCard(state, playerKey, cardInstanceId) {
   p.trash.push(card);
 
   (state.actionLog = state.actionLog || []).unshift(
-    `💾 ${p.name} paga ${cost} €$, ejecuta el Programa "${card.name}" y va al Descarte (Trash).`
+    `💾 ${p.name} usa ${cost} €$ girados, lanza el Programa "${card.name}" y va al Descarte (Trash).`
   );
 
   return { success: true, type: 'PROGRAM', card };
@@ -451,9 +509,13 @@ export function playGearCard(state, playerKey, cardInstanceId, targetInstanceId 
   const available = getAvailableEddies(p);
 
   if (available < cost) {
+    const missing = cost - available;
     return {
       success: false,
-      reason: `Eddies insuficientes. Requiere ${cost} €$ y tienes ${available} €$ disponibles.`
+      missingEddies: missing,
+      cardName: card.name,
+      cost,
+      reason: `Eddies insuficientes. "${card.name}" cuesta ${cost} €$ y solo has girado ${available} €$. Te faltan ${missing} €$ (gira más cartas de Eddies o Leyendas antes de jugar).`
     };
   }
 
@@ -529,13 +591,17 @@ export function playUnitCard(state, playerKey, cardInstanceId) {
   const available = getAvailableEddies(p);
 
   if (available < cost) {
+    const missing = cost - available;
     return {
       success: false,
-      reason: `Eddies insuficientes. Requiere ${cost} €$ y tienes ${available} €$ disponibles.`
+      missingEddies: missing,
+      cardName: card.name,
+      cost,
+      reason: `Eddies insuficientes. "${card.name}" cuesta ${cost} €$ y solo has girado ${available} €$. Te faltan ${missing} €$ (gira más cartas de Eddies o Leyendas antes de jugar).`
     };
   }
 
-  // Pagar coste
+  // Pagar coste de los Eddies girados
   spendEddies(p, cost);
   p.hand.splice(cardIdx, 1);
 
@@ -603,7 +669,8 @@ export function callLegendFaceUp(state, playerKey, legendInstanceId) {
   if (available < 1) {
     return {
       success: false,
-      reason: 'Llamar a una Leyenda cuesta 1 €$. No tienes Eddies disponibles.'
+      missingEddies: 1,
+      reason: 'Llamar a una Leyenda cuesta 1 €$. Gira 1 carta en tu Zona de Eddies o una Leyenda primero para obtener 1 €$.'
     };
   }
 
@@ -614,7 +681,7 @@ export function callLegendFaceUp(state, playerKey, legendInstanceId) {
 
   if (!state.actionLog) state.actionLog = [];
   state.actionLog.unshift(
-    `👑 ${p.name} paga 1 €$ y llama a su Leyenda "${leg.name || 'Leyenda'}" boca arriba.`
+    `👑 ${p.name} usa 1 €$ girado y llama a su Leyenda "${leg.name || 'Leyenda'}" boca arriba.`
   );
 
   return { success: true };
@@ -919,6 +986,7 @@ export function executeStartPhase(state, playerKey) {
 
   // 2. FASE DE PREPARACIÓN (READY STEP)
   p.eddies.forEach((e) => (e.isSpent = false));
+  p.floatingEddies = 0; // Reiniciar reserva de Eddies girados al inicio del turno
 
   // Enderezar Leyendas:
   if (p.legendsDoNotReadyTurn1) {
