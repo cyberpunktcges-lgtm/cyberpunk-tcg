@@ -298,12 +298,14 @@ function CyberDeckPile({
   isTrash = false,
   topCard = null,
   onClick = null,
+  onContextMenu = null,
   label = 'MAZO',
   sizeClass = 'w-16 sm:w-20 h-22 sm:h-28'
 }) {
   return (
     <div
       onClick={onClick}
+      onContextMenu={onContextMenu}
       style={{ clipPath: CYBER_CLIP }}
       className={`relative ${sizeClass} overflow-hidden select-none cursor-pointer transition-all hover:scale-105 shrink-0 shadow-lg ${
         isTrash
@@ -464,6 +466,31 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
   const [previewCard, setPreviewCard] = useState(null);
   const [isKiroshiHoverZoom, setIsKiroshiHoverZoom] = useState(false);
   const displayCard = hoveredCard || previewCard || selectedFieldUnit || selectedHandCard;
+
+  // Manejador global para inspección de cartas en pantalla completa al pulsar con botón derecho
+  const handleCardRightClick = (e, card) => {
+    if (!card) return;
+    if (e && typeof e.preventDefault === 'function') {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    setInspectedCard(card);
+    setIsInspectedFlipped(false);
+  };
+
+  // Atajo de teclado: Tecla Escape para salir de pantalla completa / modales
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        setInspectedCard(null);
+        setIsInspectedFlipped(false);
+        setLegendMenuId(null);
+        setShowLogModal(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   // Pila de historial para la función "DESHACER" (Undo)
   const [history, setHistory] = useState([]);
@@ -1523,8 +1550,9 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                   onMouseEnter={() => setIsKiroshiHoverZoom(true)}
                   onMouseLeave={() => setIsKiroshiHoverZoom(false)}
                   onClick={() => setInspectedCard(displayCard)}
+                  onContextMenu={(e) => handleCardRightClick(e, displayCard)}
                   className="relative w-28 sm:w-32 aspect-[7/10] rounded overflow-hidden border-2 border-[#FCEE0A] shadow-[0_0_15px_rgba(252,238,10,0.4)] bg-black cursor-pointer group transition-transform duration-200 hover:scale-[1.03] shrink-0"
-                  title="Pasa el ratón para ver a tamaño completo // Clic para voltear"
+                  title="Clic izquierdo o derecho para ver en PANTALLA COMPLETA // Pasa el ratón para ver a tamaño completo"
                 >
                   <img
                     src={displayCard.image}
@@ -1825,6 +1853,9 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                       }}
                       onMouseLeave={() => setHoveredCard(null)}
                       onClick={() => leg.isFaceUp && setInspectedCard(leg)}
+                      onContextMenu={(e) => {
+                        if (leg.isFaceUp) handleCardRightClick(e, leg);
+                      }}
                       className={`w-11 sm:w-13 md:w-15 h-16 sm:h-20 md:h-24 rounded-lg border transition-all flex flex-col items-center justify-center relative shadow-md ${
                         leg.isFaceUp
                           ? leg.isSpent
@@ -2057,6 +2088,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                               setInspectedCard(unit);
                             }
                           }}
+                          onContextMenu={(e) => handleCardRightClick(e, unit)}
                           style={{ clipPath: CYBER_CARD_CLIP }}
                           className={`w-14 sm:w-16 md:w-20 h-20 sm:h-24 md:h-28 bg-black border-2 transition-transform duration-300 cursor-pointer flex flex-col justify-between relative shadow-xl ${
                             canAttackThisUnit
@@ -2141,6 +2173,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                                   e.stopPropagation();
                                   setInspectedCard(g);
                                 }}
+                                onContextMenu={(e) => handleCardRightClick(e, g)}
                                 style={{ clipPath: CYBER_CARD_CLIP }}
                                 className="w-[92%] h-5 sm:h-6 bg-[#070a10] border border-[#FF003C]/80 flex items-center justify-between px-1 py-0.5 cursor-pointer shadow hover:border-[#FCEE0A] transition-all -mt-0.5 group"
                                 title={`Gear equipado: ${g.name} (${g.power || '+Fuerza'}) - Clic para ver`}
@@ -2174,8 +2207,12 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
             <div className="flex flex-col gap-1.5 shrink-0 w-16 sm:w-20 md:w-24">
               {/* TRASH RIVAL */}
               <div
-                className="h-16 sm:h-20 rounded-2xl border border-[#FF003C]/30 bg-[#060b14]/80 flex flex-col items-center justify-center p-1 relative shadow-md select-none"
-                title={`Descartes del Rival (Trash): ${bot.trash.length} cartas`}
+                onClick={() => bot.trash.length > 0 && setInspectedCard(bot.trash[bot.trash.length - 1])}
+                onContextMenu={(e) => bot.trash.length > 0 && handleCardRightClick(e, bot.trash[bot.trash.length - 1])}
+                className={`h-16 sm:h-20 rounded-2xl border border-[#FF003C]/30 bg-[#060b14]/80 flex flex-col items-center justify-center p-1 relative shadow-md select-none ${
+                  bot.trash.length > 0 ? 'cursor-pointer hover:border-[#FF003C] hover:shadow-[0_0_12px_rgba(255,0,60,0.4)]' : ''
+                }`}
+                title={`Descartes del Rival (Trash): ${bot.trash.length} cartas${bot.trash.length > 0 ? ' (clic izq o derecho para inspeccionar)' : ''}`}
               >
                 <span className="text-[8px] sm:text-[9px] font-mono text-gray-500 uppercase font-bold mb-0.5">TRASH</span>
                 <span className="text-base sm:text-lg font-black font-mono text-gray-500">
@@ -2477,6 +2514,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                               setInspectedCard(unit);
                             }
                           }}
+                          onContextMenu={(e) => handleCardRightClick(e, unit)}
                           style={{ clipPath: CYBER_CARD_CLIP }}
                           className={`w-20 sm:w-24 md:w-28 h-28 sm:h-34 md:h-38 bg-black border-2 transition-transform duration-300 cursor-pointer flex flex-col justify-between relative shadow-xl ${
                             isCurrentBlocker
@@ -2571,6 +2609,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                                   e.stopPropagation();
                                   setInspectedCard(g);
                                 }}
+                                onContextMenu={(e) => handleCardRightClick(e, g)}
                                 style={{ clipPath: CYBER_CARD_CLIP }}
                                 className="w-[92%] h-6 sm:h-7 bg-[#070a10] border border-[#FCEE0A] flex items-center justify-between px-1.5 py-0.5 cursor-pointer shadow-[0_4px_10px_rgba(0,0,0,0.8)] hover:border-[#0dfceb] transition-all -mt-1 group"
                                 title={`Gear equipado: ${g.name} (${g.power || '+Fuerza'}) - Clic para ver`}
@@ -2815,6 +2854,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                             setPreviewCard(leg);
                           }}
                           onMouseLeave={() => setHoveredCard(null)}
+                          onContextMenu={(e) => handleCardRightClick(e, leg)}
                           onDragOver={(e) => {
                             e.preventDefault();
                             e.stopPropagation();
@@ -2953,6 +2993,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                         <div
                           key={ed.instanceId || idx}
                           onClick={() => handleToggleEddie(ed.instanceId)}
+                          onContextMenu={(e) => handleCardRightClick(e, ed)}
                           className={`transition-all duration-300 flex items-center justify-center shrink-0 cursor-pointer ${
                             ed.isSpent ? 'w-16 sm:w-20 h-10 sm:h-12 my-0.5' : 'w-10 sm:w-12 h-14 sm:h-16'
                           }`}
@@ -3021,8 +3062,9 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
               {/* TRASH JUGADOR */}
               <div
                 onClick={() => p.trash.length > 0 && setInspectedCard(p.trash[p.trash.length - 1])}
+                onContextMenu={(e) => p.trash.length > 0 && handleCardRightClick(e, p.trash[p.trash.length - 1])}
                 className="h-16 sm:h-20 rounded-2xl border border-[#0dfceb]/30 bg-[#060b14]/80 flex flex-col items-center justify-center p-1 relative shadow-md select-none cursor-pointer hover:border-[#FCEE0A]"
-                title={`Descartes (Trash): ${p.trash.length} cartas (clic para inspeccionar última)`}
+                title={`Descartes (Trash): ${p.trash.length} cartas (clic izq o derecho para inspeccionar)`}
               >
                 <span className="text-[8px] sm:text-[9px] font-mono text-gray-400 uppercase font-bold mb-0.5">TRASH</span>
                 <span className="text-base sm:text-lg font-black font-mono text-gray-400">
@@ -3218,6 +3260,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                         setGameState((prev) => ({ ...prev }));
                       }
                     }}
+                    onContextMenu={(e) => handleCardRightClick(e, card)}
                     style={{ clipPath: CYBER_CARD_CLIP }}
                     className={`w-14 sm:w-18 md:w-22 h-20 sm:h-26 md:h-30 bg-black border transition-all duration-150 cursor-grab active:cursor-grabbing shrink-0 relative shadow-lg ${
                       isSelected
@@ -3275,6 +3318,9 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                   topCard={p.trash.length > 0 ? p.trash[p.trash.length - 1] : null}
                   onClick={() =>
                     p.trash.length > 0 && setInspectedCard(p.trash[p.trash.length - 1])
+                  }
+                  onContextMenu={(e) =>
+                    p.trash.length > 0 && handleCardRightClick(e, p.trash[p.trash.length - 1])
                   }
                 />
               </div>
@@ -3510,7 +3556,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
 
         return (
           <div
-            className="fixed inset-0 z-50 bg-[#000000]/85 backdrop-blur-md flex items-center justify-center p-4 font-mono"
+            className="fixed inset-0 z-50 bg-[#000000]/90 backdrop-blur-md flex items-center justify-center p-2 sm:p-4 font-mono select-none"
             onClick={() => {
               setInspectedCard(null);
               setIsInspectedFlipped(false);
@@ -3519,14 +3565,19 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
             <div
               onClick={(e) => e.stopPropagation()}
               style={{ clipPath: CYBER_CLIP }}
-              className="max-w-md w-full bg-[#070a10]/95 border-2 border-[#0dfceb] p-4 space-y-3 relative shadow-[0_0_50px_rgba(13,252,235,0.4)] backdrop-blur-md"
+              className="max-w-xl w-auto max-h-[96vh] flex flex-col bg-[#070a10]/98 border-2 border-[#0dfceb] p-3 sm:p-4 space-y-2 relative shadow-[0_0_60px_rgba(13,252,235,0.45)] backdrop-blur-md"
             >
-              <div className="flex items-center justify-between border-b border-[#0dfceb]/30 pb-2 gap-2">
+              <div className="flex items-center justify-between border-b border-[#0dfceb]/30 pb-2 gap-3">
                 <div className="min-w-0">
-                  <span className="text-[10px] text-gray-400 uppercase block truncate">
-                    {isLeg ? '👑 LEYENDA' : inspectedCard.officialType || inspectedCard.cardType || 'UNIDAD / GEAR / PROGRAMA'}
-                  </span>
-                  <span className="text-xs text-[#0dfceb] font-black uppercase truncate block">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] text-gray-400 uppercase truncate">
+                      {isLeg ? '👑 LEYENDA' : inspectedCard.officialType || inspectedCard.cardType || 'UNIDAD / GEAR / PROGRAMA'}
+                    </span>
+                    <span className="text-[9px] px-1.5 py-0.2 bg-[#0dfceb]/20 border border-[#0dfceb]/50 text-[#0dfceb] font-black uppercase rounded">
+                      PANTALLA COMPLETA
+                    </span>
+                  </div>
+                  <span className="text-xs sm:text-sm text-[#0dfceb] font-black uppercase truncate block">
                     {inspectedCard.name}
                   </span>
                 </div>
@@ -3548,22 +3599,23 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                       setInspectedCard(null);
                       setIsInspectedFlipped(false);
                     }}
-                    className="p-1 bg-[#000000] border border-gray-700 hover:border-white text-gray-300 hover:text-white cursor-pointer"
+                    className="p-1 px-2 bg-[#000000] border border-gray-700 hover:border-white text-gray-300 hover:text-white cursor-pointer font-bold text-xs"
+                    title="Cerrar (ESC)"
                   >
-                    ✕
+                    ✕ ESC
                   </button>
                 </div>
               </div>
 
               <div
-                className="w-full flex justify-center py-2 cursor-pointer select-none"
+                className="w-full flex-1 flex items-center justify-center py-1 cursor-pointer select-none overflow-hidden"
                 onClick={() => setIsInspectedFlipped(!isInspectedFlipped)}
-                title="Haz clic para voltear la carta"
+                title="Haz clic para voltear la carta // Pulsa ESC para cerrar"
               >
                 <img
                   src={isInspectedFlipped ? backSrc : inspectedCard.image}
                   alt={isInspectedFlipped ? 'Reverso oficial' : inspectedCard.name}
-                  className="max-h-[65vh] w-auto object-contain rounded-sm transition-transform duration-200 hover:scale-[1.02] shadow-2xl"
+                  className="max-h-[76vh] sm:max-h-[82vh] w-auto max-w-full object-contain rounded-md transition-transform duration-200 hover:scale-[1.01] shadow-[0_0_35px_rgba(0,0,0,0.95)]"
                 />
               </div>
 
@@ -3574,7 +3626,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                     {isLeg ? 'LEYENDA (DORADO)' : 'NORMAL (UNIDADES, GEARS, PROGRAMAS)'}
                   </strong>
                 </span>
-                <span className="text-gray-500">[Clic para girar]</span>
+                <span className="text-gray-500">[Clic para girar • ESC para cerrar]</span>
               </div>
             </div>
           </div>
@@ -3950,6 +4002,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                         return (
                           <div
                             key={leg.instanceId}
+                            onContextMenu={(e) => handleCardRightClick(e, leg)}
                             className="bg-[#070a10] border border-[#FCEE0A]/40 hover:border-[#FCEE0A] p-2 rounded flex flex-col justify-between transition-all shadow-[0_0_12px_rgba(252,238,10,0.15)] group"
                           >
                             <div>
@@ -4170,6 +4223,8 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                           }
                         }));
                       }}
+                      onContextMenu={(e) => handleCardRightClick(e, card)}
+                      title="Clic izq para seleccionar // Clic DERECHO para ver en PANTALLA COMPLETA"
                       className={`relative w-28 sm:w-32 aspect-[7/10] rounded overflow-hidden border-2 transition-all duration-200 flex flex-col justify-between ${
                         !isEligible
                           ? 'border-gray-800 opacity-40 cursor-not-allowed grayscale'
