@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Terminal,
@@ -430,6 +430,26 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
 
   // Menú contextual flotante sobre una Leyenda (elección entre HACER CALL y SACAR EDDIE)
   const [legendMenuId, setLegendMenuId] = useState(null);
+  const legendMenuRef = useRef(null);
+
+  // Cerrar el menú flotante de la Leyenda si se hace clic fuera de él (sin backdrops molestos)
+  useEffect(() => {
+    if (!legendMenuId) return;
+
+    const handlePointerDown = (e) => {
+      if (legendMenuRef.current && !legendMenuRef.current.contains(e.target)) {
+        const isSlotClick = e.target.closest('[data-legend-slot="true"]');
+        if (!isSlotClick) {
+          setLegendMenuId(null);
+        }
+      }
+    };
+
+    window.addEventListener('pointerdown', handlePointerDown);
+    return () => {
+      window.removeEventListener('pointerdown', handlePointerDown);
+    };
+  }, [legendMenuId]);
 
   // Estado para previsualización fija en la zona central izquierda del HUD (Kiroshi Scanner)
   const [hoveredCard, setHoveredCard] = useState(null);
@@ -537,7 +557,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
         type: 'warning'
       });
     }
-    setGameState({ ...gameState });
+    setGameState(JSON.parse(JSON.stringify(gameState)));
   };
 
   // Girar o enderezar Leyenda (+1 €$ en reserva)
@@ -553,7 +573,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
         type: 'warning'
       });
     }
-    setGameState({ ...gameState });
+    setGameState(JSON.parse(JSON.stringify(gameState)));
   };
 
   // Vender carta arrastrada o clicada
@@ -870,7 +890,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
       setPreviewCard(leg);
       setHoveredCard(leg);
     }
-    setGameState({ ...gameState });
+    setGameState(JSON.parse(JSON.stringify(gameState)));
   };
 
   // Autoguardado continuo de la partida en localStorage ante cualquier cambio
@@ -1386,6 +1406,35 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                     )}
                     {displayCard.isLagging && (
                       <span className="text-[#FF003C] uppercase">⚠ LAG (ESTE TURNO)</span>
+                    )}
+                  </div>
+                )}
+
+                {/* Si la carta mostrada es una Leyenda del jugador boca abajo, ofrecer botón directo de Call */}
+                {p.legends.some((l) => l.instanceId === displayCard.instanceId) && !displayCard.isFaceUp && (
+                  <div className="w-full pt-2 mt-1 border-t border-[#0dfceb]/30">
+                    <button
+                      type="button"
+                      disabled={p.hasCalledLegendThisTurn}
+                      onClick={() => handleCallLegendAction(displayCard.instanceId)}
+                      className={`w-full py-2 px-2.5 rounded font-mono font-black text-[10px] uppercase tracking-wider flex items-center justify-between transition-all ${
+                        p.hasCalledLegendThisTurn
+                          ? 'bg-gray-900 text-gray-500 border border-gray-800 cursor-not-allowed'
+                          : availableEddies > 0
+                          ? 'bg-[#0dfceb] hover:bg-white text-black shadow-[0_0_15px_rgba(13,252,235,0.7)] cursor-pointer'
+                          : 'bg-[#0dfceb]/20 hover:bg-[#0dfceb] text-[#0dfceb] hover:text-black border border-[#0dfceb] shadow-[0_0_10px_rgba(13,252,235,0.3)] cursor-pointer'
+                      }`}
+                    >
+                      <span className="flex items-center gap-1.5">
+                        <span>👑</span>
+                        <span>HACER CALL (DAR LA VUELTA)</span>
+                      </span>
+                      <span className="text-[9px] px-1.5 py-0.5 bg-black text-[#0dfceb] rounded">1 €$</span>
+                    </button>
+                    {p.hasCalledLegendThisTurn && (
+                      <span className="text-[8px] text-gray-500 block text-center mt-1">
+                        Límite alcanzado: 1 llamada por turno.
+                      </span>
                     )}
                   </div>
                 )}
@@ -2242,12 +2291,18 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                     const isMenuOpen = legendMenuId === leg.instanceId;
 
                     return (
-                      <div key={leg.instanceId || i} className={`relative flex flex-col items-center ${
-                        isMenuOpen ? 'z-50' : ''
-                      }`}>
+                      <div
+                        key={leg.instanceId || i}
+                        data-legend-slot="true"
+                        className={`relative flex flex-col items-center ${
+                          isMenuOpen ? 'z-50' : ''
+                        }`}
+                      >
                         {/* VENTANA FLOTANTE PEQUEÑA ENCIMA DE LA LEYENDA (ELECCIÓN HACER CALL O SACAR EDDIE) */}
                         {isMenuOpen && (
                           <div
+                            ref={legendMenuRef}
+                            onPointerDown={(e) => e.stopPropagation()}
                             onClick={(e) => e.stopPropagation()}
                             style={{ clipPath: CYBER_CLIP }}
                             className={`absolute bottom-[calc(100%+8px)] ${
@@ -2256,16 +2311,19 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                                 : i === 2
                                 ? 'right-0'
                                 : 'left-1/2 -translate-x-1/2'
-                            } z-50 w-48 sm:w-56 bg-[#070a10]/98 border-2 border-[#0dfceb] p-3 shadow-[0_0_35px_rgba(13,252,235,0.7)] backdrop-blur-md font-mono select-none`}
+                            } z-50 w-56 sm:w-64 bg-[#070a10]/98 border-2 border-[#0dfceb] p-3 shadow-[0_0_35px_rgba(13,252,235,0.7)] backdrop-blur-md font-mono select-none`}
                           >
                             {/* Cabecera del Popover */}
                             <div className="flex items-center justify-between pb-1 mb-2 border-b border-[#0dfceb]/30 text-[9px]">
-                              <span className="font-black uppercase text-[#0dfceb] tracking-wider truncate max-w-[130px]">
+                              <span className="font-black uppercase text-[#0dfceb] tracking-wider truncate max-w-[140px]">
                                 {leg.name || 'LEYENDA'}
                               </span>
                               <button
                                 type="button"
-                                onClick={() => setLegendMenuId(null)}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setLegendMenuId(null);
+                                }}
                                 className="text-gray-400 hover:text-white px-1 font-bold cursor-pointer"
                                 title="Cerrar"
                               >
@@ -2285,20 +2343,29 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                                 }}
                                 className={`w-full py-2 px-2.5 mb-1.5 text-left flex items-center justify-between rounded text-[10px] sm:text-[11px] font-black uppercase transition-all ${
                                   p.hasCalledLegendThisTurn
-                                    ? 'bg-gray-900 text-gray-500 border border-gray-800 cursor-not-allowed'
+                                    ? 'bg-gray-900 text-gray-500 border border-gray-800 cursor-not-allowed opacity-60'
                                     : availableEddies > 0
-                                    ? 'bg-[#0dfceb] text-black border border-[#0dfceb] shadow-[0_0_15px_rgba(13,252,235,0.5)] cursor-pointer hover:bg-white'
-                                    : 'bg-[#0dfceb]/20 hover:bg-[#0dfceb] text-[#0dfceb] hover:text-black border border-[#0dfceb]/60 shadow-[0_0_10px_rgba(13,252,235,0.3)] cursor-pointer'
+                                    ? 'bg-[#0dfceb] text-black border border-[#0dfceb] shadow-[0_0_15px_rgba(13,252,235,0.6)] cursor-pointer hover:bg-white hover:scale-[1.02]'
+                                    : 'bg-[#0dfceb]/25 hover:bg-[#0dfceb] text-[#0dfceb] hover:text-black border border-[#0dfceb]/70 shadow-[0_0_10px_rgba(13,252,235,0.3)] cursor-pointer hover:scale-[1.02]'
                                 }`}
                               >
                                 <span className="flex items-center gap-1.5">
                                   <span>👑</span>
                                   <span>HACER CALL (DAR LA VUELTA)</span>
                                 </span>
-                                <span className="text-[9px] font-bold px-1.5 py-0.5 bg-black/60 text-[#0dfceb] rounded">
+                                <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${
+                                  availableEddies > 0 ? 'bg-black text-[#0dfceb]' : 'bg-black/60 text-[#0dfceb]'
+                                }`}>
                                   1 €$
                                 </span>
                               </button>
+                            )}
+
+                            {/* Mensaje de límite de 1 Call por turno */}
+                            {!leg.isFaceUp && p.hasCalledLegendThisTurn && (
+                              <div className="text-[8px] text-[#FF003C] font-mono text-center pb-1">
+                                Ya has llamado a 1 Leyenda este turno (límite: 1/turno).
+                              </div>
                             )}
 
                             {/* Opción 2: SACAR EDDIE (si está enderezada) */}
@@ -2306,7 +2373,8 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                               <button
                                 type="button"
                                 disabled={isTurn1Penalty}
-                                onClick={() => {
+                                onClick={(e) => {
+                                  e.stopPropagation();
                                   setLegendMenuId(null);
                                   if (isTurn1Penalty) return;
                                   handleToggleLegend(leg.instanceId);
@@ -2314,7 +2382,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                                 className={`w-full py-1.5 px-2 text-left flex items-center justify-between rounded text-[10px] font-black uppercase transition-all ${
                                   isTurn1Penalty
                                     ? 'bg-gray-900 text-gray-500 border border-gray-800 cursor-not-allowed'
-                                    : 'bg-[#FCEE0A]/20 hover:bg-[#FCEE0A] text-[#FCEE0A] hover:text-black border border-[#FCEE0A]/60 shadow-[0_0_10px_rgba(252,238,10,0.3)] cursor-pointer'
+                                    : 'bg-[#FCEE0A]/20 hover:bg-[#FCEE0A] text-[#FCEE0A] hover:text-black border border-[#FCEE0A]/60 shadow-[0_0_10px_rgba(252,238,10,0.3)] cursor-pointer hover:scale-[1.02]'
                                 }`}
                               >
                                 <span className="flex items-center gap-1.5">
@@ -2325,15 +2393,24 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                               </button>
                             )}
 
+                            {/* Aviso informativo si tiene penalización de Turno 1 */}
+                            {isTurn1Penalty && (
+                              <div className="text-[9px] text-gray-400 italic text-center py-1.5 px-2 bg-black/60 rounded border border-gray-800 mb-1 leading-tight">
+                                ⚠️ Penalización T1: Comienza girada.<br />
+                                <span className="text-[#0dfceb] not-italic font-bold">¡Pero SÍ puedes hacer Call para darle la vuelta!</span>
+                              </div>
+                            )}
+
                             {/* Opción 3: Si ya está girada pero aún quedan eddies en reserva: ENDEREZAR */}
                             {leg.isSpent && availableEddies > 0 && !isTurn1Penalty && (
                               <button
                                 type="button"
-                                onClick={() => {
+                                onClick={(e) => {
+                                  e.stopPropagation();
                                   setLegendMenuId(null);
                                   handleToggleLegend(leg.instanceId);
                                 }}
-                                className="w-full py-1.5 px-2 text-left flex items-center justify-between rounded text-[10px] font-black uppercase bg-[#0dfceb]/20 hover:bg-[#0dfceb] text-[#0dfceb] hover:text-black border border-[#0dfceb]/60 cursor-pointer shadow"
+                                className="w-full py-1.5 px-2 text-left flex items-center justify-between rounded text-[10px] font-black uppercase bg-[#0dfceb]/20 hover:bg-[#0dfceb] text-[#0dfceb] hover:text-black border border-[#0dfceb]/60 cursor-pointer shadow hover:scale-[1.02]"
                               >
                                 <span className="flex items-center gap-1.5">
                                   <span>🔄</span>
@@ -2353,7 +2430,8 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                             {/* Opción 4: Inspeccionar carta en grande */}
                             <button
                               type="button"
-                              onClick={() => {
+                              onClick={(e) => {
+                                e.stopPropagation();
                                 setLegendMenuId(null);
                                 setInspectedCard(leg);
                               }}
@@ -2390,6 +2468,8 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                           }}
                           onClick={(e) => {
                             e.stopPropagation();
+                            setHoveredCard(leg);
+                            setPreviewCard(leg);
                             if (!isMyTurn) {
                               setInspectedCard(leg);
                               return;
@@ -2404,7 +2484,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                                 ? 'border-[#FCEE0A]/70 shadow-[0_0_8px_rgba(252,238,10,0.3)]'
                                 : 'border-[#FCEE0A] hover:border-[#0dfceb] shadow-[0_0_14px_rgba(252,238,10,0.5)]'
                               : leg.isSpent
-                              ? 'border-[#0dfceb]/30 opacity-70'
+                              ? 'border-[#0dfceb]/30 opacity-70 hover:border-[#0dfceb]'
                               : 'border-[#0dfceb]/50 hover:border-[#FCEE0A] shadow-[0_0_8px_rgba(13,252,235,0.2)]'
                           }`}
                           title={
@@ -3564,14 +3644,6 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
           </div>
         );
       })()}
-
-      {/* Fondo transparente para cerrar el menú flotante de Leyenda al hacer clic fuera */}
-      {legendMenuId && (
-        <div
-          className="fixed inset-0 z-30 pointer-events-auto"
-          onClick={() => setLegendMenuId(null)}
-        />
-      )}
 
       {/* 6. MODAL DE TRANSMISIÓN / HOLOCALL DE PERSONAJE (AVISOS DE EDDIES Y TRIGGERS) */}
       {holocall && (
