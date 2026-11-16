@@ -1,0 +1,29 @@
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteBase /cyberpunk-tcg/
+
+    # Si ya apunta a dist/, no reescribir
+    RewriteCond %{REQUEST_URI} ^/cyberpunk-tcg/dist/ [NC]
+    RewriteRule ^ - [L]
+
+    # Mapeo de assets estáticos dentro de /cyberpunk-tcg/
+    RewriteRule ^_astro/(.*)$ dist/_astro/$1 [L]
+    RewriteCond %{DOCUMENT_ROOT}/cyberpunk-tcg/dist/images/$1 -f
+    RewriteRule ^images/(.*)$ dist/images/$1 [L]
+
+    # Si existe el archivo exacto en dist/
+    RewriteCond %{DOCUMENT_ROOT}/cyberpunk-tcg/dist/$1 -f
+    RewriteRule ^(.+)$ dist/$1 [L]
+
+    # Si existe el directorio con index.html en dist/
+    RewriteCond %{DOCUMENT_ROOT}/cyberpunk-tcg/dist/$1/index.html -f
+    RewriteRule ^([^/]+)/?$ dist/$1/index.html [L]
+
+    # Rutas anidadas como /cyberpunk-tcg/simulador o /cyberpunk-tcg/cartas
+    RewriteCond %{DOCUMENT_ROOT}/cyberpunk-tcg/dist/$1/index.html -f
+    RewriteRule ^(.*)/?$ dist/$1/index.html [L]
+
+    # Para la raíz /cyberpunk-tcg/ o /cyberpunk-tcg
+    RewriteRule ^$ dist/index.html [L]
+</IfModule>
+

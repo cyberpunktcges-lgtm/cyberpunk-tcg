@@ -2234,13 +2234,17 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
               {/* FILA INFERIOR (BACKLINE): LEYENDAS JUGADOR A LA IZQUIERDA + ZONA DE EDDIES JUGADOR */}
               <div className="h-20 sm:h-24 md:h-28 flex gap-2 items-stretch w-full">
                 {/* 1. LEYENDAS JUGADOR (3 SLOTS) A LA IZQUIERDA */}
-                <div className="rounded-2xl border border-[#0dfceb]/30 bg-[#060b14]/80 p-1.5 sm:p-2 flex items-center justify-center gap-1.5 sm:gap-2 shrink-0">
+                <div className={`rounded-2xl border border-[#0dfceb]/30 bg-[#060b14]/80 p-1.5 sm:p-2 flex items-center justify-center gap-1.5 sm:gap-2 shrink-0 ${
+                  legendMenuId ? 'relative z-40' : ''
+                }`}>
                   {p.legends.map((leg, i) => {
                     const isTurn1Penalty = leg.isSpent && gameState.turnNumber === 1 && i < 2;
                     const isMenuOpen = legendMenuId === leg.instanceId;
 
                     return (
-                      <div key={leg.instanceId || i} className="relative flex flex-col items-center">
+                      <div key={leg.instanceId || i} className={`relative flex flex-col items-center ${
+                        isMenuOpen ? 'z-50' : ''
+                      }`}>
                         {/* VENTANA FLOTANTE PEQUEÑA ENCIMA DE LA LEYENDA (ELECCIÓN HACER CALL O SACAR EDDIE) */}
                         {isMenuOpen && (
                           <div
