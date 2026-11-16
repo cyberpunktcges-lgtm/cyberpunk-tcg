@@ -19,13 +19,15 @@ import {
   calculateGigsToSteal,
   isCardVendible
 } from './cyberpunkEngine.js';
+import { executeUnitAttackTrigger } from './cardEffects.js';
 
 /**
  * Decide si el bot desea interceptar un ataque del jugador usando una de sus unidades con Blocker.
  */
 export function decideBotBlocker(botState, attackerPower, isGigAttack = false) {
+  // REGLA OFICIAL: Las unidades con Blocker pueden bloquear aunque tengan Lag (solo deben estar Ready/no giradas)
   const readyBlockers = (botState.field || []).filter(
-    (u) => !u.isSpent && !u.isLagging && hasKeyword(u, 'Blocker')
+    (u) => !u.isSpent && hasKeyword(u, 'Blocker')
   );
 
   if (readyBlockers.length === 0) return null;
@@ -69,7 +71,7 @@ export function executeBotReaction(gameState, attackerUnit, targetType, targetUn
       botPrepareEddies(bot, 1, uncalledLeg.instanceId);
       callLegendFaceUp(gameState, 'bot', uncalledLeg.instanceId);
       gameState.actionLog.unshift(
-        `🛡️ [Fase de Respuesta] ¡El rival responde llamando a su Leyenda "${uncalledLeg.name}" boca arriba!`
+        `👑 [FASE 2: REACCIÓN] ¡CALL! El rival responde llamando a su Leyenda "${uncalledLeg.name}" boca arriba.`
       );
     }
   }
@@ -83,7 +85,7 @@ export function executeBotReaction(gameState, attackerUnit, targetType, targetUn
     botPrepareEddies(bot, qCard.parsedCost || 0);
     playCard(gameState, 'bot', qCard.instanceId);
     gameState.actionLog.unshift(
-      `⚡ [Fase de Respuesta] ¡QUICK! El rival responde jugando "${qCard.name}".`
+      `⚡ [FASE 2: REACCIÓN] ¡QUICK! El rival responde jugando "${qCard.name}".`
     );
   }
 
@@ -94,11 +96,11 @@ export function executeBotReaction(gameState, attackerUnit, targetType, targetUn
   if (chosenBlocker) {
     chosenBlocker.isSpent = true;
     gameState.actionLog.unshift(
-      `🛡️ [Fase de Respuesta] ¡BLOCKER! El rival gira a "${chosenBlocker.name}" [Fuerza: ${chosenBlocker.currentPower}] para interceptar el ataque.`
+      `🛡️ [FASE 2: REACCIÓN] ¡BLOCKER! El rival gira a "${chosenBlocker.name}" [Fuerza: ${chosenBlocker.currentPower}] para interceptar el ataque.`
     );
   } else {
     gameState.actionLog.unshift(
-      `🛡️ [Fase de Respuesta] El rival no activa ningún Blocker para interceptar.`
+      `🛡️ [FASE 2: REACCIÓN] El rival decide pasar sin bloquear.`
     );
   }
 
@@ -227,6 +229,9 @@ export async function runBotTurn(gameState, updateCallback, delayMs = 700) {
 
     if (killableSpentEnemy) {
       unit.isSpent = true;
+      unit.hasTriggeredAttackThisDeclaration = true;
+      executeUnitAttackTrigger(gameState, 'bot', unit);
+
       gameState.pendingReaction = {
         attackerPlayerKey: 'bot',
         attackerUnitId: unit.instanceId,
@@ -241,7 +246,7 @@ export async function runBotTurn(gameState, updateCallback, delayMs = 700) {
         blockerUnitId: null
       };
       gameState.actionLog.unshift(
-        `⚔️ ¡ATAQUE DECLARADO! "${unit.name}" [Fuerza: ${unit.currentPower}] del rival ataca a "${killableSpentEnemy.name}". Se activa la Fase de Respuesta del jugador.`
+        `⚔️ [FASE 1: DECLARACIÓN DE ATAQUE] "${unit.name}" [Fuerza: ${unit.currentPower}] del rival ataca a tu unidad gastada "${killableSpentEnemy.name}". Se activa tu Fase de Reacción.`
       );
       updateCallback({ ...gameState });
       return; // Cede el control y espera la respuesta del jugador humano en la UI
@@ -250,6 +255,9 @@ export async function runBotTurn(gameState, updateCallback, delayMs = 700) {
     // Prioridad B: Atacar los Gigs del jugador para robar dados de Gig según la tabla de poder
     if (player.gigs && player.gigs.length > 0) {
       unit.isSpent = true;
+      unit.hasTriggeredAttackThisDeclaration = true;
+      executeUnitAttackTrigger(gameState, 'bot', unit);
+
       gameState.pendingReaction = {
         attackerPlayerKey: 'bot',
         attackerUnitId: unit.instanceId,
@@ -264,7 +272,7 @@ export async function runBotTurn(gameState, updateCallback, delayMs = 700) {
         blockerUnitId: null
       };
       gameState.actionLog.unshift(
-        `⚔️ ¡ATAQUE DECLARADO! "${unit.name}" [Fuerza: ${unit.currentPower}] del rival asalta tus Gigs. Se activa la Fase de Respuesta del jugador.`
+        `⚔️ [FASE 1: DECLARACIÓN DE ATAQUE] "${unit.name}" [Fuerza: ${unit.currentPower}] del rival asalta tus Gigs. Se activa tu Fase de Reacción.`
       );
       updateCallback({ ...gameState });
       return; // Cede el control y espera la respuesta del jugador humano en la UI
@@ -276,6 +284,9 @@ export async function runBotTurn(gameState, updateCallback, delayMs = 700) {
     );
     if (tieEnemy) {
       unit.isSpent = true;
+      unit.hasTriggeredAttackThisDeclaration = true;
+      executeUnitAttackTrigger(gameState, 'bot', unit);
+
       gameState.pendingReaction = {
         attackerPlayerKey: 'bot',
         attackerUnitId: unit.instanceId,
@@ -290,7 +301,7 @@ export async function runBotTurn(gameState, updateCallback, delayMs = 700) {
         blockerUnitId: null
       };
       gameState.actionLog.unshift(
-        `⚔️ ¡ATAQUE DECLARADO! "${unit.name}" [Fuerza: ${unit.currentPower}] del rival ataca a "${tieEnemy.name}". Se activa la Fase de Respuesta del jugador.`
+        `⚔️ [FASE 1: DECLARACIÓN DE ATAQUE] "${unit.name}" [Fuerza: ${unit.currentPower}] del rival ataca a "${tieEnemy.name}". Se activa tu Fase de Reacción.`
       );
       updateCallback({ ...gameState });
       return;

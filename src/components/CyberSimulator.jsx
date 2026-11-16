@@ -63,7 +63,7 @@ import {
   executeBotReaction,
   resolvePendingAttackAndContinueBot
 } from '../utils/botAi.js';
-import { getCardRulesText } from '../utils/cardEffects.js';
+import { getCardRulesText, executeUnitAttackTrigger } from '../utils/cardEffects.js';
 
 // =========================================================================
 // CLIP-PATHS GEOMÉTRICOS CYBERPUNK (ESQUINAS RECORTADAS EN DIAGONAL)
@@ -590,22 +590,41 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
     }
   };
 
-  // Ataque unificado del Jugador con Fase de Respuesta del Bot integrada:
-  // REGLA OFICIAL: Al declarar ataque, el rival activa su Fase de Respuesta
-  // (puede llamar a una Leyenda, jugar cartas con Quick o interceptar con un Blocker).
+  // Ataque unificado del Jugador con las 4 Fases Oficiales de Combate:
+  // FASE 1: Declarar atacantes (gira unidad Ready sin Lag, elige objetivo: unidad rival spent o Gigs).
+  //         Dispara habilidad ATTACK antes de la reacción.
+  // FASE 2: Fase de Reacción del Rival (el bot puede hacer Call a leyenda, jugar Quick o asignar Blocker).
+  // FASE 3: Combate (si el objetivo es una unidad o Blocker: compara poderes, derrota, basura).
+  // FASE 4: Robar (si el objetivo son Gigs y no hubo Blocker: roba dados según tabla de poder).
   const handlePlayerAttack = (targetType, targetUnitId = null, preferredDice = []) => {
     if (!selectedFieldUnit || selectedFieldUnit.isSpent || selectedFieldUnit.isLagging) return;
 
     pushHistory();
-    // 1. La unidad atacante se gira (Spend)
-    selectedFieldUnit.isSpent = true;
 
-    // 2. Fase de Respuesta del Rival (Bot)
+    const targetUnit = targetUnitId
+      ? (gameState.bot.field || []).find((u) => u.instanceId === targetUnitId)
+      : null;
+    const targetDesc =
+      targetType === 'GIGS'
+        ? 'el Área de Gigs del Rival'
+        : `la unidad rival gastada "${targetUnit?.name || 'Unidad'}"`;
+
+    // 1. FASE 1: DECLARACIÓN DE ATAQUE Y DISPARO DE ATTACK
+    selectedFieldUnit.isSpent = true;
+    selectedFieldUnit.hasTriggeredAttackThisDeclaration = true;
+    executeUnitAttackTrigger(gameState, 'player', selectedFieldUnit);
+
+    gameState.actionLog.unshift(
+      `⚔️ [FASE 1: DECLARACIÓN DE ATAQUE] ${gameState.player.name} gira a "${selectedFieldUnit.name}" [Fuerza: ${selectedFieldUnit.currentPower}] y ataca a ${targetDesc}. (Trigger ATTACK ejecutado).`
+    );
+
+    // 2. FASE 2: FASE DE REACCIÓN DEL RIVAL (BOT)
     const botBlocker = executeBotReaction(gameState, selectedFieldUnit, targetType, targetUnitId);
 
-    // 3. Resolución oficial de combate
+    // 3. FASE 3: COMBATE / FASE 4: ROBO DE GIGS
     if (targetType === 'GIGS') {
       if (botBlocker) {
+        // Al haber bloqueador, se convierte en combate contra el bloqueador y no se roban Gigs
         resolveFight(gameState, 'player', selectedFieldUnit, 'bot', botBlocker);
       } else {
         attackRivalGigs(gameState, 'player', selectedFieldUnit.instanceId, null, preferredDice);
@@ -620,6 +639,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
       );
     }
 
+    delete selectedFieldUnit.hasTriggeredAttackThisDeclaration;
     setSelectedFieldUnit(null);
     setGameState({ ...gameState });
   };
@@ -3430,8 +3450,9 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
       {/* 5.5. MODAL TÁCTICO: FASE DE RESPUESTA DEL JUGADOR ANTE ATAQUE DEL RIVAL */}
       {gameState?.pendingReaction && gameState.pendingReaction.attackerPlayerKey === 'bot' && (() => {
         const reaction = gameState.pendingReaction;
+        // REGLA OFICIAL: Las unidades con Blocker pueden bloquear aunque tengan Lag (solo deben estar Ready/no giradas)
         const readyBlockers = (p.field || []).filter(
-          (u) => !u.isSpent && !u.isLagging && hasKeyword(u, 'Blocker')
+          (u) => !u.isSpent && hasKeyword(u, 'Blocker')
         );
         const currentBlocker = (p.field || []).find((u) => u.instanceId === reaction.blockerUnitId);
         const uncalledLegends = (p.legends || []).filter((l) => !l.isFaceUp);
@@ -3453,11 +3474,11 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                 <div className="flex items-center gap-2">
                   <span className="w-3 h-3 bg-[#FF003C] rounded-full animate-ping" />
                   <span className="text-xs sm:text-sm font-black uppercase tracking-wider text-[#FF003C]">
-                    // ALERTA DE COMBATE: FASE DE RESPUESTA //
+                    // COMBATE OFICIAL // FASE 2: FASE DE REACCIÓN //
                   </span>
                 </div>
                 <span className="text-[10px] text-[#FCEE0A] uppercase font-bold tracking-widest">
-                  TU TURNO DE REACCIÓN
+                  TU TURNO DE RESPUESTA
                 </span>
               </div>
 
@@ -3474,7 +3495,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                   </div>
                   <div>
                     <span className="text-[9px] text-[#FF003C] font-black block uppercase tracking-wider">
-                      ⚔️ UNIDAD ATACANTE DEL RIVAL
+                      ⚔️ FASE 1: ATACANTE RIVAL (SPENT)
                     </span>
                     <span className="text-sm sm:text-base font-black text-white uppercase block">
                       {reaction.attackerName}
@@ -3495,7 +3516,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                 {/* Objetivo o Blocker asignado */}
                 <div className="text-right">
                   <span className="text-[9px] text-gray-400 font-bold block uppercase">
-                    {currentBlocker ? '🛡️ INTERCEPTANDO CON' : '🎯 OBJETIVO DECLARADO'}
+                    {currentBlocker ? '🛡️ INTERCEPTANDO CON (BLOCKER)' : '🎯 OBJETIVO DECLARADO'}
                   </span>
                   <span className={`text-sm sm:text-base font-black uppercase block ${currentBlocker ? 'text-[#0dfceb]' : 'text-white'}`}>
                     {currentBlocker ? currentBlocker.name : reaction.targetName}
@@ -3514,15 +3535,18 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
               <div className="space-y-2.5">
                 {/* Opción 1: Interceptar con Blocker */}
                 <div className="bg-[#000000]/80 border border-gray-800 p-2.5 rounded">
-                  <div className="flex items-center justify-between mb-1.5">
+                  <div className="flex items-center justify-between mb-1">
                     <span className="text-[10px] font-black uppercase text-[#0dfceb] flex items-center gap-1.5">
                       <Shield className="w-3.5 h-3.5 text-[#0dfceb]" />
-                      1. INTERCEPTAR CON UNIDAD BLOCKER (GRATIS)
+                      1. INTERCEPTAR CON BLOCKER (PUEDEN BLOQUEAR AUNQUE TENGAN LAG)
                     </span>
                     <span className="text-[9px] text-gray-400">
                       {currentBlocker ? '1 UNIDAD ASIGNADA' : `${readyBlockers.length} DISPONIBLES`}
                     </span>
                   </div>
+                  <p className="text-[9px] text-gray-400 mb-1.5">
+                    Al interceptar con un Bloqueador, el ataque se convierte en una lucha contra él y <strong className="text-[#0dfceb]">NO se roba ningún Gig</strong> aunque el atacante gane.
+                  </p>
 
                   {readyBlockers.length === 0 ? (
                     <span className="text-[10px] text-gray-500 italic block">
@@ -3660,8 +3684,10 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                   <Swords className="w-4 h-4" />
                   <span>
                     {currentBlocker
-                      ? `INTERCEPTAR Y RESOLVER COMBATE`
-                      : `PASAR RESPUESTA Y RESOLVER`}
+                      ? `INTERCEPTAR Y RESOLVER COMBATE (FASE 3)`
+                      : reaction.targetType === 'GIGS'
+                      ? `PASAR RESPUESTA Y RESOLVER ROBO DE GIGS (FASE 4)`
+                      : `PASAR RESPUESTA Y RESOLVER COMBATE (FASE 3)`}
                   </span>
                 </button>
               </div>

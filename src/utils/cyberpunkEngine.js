@@ -741,27 +741,35 @@ export function attackRivalGigs(
   // Girar la unidad atacante
   unit.isSpent = true;
 
-  // Disparar habilidades de ataque (ej: Sketchy Ripper)
-  executeUnitAttackTrigger(state, attackerPlayerKey, unit);
+  // FASE 1: Disparar habilidades de ataque (ej: Sketchy Ripper, El Sombrerón) antes de la reacción del rival
+  if (!unit.hasTriggeredAttackThisDeclaration) {
+    unit.hasTriggeredAttackThisDeclaration = true;
+    executeUnitAttackTrigger(state, attackerPlayerKey, unit);
+  }
 
-  // Intercepción por BLOCKER:
+  // FASE 2: Intercepción por BLOCKER (si fue asignado en la Fase de Reacción):
   if (blockerUnitId) {
     const blocker = defender.field.find((u) => u.instanceId === blockerUnitId);
     if (blocker && hasKeyword(blocker, 'Blocker')) {
       blocker.isSpent = true;
       state.actionLog.unshift(
-        `🛡️ ¡BLOCKER! ${defender.name} gira a "${blocker.name}" para interceptar el asalto a sus Gigs. ¡No se roba ningún Gig!`
+        `🛡️ [FASE 2: REACCIÓN] ¡BLOCKER! ${defender.name} gira a "${blocker.name}" para interceptar el asalto a sus Gigs. ¡El combate se convierte en lucha contra el bloqueador y NO se roba ningún Gig!`
       );
-      // Resolver pelea contra el Blocker
-      return resolveFight(state, attackerPlayerKey, unit, defenderKey, blocker);
+      // FASE 3: Resolver pelea contra el Blocker
+      const fightRes = resolveFight(state, attackerPlayerKey, unit, defenderKey, blocker);
+      delete unit.hasTriggeredAttackThisDeclaration;
+      return { ...fightRes, isBlocked: true, blocker };
     }
   }
+
+  // FASE 4: ROBO DE GIGS (si el objetivo eran los Gigs y no hubo Blocker)
+  delete unit.hasTriggeredAttackThisDeclaration;
 
   // Cálculo oficial de Gigs a robar según tabla de poder
   const gigsToSteal = calculateGigsToSteal(unit.currentPower);
   if (gigsToSteal <= 0) {
     state.actionLog.unshift(
-      `⚠️ "${unit.name}" tiene 0 de poder y no puede robar ningún Gig.`
+      `⚠️ [FASE 4: ROBO DE GIGS] "${unit.name}" tiene 0 de poder y no puede robar ningún Gig.`
     );
     return { success: true, stolenCount: 0 };
   }
@@ -800,7 +808,7 @@ export function attackRivalGigs(
 
   const diceNames = stolenDice.map((d) => `${d.die.toUpperCase()} (Valor: ${d.value})`).join(', ');
   state.actionLog.unshift(
-    `⚔️ ¡ASALTO EXITOSO! "${unit.name}" [Fuerza: ${unit.currentPower}] asalta los Gigs de ${defender.name} y ROBA ${countToSteal} Gig(s): ${diceNames}.`
+    `💎 [FASE 4: ROBO DE GIGS] ¡ASALTO EXITOSO! "${unit.name}" [Fuerza: ${unit.currentPower}] asalta los Gigs de ${defender.name} y ROBA ${countToSteal} Gig(s): ${diceNames}.`
   );
 
   // Comprobar victoria inmediata en Overtime
@@ -827,7 +835,7 @@ export function resolveFight(state, attPlayerKey, attUnit, defPlayerKey, defUnit
   const defPower = defUnit.currentPower || 0;
 
   state.actionLog.unshift(
-    `🥊 COMBATE: "${attUnit.name}" [Fuerza: ${attPower}] vs "${defUnit.name}" [Fuerza: ${defPower}].`
+    `🥊 [FASE 3: COMBATE] "${attUnit.name}" [Fuerza: ${attPower}] vs "${defUnit.name}" [Fuerza: ${defPower}].`
   );
 
   if (attPower > defPower) {
@@ -840,7 +848,7 @@ export function resolveFight(state, attPlayerKey, attUnit, defPlayerKey, defUnit
         defeated.gear.forEach((g) => defender.trash.push(g));
       }
       state.actionLog.unshift(
-        `💀 "${defUnit.name}" de ${defender.name} es DERROTADA y enviada a la Basura${
+        `💀 [FASE 3: DERROTA] "${defUnit.name}" de ${defender.name} es DERROTADA y enviada a la Basura${
           defeated.gear?.length ? ` junto con ${defeated.gear.length} Gear(s)` : ''
         }.`
       );
@@ -860,7 +868,7 @@ export function resolveFight(state, attPlayerKey, attUnit, defPlayerKey, defUnit
           defeated.gear.forEach((g) => attacker.trash.push(g));
         }
         state.actionLog.unshift(
-          `💥 ¡CONTRAATAQUE! "${attUnit.name}" fue superada en poder y enviada a la Basura${
+          `💥 [FASE 3: CONTRAATAQUE] "${attUnit.name}" fue superada en poder y enviada a la Basura${
             defeated.gear?.length ? ` junto con ${defeated.gear.length} Gear(s)` : ''
           }.`
         );
@@ -894,11 +902,11 @@ export function resolveFight(state, attPlayerKey, attUnit, defPlayerKey, defUnit
       if (defeatedDef) executeUnitDefeatedTrigger(state, defPlayerKey, defeatedDef);
       if (defeatedAtt) executeUnitDefeatedTrigger(state, attPlayerKey, defeatedAtt);
       state.actionLog.unshift(
-        `☠️ ¡EMPATE LETAL (${attPower} vs ${defPower})! Ambas unidades pierden el combate y van a la Basura.`
+        `☠️ [FASE 3: EMPATE LETAL] (${attPower} vs ${defPower}): Ambas unidades pierden el combate y van a la Basura.`
       );
     } else {
       state.actionLog.unshift(
-        `⚠️ Las unidades tienen 0 de poder y no pueden derrotar nada.`
+        `⚠️ [FASE 3: COMBATE] Las unidades tienen 0 de poder y no pueden derrotar nada.`
       );
     }
   }
@@ -922,11 +930,17 @@ export function fightRivalUnit(state, attackerPlayerKey, attackerUnitId, targetU
     return { success: false, reason: 'Tu unidad está girada.' };
   }
   if (attUnit.isLagging) return { success: false, reason: 'Tu unidad tiene Lag.' };
-  if (!defUnit.isSpent && !blockerUnitId) {
-    return { success: false, reason: 'Solo puedes atacar a unidades rivales giradas (Spent).' };
+  if (!defUnit.isSpent && !blockerUnitId && !attUnit.canAttackReadyUnits) {
+    return { success: false, reason: 'Solo puedes atacar a unidades rivales giradas (Spent). Las unidades enderezadas no pueden ser atacadas.' };
   }
 
   attUnit.isSpent = true;
+
+  // FASE 1: Disparar habilidad ATTACK antes de la reacción del rival
+  if (!attUnit.hasTriggeredAttackThisDeclaration) {
+    attUnit.hasTriggeredAttackThisDeclaration = true;
+    executeUnitAttackTrigger(state, attackerPlayerKey, attUnit);
+  }
 
   // Intercepción por Blocker
   if (blockerUnitId) {
@@ -934,13 +948,17 @@ export function fightRivalUnit(state, attackerPlayerKey, attackerUnitId, targetU
     if (blocker && hasKeyword(blocker, 'Blocker')) {
       blocker.isSpent = true;
       state.actionLog.unshift(
-        `🛡️ ¡BLOCKER! "${blocker.name}" se interpone para proteger a "${defUnit.name}".`
+        `🛡️ [FASE 2: REACCIÓN] ¡BLOCKER! "${blocker.name}" se interpone para proteger a "${defUnit.name}".`
       );
-      return resolveFight(state, attackerPlayerKey, attUnit, defenderKey, blocker);
+      const fightRes = resolveFight(state, attackerPlayerKey, attUnit, defenderKey, blocker);
+      delete attUnit.hasTriggeredAttackThisDeclaration;
+      return fightRes;
     }
   }
 
-  return resolveFight(state, attackerPlayerKey, attUnit, defenderKey, defUnit);
+  const fightRes = resolveFight(state, attackerPlayerKey, attUnit, defenderKey, defUnit);
+  delete attUnit.hasTriggeredAttackThisDeclaration;
+  return fightRes;
 }
 
 /**
