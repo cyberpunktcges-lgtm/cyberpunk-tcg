@@ -821,6 +821,12 @@ export function playLegendToField(state, playerKey, legendInstanceId, isGoSolo =
   if (leg.isRemovedFromGame) {
     return { success: false, reason: `"${leg.name}" ha sido eliminada de la partida (Remove from the game).` };
   }
+  if (!leg.isFaceUp) {
+    return {
+      success: false,
+      reason: 'Debes hacer Call (dar la vuelta) a la Leyenda antes de poder activar Go Solo o desplegarla al campo de batalla.'
+    };
+  }
 
   const cost = leg.parsedCost || parseCardCost(leg.cost) || leg.costNum || 0;
   const available = getAvailableEddies(p);

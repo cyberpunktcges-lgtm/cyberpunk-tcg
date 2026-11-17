@@ -1084,6 +1084,16 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
     const leg = (p.legends || []).find((l) => l.instanceId === legendInstanceId);
     if (!leg) return;
 
+    if (!leg.isFaceUp) {
+      setHolocall({
+        title: 'LEYENDA BOCA ABAJO',
+        message: 'Esta Leyenda está boca abajo. Para activar Go Solo o desplegarla al combate, primero debes pagar 1 €$ y hacer Call para ponerla boca arriba.',
+        characterName: 'VIKTOR // RIPPERDOC',
+        type: 'warning'
+      });
+      return;
+    }
+
     const cost = leg.parsedCost || parseCardCost(leg.cost) || leg.costNum || 0;
     const floating = getAvailableEddies(p);
     const totalCap = getTotalAvailableEddies(p);
@@ -3761,7 +3771,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                             {/* Cabecera del Popover */}
                             <div className="flex items-center justify-between pb-1 mb-2 border-b border-[#0dfceb]/30 text-[9px]">
                               <span className="font-black uppercase text-[#0dfceb] tracking-wider truncate max-w-[140px]">
-                                {leg.name || 'LEYENDA'}
+                                {leg.isFaceUp ? (leg.name || 'LEYENDA') : `LEYENDA #${i + 1} (BOCA ABAJO)`}
                               </span>
                               <button
                                 type="button"
@@ -3876,8 +3886,8 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                               </div>
                             )}
 
-                            {/* Opciones GO SOLO y DESPLIEGUE si la leyenda tiene coste > 0 */}
-                            {legCost > 0 && (
+                            {/* Opciones GO SOLO y DESPLIEGUE SOLO si la leyenda está BOCA ARRIBA y tiene coste > 0 */}
+                            {leg.isFaceUp && legCost > 0 && (
                               <div className="pt-1 border-t border-[#0dfceb]/30 mb-1 flex flex-col gap-1">
                                 {hasGoSoloKw && (
                                   <button
@@ -3949,7 +3959,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
 
                         {/* Carta de Leyenda */}
                         <div
-                          draggable={Boolean(legCost > 0 && !leg.isOnField && !leg.isRemovedFromGame)}
+                          draggable={Boolean(leg.isFaceUp && legCost > 0 && !leg.isOnField && !leg.isRemovedFromGame)}
                           onDragStart={(e) => {
                             e.dataTransfer.setData('text/plain', `legend:${leg.instanceId}`);
                           }}

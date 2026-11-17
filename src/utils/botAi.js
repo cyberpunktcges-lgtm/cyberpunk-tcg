@@ -195,12 +195,12 @@ export async function runBotTurn(gameState, updateCallback, delayMs = 700) {
     }
   }
 
-  // Paso 2.B: Si tiene una leyenda con Go Solo disponible y suficiente capacidad, activar Go Solo
+  // Paso 2.B: Si tiene una leyenda boca arriba con Go Solo disponible y suficiente capacidad, activar Go Solo
   const goSoloLegend = (bot.legends || []).find(
     (l) =>
       !l.isOnField &&
       !l.isRemovedFromGame &&
-      (l.isFaceUp || bot.hasCalledLegendThisTurn) &&
+      l.isFaceUp &&
       hasKeyword(l, 'Go Solo')
   );
   if (goSoloLegend) {
