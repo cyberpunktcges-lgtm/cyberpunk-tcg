@@ -248,6 +248,478 @@ function PolyhedralDie({
 }
 
 // =========================================================================
+// COMPONENTE DADO D20 POLIÉDRICO CYBERPUNK (10 FACETAS 3D Y ANIMACIÓN)
+// =========================================================================
+function CyberD20Die({
+  value,
+  theme = 'yellow', // 'yellow' | 'red'
+  isRolling = false,
+  isWinner = false,
+  isLoser = false,
+  size = 110
+}) {
+  const isYellow = theme === 'yellow';
+  const primaryColor = isYellow ? '#FCEE0A' : '#FF003C';
+  const darkBg = isYellow ? '#151300' : '#170106';
+  const baseFill = isYellow ? '252, 238, 10' : '255, 0, 60';
+
+  return (
+    <motion.div
+      animate={
+        isRolling
+          ? {
+              rotateZ: isYellow ? [0, -32, 28, -36, 24, -16, 0] : [0, 32, -28, 36, -24, 16, 0],
+              scale: [0.9, 1.14, 0.92, 1.1, 0.95, 1],
+              y: isYellow ? [-16, 12, -14, 8, -16] : [14, -14, 10, -12, 14]
+            }
+          : isWinner
+          ? {
+              scale: [1, 1.25, 0.96, 1.06, 1],
+              rotateZ: [0, -6, 6, -3, 3, 0]
+            }
+          : { scale: 1, rotateZ: 0, y: 0 }
+      }
+      transition={
+        isRolling
+          ? { repeat: Infinity, duration: 0.55, ease: 'easeInOut' }
+          : { duration: 0.55, ease: 'easeOut' }
+      }
+      style={{
+        filter: isWinner
+          ? `drop-shadow(0 0 25px ${primaryColor}) drop-shadow(0 0 40px ${primaryColor}88)`
+          : isRolling
+          ? `drop-shadow(0 0 20px ${primaryColor})`
+          : `drop-shadow(0 0 10px ${primaryColor}88)`
+      }}
+      className={`relative flex items-center justify-center select-none ${
+        isLoser ? 'opacity-55 grayscale-[30%]' : 'opacity-100'
+      }`}
+    >
+      <svg
+        width={size}
+        height={size}
+        viewBox="0 0 100 100"
+        className="overflow-visible"
+      >
+        <defs>
+          <radialGradient id={`d20-grad-${theme}`} cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stopColor={primaryColor} stopOpacity="0.45" />
+            <stop offset="75%" stopColor={primaryColor} stopOpacity="0.15" />
+            <stop offset="100%" stopColor={darkBg} stopOpacity="0.95" />
+          </radialGradient>
+        </defs>
+
+        {/* Polígono base icosaédrico exterior */}
+        <polygon
+          points="50,6 89,28 89,72 50,94 11,72 11,28"
+          fill={darkBg}
+          stroke={primaryColor}
+          strokeWidth="3.2"
+          strokeLinejoin="round"
+        />
+
+        {/* 10 Facetas triangulares de proyección isométrica frontal */}
+        {/* Faceta 1: Central invertida (donde se sitúa el número) */}
+        <polygon
+          points="32,38 68,38 50,70"
+          fill={`url(#d20-grad-${theme})`}
+          stroke={primaryColor}
+          strokeWidth="2.2"
+          strokeLinejoin="round"
+        />
+
+        {/* Faceta 2: Superior Central */}
+        <polygon
+          points="50,6 32,38 68,38"
+          fill={`rgba(${baseFill}, 0.24)`}
+          stroke={primaryColor}
+          strokeWidth="1.6"
+          strokeLinejoin="round"
+        />
+
+        {/* Faceta 3: Superior Derecha */}
+        <polygon
+          points="50,6 89,28 68,38"
+          fill={`rgba(${baseFill}, 0.34)`}
+          stroke={primaryColor}
+          strokeWidth="1.6"
+          strokeLinejoin="round"
+        />
+
+        {/* Faceta 4: Lateral Derecha Superior */}
+        <polygon
+          points="89,28 89,72 68,38"
+          fill={`rgba(${baseFill}, 0.18)`}
+          stroke={primaryColor}
+          strokeWidth="1.6"
+          strokeLinejoin="round"
+        />
+
+        {/* Faceta 5: Lateral Derecha Inferior */}
+        <polygon
+          points="89,72 68,38 50,70"
+          fill={`rgba(${baseFill}, 0.28)`}
+          stroke={primaryColor}
+          strokeWidth="1.6"
+          strokeLinejoin="round"
+        />
+
+        {/* Faceta 6: Inferior Derecha */}
+        <polygon
+          points="89,72 50,94 50,70"
+          fill={`rgba(${baseFill}, 0.12)`}
+          stroke={primaryColor}
+          strokeWidth="1.6"
+          strokeLinejoin="round"
+        />
+
+        {/* Faceta 7: Inferior Izquierda */}
+        <polygon
+          points="50,94 11,72 50,70"
+          fill={`rgba(${baseFill}, 0.14)`}
+          stroke={primaryColor}
+          strokeWidth="1.6"
+          strokeLinejoin="round"
+        />
+
+        {/* Faceta 8: Lateral Izquierda Inferior */}
+        <polygon
+          points="11,72 32,38 50,70"
+          fill={`rgba(${baseFill}, 0.30)`}
+          stroke={primaryColor}
+          strokeWidth="1.6"
+          strokeLinejoin="round"
+        />
+
+        {/* Faceta 9: Lateral Izquierda Superior */}
+        <polygon
+          points="11,72 11,28 32,38"
+          fill={`rgba(${baseFill}, 0.20)`}
+          stroke={primaryColor}
+          strokeWidth="1.6"
+          strokeLinejoin="round"
+        />
+
+        {/* Faceta 10: Superior Izquierda */}
+        <polygon
+          points="11,28 50,6 32,38"
+          fill={`rgba(${baseFill}, 0.26)`}
+          stroke={primaryColor}
+          strokeWidth="1.6"
+          strokeLinejoin="round"
+        />
+
+        {/* Borde exterior reforzado */}
+        <polygon
+          points="50,6 89,28 89,72 50,94 11,72 11,28"
+          fill="none"
+          stroke={primaryColor}
+          strokeWidth="3.2"
+          strokeLinejoin="round"
+        />
+
+        {/* Número central del D20 */}
+        <text
+          x="50"
+          y="52"
+          textAnchor="middle"
+          dominantBaseline="central"
+          fill="#FFFFFF"
+          fontSize={value >= 10 ? '22' : '26'}
+          fontWeight="900"
+          fontFamily="ui-monospace, monospace"
+          stroke="#000000"
+          strokeWidth="0.8"
+          paintOrder="stroke fill"
+          style={{
+            filter: `drop-shadow(0 0 8px ${primaryColor})`,
+            letterSpacing: '-1px'
+          }}
+        >
+          {value}
+        </text>
+      </svg>
+    </motion.div>
+  );
+}
+
+// =========================================================================
+// MODAL ANIMADO DE TIRADA DE D20 (DADOS AMARILLO Y ROJO)
+// =========================================================================
+function CyberD20RollModal({ selection, onConfirmStarter, onReroll }) {
+  const { playerRoll, botRoll, rollWinner, botDecidedStarter } = selection;
+  const playerWon = rollWinner === 'player';
+
+  const [isRolling, setIsRolling] = useState(true);
+  const [hasLanded, setHasLanded] = useState(false);
+  const [displayPlayerRoll, setDisplayPlayerRoll] = useState(() => Math.floor(Math.random() * 20) + 1);
+  const [displayBotRoll, setDisplayBotRoll] = useState(() => Math.floor(Math.random() * 20) + 1);
+  const [rollProgress, setRollProgress] = useState(0);
+
+  useEffect(() => {
+    setIsRolling(true);
+    setHasLanded(false);
+    setRollProgress(0);
+
+    const startTime = Date.now();
+    const duration = 1600; // 1.6 segundos de rodaje
+
+    // Barajeo rápido de números mientras giran los dados
+    const shuffleInterval = setInterval(() => {
+      setDisplayPlayerRoll(Math.floor(Math.random() * 20) + 1);
+      setDisplayBotRoll(Math.floor(Math.random() * 20) + 1);
+
+      const elapsed = Date.now() - startTime;
+      const progressPercent = Math.min(100, Math.floor((elapsed / duration) * 100));
+      setRollProgress(progressPercent);
+    }, 55);
+
+    // Detención e impacto final en los valores generados
+    const landTimeout = setTimeout(() => {
+      clearInterval(shuffleInterval);
+      setDisplayPlayerRoll(playerRoll);
+      setDisplayBotRoll(botRoll);
+      setIsRolling(false);
+      setHasLanded(true);
+      setRollProgress(100);
+    }, duration);
+
+    return () => {
+      clearInterval(shuffleInterval);
+      clearTimeout(landTimeout);
+    };
+  }, [playerRoll, botRoll]);
+
+  const handleSkipAnimation = () => {
+    setDisplayPlayerRoll(playerRoll);
+    setDisplayBotRoll(botRoll);
+    setIsRolling(false);
+    setHasLanded(true);
+    setRollProgress(100);
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 bg-[#000000]/92 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 font-mono select-none">
+      <motion.div
+        initial={{ scale: 0.92, opacity: 0, y: 15 }}
+        animate={{ scale: 1, opacity: 1, y: 0 }}
+        style={{ clipPath: CYBER_CLIP }}
+        className="max-w-2xl w-full bg-[#070a10]/98 border-2 border-[#0dfceb] p-5 sm:p-8 text-center space-y-5 sm:space-y-6 shadow-[0_0_80px_rgba(13,252,235,0.45)] relative max-h-[92vh] overflow-y-auto cyber-scrollbar"
+      >
+        {/* Cabecera */}
+        <div className="flex items-center justify-between border-b border-[#0dfceb]/40 pb-3">
+          <div className="flex items-center gap-2">
+            <span className="w-3 h-3 bg-[#0dfceb] rounded-full animate-ping" />
+            <span className="text-xs sm:text-sm font-black uppercase tracking-wider text-[#0dfceb]">
+              INICIO DE PARTIDA // TIRADA DE D20
+            </span>
+          </div>
+          <span className="text-[10px] text-[#FCEE0A] uppercase font-bold tracking-widest hidden sm:inline">
+            DECISIÓN DE PRIMER TURNO
+          </span>
+        </div>
+
+        {/* Explicación oficial */}
+        <p className="text-xs sm:text-sm text-gray-300 leading-relaxed max-w-lg mx-auto">
+          Al comenzar en Night City, ambos jugadores tiran su dado <strong>D20</strong>. Quien saque la puntuación más alta <strong>elige si sale él primero o sale el oponente</strong>.
+        </p>
+
+        {/* Zona de Duelo: Dado Amarillo (Jugador) vs Dado Rojo (Rival) */}
+        <div className="grid grid-cols-2 gap-3 sm:gap-6 py-2 max-w-lg mx-auto items-stretch">
+          {/* 1. DADO DEL JUGADOR: AMARILLO (#FCEE0A) */}
+          <div
+            className={`p-3.5 sm:p-5 rounded-xl border-2 transition-all duration-300 flex flex-col items-center justify-between gap-3 relative overflow-hidden ${
+              hasLanded && playerWon
+                ? 'border-[#FCEE0A] bg-gradient-to-b from-[#FCEE0A]/20 via-black/80 to-black/95 shadow-[0_0_40px_rgba(252,238,10,0.45)] scale-105'
+                : 'border-[#FCEE0A]/40 bg-black/60 shadow-[0_0_20px_rgba(252,238,10,0.15)]'
+            }`}
+          >
+            <div className="flex items-center gap-1.5 text-[10px] sm:text-xs font-black uppercase text-[#FCEE0A] tracking-wider">
+              <span className="w-2 h-2 rounded-full bg-[#FCEE0A] animate-pulse" />
+              <span>TU DADO D20</span>
+            </div>
+
+            <div className="py-2">
+              <CyberD20Die
+                theme="yellow"
+                value={displayPlayerRoll}
+                isRolling={isRolling}
+                isWinner={hasLanded && playerWon}
+                isLoser={hasLanded && !playerWon}
+                size={110}
+              />
+            </div>
+
+            <div className="w-full text-center">
+              {isRolling ? (
+                <span className="inline-block px-2.5 py-1 bg-[#FCEE0A]/20 text-[#FCEE0A] border border-[#FCEE0A]/50 text-[9px] sm:text-[10px] font-black uppercase rounded animate-pulse">
+                  🎲 RODANDO...
+                </span>
+              ) : playerWon ? (
+                <span className="inline-block px-3 py-1 bg-[#FCEE0A] text-black text-[10px] sm:text-xs font-black uppercase rounded shadow-[0_0_15px_rgba(252,238,10,0.8)]">
+                  🏆 ¡GANADOR!
+                </span>
+              ) : (
+                <span className="inline-block px-2 py-0.5 bg-gray-900 text-gray-400 border border-gray-700 text-[9px] font-bold uppercase rounded">
+                  PUNTOS: {playerRoll}
+                </span>
+              )}
+            </div>
+          </div>
+
+          {/* 2. DADO DEL RIVAL: ROJO (#FF003C) */}
+          <div
+            className={`p-3.5 sm:p-5 rounded-xl border-2 transition-all duration-300 flex flex-col items-center justify-between gap-3 relative overflow-hidden ${
+              hasLanded && !playerWon
+                ? 'border-[#FF003C] bg-gradient-to-b from-[#FF003C]/20 via-black/80 to-black/95 shadow-[0_0_40px_rgba(255,0,60,0.45)] scale-105'
+                : 'border-[#FF003C]/40 bg-black/60 shadow-[0_0_20px_rgba(255,0,60,0.15)]'
+            }`}
+          >
+            <div className="flex items-center gap-1.5 text-[10px] sm:text-xs font-black uppercase text-[#FF003C] tracking-wider">
+              <span className="w-2 h-2 rounded-full bg-[#FF003C] animate-pulse" />
+              <span>D20 DEL RIVAL</span>
+            </div>
+
+            <div className="py-2">
+              <CyberD20Die
+                theme="red"
+                value={displayBotRoll}
+                isRolling={isRolling}
+                isWinner={hasLanded && !playerWon}
+                isLoser={hasLanded && playerWon}
+                size={110}
+              />
+            </div>
+
+            <div className="w-full text-center">
+              {isRolling ? (
+                <span className="inline-block px-2.5 py-1 bg-[#FF003C]/20 text-[#FF003C] border border-[#FF003C]/50 text-[9px] sm:text-[10px] font-black uppercase rounded animate-pulse">
+                  🎲 RODANDO...
+                </span>
+              ) : !playerWon ? (
+                <span className="inline-block px-3 py-1 bg-[#FF003C] text-white text-[10px] sm:text-xs font-black uppercase rounded shadow-[0_0_15px_rgba(255,0,60,0.8)]">
+                  🤖 ¡GANADOR!
+                </span>
+              ) : (
+                <span className="inline-block px-2 py-0.5 bg-gray-900 text-gray-400 border border-gray-700 text-[9px] font-bold uppercase rounded">
+                  PUNTOS: {botRoll}
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Barra de progreso de animación (durante la tirada) */}
+        {isRolling && (
+          <div className="space-y-2 max-w-md mx-auto pt-1">
+            <div className="flex items-center justify-between text-[10px] text-gray-400">
+              <span className="text-[#0dfceb] font-bold">LANZANDO DADOS CUÁNTICOS...</span>
+              <span>{rollProgress}%</span>
+            </div>
+            <div className="w-full h-1.5 bg-gray-800 rounded-full overflow-hidden border border-gray-700">
+              <div
+                className="h-full bg-gradient-to-r from-[#FCEE0A] via-[#0dfceb] to-[#FF003C] transition-all duration-75"
+                style={{ width: `${rollProgress}%` }}
+              />
+            </div>
+            <button
+              type="button"
+              onClick={handleSkipAnimation}
+              className="text-[10px] text-gray-400 hover:text-[#0dfceb] uppercase tracking-wider underline cursor-pointer pt-1"
+            >
+              ⏩ Saltar animación
+            </button>
+          </div>
+        )}
+
+        {/* Panel de decisión (aparece tras aterrizar los dados) */}
+        <AnimatePresence>
+          {hasLanded && (
+            <motion.div
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.35 }}
+              className="space-y-4 pt-1"
+            >
+              {playerWon ? (
+                <div className="space-y-4">
+                  <div className="p-3 bg-[#FCEE0A]/10 border border-[#FCEE0A]/50 rounded text-center">
+                    <h4 className="text-sm sm:text-base font-black text-[#FCEE0A] uppercase tracking-wide">
+                      ¡HAS GANADO LA TIRADA ({playerRoll} vs {botRoll})!
+                    </h4>
+                    <p className="text-xs text-gray-300 mt-1">
+                      Tienes la iniciativa. Elige quién jugará el primer turno de la partida:
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-lg mx-auto">
+                    <button
+                      type="button"
+                      onClick={() => onConfirmStarter('player')}
+                      style={{ clipPath: CYBER_BUTTON }}
+                      className="py-3 px-4 bg-[#0dfceb] hover:bg-white text-black font-black text-xs uppercase tracking-wider cursor-pointer transition-all shadow-[0_0_20px_rgba(13,252,235,0.6)]"
+                    >
+                      🚀 SALIR YO PRIMERO
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => onConfirmStarter('bot')}
+                      style={{ clipPath: CYBER_BUTTON }}
+                      className="py-3 px-4 bg-black border-2 border-[#FCEE0A] hover:bg-[#FCEE0A] hover:text-black text-[#FCEE0A] font-black text-xs uppercase tracking-wider cursor-pointer transition-all shadow-[0_0_20px_rgba(252,238,10,0.3)]"
+                    >
+                      🛡️ QUE SALGA EL RIVAL
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div className="p-3 bg-red-950/40 border border-[#FF003C]/50 rounded text-center">
+                    <h4 className="text-sm sm:text-base font-black text-[#FF003C] uppercase tracking-wide">
+                      EL RIVAL HA GANADO LA TIRADA ({botRoll} vs {playerRoll})
+                    </h4>
+                    <p className="text-xs text-gray-200 mt-1">
+                      🤖 Decisión táctica de la IA:{' '}
+                      <strong>
+                        {botDecidedStarter === 'bot'
+                          ? 'Ha decidido salir él primero.'
+                          : 'Ha decidido cederte la iniciativa y que salgas tú primero.'}
+                      </strong>
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => onConfirmStarter(botDecidedStarter)}
+                    style={{ clipPath: CYBER_BUTTON }}
+                    className="py-3.5 px-6 bg-[#0dfceb] hover:bg-white text-black font-black text-xs uppercase tracking-widest cursor-pointer transition-all shadow-[0_0_20px_rgba(13,252,235,0.6)]"
+                  >
+                    CONTINUAR // RESOLVER MULLIGAN ➔
+                  </button>
+                </div>
+              )}
+
+              {/* Botón para volver a tirar dados si se desea repetir */}
+              {onReroll && (
+                <div className="pt-2 border-t border-gray-800">
+                  <button
+                    type="button"
+                    onClick={onReroll}
+                    className="text-[11px] text-gray-400 hover:text-[#FCEE0A] uppercase tracking-wider font-bold transition-colors inline-flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <span>🔄</span>
+                    <span>VOLVER A TIRAR DADOS</span>
+                  </button>
+                </div>
+              )}
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </motion.div>
+    </div>
+  );
+}
+
+// =========================================================================
 // REVERSO OFICIAL DE CARTA (Normal y Leyenda)
 // =========================================================================
 function CyberCardBack({ className = '', count = null, isLegend = false, card = null }) {
@@ -1337,6 +1809,31 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
         );
       } catch {}
     }
+  };
+
+  // Volver a tirar los dados D20 para decidir quién empieza
+  const handleRerollD20 = () => {
+    if (!gameState || !gameState.pendingFirstPlayerSelection) return;
+    let pRoll = Math.floor(Math.random() * 20) + 1;
+    let bRoll = Math.floor(Math.random() * 20) + 1;
+    while (pRoll === bRoll) {
+      bRoll = Math.floor(Math.random() * 20) + 1;
+    }
+    const rollWinner = pRoll > bRoll ? 'player' : 'bot';
+    const botDecidedStarter = rollWinner === 'bot' ? (Math.random() < 0.5 ? 'bot' : 'player') : null;
+
+    setGameState((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        pendingFirstPlayerSelection: {
+          playerRoll: pRoll,
+          botRoll: bRoll,
+          rollWinner,
+          botDecidedStarter
+        }
+      };
+    });
   };
 
   // Reiniciar partida con aviso de confirmación
@@ -3877,138 +4374,14 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
           MENÚS DESPLEGABLES / FLOTANTES (Fondo Translúcido y font-mono)
          ===================================================================== */}
 
-      {/* 0. MODAL DE TIRADA DE D20 INICIAL (ELECCIÓN DE PRIMER TURNO) */}
-      {gameState?.pendingFirstPlayerSelection && (() => {
-        const { playerRoll, botRoll, rollWinner, botDecidedStarter } = gameState.pendingFirstPlayerSelection;
-        const playerWon = rollWinner === 'player';
-
-        return (
-          <div className="fixed inset-0 z-50 bg-[#000000]/90 backdrop-blur-md flex items-center justify-center p-4 font-mono select-none">
-            <motion.div
-              initial={{ scale: 0.94, opacity: 0, y: 15 }}
-              animate={{ scale: 1, opacity: 1, y: 0 }}
-              style={{ clipPath: CYBER_CLIP }}
-              className="max-w-2xl w-full bg-[#070a10]/98 border-2 border-[#0dfceb] p-6 sm:p-8 text-center space-y-6 shadow-[0_0_70px_rgba(13,252,235,0.45)] relative max-h-[90vh] overflow-y-auto cyber-scrollbar"
-            >
-              {/* Cabecera */}
-              <div className="flex items-center justify-between border-b border-[#0dfceb]/40 pb-3">
-                <div className="flex items-center gap-2">
-                  <span className="w-3 h-3 bg-[#0dfceb] rounded-full animate-ping" />
-                  <span className="text-xs sm:text-sm font-black uppercase tracking-wider text-[#0dfceb]">
-                    INICIO DE PARTIDA // TIRADA DE D20
-                  </span>
-                </div>
-                <span className="text-[10px] text-[#FCEE0A] uppercase font-bold tracking-widest">
-                  DECISIÓN DE PRIMER TURNO
-                </span>
-              </div>
-
-              {/* Explicación oficial */}
-              <p className="text-xs sm:text-sm text-gray-300 leading-relaxed max-w-lg mx-auto">
-                Al comenzar la partida en Night City, ambos jugadores lanzan su dado <strong>D20</strong>. El jugador con la puntuación más alta <strong>elige si sale él primero o sale el oponente</strong>.
-              </p>
-
-              {/* Duelo de dados D20 */}
-              <div className="grid grid-cols-2 gap-4 sm:gap-6 py-2 max-w-md mx-auto">
-                {/* Dado del Jugador */}
-                <div className={`p-4 rounded border-2 transition-all flex flex-col items-center justify-center gap-2 ${
-                  playerWon
-                    ? 'border-[#0dfceb] bg-[#0dfceb]/10 shadow-[0_0_30px_rgba(13,252,235,0.35)] scale-105'
-                    : 'border-gray-700 bg-black/60 opacity-70'
-                }`}>
-                  <span className="text-[10px] sm:text-xs font-black uppercase text-[#0dfceb] tracking-wider">
-                    TU DADO D20
-                  </span>
-                  <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full border-2 border-[#0dfceb] flex items-center justify-center bg-black/90 shadow-inner">
-                    <span className="text-2xl sm:text-3xl font-black text-white font-mono">
-                      {playerRoll}
-                    </span>
-                  </div>
-                  {playerWon && (
-                    <span className="px-2 py-0.5 bg-[#0dfceb] text-black text-[9px] font-black uppercase rounded shadow">
-                      🏆 ¡GANADOR!
-                    </span>
-                  )}
-                </div>
-
-                {/* Dado del Rival */}
-                <div className={`p-4 rounded border-2 transition-all flex flex-col items-center justify-center gap-2 ${
-                  !playerWon
-                    ? 'border-[#FF003C] bg-[#FF003C]/10 shadow-[0_0_30px_rgba(255,0,60,0.35)] scale-105'
-                    : 'border-gray-700 bg-black/60 opacity-70'
-                }`}>
-                  <span className="text-[10px] sm:text-xs font-black uppercase text-[#FF003C] tracking-wider">
-                    D20 DEL RIVAL
-                  </span>
-                  <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full border-2 border-[#FF003C] flex items-center justify-center bg-black/90 shadow-inner">
-                    <span className="text-2xl sm:text-3xl font-black text-white font-mono">
-                      {botRoll}
-                    </span>
-                  </div>
-                  {!playerWon && (
-                    <span className="px-2 py-0.5 bg-[#FF003C] text-white text-[9px] font-black uppercase rounded shadow">
-                      🤖 ¡GANADOR!
-                    </span>
-                  )}
-                </div>
-              </div>
-
-              {/* Panel de decisión */}
-              {playerWon ? (
-                <div className="space-y-4 pt-1">
-                  <div className="p-3 bg-[#0dfceb]/10 border border-[#0dfceb]/40 rounded">
-                    <h4 className="text-sm font-black text-[#FCEE0A] uppercase">
-                      ¡HAS GANADO LA TIRADA ({playerRoll} vs {botRoll})!
-                    </h4>
-                    <p className="text-xs text-gray-300 mt-1">
-                      Elige quién jugará el primer turno de la partida:
-                    </p>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-lg mx-auto">
-                    <button
-                      type="button"
-                      onClick={() => handleConfirmStartingPlayer('player')}
-                      style={{ clipPath: CYBER_BUTTON }}
-                      className="py-3.5 px-4 bg-[#0dfceb] hover:bg-white text-black font-black text-xs uppercase tracking-wider cursor-pointer transition-all shadow-[0_0_20px_rgba(13,252,235,0.6)]"
-                    >
-                      🚀 SALIR YO PRIMERO
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleConfirmStartingPlayer('bot')}
-                      style={{ clipPath: CYBER_BUTTON }}
-                      className="py-3.5 px-4 bg-black border-2 border-[#FCEE0A] hover:bg-[#FCEE0A] hover:text-black text-[#FCEE0A] font-black text-xs uppercase tracking-wider cursor-pointer transition-all shadow-[0_0_20px_rgba(252,238,10,0.3)]"
-                    >
-                      🛡️ QUE SALGA EL RIVAL
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <div className="space-y-4 pt-1">
-                  <div className="p-3 bg-red-950/30 border border-[#FF003C]/40 rounded text-left sm:text-center">
-                    <h4 className="text-sm font-black text-[#FF003C] uppercase">
-                      EL RIVAL HA GANADO LA TIRADA ({botRoll} vs {playerRoll})
-                    </h4>
-                    <p className="text-xs text-gray-200 mt-1">
-                      🤖 El rival ha tomado su decisión táctica: <strong>{botDecidedStarter === 'bot' ? 'Ha decidido salir él primero.' : 'Ha decidido cederte la iniciativa y que salgas tú primero.'}</strong>
-                    </p>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={() => handleConfirmStartingPlayer(botDecidedStarter)}
-                    style={{ clipPath: CYBER_BUTTON }}
-                    className="py-3.5 px-6 bg-[#0dfceb] hover:bg-white text-black font-black text-xs uppercase tracking-widest cursor-pointer transition-all shadow-[0_0_20px_rgba(13,252,235,0.6)]"
-                  >
-                    CONTINUAR // RESOLVER MULLIGAN
-                  </button>
-                </div>
-              )}
-            </motion.div>
-          </div>
-        );
-      })()}
+      {/* 0. MODAL DE TIRADA DE D20 INICIAL (ELECCIÓN DE PRIMER TURNO - ANIMACIÓN DADOS AMARILLO Y ROJO) */}
+      {gameState?.pendingFirstPlayerSelection && (
+        <CyberD20RollModal
+          selection={gameState.pendingFirstPlayerSelection}
+          onConfirmStarter={handleConfirmStartingPlayer}
+          onReroll={handleRerollD20}
+        />
+      )}
 
       {/* 1. MODAL FLOTANTE DE MULLIGAN (INICIO DE PARTIDA) - ANCHO EXPANDIDO */}
       {!gameState.mulliganDecided && !gameState.pendingFirstPlayerSelection && (
