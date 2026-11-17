@@ -56,6 +56,8 @@ import {
   isCardVendible,
   toggleEddieSpent,
   toggleLegendSpent,
+  playLegendToField,
+  sendDefeatedUnitToGraveyardOrExile,
   resolveFight,
   DICE_CONFIG
 } from '../utils/cyberpunkEngine.js';
@@ -1075,6 +1077,84 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
     setGameState({ ...gameState });
   };
 
+  // Desplegar Leyenda al campo de batalla (con Go Solo o Despliegue normal)
+  const handlePlayLegendToFieldAction = (legendInstanceId, isGoSolo = true) => {
+    if (!gameState || gameState.activePlayer !== 'player' || gameState.isGameOver) return;
+    const p = gameState.player;
+    const leg = (p.legends || []).find((l) => l.instanceId === legendInstanceId);
+    if (!leg) return;
+
+    const cost = leg.parsedCost || parseCardCost(leg.cost) || leg.costNum || 0;
+    const floating = getAvailableEddies(p);
+    const totalCap = getTotalAvailableEddies(p);
+
+    // Si los eddies girados son inferiores al coste pero el jugador tiene capacidad suficiente (eddies/leyendas sin girar):
+    if (floating < cost) {
+      if (totalCap >= cost) {
+        let needed = cost - floating;
+        // 1. Girar cartas de la zona de eddies no giradas
+        for (const ed of p.eddies || []) {
+          if (needed <= 0) break;
+          if (!ed.isSpent) {
+            ed.isSpent = true;
+            p.floatingEddies = (p.floatingEddies || 0) + 1;
+            needed--;
+          }
+        }
+        // 2. Si todavía falta y es Go Solo, podemos girar la propia leyenda para 1 €$ (la regla oficial lo permite)
+        if (needed > 0 && isGoSolo && !leg.isSpent) {
+          leg.isSpent = true;
+          p.floatingEddies = (p.floatingEddies || 0) + 1;
+          needed--;
+        }
+        // 3. Si aún falta, girar otras leyendas disponibles
+        for (const ol of p.legends || []) {
+          if (needed <= 0) break;
+          if (ol.instanceId !== legendInstanceId && !ol.isSpent && !ol.isOnField && !ol.isRemovedFromGame) {
+            ol.isSpent = true;
+            p.floatingEddies = (p.floatingEddies || 0) + 1;
+            needed--;
+          }
+        }
+      } else {
+        const missing = cost - totalCap;
+        setHolocall({
+          title: 'EDDIES INSUFICIENTES',
+          message: `¡Atención, Netrunner! "${leg.name}" cuesta ${cost} €$, pero tu capacidad total máxima actual es de ${totalCap} €$. Te faltan ${missing} €$ para poder desplegarla.`,
+          characterName: 'VIKTOR // RIPPERDOC',
+          type: 'warning'
+        });
+        return;
+      }
+    }
+
+    pushHistory();
+    const res = playLegendToField(gameState, 'player', legendInstanceId, isGoSolo);
+    setLegendMenuId(null);
+    if (res.success) {
+      setGameState({ ...gameState });
+      setHolocall({
+        title: isGoSolo ? '🔥 ¡GO SOLO ACTIVADO!' : '⚔️ LEYENDA DESPLEGADA',
+        message: isGoSolo
+          ? `"${leg.name}" ha entrado al campo de batalla lista y sin lag. ¡Puede atacar este mismo turno!`
+          : `"${leg.name}" ha sido desplegada al campo de batalla.`,
+        characterName: 'NETWATCH // OVERWATCH',
+        type: 'success'
+      });
+    } else {
+      if (res.missingEddies) {
+        setHolocall({
+          title: 'EDDIES INSUFICIENTES',
+          message: res.reason,
+          characterName: 'VIKTOR // RIPPERDOC',
+          type: 'warning'
+        });
+      } else {
+        alert(res.reason);
+      }
+    }
+  };
+
   // Vender carta arrastrada o clicada
   const handleSellCard = (cardInstanceId) => {
     if (!gameState || gameState.activePlayer !== 'player' || gameState.isGameOver) return;
@@ -1226,6 +1306,26 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
   const handleResolveCardChoice = (selectedCardIds = []) => {
     if (!gameState?.pendingCardChoice) return;
     const choice = gameState.pendingCardChoice;
+
+    if (choice.type === 'SELECT_RIVAL_UNIT_TO_DEFEAT') {
+      const oppKey = (choice.playerKey || 'player') === 'player' ? 'bot' : 'player';
+      const opp = gameState[oppKey];
+      const selectedCards = (choice.cards || []).filter((c) => selectedCardIds.includes(c.instanceId));
+      selectedCards.forEach((sc) => {
+        const idx = (opp.field || []).findIndex((u) => u.instanceId === sc.instanceId);
+        if (idx !== -1) {
+          const [dead] = opp.field.splice(idx, 1);
+          sendDefeatedUnitToGraveyardOrExile(opp, dead, gameState);
+          gameState.actionLog.unshift(
+            `💥 [${choice.sourceCardName}] ¡PLAY! Has destruido a la unidad rival "${dead.name}".`
+          );
+        }
+      });
+      delete gameState.pendingCardChoice;
+      setGameState({ ...gameState });
+      return;
+    }
+
     const p = gameState[choice.playerKey || 'player'];
     const selectedCards = (choice.cards || []).filter((c) => selectedCardIds.includes(c.instanceId));
     const remainingCards = (choice.cards || []).filter((c) => !selectedCardIds.includes(c.instanceId));
@@ -2618,6 +2718,40 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                 {/* LEYENDAS RIVAL (3 SLOTS) A LA IZQUIERDA */}
                 <div className="rounded-2xl border border-[#FF003C]/30 bg-[#060b14]/80 p-1.5 sm:p-2 flex items-center justify-center gap-1.5 sm:gap-2 shrink-0">
                   {bot.legends.map((leg, i) => (
+                    leg.isOnField ? (
+                      <div
+                        key={leg.instanceId || i}
+                        onClick={() => {
+                          const u = (bot.field || []).find(
+                            (unit) => unit.legendInstanceId === leg.instanceId || unit.instanceId === leg.unitInstanceId
+                          );
+                          if (u) {
+                            setSelectedFieldUnit(u);
+                            setInspectedCard(u);
+                          }
+                        }}
+                        className="w-11 sm:w-13 md:w-15 h-16 sm:h-20 md:h-24 rounded-lg border-2 border-dashed border-[#FF003C] bg-[#FF003C]/10 flex flex-col items-center justify-center p-1 text-center cursor-pointer relative overflow-hidden group hover:border-[#FCEE0A] transition-all"
+                        title="Leyenda del Rival en combate (Go Solo)"
+                      >
+                        <div className="absolute inset-0 bg-cover bg-center opacity-25 filter grayscale" style={{ backgroundImage: `url(${leg.image})` }} />
+                        <span className="text-base sm:text-lg animate-pulse z-10">🔥</span>
+                        <span className="text-[7px] sm:text-[8px] font-black text-[#FF003C] group-hover:text-[#FCEE0A] uppercase leading-tight font-mono z-10">
+                          GO SOLO<br />EN CAMPO
+                        </span>
+                      </div>
+                    ) : leg.isRemovedFromGame ? (
+                      <div
+                        key={leg.instanceId || i}
+                        className="w-11 sm:w-13 md:w-15 h-16 sm:h-20 md:h-24 rounded-lg border border-dashed border-gray-700 bg-black/60 flex flex-col items-center justify-center p-1 text-center select-none opacity-50 relative overflow-hidden"
+                        title="Leyenda del Rival eliminada de la partida (Removed from the game)"
+                      >
+                        <div className="absolute inset-0 bg-cover bg-center opacity-10 filter grayscale" style={{ backgroundImage: `url(${leg.image})` }} />
+                        <span className="text-sm text-gray-500 z-10">🚫</span>
+                        <span className="text-[6.5px] font-bold text-gray-400 uppercase leading-tight font-mono z-10">
+                          ELIMINADA<br />EXILIO
+                        </span>
+                      </div>
+                    ) : (
                     <div
                       key={leg.instanceId || i}
                       onMouseEnter={() => {
@@ -2694,6 +2828,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                         </div>
                       )}
                     </div>
+                  )
                   ))}
                 </div>
 
@@ -3273,7 +3408,16 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                   e.preventDefault();
                   setIsDragOverField(false);
                   const cardId = e.dataTransfer.getData('text/plain');
-                  if (cardId) handlePlayCard(cardId);
+                  if (cardId) {
+                    if (cardId.startsWith('legend:')) {
+                      const legId = cardId.replace(/^legend:/, '');
+                      const leg = (p.legends || []).find((l) => l.instanceId === legId);
+                      const isGoSolo = leg ? hasKeyword(leg, 'Go Solo') : true;
+                      handlePlayLegendToFieldAction(legId, isGoSolo);
+                    } else {
+                      handlePlayCard(cardId);
+                    }
+                  }
                 }}
                 className={`flex-1 rounded-2xl border transition-all p-2.5 sm:p-3 min-h-[140px] sm:min-h-[160px] flex items-center relative overflow-x-auto ${
                   isDragOverField
@@ -3547,6 +3691,49 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                   {p.legends.map((leg, i) => {
                     const isTurn1Penalty = leg.isSpent && gameState.turnNumber === 1 && i < 2;
                     const isMenuOpen = legendMenuId === leg.instanceId;
+                    const legCost = leg.parsedCost || parseCardCost(leg.cost) || leg.costNum || 0;
+                    const hasGoSoloKw = hasKeyword(leg, 'Go Solo');
+
+                    if (leg.isOnField) {
+                      return (
+                        <div
+                          key={leg.instanceId || i}
+                          onClick={() => {
+                            const u = (p.field || []).find(
+                              (unit) => unit.legendInstanceId === leg.instanceId || unit.instanceId === leg.unitInstanceId
+                            );
+                            if (u) {
+                              setSelectedFieldUnit(u);
+                              setInspectedCard(u);
+                            }
+                          }}
+                          className="w-11 sm:w-13 md:w-15 h-16 sm:h-20 md:h-24 rounded-lg border-2 border-dashed border-[#0dfceb] bg-[#0dfceb]/10 flex flex-col items-center justify-center p-1 text-center cursor-pointer relative overflow-hidden group hover:border-[#FCEE0A] transition-all shadow-[0_0_12px_rgba(13,252,235,0.3)]"
+                          title="Tu Leyenda está combatiendo en el campo de batalla como Unidad (Go Solo)"
+                        >
+                          <div className="absolute inset-0 bg-cover bg-center opacity-25 filter grayscale" style={{ backgroundImage: `url(${leg.image})` }} />
+                          <span className="text-base sm:text-lg animate-pulse z-10">🔥</span>
+                          <span className="text-[7px] sm:text-[8px] font-black text-[#0dfceb] group-hover:text-[#FCEE0A] uppercase leading-tight font-mono z-10">
+                            GO SOLO<br />EN CAMPO
+                          </span>
+                        </div>
+                      );
+                    }
+
+                    if (leg.isRemovedFromGame) {
+                      return (
+                        <div
+                          key={leg.instanceId || i}
+                          className="w-11 sm:w-13 md:w-15 h-16 sm:h-20 md:h-24 rounded-lg border border-dashed border-gray-700 bg-black/60 flex flex-col items-center justify-center p-1 text-center select-none opacity-50 relative overflow-hidden"
+                          title="Leyenda eliminada de la partida (Removed from the game)"
+                        >
+                          <div className="absolute inset-0 bg-cover bg-center opacity-10 filter grayscale" style={{ backgroundImage: `url(${leg.image})` }} />
+                          <span className="text-sm text-gray-500 z-10">🚫</span>
+                          <span className="text-[6.5px] font-bold text-gray-400 uppercase leading-tight font-mono z-10">
+                            ELIMINADA<br />EXILIO
+                          </span>
+                        </div>
+                      );
+                    }
 
                     return (
                       <div
@@ -3689,6 +3876,59 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                               </div>
                             )}
 
+                            {/* Opciones GO SOLO y DESPLIEGUE si la leyenda tiene coste > 0 */}
+                            {legCost > 0 && (
+                              <div className="pt-1 border-t border-[#0dfceb]/30 mb-1 flex flex-col gap-1">
+                                {hasGoSoloKw && (
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setLegendMenuId(null);
+                                      handlePlayLegendToFieldAction(leg.instanceId, true);
+                                    }}
+                                    className="w-full py-1.5 px-2 text-left rounded text-[10px] font-black uppercase transition-all bg-gradient-to-r from-[#FF003C] to-[#FCEE0A] text-black shadow-[0_0_14px_rgba(255,0,60,0.5)] cursor-pointer hover:scale-[1.02] hover:brightness-110 flex flex-col gap-0.5 border border-[#FF003C]"
+                                  >
+                                    <div className="flex items-center justify-between w-full">
+                                      <span className="flex items-center gap-1.5">
+                                        <span>🔥</span>
+                                        <span>ACTIVAR GO SOLO</span>
+                                      </span>
+                                      <span className="text-[9px] font-black px-1.5 py-0.2 rounded bg-black text-[#FCEE0A]">
+                                        {legCost} €$
+                                      </span>
+                                    </div>
+                                    <span className="text-[8px] font-sans text-black/90 font-bold lowercase tracking-tight">
+                                      entra lista y sin lag • ataca ya
+                                    </span>
+                                  </button>
+                                )}
+
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setLegendMenuId(null);
+                                    handlePlayLegendToFieldAction(leg.instanceId, false);
+                                  }}
+                                  className="w-full py-1.5 px-2 text-left rounded text-[10px] font-black uppercase transition-all bg-gray-800 hover:bg-gray-700 text-gray-200 border border-gray-600 cursor-pointer flex flex-col gap-0.5 hover:scale-[1.01]"
+                                >
+                                  <div className="flex items-center justify-between w-full">
+                                    <span className="flex items-center gap-1.5">
+                                      <span>⚔️</span>
+                                      <span>DESPLEGAR AL CAMPO</span>
+                                    </span>
+                                    <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-black/70 text-gray-300">
+                                      {legCost} €$
+                                    </span>
+                                  </div>
+                                  <span className="text-[8px] font-sans text-gray-400 font-normal lowercase tracking-tight">
+                                    entra con lag {leg.isSpent ? '• entrará girada' : '• entrará ready'}
+                                  </span>
+                                </button>
+                              </div>
+                            )}
+
                             {/* Opción 4: Inspeccionar carta en grande */}
                             <button
                               type="button"
@@ -3709,6 +3949,10 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
 
                         {/* Carta de Leyenda */}
                         <div
+                          draggable={Boolean(legCost > 0 && !leg.isOnField && !leg.isRemovedFromGame)}
+                          onDragStart={(e) => {
+                            e.dataTransfer.setData('text/plain', `legend:${leg.instanceId}`);
+                          }}
                           onMouseEnter={() => {
                             setHoveredCard(leg);
                             setPreviewCard(leg);

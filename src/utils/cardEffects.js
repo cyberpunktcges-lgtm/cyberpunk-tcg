@@ -746,6 +746,46 @@ export function executeProgramEffect(state, playerKey, card) {
 // 2. MOTOR DE UNIDADES AL ENTRAR AL CAMPO (ON-PLAY TRIGGERS)
 // =========================================================================
 
+/**
+ * Envía una unidad derrotada al descarte (Trash) o al exilio (Removed from the game):
+ * REGLA OFICIAL DE GO SOLO / LEYENDAS:
+ * "If it leaves the field, remove it from the game."
+ */
+export function sendDefeatedUnitToGraveyardOrExile(playerState, unit, state = null) {
+  if (!unit || !playerState) return;
+
+  const isGoSoloOrLegend = Boolean(unit.hasGoSolo || unit.isLegendUnit);
+
+  if (isGoSoloOrLegend) {
+    const legendId = unit.legendInstanceId || (unit.instanceId ? unit.instanceId.replace(/_unit$/, '') : null);
+    if (legendId && playerState.legends) {
+      const leg = playerState.legends.find((l) => l.instanceId === legendId);
+      if (leg) {
+        leg.isOnField = false;
+        leg.isRemovedFromGame = true;
+      }
+    }
+
+    if (!playerState.removedFromGame) playerState.removedFromGame = [];
+    playerState.removedFromGame.push(unit);
+
+    if (state && state.actionLog) {
+      state.actionLog.unshift(
+        `🚫 [GO SOLO / LEYENDA] "${unit.name}" abandona el campo de batalla y queda ELIMINADA DE LA PARTIDA (Remove from the game).`
+      );
+    }
+  } else {
+    if (!playerState.trash) playerState.trash = [];
+    playerState.trash.push(unit);
+  }
+
+  // Los Gears equipados a la unidad derrotada van al Trash normalmente
+  if (unit.gear && unit.gear.length > 0) {
+    if (!playerState.trash) playerState.trash = [];
+    unit.gear.forEach((g) => playerState.trash.push(g));
+  }
+}
+
 export function executeUnitPlayTrigger(state, playerKey, unitInstance) {
   if (!state || !unitInstance) return;
   const p = state[playerKey];
@@ -754,18 +794,79 @@ export function executeUnitPlayTrigger(state, playerKey, unitInstance) {
   const cardId = unitInstance.id || '';
   const cardName = unitInstance.name || 'Unidad';
 
+  // CP-002: Adam Smasher // Ender of Legends
+  // "GO SOLO // PLAY Defeat a rival Unit."
+  if (cardId === 'CP-002') {
+    const oppUnits = opp.field || [];
+    if (oppUnits.length === 0) {
+      state.actionLog.unshift(
+        `💥 [Adam Smasher // Ender of Legends] ¡PLAY activado! Pero el rival no controla ninguna Unidad en el campo de batalla.`
+      );
+      if (playerKey === 'player') {
+        state.pendingCardChoice = {
+          type: 'SELECT_RIVAL_UNIT_TO_DEFEAT',
+          sourceZone: 'RIVAL_FIELD',
+          sourceCardId: 'CP-002',
+          sourceCardName: 'Adam Smasher // Ender of Legends',
+          sourceCardImage: unitInstance.image,
+          title: '💥 ADAM SMASHER // HABILIDAD PLAY',
+          prompt: 'Habilidad PLAY activada: "Defeat a rival Unit". El rival no controla ninguna unidad en el campo de batalla.',
+          cards: [],
+          eligibleIds: [],
+          maxChoices: 0,
+          minChoices: 0,
+          playerKey: 'player'
+        };
+      }
+    } else if (oppUnits.length === 1) {
+      const [dead] = opp.field.splice(0, 1);
+      sendDefeatedUnitToGraveyardOrExile(opp, dead, state);
+      state.actionLog.unshift(
+        `💥 [Adam Smasher // Ender of Legends] ¡"ENDER OF LEGENDS"! PLAY: Ha destruido a la unidad rival "${dead.name}".`
+      );
+    } else {
+      if (playerKey === 'player') {
+        state.pendingCardChoice = {
+          type: 'SELECT_RIVAL_UNIT_TO_DEFEAT',
+          sourceZone: 'RIVAL_FIELD',
+          sourceCardId: 'CP-002',
+          sourceCardName: 'Adam Smasher // Ender of Legends',
+          sourceCardImage: unitInstance.image,
+          title: '💥 ADAM SMASHER // HABILIDAD PLAY',
+          prompt: 'Elige una Unidad del rival para DESTRUIRLA inmediatamente con la habilidad PLAY:',
+          cards: oppUnits.map((u) => ({ ...u })),
+          eligibleIds: oppUnits.map((u) => u.instanceId),
+          maxChoices: 1,
+          minChoices: 1,
+          playerKey: 'player'
+        };
+      } else {
+        // Bot AI chooses highest power unit of player
+        let highestIdx = 0;
+        for (let i = 1; i < oppUnits.length; i++) {
+          if ((oppUnits[i].currentPower || 0) > (oppUnits[highestIdx].currentPower || 0)) {
+            highestIdx = i;
+          }
+        }
+        const [dead] = opp.field.splice(highestIdx, 1);
+        sendDefeatedUnitToGraveyardOrExile(opp, dead, state);
+        state.actionLog.unshift(
+          `💥 [Adam Smasher // Ender of Legends] ¡"ENDER OF LEGENDS"! El rival destruye a tu unidad "${dead.name}".`
+        );
+      }
+    }
+  }
+
   // CP-003: Adam Smasher // Metal Over Meat
   // "PLAY Defeat all other Units."
   if (cardId === 'CP-003') {
     const allOthersFriendly = (p.field || []).filter((u) => u.instanceId !== unitInstance.instanceId);
     p.field = [unitInstance];
-    if (!p.trash) p.trash = [];
-    p.trash.push(...allOthersFriendly);
+    allOthersFriendly.forEach((u) => sendDefeatedUnitToGraveyardOrExile(p, u, state));
 
     const allRival = opp.field || [];
     opp.field = [];
-    if (!opp.trash) opp.trash = [];
-    opp.trash.push(...allRival);
+    allRival.forEach((u) => sendDefeatedUnitToGraveyardOrExile(opp, u, state));
 
     state.actionLog.unshift(
       `💥 [Adam Smasher // Metal Over Meat] ¡"METAL OVER MEAT"! Destruye a TODAS las demás unidades en el campo de batalla.`
@@ -778,8 +879,7 @@ export function executeUnitPlayTrigger(state, playerKey, unitInstance) {
     const targetIdx = (opp.field || []).findIndex((u) => (u.costNum || u.cost || 0) <= 2);
     if (targetIdx !== -1) {
       const [dead] = opp.field.splice(targetIdx, 1);
-      if (!opp.trash) opp.trash = [];
-      opp.trash.push(dead);
+      sendDefeatedUnitToGraveyardOrExile(opp, dead, state);
       state.actionLog.unshift(`🐕 [Caliber] Destruye a la unidad rival "${dead.name}" (Coste <= 2).`);
     }
   }

@@ -405,7 +405,9 @@ export function getTotalAvailableEddies(playerState) {
   if (!playerState) return 0;
   const floating = playerState.floatingEddies || 0;
   const readyEddies = (playerState.eddies || []).filter((e) => !e.isSpent).length;
-  const readyLegends = (playerState.legends || []).filter((l) => !l.isSpent).length;
+  const readyLegends = (playerState.legends || []).filter(
+    (l) => !l.isSpent && !l.isOnField && !l.isRemovedFromGame
+  ).length;
   return floating + readyEddies + readyLegends;
 }
 
@@ -515,6 +517,12 @@ export function toggleLegendSpent(state, playerKey, legendInstanceId) {
   const p = state[playerKey];
   const leg = (p.legends || []).find((l) => l.instanceId === legendInstanceId);
   if (!leg) return { success: false, reason: 'Leyenda no encontrada.' };
+  if (leg.isOnField) {
+    return { success: false, reason: 'Esta Leyenda está en el campo de batalla como Unidad (Go Solo).' };
+  }
+  if (leg.isRemovedFromGame) {
+    return { success: false, reason: 'Esta Leyenda ha sido eliminada de la partida (Removed from the game).' };
+  }
 
   if (!leg.isSpent) {
     // Girar leyenda para obtener 1 €$
@@ -794,6 +802,88 @@ export function callLegendFaceUp(state, playerKey, legendInstanceId) {
 }
 
 /**
+ * Despliega una Leyenda desde la Zona de Leyendas al Campo de Batalla (Go Solo o Despliegue normal):
+ * REGLA OFICIAL:
+ * "GO SOLO (Pay this Legend's cost to play it as a ready Unit. It can attack this turn. If it leaves the field, remove it from the game.)"
+ *
+ * REGLA SOLICITADA POR EL USUARIO:
+ * "yo puedo pagar el coste de la leyenda (que tenga go solo) y la leyenda saldría al campo de batalla pero con lag y girada si la giré,
+ *  pero si pago el coste de la leyenda con go solo, la leyenda entrará ready y sin lag"
+ */
+export function playLegendToField(state, playerKey, legendInstanceId, isGoSolo = true) {
+  const p = state[playerKey];
+  const leg = (p.legends || []).find((l) => l.instanceId === legendInstanceId);
+  if (!leg) return { success: false, reason: 'Leyenda no encontrada en tu zona.' };
+
+  if (leg.isOnField) {
+    return { success: false, reason: `"${leg.name}" ya está en el campo de batalla.` };
+  }
+  if (leg.isRemovedFromGame) {
+    return { success: false, reason: `"${leg.name}" ha sido eliminada de la partida (Remove from the game).` };
+  }
+
+  const cost = leg.parsedCost || parseCardCost(leg.cost) || leg.costNum || 0;
+  const available = getAvailableEddies(p);
+
+  if (available < cost) {
+    const missing = cost - available;
+    return {
+      success: false,
+      missingEddies: missing,
+      cardName: leg.name,
+      cost,
+      reason: `Eddies insuficientes. "${leg.name}" cuesta ${cost} €$ y solo has girado ${available} €$. Te faltan ${missing} €$ (gira más cartas de Eddies o Leyendas antes de jugar).`
+    };
+  }
+
+  // Pagar coste de los Eddies girados
+  spendEddies(p, cost);
+
+  // Al salir al campo, se revela boca arriba si estaba boca abajo
+  leg.isFaceUp = true;
+  leg.isOnField = true;
+
+  // Estado previo de giro de la leyenda (por si se giró para pagar antes de Go Solo)
+  const wasSpent = Boolean(leg.isSpent);
+
+  // Si se paga con GO SOLO: entra READY (isSpent = false) y SIN LAG (isLagging = false)
+  // Si se despliega normalmente: entra CON LAG (isLagging = true) y si estaba girada, entra girada (isSpent = wasSpent)
+  const entersReady = isGoSolo ? true : !wasSpent;
+  const entersLagging = isGoSolo ? false : true;
+
+  const unitInstance = {
+    ...leg,
+    instanceId: `${leg.instanceId}_unit`,
+    legendInstanceId: leg.instanceId,
+    isLegendUnit: true,
+    hasGoSolo: Boolean(isGoSolo),
+    isSpent: !entersReady,
+    isLagging: entersLagging,
+    turnEntered: state.turnNumber,
+    currentPower: leg.parsedPower || parseCardPower(leg.power) || (leg.powerVal ? parseInt(leg.powerVal, 10) : 0),
+    gear: leg.gear || []
+  };
+
+  leg.unitInstanceId = unitInstance.instanceId;
+
+  if (!p.field) p.field = [];
+  p.field.push(unitInstance);
+
+  const modeText = isGoSolo
+    ? '🔥 [GO SOLO: Entra LISTA y SIN LAG, ¡puede atacar este turno!]'
+    : `⚔️ [DESPLIEGUE NORMAL: Entra con Lag${unitInstance.isSpent ? ' y girada' : ''}]`;
+
+  (state.actionLog = state.actionLog || []).unshift(
+    `👑 ${p.name} paga ${cost} €$ y lleva a su Leyenda "${leg.name}" al campo de batalla [Fuerza: ${unitInstance.currentPower}] ${modeText}.`
+  );
+
+  // Ejecutar habilidades ON-PLAY de la leyenda (ej: CP-002 Adam Smasher)
+  executeUnitPlayTrigger(state, playerKey, unitInstance);
+
+  return { success: true, isGoSolo, unit: unitInstance, legend: leg };
+}
+
+/**
  * Declara un ataque de una unidad contra los Gigs del rival para robar dados de Gig:
  * REGLA OFICIAL:
  * - Solo unidades listas (ready) y sin Lag pueden atacar.
@@ -907,6 +997,47 @@ export function attackRivalGigs(
 }
 
 /**
+ * Envía una unidad derrotada al descarte (Trash) o al exilio (Removed from the game):
+ * REGLA OFICIAL DE GO SOLO / LEYENDAS:
+ * "If it leaves the field, remove it from the game."
+ * Si una unidad tiene Go Solo o proviene de una Leyenda, al abandonar el campo queda eliminada de la partida.
+ */
+export function sendDefeatedUnitToGraveyardOrExile(playerState, unit, state = null) {
+  if (!unit || !playerState) return;
+
+  const isGoSoloOrLegend = Boolean(unit.hasGoSolo || unit.isLegendUnit);
+
+  if (isGoSoloOrLegend) {
+    const legendId = unit.legendInstanceId || (unit.instanceId ? unit.instanceId.replace(/_unit$/, '') : null);
+    if (legendId && playerState.legends) {
+      const leg = playerState.legends.find((l) => l.instanceId === legendId);
+      if (leg) {
+        leg.isOnField = false;
+        leg.isRemovedFromGame = true;
+      }
+    }
+
+    if (!playerState.removedFromGame) playerState.removedFromGame = [];
+    playerState.removedFromGame.push(unit);
+
+    if (state && state.actionLog) {
+      state.actionLog.unshift(
+        `🚫 [GO SOLO / LEYENDA] "${unit.name}" abandona el campo de batalla y queda ELIMINADA DE LA PARTIDA (Remove from the game).`
+      );
+    }
+  } else {
+    if (!playerState.trash) playerState.trash = [];
+    playerState.trash.push(unit);
+  }
+
+  // Los Gears equipados a la unidad derrotada van al Trash normalmente
+  if (unit.gear && unit.gear.length > 0) {
+    if (!playerState.trash) playerState.trash = [];
+    unit.gear.forEach((g) => playerState.trash.push(g));
+  }
+}
+
+/**
  * Resuelve una pelea entre dos unidades según las reglas oficiales de combate:
  * - Poder mayor derrota a poder menor.
  * - EMPATE: "Both Units lose the fight and both are defeated. Defeated Units go to the trash."
@@ -932,16 +1063,13 @@ export function resolveFight(state, attPlayerKey, attUnit, defPlayerKey, defUnit
   };
 
   if (attPower > defPower) {
-    // Atacante tiene mayor fuerza: la unidad de menor fuerza (defensora) va al Trash
+    // Atacante tiene mayor fuerza: la unidad de menor fuerza (defensora) es derrotada
     const idx = defender.field.findIndex((u) => u.instanceId === defUnit.instanceId);
     if (idx !== -1) {
       const [defeated] = defender.field.splice(idx, 1);
-      defender.trash.push(defeated);
-      if (defeated.gear && defeated.gear.length > 0) {
-        defeated.gear.forEach((g) => defender.trash.push(g));
-      }
+      sendDefeatedUnitToGraveyardOrExile(defender, defeated, state);
       state.actionLog.unshift(
-        `💀 [FASE 3: DERROTA] "${defUnit.name}" tiene menor fuerza (${defPower} < ${attPower}) y es enviada a la Basura (Trash)${
+        `💀 [FASE 3: DERROTA] "${defUnit.name}" tiene menor fuerza (${defPower} < ${attPower}) y es derrotada${
           defeated.gear?.length ? ` junto con ${defeated.gear.length} Gear(s)` : ''
         }.`
       );
@@ -958,16 +1086,13 @@ export function resolveFight(state, attPlayerKey, attUnit, defPlayerKey, defUnit
       };
     }
   } else if (defPower > attPower) {
-    // Defensor tiene mayor fuerza: la unidad de menor fuerza (atacante) va al Trash
+    // Defensor tiene mayor fuerza: la unidad de menor fuerza (atacante) es derrotada
     const idx = attacker.field.findIndex((u) => u.instanceId === attUnit.instanceId);
     if (idx !== -1) {
       const [defeated] = attacker.field.splice(idx, 1);
-      attacker.trash.push(defeated);
-      if (defeated.gear && defeated.gear.length > 0) {
-        defeated.gear.forEach((g) => attacker.trash.push(g));
-      }
+      sendDefeatedUnitToGraveyardOrExile(attacker, defeated, state);
       state.actionLog.unshift(
-        `💥 [FASE 3: CONTRAATAQUE] "${attUnit.name}" tiene menor fuerza (${attPower} < ${defPower}) y es enviada a la Basura (Trash)${
+        `💥 [FASE 3: CONTRAATAQUE] "${attUnit.name}" tiene menor fuerza (${attPower} < ${defPower}) y es derrotada${
           defeated.gear?.length ? ` junto con ${defeated.gear.length} Gear(s)` : ''
         }.`
       );
@@ -984,30 +1109,24 @@ export function resolveFight(state, attPlayerKey, attUnit, defPlayerKey, defUnit
       };
     }
   } else {
-    // REGLA OFICIAL DE EMPATE: ¡Ambas unidades tienen la misma fuerza y van al Trash!
+    // REGLA OFICIAL DE EMPATE: ¡Ambas unidades tienen la misma fuerza y son derrotadas!
     if (attPower > 0 || defPower > 0) {
       const defIdx = defender.field.findIndex((u) => u.instanceId === defUnit.instanceId);
       let defeatedDef = null;
       if (defIdx !== -1) {
         [defeatedDef] = defender.field.splice(defIdx, 1);
-        defender.trash.push(defeatedDef);
-        if (defeatedDef.gear && defeatedDef.gear.length > 0) {
-          defeatedDef.gear.forEach((g) => defender.trash.push(g));
-        }
+        sendDefeatedUnitToGraveyardOrExile(defender, defeatedDef, state);
       }
       const attIdx = attacker.field.findIndex((u) => u.instanceId === attUnit.instanceId);
       let defeatedAtt = null;
       if (attIdx !== -1) {
         [defeatedAtt] = attacker.field.splice(attIdx, 1);
-        attacker.trash.push(defeatedAtt);
-        if (defeatedAtt.gear && defeatedAtt.gear.length > 0) {
-          defeatedAtt.gear.forEach((g) => attacker.trash.push(g));
-        }
+        sendDefeatedUnitToGraveyardOrExile(attacker, defeatedAtt, state);
       }
       if (defeatedDef) executeUnitDefeatedTrigger(state, defPlayerKey, defeatedDef);
       if (defeatedAtt) executeUnitDefeatedTrigger(state, attPlayerKey, defeatedAtt);
       state.actionLog.unshift(
-        `☠️ [FASE 3: EMPATE LETAL] (${attPower} vs ${defPower}): Ambas unidades tienen la misma fuerza: ¡AMBAS VAN A LA BASURA (TRASH)!`
+        `☠️ [FASE 3: EMPATE LETAL] (${attPower} vs ${defPower}): Ambas unidades tienen la misma fuerza: ¡AMBAS SON DERROTADAS!`
       );
       result = {
         ...result,
@@ -1161,16 +1280,22 @@ export function executeStartPhase(state, playerKey) {
   p.eddies.forEach((e) => (e.isSpent = false));
   p.floatingEddies = 0; // Reiniciar reserva de Eddies girados al inicio del turno
 
-  // Enderezar Leyendas:
+  // Enderezar Leyendas (solo las que no estén combatiendo en el campo de batalla ni eliminadas):
   if (p.legendsDoNotReadyTurn1) {
     // En Turno 1 del Jugador 1: las dos de la izquierda no se enderezan
-    if (p.legends[2]) p.legends[2].isSpent = false;
+    if (p.legends[2] && !p.legends[2].isOnField && !p.legends[2].isRemovedFromGame) {
+      p.legends[2].isSpent = false;
+    }
     p.legendsDoNotReadyTurn1 = false; // Se libera para su próximo turno
     state.actionLog.unshift(
       `🔒 Penalización de Turno 1: Tus 2 leyendas izquierdas permanecen giradas en este turno.`
     );
   } else {
-    p.legends.forEach((l) => (l.isSpent = false));
+    p.legends.forEach((l) => {
+      if (!l.isOnField && !l.isRemovedFromGame) {
+        l.isSpent = false;
+      }
+    });
   }
 
   // Enderezar Unidades y limpiar Lag

@@ -11,13 +11,15 @@ import {
   playCard,
   playUnitCard,
   callLegendFaceUp,
+  playLegendToField,
   attackRivalGigs,
   fightRivalUnit,
   resolveFight,
   passTurn,
   hasKeyword,
   calculateGigsToSteal,
-  isCardVendible
+  isCardVendible,
+  parseCardCost
 } from './cyberpunkEngine.js';
 import { executeUnitAttackTrigger } from './cardEffects.js';
 
@@ -189,6 +191,25 @@ export async function runBotTurn(gameState, updateCallback, delayMs = 700) {
       await wait(delayMs);
       botPrepareEddies(bot, 1, faceDownLegend.instanceId);
       callLegendFaceUp(gameState, 'bot', faceDownLegend.instanceId);
+      updateCallback({ ...gameState });
+    }
+  }
+
+  // Paso 2.B: Si tiene una leyenda con Go Solo disponible y suficiente capacidad, activar Go Solo
+  const goSoloLegend = (bot.legends || []).find(
+    (l) =>
+      !l.isOnField &&
+      !l.isRemovedFromGame &&
+      (l.isFaceUp || bot.hasCalledLegendThisTurn) &&
+      hasKeyword(l, 'Go Solo')
+  );
+  if (goSoloLegend) {
+    const cost = goSoloLegend.parsedCost || parseCardCost(goSoloLegend.cost) || goSoloLegend.costNum || 0;
+    const maxCapacity = getBotMaxCapacity(bot);
+    if (cost > 0 && maxCapacity >= cost) {
+      await wait(delayMs);
+      botPrepareEddies(bot, cost);
+      playLegendToField(gameState, 'bot', goSoloLegend.instanceId, true);
       updateCallback({ ...gameState });
     }
   }
