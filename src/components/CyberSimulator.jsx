@@ -821,8 +821,8 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
       `⚔️ [FASE 1: DECLARACIÓN DE ATAQUE] ${gameState.player.name} gira a "${selectedFieldUnit.name}" [Fuerza: ${selectedFieldUnit.currentPower}] y ataca a ${targetDesc}. (Trigger ATTACK ejecutado).`
     );
 
-    // Si el trigger de ataque disparó una elección de cartas interactiva (ej: Sketchy Ripper), pausar combate
-    if (gameState.pendingCardChoice) {
+    // Si el trigger de ataque disparó una elección interactiva (cartas o modal), pausar combate
+    if (gameState.pendingCardChoice || gameState.pendingModalChoice) {
       gameState.pendingAttackContinuation = {
         targetType,
         targetUnitId,
@@ -841,7 +841,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
     });
   };
 
-  // Resolver la elección interactiva de carta (ej: Sketchy Ripper, Viktor Vektor, Three Mouths, etc.)
+  // Resolver la elección interactiva de carta (ej: Sketchy Ripper, Viktor Vektor, Three Mouths, All Is Lost, Screw, etc.)
   const handleResolveCardChoice = (selectedCardIds = []) => {
     if (!gameState?.pendingCardChoice) return;
     const choice = gameState.pendingCardChoice;
@@ -849,35 +849,250 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
     const selectedCards = (choice.cards || []).filter((c) => selectedCardIds.includes(c.instanceId));
     const remainingCards = (choice.cards || []).filter((c) => !selectedCardIds.includes(c.instanceId));
 
-    // Añadir cartas seleccionadas al destino (ej: mano con distintivo recién robada)
+    // Si las cartas venían de TRASH o TRASH_FROM_DECK, quitar las seleccionadas del trash
+    if (choice.sourceZone === 'TRASH' || choice.sourceZone === 'TRASH_FROM_DECK') {
+      selectedCards.forEach((sc) => {
+        const idx = (p.trash || []).findIndex((tc) => tc.instanceId === sc.instanceId);
+        if (idx !== -1) p.trash.splice(idx, 1);
+      });
+    }
+
+    // Añadir cartas seleccionadas al destino (ej: mano o campo)
     if (choice.destination === 'HAND') {
       selectedCards.forEach((c) => {
         c.isJustDrawn = true;
         p.hand.push(c);
       });
+    } else if (choice.destination === 'FIELD') {
+      selectedCards.forEach((c) => {
+        p.field.push({
+          ...c,
+          isSpent: false,
+          isLagging: true,
+          currentPower: c.parsedPower || c.power || 1,
+          gear: []
+        });
+      });
     }
 
-    // Enviar las restantes a su destino (fondo de mazo o trash)
-    if (choice.remainingDestination === 'BOTTOM_DECK') {
-      if (!p.deck) p.deck = [];
-      p.deck.push(...remainingCards);
-    } else if (choice.remainingDestination === 'TRASH') {
-      if (!p.trash) p.trash = [];
-      p.trash.push(...remainingCards);
+    // Enviar las restantes a su destino (fondo de mazo o trash) si venían de DECK
+    if (choice.sourceZone === 'DECK' || !choice.sourceZone) {
+      if (choice.remainingDestination === 'BOTTOM_DECK') {
+        if (!p.deck) p.deck = [];
+        p.deck.push(...remainingCards);
+      } else if (choice.remainingDestination === 'TRASH') {
+        if (!p.trash) p.trash = [];
+        p.trash.push(...remainingCards);
+      }
     }
 
     if (selectedCards.length > 0) {
+      const destText = choice.destination === 'FIELD' ? 'y se desplegó al campo de batalla' : 'y se añadió a tu mano';
       gameState.actionLog.unshift(
-        `🃏 [${choice.sourceCardName}] Seleccionaste "${selectedCards.map((c) => c.name).join(', ')}" y se añadió a tu mano. El resto fue al fondo del mazo.`
+        `🃏 [${choice.sourceCardName}] Seleccionaste "${selectedCards.map((c) => c.name).join(', ')}" ${destText}.`
       );
     } else {
       gameState.actionLog.unshift(
-        `🔍 [${choice.sourceCardName}] No se seleccionó ninguna carta. Las cartas fueron enviadas al fondo del mazo.`
+        `🔍 [${choice.sourceCardName}] No se seleccionó ninguna carta (0 objetivos válidos o elección omitida).`
       );
     }
 
     const pendingAttack = gameState.pendingAttackContinuation;
     delete gameState.pendingCardChoice;
+    delete gameState.pendingAttackContinuation;
+
+    if (pendingAttack) {
+      continueAttackAfterTrigger(pendingAttack);
+    } else {
+      setGameState({ ...gameState });
+    }
+  };
+
+  // Resolver la elección modal interactiva (ej: Dexter DeShawn, Dum Dum, Muamar Reyes, Padre, Wakako Okada, etc.)
+  const handleResolveModalChoice = (optionId) => {
+    if (!gameState?.pendingModalChoice) return;
+    const choice = gameState.pendingModalChoice;
+    const p = gameState.player;
+    const opp = gameState.bot;
+
+    // Dexter DeShawn
+    if (optionId === 'DEXTER_BUFF') {
+      const target = p.field && p.field.length > 0 ? p.field[0] : null;
+      if (target) {
+        target.currentPower = (target.currentPower || target.power || 0) + 2;
+        gameState.actionLog.unshift(
+          `💼 [Dexter DeShawn] Otorgó +2 de poder a "${target.name}" este turno (Poder actual: ${target.currentPower}).`
+        );
+      }
+    } else if (optionId === 'DEXTER_DRAW') {
+      if (p.deck && p.deck.length > 0) {
+        const drawn = p.deck.shift();
+        drawn.isJustDrawn = true;
+        p.hand.push(drawn);
+        gameState.actionLog.unshift(
+          `💼 [Dexter DeShawn] Robaste 1 carta de tu mazo: "${drawn.name}".`
+        );
+      }
+    }
+
+    // Dum Dum
+    else if (optionId === 'DUMDUM_SAC_GEAR') {
+      let sacrificed = null;
+      for (const unit of p.field || []) {
+        if (unit.gear && unit.gear.length > 0) {
+          sacrificed = unit.gear.shift();
+          if (!p.trash) p.trash = [];
+          p.trash.push(sacrificed);
+          break;
+        }
+      }
+      const drawnCards = [];
+      for (let i = 0; i < 2 && p.deck && p.deck.length > 0; i++) {
+        const d = p.deck.shift();
+        d.isJustDrawn = true;
+        p.hand.push(d);
+        drawnCards.push(d.name);
+      }
+      gameState.actionLog.unshift(
+        `💉 [Dum Dum] Destruyó el Gear "${sacrificed?.name || 'Gear'}" y robó 2 cartas: ${drawnCards.join(', ')}.`
+      );
+    } else if (optionId === 'DUMDUM_DRAW') {
+      if (p.deck && p.deck.length > 0) {
+        const drawn = p.deck.shift();
+        drawn.isJustDrawn = true;
+        p.hand.push(drawn);
+        gameState.actionLog.unshift(
+          `💉 [Dum Dum] Robaste 1 carta: "${drawn.name}".`
+        );
+      }
+    }
+
+    // Muamar Reyes
+    else if (optionId === 'MUAMAR_PROTECT') {
+      const target = p.field && p.field.length > 0 ? p.field[0] : null;
+      if (target) {
+        target.cannotBeDefeatedThisTurn = true;
+        gameState.actionLog.unshift(
+          `🚗 [Muamar Reyes] "${target.name}" no podrá ser derrotada en combate este turno.`
+        );
+      }
+    } else if (optionId === 'MUAMAR_DRAW') {
+      if (p.deck && p.deck.length > 0) {
+        const drawn = p.deck.shift();
+        drawn.isJustDrawn = true;
+        p.hand.push(drawn);
+        gameState.actionLog.unshift(
+          `🚗 [Muamar Reyes] Robaste 1 carta: "${drawn.name}".`
+        );
+      }
+    }
+
+    // Padre
+    else if (optionId === 'PADRE_SPEND_RIVAL') {
+      const target = (opp.field || []).find((u) => !u.isSpent) || opp.field?.[0];
+      if (target) {
+        target.isSpent = true;
+        gameState.actionLog.unshift(
+          `✝️ [Padre] Giró (Spend) a la unidad rival "${target.name}".`
+        );
+      }
+    } else if (optionId === 'PADRE_DRAW') {
+      if (p.deck && p.deck.length > 0) {
+        const drawn = p.deck.shift();
+        drawn.isJustDrawn = true;
+        p.hand.push(drawn);
+        gameState.actionLog.unshift(
+          `✝️ [Padre] Robaste 1 carta: "${drawn.name}".`
+        );
+      }
+    }
+
+    // Wakako Okada
+    else if (optionId === 'WAKAKO_DEBUFF_RIVAL') {
+      const target = opp.field && opp.field.length > 0 ? opp.field[0] : null;
+      if (target) {
+        target.currentPower = Math.max(0, (target.currentPower || target.power || 0) - 2);
+        gameState.actionLog.unshift(
+          `🌸 [Wakako Okada] Redujo el poder de la unidad rival "${target.name}" en 2 (Poder actual: ${target.currentPower}).`
+        );
+      }
+    } else if (optionId === 'WAKAKO_DRAW') {
+      if (p.deck && p.deck.length > 0) {
+        const drawn = p.deck.shift();
+        drawn.isJustDrawn = true;
+        p.hand.push(drawn);
+        gameState.actionLog.unshift(
+          `🌸 [Wakako Okada] Robaste 1 carta: "${drawn.name}".`
+        );
+      }
+    }
+
+    // Pyramid Song
+    else if (optionId === 'PYRAMID_DEBUFF') {
+      const target = opp.field && opp.field.length > 0 ? opp.field[0] : null;
+      if (target) {
+        target.currentPower = Math.max(0, (target.currentPower || target.power || 0) - 4);
+        gameState.actionLog.unshift(
+          `🌊 [Pyramid Song] Redujo el poder de "${target.name}" en 4 este turno.`
+        );
+      }
+    } else if (optionId === 'PYRAMID_BOTTOM_ZERO') {
+      const zeroIdx = (opp.field || []).findIndex((u) => (u.currentPower || 0) === 0);
+      if (zeroIdx !== -1) {
+        const [dead] = opp.field.splice(zeroIdx, 1);
+        if (!opp.deck) opp.deck = [];
+        opp.deck.push(dead);
+        gameState.actionLog.unshift(
+          `🌊 [Pyramid Song] Envió a "${dead.name}" (poder 0) al fondo del mazo rival.`
+        );
+      }
+    }
+
+    // Towerfall
+    else if (optionId === 'TOWERFALL_DEBUFF_ALL') {
+      (opp.field || []).forEach((u) => {
+        u.currentPower = Math.max(0, (u.currentPower || 0) - 5);
+      });
+      gameState.actionLog.unshift(
+        `🏢 [Towerfall] Redujo el poder de todas las unidades rivales en 5 este turno.`
+      );
+    } else if (optionId === 'TOWERFALL_BOTTOM_ZEROS') {
+      for (let i = (opp.field?.length || 0) - 1; i >= 0; i--) {
+        if ((opp.field[i].currentPower || 0) === 0) {
+          const [dead] = opp.field.splice(i, 1);
+          if (!opp.deck) opp.deck = [];
+          opp.deck.push(dead);
+          gameState.actionLog.unshift(
+            `🏢 [Towerfall] "${dead.name}" (poder 0) fue enviada al fondo del mazo rival.`
+          );
+        }
+      }
+    }
+
+    // Nocturne Op55N1
+    else if (optionId === 'NOCTURNE_DRAW_2') {
+      const drawnCards = [];
+      for (let i = 0; i < 2 && p.deck && p.deck.length > 0; i++) {
+        const d = p.deck.shift();
+        d.isJustDrawn = true;
+        p.hand.push(d);
+        drawnCards.push(d.name);
+      }
+      gameState.actionLog.unshift(
+        `🎶 [Nocturne Op55N1] Robaste 2 cartas: ${drawnCards.join(', ')}.`
+      );
+    } else if (optionId === 'NOCTURNE_FREEZE_RIVAL') {
+      const target = opp.field && opp.field.length > 0 ? opp.field[0] : null;
+      if (target) {
+        target.cannotAttackUntilNextTurn = true;
+        gameState.actionLog.unshift(
+          `🎶 [Nocturne Op55N1] "${target.name}" no podrá atacar hasta tu próximo turno.`
+        );
+      }
+    }
+
+    const pendingAttack = gameState.pendingAttackContinuation;
+    delete gameState.pendingModalChoice;
     delete gameState.pendingAttackContinuation;
 
     if (pendingAttack) {
@@ -4380,74 +4595,81 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                 </div>
               </div>
 
-              {/* Grid de cartas reveladas */}
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 py-2 justify-items-center">
-                {(choice.cards || []).map((card) => {
-                  const isEligible = eligibleIds.has(card.instanceId);
-                  const isSelected = selectedIds.includes(card.instanceId);
+              {/* Grid de cartas reveladas o Estado Vacío */}
+              {(choice.cards || []).length > 0 ? (
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 py-2 justify-items-center">
+                  {(choice.cards || []).map((card) => {
+                    const isEligible = eligibleIds.has(card.instanceId);
+                    const isSelected = selectedIds.includes(card.instanceId);
 
-                  return (
-                    <div
-                      key={card.instanceId}
-                      onClick={() => {
-                        if (!isEligible) return;
-                        let next;
-                        if (isSelected) {
-                          next = selectedIds.filter((id) => id !== card.instanceId);
-                        } else {
-                          if (selectedIds.length >= choice.maxChoices) {
-                            next = choice.maxChoices === 1 ? [card.instanceId] : selectedIds;
+                    return (
+                      <div
+                        key={card.instanceId}
+                        onClick={() => {
+                          if (!isEligible) return;
+                          let next;
+                          if (isSelected) {
+                            next = selectedIds.filter((id) => id !== card.instanceId);
                           } else {
-                            next = [...selectedIds, card.instanceId];
+                            if (selectedIds.length >= choice.maxChoices) {
+                              next = choice.maxChoices === 1 ? [card.instanceId] : selectedIds;
+                            } else {
+                              next = [...selectedIds, card.instanceId];
+                            }
                           }
-                        }
-                        setGameState((prev) => ({
-                          ...prev,
-                          pendingCardChoice: {
-                            ...prev.pendingCardChoice,
-                            selectedIds: next
-                          }
-                        }));
-                      }}
-                      onContextMenu={(e) => handleCardRightClick(e, card)}
-                      title="Clic izq para seleccionar // Clic DERECHO para ver en PANTALLA COMPLETA"
-                      className={`relative w-28 sm:w-32 aspect-[7/10] rounded overflow-hidden border-2 transition-all duration-200 flex flex-col justify-between ${
-                        !isEligible
-                          ? 'border-gray-800 opacity-40 cursor-not-allowed grayscale'
-                          : isSelected
-                          ? 'border-[#0dfceb] ring-2 ring-[#0dfceb] shadow-[0_0_20px_rgba(13,252,235,0.8)] -translate-y-1.5 cursor-pointer'
-                          : 'border-gray-700 hover:border-[#0dfceb] cursor-pointer hover:scale-105'
-                      }`}
-                    >
-                      <img src={card.image} alt={card.name} className="w-full h-full object-cover" />
+                          setGameState((prev) => ({
+                            ...prev,
+                            pendingCardChoice: {
+                              ...prev.pendingCardChoice,
+                              selectedIds: next
+                            }
+                          }));
+                        }}
+                        onContextMenu={(e) => handleCardRightClick(e, card)}
+                        title="Clic izq para seleccionar // Clic DERECHO para ver en PANTALLA COMPLETA"
+                        className={`relative w-28 sm:w-32 aspect-[7/10] rounded overflow-hidden border-2 transition-all duration-200 flex flex-col justify-between ${
+                          !isEligible
+                            ? 'border-gray-800 opacity-40 cursor-not-allowed grayscale'
+                            : isSelected
+                            ? 'border-[#0dfceb] ring-2 ring-[#0dfceb] shadow-[0_0_20px_rgba(13,252,235,0.8)] -translate-y-1.5 cursor-pointer'
+                            : 'border-gray-700 hover:border-[#0dfceb] cursor-pointer hover:scale-105'
+                        }`}
+                      >
+                        <img src={card.image} alt={card.name} className="w-full h-full object-cover" />
 
-                      {/* Badge superior */}
-                      <div className="absolute top-1 inset-x-1 flex items-center justify-between">
-                        <span className="px-1 py-0.2 bg-black/90 text-[7px] text-gray-300 rounded font-black uppercase">
-                          {card.officialType || 'CARD'}
-                        </span>
-                        {isSelected && (
-                          <span className="px-1.5 py-0.5 bg-[#0dfceb] text-black font-black text-[9px] rounded-full shadow">
-                            ✓ ELEGIDA
+                        {/* Badge superior */}
+                        <div className="absolute top-1 inset-x-1 flex items-center justify-between">
+                          <span className="px-1 py-0.2 bg-black/90 text-[7px] text-gray-300 rounded font-black uppercase">
+                            {card.officialType || 'CARD'}
                           </span>
-                        )}
-                        {!isEligible && (
-                          <span className="px-1 py-0.2 bg-[#FF003C] text-white text-[7px] font-black uppercase rounded">
-                            NO VÁLIDA
-                          </span>
-                        )}
-                      </div>
+                          {isSelected && (
+                            <span className="px-1.5 py-0.5 bg-[#0dfceb] text-black font-black text-[9px] rounded-full shadow">
+                              ✓ ELEGIDA
+                            </span>
+                          )}
+                          {!isEligible && (
+                            <span className="px-1 py-0.2 bg-[#FF003C] text-white text-[7px] font-black uppercase rounded">
+                              NO VÁLIDA
+                            </span>
+                          )}
+                        </div>
 
-                      {/* Pie de carta */}
-                      <div className="absolute bottom-0 inset-x-0 bg-black/90 p-1 border-t border-gray-800 text-center">
-                        <span className="text-[8px] font-bold text-white uppercase truncate block">
-                          {card.name}
-                        </span>
+                        {/* Pie de carta */}
+                        <div className="absolute bottom-0 inset-x-0 bg-black/90 p-1 border-t border-gray-800 text-center">
+                          <span className="text-[8px] font-bold text-white uppercase truncate block">
+                            {card.name}
+                          </span>
+                        </div>
                       </div>
-                    </div>
-                  );
-                })}
-              </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="p-6 text-center border border-dashed border-gray-700 rounded bg-black/40 my-2">
+                  <p className="text-sm text-[#FF003C] font-bold uppercase tracking-wider">⚠️ ZONA SIN CARTAS DISPONIBLES</p>
+                  <p className="text-xs text-gray-400 mt-1">El efecto del trigger se ha disparado correctamente, pero no hay cartas disponibles en el mazo o zona para examinar.</p>
+                </div>
+              )}
 
               {/* Botón de Confirmación */}
               <div className="pt-2 border-t border-[#0dfceb]/30 flex items-center justify-between">
@@ -4466,11 +4688,148 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                   }`}
                 >
                   {hasEligible && selectedIds.length > 0
-                    ? `AÑADIR A LA MANO (${selectedIds.length})`
+                    ? `${choice.destination === 'FIELD' ? 'DESPLEGAR AL CAMPO' : 'AÑADIR A LA MANO'} (${selectedIds.length})`
                     : hasEligible
                     ? 'SELECCIONA UNA CARTA'
+                    : (choice.cards || []).length === 0
+                    ? 'CONTINUAR (0 CARTAS)'
                     : 'NO HAY COINCIDENCIAS // CONTINUAR'}
                 </button>
+              </div>
+            </motion.div>
+          </div>
+        );
+      })()}
+
+      {/* 5.6.b. MODAL INTERACTIVO DE ELECCIÓN DE EFECTO (MODAL TRIGGERS: DEXTER, DUM DUM, MUAMAR, PADRE, WAKAKO, PYRAMID, ETC.) */}
+      {gameState?.pendingModalChoice && (() => {
+        const choice = gameState.pendingModalChoice;
+        const options = choice.options || [];
+        const hasAnyEligible = options.some((opt) => opt.isEligible);
+
+        return (
+          <div className="fixed inset-0 z-50 bg-[#000000]/90 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 font-mono select-none">
+            <motion.div
+              initial={{ scale: 0.94, opacity: 0, y: 15 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              style={{ clipPath: CYBER_CLIP }}
+              className="max-w-xl w-full bg-[#070a10]/98 border-2 border-[#0dfceb] p-5 space-y-4 shadow-[0_0_60px_rgba(13,252,235,0.45)] relative max-h-[90vh] overflow-y-auto cyber-scrollbar"
+            >
+              {/* Cabecera */}
+              <div className="flex items-center justify-between border-b border-[#0dfceb]/40 pb-2.5">
+                <div className="flex items-center gap-2">
+                  <span className="w-3 h-3 bg-[#0dfceb] rounded-full animate-ping" />
+                  <span className="text-xs sm:text-sm font-black uppercase tracking-wider text-[#0dfceb]">
+                    {choice.title}
+                  </span>
+                </div>
+                <span className="text-[10px] text-[#FCEE0A] uppercase font-bold tracking-widest">
+                  TRIGGER DISPARADO
+                </span>
+              </div>
+
+              {/* Tarjeta origen e Instrucción */}
+              <div className="bg-[#000000] border border-[#0dfceb]/40 p-3 rounded flex items-center gap-3">
+                {choice.sourceCardImage && (
+                  <div
+                    onClick={() => handleCardRightClick(null, { name: choice.sourceCardName, image: choice.sourceCardImage })}
+                    onContextMenu={(e) => handleCardRightClick(e, { name: choice.sourceCardName, image: choice.sourceCardImage })}
+                    className="w-14 h-20 rounded border border-[#0dfceb] overflow-hidden shrink-0 bg-black cursor-pointer hover:scale-105 transition-transform"
+                    title="Clic para ver carta en PANTALLA COMPLETA"
+                  >
+                    <img src={choice.sourceCardImage} alt={choice.sourceCardName} className="w-full h-full object-cover" />
+                  </div>
+                )}
+                <div>
+                  <h4 className="text-xs font-black text-[#FCEE0A] uppercase">{choice.sourceCardName}</h4>
+                  <p className="text-xs text-white leading-relaxed mt-1">
+                    {choice.prompt}
+                  </p>
+                  <span className="text-[9px] text-gray-400 block mt-1">
+                    Haz clic en una opción elegible para ejecutarla. Si una opción carece de objetivos válidos, se mostrará atenuada en gris.
+                  </span>
+                </div>
+              </div>
+
+              {/* Lista de Opciones */}
+              <div className="space-y-3 py-1">
+                {options.map((opt, idx) => {
+                  const isEligible = opt.isEligible;
+                  return (
+                    <div
+                      key={opt.id}
+                      onClick={() => {
+                        if (isEligible) handleResolveModalChoice(opt.id);
+                      }}
+                      className={`p-3.5 rounded border-2 transition-all flex items-center justify-between gap-3 ${
+                        isEligible
+                          ? 'border-[#0dfceb]/60 hover:border-[#0dfceb] bg-[#0dfceb]/5 hover:bg-[#0dfceb]/15 cursor-pointer shadow-[0_0_15px_rgba(13,252,235,0.15)] group'
+                          : 'border-red-900/40 bg-red-950/20 opacity-50 cursor-not-allowed grayscale'
+                      }`}
+                    >
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <span className={`px-1.5 py-0.5 text-[8px] font-black rounded uppercase ${
+                            isEligible ? 'bg-[#0dfceb] text-black' : 'bg-red-800 text-white'
+                          }`}>
+                            OPCIÓN {idx + 1}
+                          </span>
+                          <span className="text-xs font-black text-white uppercase group-hover:text-[#0dfceb] transition-colors">
+                            {opt.title}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-gray-300 leading-snug">
+                          {opt.description}
+                        </p>
+                        {!isEligible && (
+                          <span className="inline-block text-[9px] text-[#FF003C] font-bold mt-1">
+                            ⚠️ {opt.ineligibleReason || 'Sin objetivos válidos en este momento'}
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="shrink-0">
+                        {isEligible ? (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleResolveModalChoice(opt.id);
+                            }}
+                            style={{ clipPath: CYBER_BUTTON }}
+                            className="px-3 py-1.5 bg-[#0dfceb] hover:bg-white text-black font-black text-[10px] uppercase shadow-[0_0_15px_rgba(13,252,235,0.6)] cursor-pointer"
+                          >
+                            ELEGIR
+                          </button>
+                        ) : (
+                          <span className="px-2 py-1 bg-red-900/40 border border-red-700/60 text-red-300 text-[9px] font-bold rounded uppercase">
+                            NO ELEGIBLE
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Pie con botón de omisión si ninguna opción es aplicable */}
+              <div className="pt-2 border-t border-[#0dfceb]/30 flex items-center justify-between">
+                <span className="text-[10px] text-gray-400">
+                  {hasAnyEligible ? 'Selecciona una opción activa para continuar' : 'Ninguna opción tiene objetivos válidos'}
+                </span>
+                {!hasAnyEligible && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      delete gameState.pendingModalChoice;
+                      setGameState({ ...gameState });
+                    }}
+                    style={{ clipPath: CYBER_BUTTON }}
+                    className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-white font-mono font-black text-xs uppercase cursor-pointer border border-gray-600"
+                  >
+                    CONTINUAR SIN EFECTO
+                  </button>
+                )}
               </div>
             </motion.div>
           </div>

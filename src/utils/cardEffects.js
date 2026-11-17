@@ -106,14 +106,33 @@ export function executeProgramEffect(state, playerKey, card) {
   // "Trash 3. Add a Unit from among them to your hand."
   if (cardId === 'CP-006') {
     const trashed = trashFromDeck(p, 3, state, cardName);
-    const unitIdx = trashed.findIndex((c) => c.officialType === 'UNIT' || c.type?.includes('UNIT'));
-    if (unitIdx !== -1) {
-      const unit = trashed.splice(unitIdx, 1)[0];
-      p.hand.push(unit);
-      // Quitarlo del trash también
-      const tIdx = p.trash.lastIndexOf(unit);
-      if (tIdx !== -1) p.trash.splice(tIdx, 1);
-      state.actionLog.unshift(`🔎 [All Is Lost] Recupera la Unidad "${unit.name}" a la mano.`);
+    const eligibleUnits = trashed.filter((c) => c.officialType === 'UNIT' || c.type?.includes('UNIT'));
+    if (playerKey === 'player') {
+      state.pendingCardChoice = {
+        type: 'TRASH_AND_CHOOSE',
+        sourceZone: 'TRASH_FROM_DECK',
+        sourceCardId: 'CP-006',
+        sourceCardName: 'All Is Lost',
+        sourceCardImage: card.image,
+        title: '☠️ ALL IS LOST // PROGRAMA',
+        prompt: trashed.length > 0
+          ? 'Has enviado cartas de tu mazo a la Basura. Selecciona 1 Unidad entre ellas para recuperarla a tu mano:'
+          : 'Tu mazo está vacío. No hay cartas que enviar a la Basura.',
+        cards: trashed,
+        eligibleIds: eligibleUnits.map((c) => c.instanceId),
+        maxChoices: 1,
+        minChoices: eligibleUnits.length > 0 ? 1 : 0,
+        filterDescription: 'Solo cartas de tipo Unidad',
+        destination: 'HAND'
+      };
+    } else {
+      if (eligibleUnits.length > 0) {
+        const [unit] = eligibleUnits;
+        const tIdx = p.trash.lastIndexOf(unit);
+        if (tIdx !== -1) p.trash.splice(tIdx, 1);
+        p.hand.push(unit);
+        state.actionLog.unshift(`🔎 [All Is Lost Rival] Recupera la Unidad "${unit.name}" a la mano.`);
+      }
     }
     return { executed: true };
   }
@@ -351,9 +370,36 @@ export function executeProgramEffect(state, playerKey, card) {
   }
 
   // CP-085: Nocturne Op55N1
-  // "Draw 2."
+  // "Choose one effect. Draw 2. // A Unit can't attack until your next turn."
   if (cardId === 'CP-085') {
-    drawCards(p, 2, state, cardName);
+    const hasRivalUnits = (opp.field || []).length > 0;
+    if (playerKey === 'player') {
+      state.pendingModalChoice = {
+        sourceCardId: 'CP-085',
+        sourceCardName: 'Nocturne Op55N1',
+        sourceCardImage: card.image,
+        title: '🎶 NOCTURNE OP55N1 // PROGRAMA: ELIGE UN EFECTO',
+        prompt: 'Elige uno de los efectos oficiales del Programa Nocturne Op55N1:',
+        options: [
+          {
+            id: 'NOCTURNE_DRAW_2',
+            title: 'ROBAR 2 CARTAS',
+            description: 'Roba 2 cartas de tu mazo a tu mano.',
+            isEligible: (p.deck || []).length > 0,
+            ineligibleReason: 'Tu mazo está vacío.'
+          },
+          {
+            id: 'NOCTURNE_FREEZE_RIVAL',
+            title: 'CONGELAR UNIDAD RIVAL',
+            description: 'Una unidad rival no puede atacar hasta tu próximo turno.',
+            isEligible: hasRivalUnits,
+            ineligibleReason: 'El rival no tiene unidades en su campo de batalla.'
+          }
+        ]
+      };
+    } else {
+      drawCards(p, 2, state, cardName);
+    }
     return { executed: true };
   }
 
@@ -386,16 +432,53 @@ export function executeProgramEffect(state, playerKey, card) {
   }
 
   // CP-098: Pyramid Song
-  // "Give a rival Unit -4 power this turn. Bottom-deck a rival Unit with power 0."
+  // "Choose one effect. If a friendly d4 is a min Gig, choose both instead. Give a rival Unit -4 power this turn. // Bottom-deck a rival Unit with power 0."
   if (cardId === 'CP-098') {
-    if (opp.field && opp.field.length > 0) {
-      opp.field[0].currentPower = Math.max(0, (opp.field[0].currentPower || 0) - 4);
-      state.actionLog.unshift(`🌊 [Pyramid Song] Reduce el poder de "${opp.field[0].name}" en 4.`);
-      if (opp.field[0].currentPower === 0) {
-        const [dead] = opp.field.splice(0, 1);
-        if (!opp.deck) opp.deck = [];
-        opp.deck.push(dead);
-        state.actionLog.unshift(`🌊 [Pyramid Song] Al tener 0 de poder, "${dead.name}" va al fondo del mazo.`);
+    const hasMinD4 = (p.gigs || []).some((g) => g.die.toLowerCase() === 'd4' && g.value === 1);
+    const hasRivalUnits = (opp.field || []).length > 0;
+    const hasZeroPowerRival = (opp.field || []).some((u) => (u.currentPower || 0) === 0);
+
+    if (hasMinD4) {
+      state.actionLog.unshift(`🌊 [Pyramid Song] ¡Condición de dado d4 mínimo activa! Se ejecutan AMBOS efectos.`);
+      if (hasRivalUnits) {
+        opp.field[0].currentPower = Math.max(0, (opp.field[0].currentPower || 0) - 4);
+        state.actionLog.unshift(`🌊 [Pyramid Song] Reduce el poder de "${opp.field[0].name}" en 4.`);
+      }
+      for (let i = (opp.field?.length || 0) - 1; i >= 0; i--) {
+        if ((opp.field[i].currentPower || 0) === 0) {
+          const [dead] = opp.field.splice(i, 1);
+          if (!opp.deck) opp.deck = [];
+          opp.deck.push(dead);
+          state.actionLog.unshift(`🌊 [Pyramid Song] Al tener 0 de poder, "${dead.name}" va al fondo del mazo.`);
+        }
+      }
+    } else if (playerKey === 'player') {
+      state.pendingModalChoice = {
+        sourceCardId: 'CP-098',
+        sourceCardName: 'Pyramid Song',
+        sourceCardImage: card.image,
+        title: '🌊 PYRAMID SONG // PROGRAMA: ELIGE UN EFECTO',
+        prompt: 'Elige uno de los dos efectos oficiales de Pyramid Song:',
+        options: [
+          {
+            id: 'PYRAMID_DEBUFF',
+            title: 'DEBILITAR UNIDAD RIVAL (-4 PODER)',
+            description: 'Reduce el poder de una unidad rival en 4 este turno.',
+            isEligible: hasRivalUnits,
+            ineligibleReason: 'El rival no tiene unidades en su campo de batalla.'
+          },
+          {
+            id: 'PYRAMID_BOTTOM_ZERO',
+            title: 'BOTTOM-DECK A UNIDAD CON 0 DE PODER',
+            description: 'Envía una unidad rival con poder 0 al fondo de su mazo.',
+            isEligible: hasZeroPowerRival,
+            ineligibleReason: 'El rival no tiene ninguna unidad con poder 0.'
+          }
+        ]
+      };
+    } else {
+      if (hasRivalUnits) {
+        opp.field[0].currentPower = Math.max(0, (opp.field[0].currentPower || 0) - 4);
       }
     }
     return { executed: true };
@@ -453,13 +536,33 @@ export function executeProgramEffect(state, playerKey, card) {
   // "Trash 4. Add a Gear from among them to your hand."
   if (cardId === 'CP-127') {
     const trashed = trashFromDeck(p, 4, state, cardName);
-    const gearIdx = trashed.findIndex((c) => c.officialType === 'GEAR' || c.type?.includes('GEAR'));
-    if (gearIdx !== -1) {
-      const gear = trashed.splice(gearIdx, 1)[0];
-      p.hand.push(gear);
-      const tIdx = p.trash.lastIndexOf(gear);
-      if (tIdx !== -1) p.trash.splice(tIdx, 1);
-      state.actionLog.unshift(`💎 [The Heist] ¡Encontró el Gear "${gear.name}"! Añadido a la mano.`);
+    const eligibleGears = trashed.filter((c) => c.officialType === 'GEAR' || c.type?.includes('GEAR'));
+    if (playerKey === 'player') {
+      state.pendingCardChoice = {
+        type: 'TRASH_AND_CHOOSE',
+        sourceZone: 'TRASH_FROM_DECK',
+        sourceCardId: 'CP-127',
+        sourceCardName: 'The Heist',
+        sourceCardImage: card.image,
+        title: '💎 THE HEIST // PROGRAMA',
+        prompt: trashed.length > 0
+          ? 'Has enviado 4 cartas de tu mazo a la Basura. Selecciona 1 Gear entre ellas para añadirlo a tu mano:'
+          : 'Tu mazo está vacío. No hay cartas que enviar a la Basura.',
+        cards: trashed,
+        eligibleIds: eligibleGears.map((c) => c.instanceId),
+        maxChoices: 1,
+        minChoices: eligibleGears.length > 0 ? 1 : 0,
+        filterDescription: 'Solo cartas de tipo Gear',
+        destination: 'HAND'
+      };
+    } else {
+      if (eligibleGears.length > 0) {
+        const [gear] = eligibleGears;
+        const tIdx = p.trash.lastIndexOf(gear);
+        if (tIdx !== -1) p.trash.splice(tIdx, 1);
+        p.hand.push(gear);
+        state.actionLog.unshift(`💎 [The Heist Rival] ¡Encontró el Gear "${gear.name}"! Añadido a su mano.`);
+      }
     }
     return { executed: true };
   }
@@ -467,48 +570,88 @@ export function executeProgramEffect(state, playerKey, card) {
   // CP-129: Three Mouths, One Desire
   // "Search the top 3 cards of your deck. Add 1 to your hand. Bottom-deck the rest."
   if (cardId === 'CP-129') {
-    if (p.deck && p.deck.length > 0) {
-      const top3 = p.deck.splice(0, Math.min(3, p.deck.length));
-      if (playerKey === 'player') {
-        state.pendingCardChoice = {
-          type: 'SEARCH_AND_CHOOSE',
-          sourceCardId: 'CP-129',
-          sourceCardName: 'Three Mouths, One Desire',
-          sourceCardImage: card.image,
-          title: '🎭 THREE MOUTHS, ONE DESIRE // PROGRAM',
-          prompt: 'Se han revelado las 3 primeras cartas de tu mazo. Selecciona 1 carta para añadir a tu mano (el resto irá al fondo del mazo):',
-          cards: top3,
-          eligibleIds: top3.map((c) => c.instanceId),
-          maxChoices: 1,
-          minChoices: 1,
-          filterDescription: 'Cualquier carta',
-          remainingDestination: 'BOTTOM_DECK',
-          destination: 'HAND'
-        };
-      } else {
+    const top3 = (p.deck || []).splice(0, Math.min(3, p.deck?.length || 0));
+    if (playerKey === 'player') {
+      state.pendingCardChoice = {
+        type: 'SEARCH_AND_CHOOSE',
+        sourceZone: 'DECK',
+        sourceCardId: 'CP-129',
+        sourceCardName: 'Three Mouths, One Desire',
+        sourceCardImage: card.image,
+        title: '🎭 THREE MOUTHS, ONE DESIRE // PROGRAMA',
+        prompt: top3.length > 0
+          ? 'Se han revelado las 3 primeras cartas de tu mazo. Selecciona 1 carta para añadir a tu mano (el resto irá al fondo del mazo):'
+          : 'Tu mazo está vacío. No hay cartas que examinar.',
+        cards: top3,
+        eligibleIds: top3.map((c) => c.instanceId),
+        maxChoices: 1,
+        minChoices: top3.length > 0 ? 1 : 0,
+        filterDescription: 'Cualquier carta',
+        remainingDestination: 'BOTTOM_DECK',
+        destination: 'HAND'
+      };
+    } else {
+      if (top3.length > 0) {
         const chosen = top3.shift();
         p.hand.push(chosen);
         p.deck.push(...top3);
-        state.actionLog.unshift(`🎭 [Three Mouths, One Desire] El rival añade "${chosen.name}" a su mano.`);
+        state.actionLog.unshift(`🎭 [Three Mouths, One Desire Rival] Añade "${chosen.name}" a su mano.`);
       }
     }
     return { executed: true };
   }
 
   // CP-130: Towerfall
-  // "Give all rival Units -5 power this turn. Bottom-deck all rival Units with power 0."
+  // "Choose one effect. If you have less ☆ (Street Cred) than a Rival, choose both instead. Give all rival Units -5 power this turn. // Bottom-deck all rival Units with power 0."
   if (cardId === 'CP-130') {
-    (opp.field || []).forEach((u) => {
-      u.currentPower = Math.max(0, (u.currentPower || 0) - 5);
-    });
-    state.actionLog.unshift(`🏢 [Towerfall] Reduce el poder de todas las unidades rivales en 5.`);
-    for (let i = (opp.field?.length || 0) - 1; i >= 0; i--) {
-      if (opp.field[i].currentPower === 0) {
-        const [dead] = opp.field.splice(i, 1);
-        if (!opp.deck) opp.deck = [];
-        opp.deck.push(dead);
-        state.actionLog.unshift(`🏢 [Towerfall] "${dead.name}" cae a 0 de poder y va al fondo del mazo.`);
+    const myCred = (p.gigs || []).reduce((s, g) => s + (g.value || 0), 0);
+    const oppCred = (opp.gigs || []).reduce((s, g) => s + (g.value || 0), 0);
+    const hasLessCred = myCred < oppCred;
+    const hasRivalUnits = (opp.field || []).length > 0;
+    const hasZeroUnits = (opp.field || []).some((u) => (u.currentPower || 0) === 0);
+
+    if (hasLessCred) {
+      state.actionLog.unshift(`🏢 [Towerfall] ¡Tienes menor Credibilidad en la Calle que el rival! Se ejecutan AMBOS efectos.`);
+      (opp.field || []).forEach((u) => {
+        u.currentPower = Math.max(0, (u.currentPower || 0) - 5);
+      });
+      state.actionLog.unshift(`🏢 [Towerfall] Reduce el poder de todas las unidades rivales en 5.`);
+      for (let i = (opp.field?.length || 0) - 1; i >= 0; i--) {
+        if ((opp.field[i].currentPower || 0) === 0) {
+          const [dead] = opp.field.splice(i, 1);
+          if (!opp.deck) opp.deck = [];
+          opp.deck.push(dead);
+          state.actionLog.unshift(`🏢 [Towerfall] "${dead.name}" cae a 0 de poder y va al fondo del mazo.`);
+        }
       }
+    } else if (playerKey === 'player') {
+      state.pendingModalChoice = {
+        sourceCardId: 'CP-130',
+        sourceCardName: 'Towerfall',
+        sourceCardImage: card.image,
+        title: '🏢 TOWERFALL // PROGRAMA: ELIGE UN EFECTO',
+        prompt: 'Elige uno de los dos efectos oficiales de Towerfall:',
+        options: [
+          {
+            id: 'TOWERFALL_DEBUFF_ALL',
+            title: 'DEBILITAR A TODAS LAS UNIDADES RIVALES (-5 PODER)',
+            description: 'Reduce el poder de todas las unidades rivales en 5 este turno.',
+            isEligible: hasRivalUnits,
+            ineligibleReason: 'El rival no tiene unidades en su campo de batalla.'
+          },
+          {
+            id: 'TOWERFALL_BOTTOM_ZEROS',
+            title: 'BOTTOM-DECK A UNIDADES CON 0 DE PODER',
+            description: 'Envía todas las unidades rivales con poder 0 al fondo de su mazo.',
+            isEligible: hasZeroUnits,
+            ineligibleReason: 'El rival no tiene ninguna unidad con poder 0.'
+          }
+        ]
+      };
+    } else {
+      (opp.field || []).forEach((u) => {
+        u.currentPower = Math.max(0, (u.currentPower || 0) - 5);
+      });
     }
     return { executed: true };
   }
@@ -544,14 +687,38 @@ export function executeProgramEffect(state, playerKey, card) {
   // CP-144: We Gotta Live Together
   // "Play up to 2 Units with cost 3 or less from your trash for free."
   if (cardId === 'CP-144') {
-    let revived = 0;
-    for (let i = (p.trash?.length || 0) - 1; i >= 0 && revived < 2; i--) {
-      const c = p.trash[i];
-      if ((c.officialType === 'UNIT' || c.type?.includes('UNIT')) && (c.costNum || c.cost || 0) <= 3) {
-        const [unit] = p.trash.splice(i, 1);
-        p.field.push({ ...unit, isSpent: false, isLagging: true, currentPower: unit.parsedPower || 1, gear: [] });
-        revived++;
-        state.actionLog.unshift(`⛺ [We Gotta Live Together] Rescata y despliega a "${unit.name}" gratis desde la Basura.`);
+    const allTrash = p.trash || [];
+    const eligibleUnits = allTrash.filter(
+      (c) => (c.officialType === 'UNIT' || c.type?.includes('UNIT')) && (c.costNum || c.cost || 0) <= 3
+    );
+    if (playerKey === 'player') {
+      state.pendingCardChoice = {
+        type: 'CHOOSE_FROM_TRASH',
+        sourceZone: 'TRASH',
+        sourceCardId: 'CP-144',
+        sourceCardName: 'We Gotta Live Together',
+        sourceCardImage: card.image,
+        title: '⛺ WE GOTTA LIVE TOGETHER // PROGRAMA',
+        prompt: allTrash.length > 0
+          ? 'Selecciona hasta 2 Unidades con coste ≤ 3 €$ de tu Basura para desplegarlas gratis:'
+          : 'Tu Basura está vacía.',
+        cards: allTrash,
+        eligibleIds: eligibleUnits.map((c) => c.instanceId),
+        maxChoices: 2,
+        minChoices: 0,
+        filterDescription: 'Unidades en Basura con coste ≤ 3 €$',
+        destination: 'FIELD'
+      };
+    } else {
+      let revived = 0;
+      for (let i = (p.trash?.length || 0) - 1; i >= 0 && revived < 2; i--) {
+        const c = p.trash[i];
+        if ((c.officialType === 'UNIT' || c.type?.includes('UNIT')) && (c.costNum || c.cost || 0) <= 3) {
+          const [unit] = p.trash.splice(i, 1);
+          p.field.push({ ...unit, isSpent: false, isLagging: true, currentPower: unit.parsedPower || 1, gear: [] });
+          revived++;
+          state.actionLog.unshift(`⛺ [We Gotta Live Together Rival] Despliega a "${unit.name}" gratis desde la Basura.`);
+        }
       }
     }
     return { executed: true };
@@ -645,13 +812,33 @@ export function executeUnitPlayTrigger(state, playerKey, unitInstance) {
   // "PLAY Trash 3. Add a Program from among them to your hand."
   if (cardId === 'CP-044') {
     const trashed = trashFromDeck(p, 3, state, cardName);
-    const progIdx = trashed.findIndex((c) => c.officialType === 'PROGRAM' || c.type?.includes('PROGRAM'));
-    if (progIdx !== -1) {
-      const prog = trashed.splice(progIdx, 1)[0];
-      p.hand.push(prog);
-      const tIdx = p.trash.lastIndexOf(prog);
-      if (tIdx !== -1) p.trash.splice(tIdx, 1);
-      state.actionLog.unshift(`💻 [Hacked Corpo] Añade el Programa "${prog.name}" a la mano.`);
+    const eligibleProgs = trashed.filter((c) => c.officialType === 'PROGRAM' || c.type?.includes('PROGRAM'));
+    if (playerKey === 'player') {
+      state.pendingCardChoice = {
+        type: 'TRASH_AND_CHOOSE',
+        sourceZone: 'TRASH_FROM_DECK',
+        sourceCardId: 'CP-044',
+        sourceCardName: 'Hacked Corpo',
+        sourceCardImage: unitInstance.image,
+        title: '💻 HACKED CORPO // HABILIDAD PLAY',
+        prompt: trashed.length > 0
+          ? 'Has enviado 3 cartas de tu mazo a la Basura. Selecciona 1 Programa entre ellas para añadir a tu mano:'
+          : 'Tu mazo está vacío. No hay cartas que enviar a la Basura.',
+        cards: trashed,
+        eligibleIds: eligibleProgs.map((c) => c.instanceId),
+        maxChoices: 1,
+        minChoices: eligibleProgs.length > 0 ? 1 : 0,
+        filterDescription: 'Solo cartas de tipo Programa',
+        destination: 'HAND'
+      };
+    } else {
+      if (eligibleProgs.length > 0) {
+        const [prog] = eligibleProgs;
+        const tIdx = p.trash.lastIndexOf(prog);
+        if (tIdx !== -1) p.trash.splice(tIdx, 1);
+        p.hand.push(prog);
+        state.actionLog.unshift(`💻 [Hacked Corpo Rival] Añade el Programa "${prog.name}" a su mano.`);
+      }
     }
   }
 
@@ -807,38 +994,39 @@ export function executeUnitAttackTrigger(state, playerKey, attackerUnit) {
 
   // CP-121: Sketchy Ripper
   if (cardId === 'CP-121' || attackerUnit.name.includes('Sketchy Ripper')) {
-    if (p.deck && p.deck.length > 0) {
-      const examined = p.deck.splice(0, Math.min(3, p.deck.length));
-      const gears = examined.filter((c) => c.officialType === 'GEAR' || c.type?.includes('GEAR'));
+    const examined = (p.deck || []).splice(0, Math.min(3, p.deck?.length || 0));
+    const gears = examined.filter((c) => c.officialType === 'GEAR' || c.type?.includes('GEAR'));
 
-      if (playerKey === 'player') {
-        state.pendingCardChoice = {
-          type: 'SEARCH_AND_CHOOSE',
-          sourceCardId: 'CP-121',
-          sourceCardName: attackerUnit.name,
-          sourceCardImage: attackerUnit.image,
-          title: '🔧 SKETCHY RIPPER // HABILIDAD ATTACK',
-          prompt: 'Se han revelado las 3 primeras cartas de tu mazo. Selecciona 1 Gear para añadir a tu mano (el resto irá al fondo de tu mazo):',
-          cards: examined,
-          eligibleIds: gears.map((g) => g.instanceId),
-          maxChoices: 1,
-          minChoices: gears.length > 0 ? 1 : 0,
-          filterDescription: 'Solo cartas de tipo Gear',
-          remainingDestination: 'BOTTOM_DECK',
-          destination: 'HAND'
-        };
+    if (playerKey === 'player') {
+      state.pendingCardChoice = {
+        type: 'SEARCH_AND_CHOOSE',
+        sourceZone: 'DECK',
+        sourceCardId: 'CP-121',
+        sourceCardName: attackerUnit.name,
+        sourceCardImage: attackerUnit.image,
+        title: '🔧 SKETCHY RIPPER // HABILIDAD ATTACK',
+        prompt: examined.length > 0
+          ? 'Se han examinado las 3 cartas superiores de tu mazo. Selecciona 1 Gear para añadir a tu mano (el resto irá al fondo de tu mazo):'
+          : 'Tu mazo está vacío. No hay cartas que examinar.',
+        cards: examined,
+        eligibleIds: gears.map((g) => g.instanceId),
+        maxChoices: 1,
+        minChoices: gears.length > 0 ? 1 : 0,
+        filterDescription: 'Solo cartas de tipo Gear',
+        remainingDestination: 'BOTTOM_DECK',
+        destination: 'HAND'
+      };
+    } else {
+      // Bot auto-resolves
+      if (gears.length > 0) {
+        const found = gears[0];
+        const remaining = examined.filter((c) => c.instanceId !== found.instanceId);
+        p.hand.push(found);
+        p.deck.push(...remaining);
+        state.actionLog.unshift(`🔧 [Sketchy Ripper] ¡El rival encontró "${found.name}"! Añadido a su mano.`);
       } else {
-        // Bot auto-resolves
-        if (gears.length > 0) {
-          const found = gears[0];
-          const remaining = examined.filter((c) => c.instanceId !== found.instanceId);
-          p.hand.push(found);
-          p.deck.push(...remaining);
-          state.actionLog.unshift(`🔧 [Sketchy Ripper] ¡El rival encontró "${found.name}"! Añadido a su mano.`);
-        } else {
-          p.deck.push(...examined);
-          state.actionLog.unshift(`🔍 [Sketchy Ripper] El rival revisó 3 cartas pero no encontró ningún Gear.`);
-        }
+        p.deck.push(...examined);
+        state.actionLog.unshift(`🔍 [Sketchy Ripper] El rival revisó 3 cartas pero no encontró ningún Gear.`);
       }
     }
   }
@@ -952,11 +1140,36 @@ export function executeUnitDefeatedTrigger(state, ownerKey, defeatedUnit) {
 
   // CP-118: Screw // Lovelorn Fool
   if (cardId === 'CP-118') {
-    const unitIdx = (p.trash || []).findIndex((c) => c.officialType === 'UNIT' || c.type?.includes('UNIT'));
-    if (unitIdx !== -1) {
-      const [recovered] = p.trash.splice(unitIdx, 1);
-      p.hand.push(recovered);
-      state.actionLog.unshift(`💔 [Screw] Recupera a "${recovered.name}" del Trash a la mano.`);
+    const allTrash = p.trash || [];
+    const eligibleUnits = allTrash.filter(
+      (c) => (c.officialType === 'UNIT' || c.type?.includes('UNIT')) && c.instanceId !== defeatedUnit.instanceId
+    );
+    if (ownerKey === 'player') {
+      state.pendingCardChoice = {
+        type: 'CHOOSE_FROM_TRASH',
+        sourceZone: 'TRASH',
+        sourceCardId: 'CP-118',
+        sourceCardName: 'Screw // Lovelorn Fool',
+        sourceCardImage: defeatedUnit.image,
+        title: '💔 SCREW // HABILIDAD DEFEATED',
+        prompt: allTrash.length > 0
+          ? 'Screw ha sido derrotado. Selecciona otra Unidad de tu Basura para añadirla a tu mano:'
+          : 'Tu Basura está vacía.',
+        cards: allTrash,
+        eligibleIds: eligibleUnits.map((c) => c.instanceId),
+        maxChoices: 1,
+        minChoices: eligibleUnits.length > 0 ? 1 : 0,
+        filterDescription: 'Solo Unidades de tu Basura (distintas de Screw)',
+        destination: 'HAND'
+      };
+    } else {
+      if (eligibleUnits.length > 0) {
+        const [recovered] = eligibleUnits;
+        const idx = p.trash.findIndex((c) => c.instanceId === recovered.instanceId);
+        if (idx !== -1) p.trash.splice(idx, 1);
+        p.hand.push(recovered);
+        state.actionLog.unshift(`💔 [Screw Rival] Recupera a "${recovered.name}" del Trash a la mano.`);
+      }
     }
   }
 
@@ -974,20 +1187,24 @@ export function executeUnitDefeatedTrigger(state, ownerKey, defeatedUnit) {
   const hasEquippedGear = defeatedUnit.gear && defeatedUnit.gear.length > 0;
   if (hasEquippedGear) {
     const riverWard = (p.legends || []).find((l) => l.isFaceUp && (l.id === 'CP-104' || l.slug?.includes('river-ward')));
-    if (riverWard && p.deck && p.deck.length > 0) {
-      const top2 = p.deck.splice(0, Math.min(2, p.deck.length));
+    if (riverWard) {
+      const top2 = (p.deck || []).splice(0, Math.min(2, p.deck?.length || 0));
       if (ownerKey === 'player') {
         state.pendingCardChoice = {
           type: 'SEARCH_AND_CHOOSE',
+          sourceZone: 'DECK',
           sourceCardId: 'CP-104',
           sourceCardName: 'River Ward',
           sourceCardImage: riverWard.image || '',
           title: '🔫 RIVER WARD // INVESTIGACIÓN NCPD',
-          prompt: 'Tu unidad equipada ha sido derrotada. Selecciona 1 de las 2 cartas superiores de tu mazo para añadir a tu mano (la otra irá al Trash):',
+          prompt: top2.length > 0
+            ? 'Tu unidad equipada ha sido derrotada. Selecciona 1 de las 2 cartas superiores de tu mazo para añadir a tu mano (la otra irá al Trash):'
+            : 'Tu mazo está vacío. No hay cartas que examinar.',
           cards: top2,
           eligibleIds: top2.map((c) => c.instanceId),
           filterDescription: 'Cualquier carta (1 a la mano, 1 al Trash)',
           maxChoices: 1,
+          minChoices: top2.length > 0 ? 1 : 0,
           destination: 'HAND',
           remainingDestination: 'TRASH'
         };
@@ -1008,78 +1225,277 @@ export function executeUnitDefeatedTrigger(state, ownerKey, defeatedUnit) {
 export function executeCallLegendTrigger(state, playerKey, legendCard) {
   if (!state || !legendCard) return;
   const p = state[playerKey];
+  const oppKey = playerKey === 'player' ? 'bot' : 'player';
+  const opp = state[oppKey];
   const cardId = legendCard.id || '';
   const cardName = legendCard.name || 'Leyenda';
 
   // CP-026: Dexter DeShawn // Off the Grid
-  if (cardId === 'CP-026') {
-    drawCards(p, 1, state, cardName);
+  // "CALL Choose one effect. Give a friendly Unit +2 power this turn. // Draw 1."
+  if (cardId === 'CP-026' || legendCard.slug?.includes('dexter-deshawn')) {
+    const hasFriendlyUnit = (p.field || []).length > 0;
+    if (playerKey === 'player') {
+      state.pendingModalChoice = {
+        sourceCardId: 'CP-026',
+        sourceCardName: 'Dexter DeShawn // Off the Grid',
+        sourceCardImage: legendCard.image,
+        title: '💼 DEXTER DESHAWN // CALL: ELIGE UN EFECTO',
+        prompt: 'Elige uno de los dos efectos oficiales de la habilidad CALL de Dexter DeShawn:',
+        options: [
+          {
+            id: 'DEXTER_BUFF',
+            title: 'POTENCIAR UNIDAD (+2 PODER)',
+            description: 'Otorga +2 de poder a una unidad amiga este turno.',
+            isEligible: hasFriendlyUnit,
+            ineligibleReason: 'No controlas ninguna unidad en tu campo de batalla.'
+          },
+          {
+            id: 'DEXTER_DRAW',
+            title: 'ROBAR 1 CARTA',
+            description: 'Roba 1 carta de tu mazo a tu mano.',
+            isEligible: (p.deck || []).length > 0,
+            ineligibleReason: 'Tu mazo está vacío.'
+          }
+        ]
+      };
+    } else {
+      if (hasFriendlyUnit) {
+        p.field[0].currentPower = (p.field[0].currentPower || 0) + 2;
+        state.actionLog.unshift(`💼 [Dexter DeShawn Rival] Otorga +2 de poder a "${p.field[0].name}".`);
+      } else {
+        drawCards(p, 1, state, cardName);
+      }
+    }
   }
 
   // CP-029: Dum Dum // Maelstrom Triggerman
-  if (cardId === 'CP-029') {
-    drawCards(p, 1, state, cardName);
+  // "CALL You may defeat a friendly Gear. If you do, draw 2. Otherwise, draw 1."
+  if (cardId === 'CP-029' || legendCard.slug?.includes('dum-dum')) {
+    const hasGear = (p.field || []).some((u) => u.gear && u.gear.length > 0);
+    if (playerKey === 'player') {
+      state.pendingModalChoice = {
+        sourceCardId: 'CP-029',
+        sourceCardName: 'Dum Dum // Maelstrom Triggerman',
+        sourceCardImage: legendCard.image,
+        title: '💉 DUM DUM // CALL: ELIGE UN EFECTO',
+        prompt: 'Puedes destruir un Gear equipado para robar 2 cartas, o bien robar 1 carta directamente:',
+        options: [
+          {
+            id: 'DUMDUM_SAC_GEAR',
+            title: 'DESTRUIR UN GEAR AMIGO Y ROBAR 2 CARTAS',
+            description: 'Envía 1 Gear equipado a una unidad amiga a la Basura y roba 2 cartas.',
+            isEligible: hasGear,
+            ineligibleReason: 'No tienes ninguna unidad con un Gear equipado.'
+          },
+          {
+            id: 'DUMDUM_DRAW',
+            title: 'ROBAR 1 CARTA',
+            description: 'Roba 1 carta de tu mazo directamente.',
+            isEligible: (p.deck || []).length > 0,
+            ineligibleReason: 'Tu mazo está vacío.'
+          }
+        ]
+      };
+    } else {
+      if (hasGear) {
+        for (const u of p.field || []) {
+          if (u.gear && u.gear.length > 0) {
+            const [g] = u.gear.splice(0, 1);
+            if (!p.trash) p.trash = [];
+            p.trash.push(g);
+            break;
+          }
+        }
+        drawCards(p, 2, state, cardName);
+      } else {
+        drawCards(p, 1, state, cardName);
+      }
+    }
   }
 
   // CP-082: Muamar Reyes // El Capitán
-  if (cardId === 'CP-082') {
-    drawCards(p, 1, state, cardName);
+  // "CALL Choose one effect. A friendly Unit can't be defeated in a fight this turn. // Draw 1."
+  if (cardId === 'CP-082' || legendCard.slug?.includes('muamar-reyes')) {
+    const hasFriendlyUnit = (p.field || []).length > 0;
+    if (playerKey === 'player') {
+      state.pendingModalChoice = {
+        sourceCardId: 'CP-082',
+        sourceCardName: 'Muamar Reyes // El Capitán',
+        sourceCardImage: legendCard.image,
+        title: '🚗 MUAMAR REYES // CALL: ELIGE UN EFECTO',
+        prompt: 'Elige uno de los dos efectos oficiales de la habilidad CALL de El Capitán:',
+        options: [
+          {
+            id: 'MUAMAR_PROTECT',
+            title: 'INMUNIDAD EN COMBATE',
+            description: 'Una unidad amiga no puede ser derrotada en un combate este turno.',
+            isEligible: hasFriendlyUnit,
+            ineligibleReason: 'No controlas ninguna unidad en tu campo de batalla.'
+          },
+          {
+            id: 'MUAMAR_DRAW',
+            title: 'ROBAR 1 CARTA',
+            description: 'Roba 1 carta de tu mazo a la mano.',
+            isEligible: (p.deck || []).length > 0,
+            ineligibleReason: 'Tu mazo está vacío.'
+          }
+        ]
+      };
+    } else {
+      if (hasFriendlyUnit) {
+        p.field[0].cannotBeDefeatedThisTurn = true;
+        state.actionLog.unshift(`🚗 [Muamar Reyes Rival] Inmuniza a "${p.field[0].name}" en combate este turno.`);
+      } else {
+        drawCards(p, 1, state, cardName);
+      }
+    }
   }
 
   // CP-091: Padre // Man of the Cross
-  if (cardId === 'CP-091') {
-    drawCards(p, 1, state, cardName);
+  // "CALL Choose one effect. Spend a rival Unit. // Draw 1."
+  if (cardId === 'CP-091' || legendCard.slug?.includes('padre')) {
+    const hasRivalUnits = (opp.field || []).length > 0;
+    const hasReadyRival = (opp.field || []).some((u) => !u.isSpent);
+    if (playerKey === 'player') {
+      state.pendingModalChoice = {
+        sourceCardId: 'CP-091',
+        sourceCardName: 'Padre // Man of the Cross',
+        sourceCardImage: legendCard.image,
+        title: '✝️ PADRE // CALL: ELIGE UN EFECTO',
+        prompt: 'Elige uno de los dos efectos oficiales de la habilidad CALL del Padre:',
+        options: [
+          {
+            id: 'PADRE_SPEND_RIVAL',
+            title: 'GIRAR UNIDAD RIVAL (SPEND)',
+            description: 'Gira (Spend) una unidad del rival para agotarla.',
+            isEligible: hasReadyRival,
+            ineligibleReason: hasRivalUnits ? 'Todas las unidades rivales ya están giradas.' : 'El rival no tiene unidades en campo.'
+          },
+          {
+            id: 'PADRE_DRAW',
+            title: 'ROBAR 1 CARTA',
+            description: 'Roba 1 carta de tu mazo a la mano.',
+            isEligible: (p.deck || []).length > 0,
+            ineligibleReason: 'Tu mazo está vacío.'
+          }
+        ]
+      };
+    } else {
+      const readyRival = (opp.field || []).find((u) => !u.isSpent);
+      if (readyRival) {
+        readyRival.isSpent = true;
+        state.actionLog.unshift(`✝️ [Padre Rival] Gira (Spend) a tu unidad "${readyRival.name}".`);
+      } else {
+        drawCards(p, 1, state, cardName);
+      }
+    }
   }
 
   // CP-137: V // Streetkid
-  if (cardId === 'CP-137') {
+  if (cardId === 'CP-137' || legendCard.slug?.includes('streetkid')) {
     trashFromDeck(p, 3, state, cardName);
-    const progIdx = (p.trash || []).findIndex((c) => c.officialType === 'PROGRAM' || c.type?.includes('PROGRAM'));
-    if (progIdx !== -1) {
-      const [prog] = p.trash.splice(progIdx, 1);
-      p.hand.push(prog);
-      state.actionLog.unshift(`🌆 [V // Streetkid] Recupera el Programa "${prog.name}" a la mano.`);
+    const allTrash = p.trash || [];
+    const eligibleProgs = allTrash.filter((c) => c.officialType === 'PROGRAM' || c.type?.includes('PROGRAM'));
+    if (playerKey === 'player') {
+      state.pendingCardChoice = {
+        type: 'CHOOSE_FROM_TRASH',
+        sourceZone: 'TRASH',
+        sourceCardId: 'CP-137',
+        sourceCardName: 'V // Streetkid',
+        sourceCardImage: legendCard.image,
+        title: '🌆 V // STREETKID // HABILIDAD CALL',
+        prompt: allTrash.length > 0
+          ? 'Has enviado 3 cartas al Trash. Selecciona 1 Programa de tu Basura para añadirlo a tu mano:'
+          : 'Tu Basura está vacía.',
+        cards: allTrash,
+        eligibleIds: eligibleProgs.map((c) => c.instanceId),
+        maxChoices: 1,
+        minChoices: eligibleProgs.length > 0 ? 1 : 0,
+        filterDescription: 'Solo Programas de tu Basura',
+        destination: 'HAND'
+      };
+    } else {
+      if (eligibleProgs.length > 0) {
+        const [prog] = eligibleProgs;
+        const idx = p.trash.findIndex((c) => c.instanceId === prog.instanceId);
+        if (idx !== -1) p.trash.splice(idx, 1);
+        p.hand.push(prog);
+        state.actionLog.unshift(`🌆 [V // Streetkid Rival] Recupera el Programa "${prog.name}" a la mano.`);
+      }
     }
   }
 
   // CP-141: Viktor Vektor // Sit Down and Relax
-  if (cardId === 'CP-141') {
-    if (p.deck && p.deck.length > 0) {
-      const top5 = p.deck.splice(0, Math.min(5, p.deck.length));
-      const eligibleGears = top5.filter(
-        (c) => (c.officialType === 'GEAR' || c.type?.includes('GEAR')) && (c.costNum || 0) <= 2
-      );
-      if (playerKey === 'player') {
-        state.pendingCardChoice = {
-          type: 'SEARCH_AND_CHOOSE',
-          sourceCardId: 'CP-141',
-          sourceCardName: 'Viktor Vektor',
-          sourceCardImage: legendCard?.image || '',
-          title: '👓 VIKTOR VEKTOR // HABILIDAD CALL',
-          prompt: 'Se han examinado las 5 primeras cartas de tu mazo. Selecciona hasta 2 Gears con coste ≤ 2 €$ para añadir a tu mano (el resto irá al fondo del mazo):',
-          cards: top5,
-          eligibleIds: eligibleGears.map((g) => g.instanceId),
-          maxChoices: 2,
-          minChoices: 0,
-          filterDescription: 'Gears con coste ≤ 2 €$',
-          remainingDestination: 'BOTTOM_DECK',
-          destination: 'HAND'
-        };
-      } else {
-        const chosen = eligibleGears.slice(0, 2);
-        const remaining = top5.filter((c) => !chosen.some((g) => g.instanceId === c.instanceId));
-        p.hand.push(...chosen);
-        p.deck.push(...remaining);
-        if (chosen.length > 0) {
-          state.actionLog.unshift(`👓 [Viktor Vektor] El rival añadió ${chosen.length} Gear(s) a su mano.`);
-        }
+  if (cardId === 'CP-141' || legendCard.slug?.includes('sit-down')) {
+    const top5 = (p.deck || []).splice(0, Math.min(5, p.deck?.length || 0));
+    const eligibleGears = top5.filter(
+      (c) => (c.officialType === 'GEAR' || c.type?.includes('GEAR')) && (c.costNum || 0) <= 2
+    );
+    if (playerKey === 'player') {
+      state.pendingCardChoice = {
+        type: 'SEARCH_AND_CHOOSE',
+        sourceZone: 'DECK',
+        sourceCardId: 'CP-141',
+        sourceCardName: 'Viktor Vektor',
+        sourceCardImage: legendCard?.image || '',
+        title: '👓 VIKTOR VEKTOR // HABILIDAD CALL',
+        prompt: top5.length > 0
+          ? 'Se han examinado las cartas superiores de tu mazo. Selecciona hasta 2 Gears con coste ≤ 2 €$ para añadir a tu mano (el resto irá al fondo del mazo):'
+          : 'Tu mazo está vacío. No hay cartas que examinar.',
+        cards: top5,
+        eligibleIds: eligibleGears.map((g) => g.instanceId),
+        maxChoices: 2,
+        minChoices: 0,
+        filterDescription: 'Gears con coste ≤ 2 €$',
+        remainingDestination: 'BOTTOM_DECK',
+        destination: 'HAND'
+      };
+    } else {
+      const chosen = eligibleGears.slice(0, 2);
+      const remaining = top5.filter((c) => !chosen.some((g) => g.instanceId === c.instanceId));
+      p.hand.push(...chosen);
+      p.deck.push(...remaining);
+      if (chosen.length > 0) {
+        state.actionLog.unshift(`👓 [Viktor Vektor] El rival añadió ${chosen.length} Gear(s) a su mano.`);
       }
     }
   }
 
   // CP-143: Wakako Okada // Peace and Harmony
-  if (cardId === 'CP-143') {
-    drawCards(p, 1, state, cardName);
+  if (cardId === 'CP-143' || legendCard.slug?.includes('wakako-okada')) {
+    const hasRivalUnits = (opp.field || []).length > 0;
+    if (playerKey === 'player') {
+      state.pendingModalChoice = {
+        sourceCardId: 'CP-143',
+        sourceCardName: 'Wakako Okada // Peace and Harmony',
+        sourceCardImage: legendCard.image,
+        title: '🌸 WAKAKO OKADA // CALL: ELIGE UN EFECTO',
+        prompt: 'Elige uno de los dos efectos oficiales de la habilidad CALL de Wakako Okada:',
+        options: [
+          {
+            id: 'WAKAKO_DEBUFF_RIVAL',
+            title: 'DEBILITAR UNIDAD RIVAL (-2 PODER)',
+            description: 'Reduce el poder de una unidad rival en 2 este turno.',
+            isEligible: hasRivalUnits,
+            ineligibleReason: 'El rival no tiene unidades en su campo de batalla.'
+          },
+          {
+            id: 'WAKAKO_DRAW',
+            title: 'ROBAR 1 CARTA',
+            description: 'Roba 1 carta de tu mazo a la mano.',
+            isEligible: (p.deck || []).length > 0,
+            ineligibleReason: 'Tu mazo está vacío.'
+          }
+        ]
+      };
+    } else {
+      if (hasRivalUnits) {
+        opp.field[0].currentPower = Math.max(0, (opp.field[0].currentPower || 0) - 2);
+        state.actionLog.unshift(`🌸 [Wakako Okada Rival] Reduce el poder de "${opp.field[0].name}" en 2.`);
+      } else {
+        drawCards(p, 1, state, cardName);
+      }
+    }
   }
 }
 
