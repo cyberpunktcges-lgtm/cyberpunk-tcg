@@ -968,6 +968,37 @@ export function executeUnitDefeatedTrigger(state, ownerKey, defeatedUnit) {
       state.actionLog.unshift(`🐛 [T-Bug] Llama gratis a la Leyenda "${faceDownLegend.name}".`);
     }
   }
+
+  // CP-104: River Ward // Detective on the Hunt (Habilidad Pasiva)
+  // "When a friendly equipped Unit is defeated, search the top 2 cards of your deck and trash 1."
+  const hasEquippedGear = defeatedUnit.gear && defeatedUnit.gear.length > 0;
+  if (hasEquippedGear) {
+    const riverWard = (p.legends || []).find((l) => l.isFaceUp && (l.id === 'CP-104' || l.slug?.includes('river-ward')));
+    if (riverWard && p.deck && p.deck.length > 0) {
+      const top2 = p.deck.splice(0, Math.min(2, p.deck.length));
+      if (ownerKey === 'player') {
+        state.pendingCardChoice = {
+          type: 'SEARCH_AND_CHOOSE',
+          sourceCardId: 'CP-104',
+          sourceCardName: 'River Ward',
+          sourceCardImage: riverWard.image || '',
+          title: '🔫 RIVER WARD // INVESTIGACIÓN NCPD',
+          prompt: 'Tu unidad equipada ha sido derrotada. Selecciona 1 de las 2 cartas superiores de tu mazo para añadir a tu mano (la otra irá al Trash):',
+          cards: top2,
+          eligibleIds: top2.map((c) => c.instanceId),
+          filterDescription: 'Cualquier carta (1 a la mano, 1 al Trash)',
+          maxChoices: 1,
+          destination: 'HAND',
+          remainingDestination: 'TRASH'
+        };
+      } else {
+        const [toHand, toTrash] = top2;
+        if (toHand) p.hand.push(toHand);
+        if (toTrash) p.trash.push(toTrash);
+        state.actionLog.unshift(`🔫 [River Ward Rival] Investiga las 2 primeras cartas: 1 a la mano y 1 al Trash.`);
+      }
+    }
+  }
 }
 
 // =========================================================================
@@ -1099,4 +1130,82 @@ export function executeEndOfTurnTriggers(state, playerKey) {
       drawCards(p, 1, state, 'V // Roamer of the Badlands');
     }
   }
+}
+
+// =========================================================================
+// 9. MOTOR DE ACTIVACIÓN DE LEYENDAS (ACTIVATED ABILITIES: ↷ / QUICK)
+// =========================================================================
+
+export function executeLegendAbility(state, playerKey, legendCard) {
+  if (!state || !legendCard) return { success: false, reason: 'Leyenda no válida' };
+  const p = state[playerKey];
+  const cardId = legendCard.id || '';
+
+  // CP-104: River Ward // Detective on the Hunt
+  // "QUICK ↷ Play a Gear with cost 2 or less from your hand for free."
+  if (cardId === 'CP-104' || legendCard.slug?.includes('river-ward')) {
+    if (!legendCard.isFaceUp) {
+      return { success: false, reason: 'River Ward debe estar boca arriba para activar su habilidad.' };
+    }
+    if (legendCard.isSpent) {
+      return { success: false, reason: 'River Ward ya está girada en este turno.' };
+    }
+    const eligibleGears = (p.hand || []).filter(
+      (c) => (c.officialType === 'GEAR' || c.type?.includes('GEAR')) && (c.costNum || c.parsedCost || 0) <= 2
+    );
+    if (eligibleGears.length === 0) {
+      return { success: false, reason: 'No tienes ningún Gear con coste ≤ 2 €$ en tu mano.' };
+    }
+    if ((p.field || []).length === 0) {
+      return { success: false, reason: 'No tienes unidades en juego para equiparles el Gear.' };
+    }
+    return { success: true, type: 'RIVER_WARD_EQUIP', eligibleGears };
+  }
+
+  // CP-057: Judy Álvarez // Braindance Maestro
+  // "↷ Trash the top card of your deck. If it's a Program, you may add it to your hand."
+  if (cardId === 'CP-057' || legendCard.slug?.includes('judy-alvarez')) {
+    if (!legendCard.isFaceUp || legendCard.isSpent) {
+      return { success: false, reason: 'Judy Álvarez ya está girada o boca abajo.' };
+    }
+    legendCard.isSpent = true;
+    if (p.deck && p.deck.length > 0) {
+      const [trashed] = p.deck.splice(0, 1);
+      const isProg = trashed.officialType === 'PROGRAM' || trashed.type?.includes('PROGRAM');
+      if (isProg) {
+        trashed.isJustDrawn = true;
+        p.hand.push(trashed);
+        state.actionLog.unshift(`🧠 [Judy Álvarez] Descarta "${trashed.name}" del mazo: ¡Es un PROGRAMA y se añade a tu mano!`);
+      } else {
+        p.trash.push(trashed);
+        state.actionLog.unshift(`🧠 [Judy Álvarez] Descarta "${trashed.name}" del mazo al Trash (no es Programa).`);
+      }
+      return { success: true, message: `Habilidad ejecutada con "${trashed.name}".` };
+    }
+    return { success: false, reason: 'El mazo está vacío.' };
+  }
+
+  // CP-026: Dexter DeShawn // Off the Grid ("↷: Increase a Gig by up to 2")
+  if (cardId === 'CP-026' || legendCard.slug?.includes('dexter-deshawn')) {
+    if (!legendCard.isFaceUp || legendCard.isSpent) return { success: false, reason: 'Dexter ya está girado o boca abajo.' };
+    if ((p.gigs || []).length === 0) return { success: false, reason: 'No controlas ningún Gig para aumentar.' };
+    legendCard.isSpent = true;
+    const gig = p.gigs[0];
+    gig.value = Math.min(20, (gig.value || 0) + 2);
+    state.actionLog.unshift(`💼 [Dexter DeShawn] Aumenta el valor de tu Gig ${gig.dieType.toUpperCase()} en +2 (Nuevo valor: ${gig.value}).`);
+    return { success: true, message: `Gig ${gig.dieType.toUpperCase()} aumentado en +2.` };
+  }
+
+  // CP-143: Wakako Okada // Peace and Harmony ("↷: Decrease a Gig by up to 2")
+  if (cardId === 'CP-143' || legendCard.slug?.includes('wakako-okada')) {
+    if (!legendCard.isFaceUp || legendCard.isSpent) return { success: false, reason: 'Wakako ya está girada o boca abajo.' };
+    if ((p.gigs || []).length === 0) return { success: false, reason: 'No controlas ningún Gig para reducir.' };
+    legendCard.isSpent = true;
+    const gig = p.gigs[0];
+    gig.value = Math.max(1, (gig.value || 0) - 2);
+    state.actionLog.unshift(`🌸 [Wakako Okada] Reduce el valor de tu Gig ${gig.dieType.toUpperCase()} en -2 (Nuevo valor: ${gig.value}).`);
+    return { success: true, message: `Gig ${gig.dieType.toUpperCase()} reducido en -2.` };
+  }
+
+  return { success: false, reason: 'Esta leyenda no tiene habilidad activada disponible.' };
 }

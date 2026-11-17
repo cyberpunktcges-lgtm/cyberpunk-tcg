@@ -187,8 +187,9 @@ export function createInitialGameState(playerDeckInput, botDeckInput, allCards =
     };
   };
 
-  // 1. Preparar mazo y leyendas del jugador
-  const playerLegends = (playerDeckInput.legends || []).slice(0, 3).map((l, idx) =>
+  // 1. Preparar mazo y leyendas del jugador (posicionadas aleatoriamente al inicio)
+  const shuffledRawPlayerLegends = shuffleDeck([...(playerDeckInput.legends || [])]).slice(0, 3);
+  const playerLegends = shuffledRawPlayerLegends.map((l, idx) =>
     enrichLegend(l, 'p', idx, idx < 2)
   );
 
@@ -202,8 +203,9 @@ export function createInitialGameState(playerDeckInput, botDeckInput, allCards =
   });
   const shuffledPlayerDeck = shuffleDeck(rawPlayerCards);
 
-  // 2. Preparar mazo y leyendas del Bot (jugador 2: no sufre penalización de leyendas)
-  const botLegends = (botDeckInput.legends || []).slice(0, 3).map((l, idx) =>
+  // 2. Preparar mazo y leyendas del Bot (posicionadas aleatoriamente al inicio)
+  const shuffledRawBotLegends = shuffleDeck([...(botDeckInput.legends || [])]).slice(0, 3);
+  const botLegends = shuffledRawBotLegends.map((l, idx) =>
     enrichLegend(l, 'b', idx, false)
   );
 
@@ -395,20 +397,11 @@ export function toggleEddieSpent(state, playerKey, eddieInstanceId) {
     );
     return { success: true, isSpent: true, floatingEddies: p.floatingEddies };
   } else {
-    // Intentar enderezar (cancelar)
-    if ((p.floatingEddies || 0) > 0) {
-      ed.isSpent = false;
-      p.floatingEddies = Math.max(0, p.floatingEddies - 1);
-      (state.actionLog = state.actionLog || []).unshift(
-        `💶 ${p.name} endereza 1 carta en su Zona de Eddies (-1 €$). Total listos: ${p.floatingEddies} €$.`
-      );
-      return { success: true, isSpent: false, floatingEddies: p.floatingEddies };
-    } else {
-      return {
-        success: false,
-        reason: 'Esta carta de Eddies ya ha sido consumida este turno para pagar cartas.'
-      };
-    }
+    // REGLA: No se puede enderezar manualmente. Si el jugador se equivoca, debe usar DESHACER.
+    return {
+      success: false,
+      reason: 'Las cartas no se pueden enderezar manualmente. Si te has equivocado, usa el botón DESHACER (1 solo uso).'
+    };
   }
 }
 
@@ -431,20 +424,11 @@ export function toggleLegendSpent(state, playerKey, legendInstanceId) {
     );
     return { success: true, isSpent: true, floatingEddies: p.floatingEddies };
   } else {
-    // Intentar enderezar (cancelar)
-    if ((p.floatingEddies || 0) > 0) {
-      leg.isSpent = false;
-      p.floatingEddies = Math.max(0, p.floatingEddies - 1);
-      (state.actionLog = state.actionLog || []).unshift(
-        `👑 ${p.name} endereza a su Leyenda "${leg.name}" (-1 €$). Total listos: ${p.floatingEddies} €$.`
-      );
-      return { success: true, isSpent: false, floatingEddies: p.floatingEddies };
-    } else {
-      return {
-        success: false,
-        reason: 'Esta Leyenda ya ha sido consumida este turno para pagar cartas.'
-      };
-    }
+    // REGLA: Las Leyendas no se pueden enderezar manualmente. Si el jugador se equivoca, debe usar DESHACER.
+    return {
+      success: false,
+      reason: 'Las Leyendas no se pueden enderezar manualmente. Si te has equivocado, usa el botón DESHACER (1 solo uso).'
+    };
   }
 }
 

@@ -63,7 +63,7 @@ import {
   executeBotReaction,
   resolvePendingAttackAndContinueBot
 } from '../utils/botAi.js';
-import { getCardRulesText, executeUnitAttackTrigger } from '../utils/cardEffects.js';
+import { getCardRulesText, executeUnitAttackTrigger, executeLegendAbility } from '../utils/cardEffects.js';
 
 // =========================================================================
 // CLIP-PATHS GEOMÉTRICOS CYBERPUNK (ESQUINAS RECORTADAS EN DIAGONAL)
@@ -435,6 +435,12 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
   // Modal interactivo para robar Gigs específicos del rival
   const [pendingGigTheft, setPendingGigTheft] = useState(null);
 
+  // Modal para inspeccionar la pila completa de Trash / Descartes
+  const [viewingTrashModal, setViewingTrashModal] = useState(null);
+
+  // Modal de activación de River Ward u otras leyendas para elegir Gear y Unidad destino
+  const [pendingLegendGearModal, setPendingLegendGearModal] = useState(null);
+
   // Drawer / menú lateral HUD para resoluciones móviles y tablets (< lg)
   const [isHudOpen, setIsHudOpen] = useState(false);
 
@@ -486,28 +492,36 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
         setIsInspectedFlipped(false);
         setLegendMenuId(null);
         setShowLogModal(false);
+        setViewingTrashModal(null);
+        setPendingLegendGearModal(null);
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  // Pila de historial para la función "DESHACER" (Undo)
+  // Historial de 1 solo paso para la función "DESHACER" (Undo - 1 sola vez por acción)
   const [history, setHistory] = useState([]);
 
   const pushHistory = () => {
     if (gameState) {
-      setHistory((prev) => [...prev.slice(-10), JSON.parse(JSON.stringify(gameState))]);
+      setHistory([JSON.parse(JSON.stringify(gameState))]);
     }
   };
 
   const handleUndo = () => {
     if (history.length > 0 && gameState?.activePlayer === 'player' && !gameState?.isGameOver) {
-      const prev = history[history.length - 1];
-      setHistory((h) => h.slice(0, -1));
+      const prev = history[0];
+      setHistory([]); // Queda agotado el Deshacer (solo se puede deshacer 1 sola vez)
       setGameState(prev);
       setSelectedHandCard(null);
       setSelectedFieldUnit(null);
+      setHolocall({
+        title: 'ACCIÓN DESHECHA',
+        message: 'Has deshecho tu última acción. El estado anterior ha sido restaurado.',
+        characterName: 'VIKTOR // RIPPERDOC',
+        type: 'info'
+      });
     }
   };
 
@@ -595,7 +609,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
     setGameState(JSON.parse(JSON.stringify(gameState)));
   };
 
-  // Girar o enderezar Leyenda (+1 €$ en reserva)
+  // Girar Leyenda (+1 €$ en reserva)
   const handleToggleLegend = (legendId) => {
     if (!gameState || gameState.activePlayer !== 'player' || gameState.isGameOver) return;
     pushHistory();
@@ -609,6 +623,75 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
       });
     }
     setGameState(JSON.parse(JSON.stringify(gameState)));
+  };
+
+  // Activar habilidad de Leyenda boca arriba (↷ / Quick)
+  const handleActivateLegendAbility = (legendInstanceId) => {
+    if (!gameState || gameState.activePlayer !== 'player' || gameState.isGameOver) return;
+    const leg = (gameState.player.legends || []).find((l) => l.instanceId === legendInstanceId);
+    if (!leg) return;
+
+    const res = executeLegendAbility(gameState, 'player', leg);
+    if (!res.success) {
+      setHolocall({
+        title: 'HABILIDAD NO DISPONIBLE',
+        message: res.reason || 'No se puede activar la habilidad de esta Leyenda en este momento.',
+        characterName: 'VIKTOR // RIPPERDOC',
+        type: 'warning'
+      });
+      return;
+    }
+
+    if (res.type === 'RIVER_WARD_EQUIP') {
+      setPendingLegendGearModal({
+        legendId: leg.instanceId,
+        eligibleGears: res.eligibleGears,
+        selectedGearId: res.eligibleGears[0]?.instanceId || null,
+        selectedTargetUnitId: gameState.player.field[0]?.instanceId || null
+      });
+      return;
+    }
+
+    pushHistory();
+    setGameState({ ...gameState });
+    setHolocall({
+      title: 'HABILIDAD DE LEYENDA ACTIVADA',
+      message: res.message || `Has activado la habilidad de "${leg.name}".`,
+      characterName: 'NETWATCH // INTEL',
+      type: 'success'
+    });
+  };
+
+  // Confirmar equipamiento gratuito por habilidad de River Ward
+  const handleConfirmRiverWardEquip = () => {
+    if (!pendingLegendGearModal || !gameState) return;
+    const { legendId, selectedGearId, selectedTargetUnitId } = pendingLegendGearModal;
+    const p = gameState.player;
+    const leg = (p.legends || []).find((l) => l.instanceId === legendId);
+    const gearIdx = (p.hand || []).findIndex((c) => c.instanceId === selectedGearId);
+    const targetUnit = (p.field || []).find((u) => u.instanceId === selectedTargetUnitId);
+
+    if (!leg || gearIdx === -1 || !targetUnit) {
+      setPendingLegendGearModal(null);
+      return;
+    }
+
+    pushHistory();
+    leg.isSpent = true;
+    const [gear] = p.hand.splice(gearIdx, 1);
+    if (!targetUnit.gear) targetUnit.gear = [];
+    targetUnit.gear.push(gear);
+    const bonus = gear.parsedPower || 0;
+    if (bonus > 0) {
+      targetUnit.currentPower = (targetUnit.currentPower || 0) + bonus;
+    }
+
+    gameState.actionLog.unshift(
+      `🔫 ${p.name} activa la habilidad de River Ward (↷): Equipa gratis el Gear "${gear.name}" (${bonus > 0 ? `+${bonus} Fuerza` : 'Gear'}) a "${targetUnit.name}".`
+    );
+
+    setPendingLegendGearModal(null);
+    setGameState({ ...gameState });
   };
 
   // Vender carta arrastrada o clicada
@@ -1838,6 +1921,35 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
           <div className="flex gap-2 sm:gap-3 w-full items-stretch">
             {/* 1.A ZONA CENTRAL DEL RIVAL: BACKLINE (LEYENDAS + EDDIES) -> GIGS -> FRONTLINE (CAMPO) */}
             <div className="flex-1 flex flex-col gap-1.5 min-w-0">
+              {/* FILA DE CARTAS EN MANO DEL RIVAL (BOCA ABAJO EN MINIATURA) */}
+              <div className="flex items-center justify-between px-2.5 py-1 bg-[#060b14]/90 border border-[#FF003C]/40 rounded-xl shadow-[0_0_10px_rgba(255,0,60,0.15)]">
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#FF003C] animate-pulse" />
+                  <span className="text-[8px] sm:text-[9px] font-mono text-gray-300 uppercase font-black tracking-wider">
+                    MANO DEL RIVAL:
+                  </span>
+                  <span className="text-[8px] sm:text-[9px] font-mono text-[#FF003C] font-bold">
+                    {bot.hand.length} {bot.hand.length === 1 ? 'CARTA' : 'CARTAS'}
+                  </span>
+                </div>
+                <div className="flex items-center -space-x-1 sm:-space-x-1.5 py-0.5 overflow-x-auto max-w-[65%]">
+                  {bot.hand.map((_, hIdx) => (
+                    <motion.div
+                      key={hIdx}
+                      whileHover={{ y: -3, scale: 1.15, zIndex: 30 }}
+                      style={{ clipPath: CYBER_CARD_CLIP }}
+                      className="w-5 sm:w-6 h-7 sm:h-9 bg-black border border-[#FF003C]/70 rounded-sm shadow-md shrink-0 transition-transform relative select-none"
+                      title={`Carta #${hIdx + 1} de la mano del rival (boca abajo)`}
+                    >
+                      <CyberCardBack className="w-full h-full" />
+                    </motion.div>
+                  ))}
+                  {bot.hand.length === 0 && (
+                    <span className="text-[8px] text-gray-600 italic">Mano vacía</span>
+                  )}
+                </div>
+              </div>
+
               {/* FILA SUPERIOR (BACKLINE): LEYENDAS RIVAL A LA IZQUIERDA + EDDIES RIVAL A LA DERECHA */}
               <div className="h-20 sm:h-24 md:h-28 flex gap-2 items-stretch w-full">
                 {/* LEYENDAS RIVAL (3 SLOTS) A LA IZQUIERDA */}
@@ -2207,17 +2319,41 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
             <div className="flex flex-col gap-1.5 shrink-0 w-16 sm:w-20 md:w-24">
               {/* TRASH RIVAL */}
               <div
-                onClick={() => bot.trash.length > 0 && setInspectedCard(bot.trash[bot.trash.length - 1])}
+                onClick={() => {
+                  if (bot.trash.length > 0) {
+                    setViewingTrashModal({ playerKey: 'bot', title: 'DESCARTE DEL RIVAL (TRASH)' });
+                  }
+                }}
                 onContextMenu={(e) => bot.trash.length > 0 && handleCardRightClick(e, bot.trash[bot.trash.length - 1])}
-                className={`h-16 sm:h-20 rounded-2xl border border-[#FF003C]/30 bg-[#060b14]/80 flex flex-col items-center justify-center p-1 relative shadow-md select-none ${
-                  bot.trash.length > 0 ? 'cursor-pointer hover:border-[#FF003C] hover:shadow-[0_0_12px_rgba(255,0,60,0.4)]' : ''
+                className={`h-16 sm:h-20 rounded-2xl border border-[#FF003C]/40 bg-[#060b14] flex flex-col items-center justify-center p-1 relative shadow-md select-none overflow-hidden ${
+                  bot.trash.length > 0 ? 'cursor-pointer hover:border-[#FF003C] hover:shadow-[0_0_15px_rgba(255,0,60,0.5)] group' : ''
                 }`}
-                title={`Descartes del Rival (Trash): ${bot.trash.length} cartas${bot.trash.length > 0 ? ' (clic izq o derecho para inspeccionar)' : ''}`}
+                title={`Descartes del Rival: ${bot.trash.length} cartas (Clic para ver todas // Clic derecho para pantalla completa)`}
               >
-                <span className="text-[8px] sm:text-[9px] font-mono text-gray-500 uppercase font-bold mb-0.5">TRASH</span>
-                <span className="text-base sm:text-lg font-black font-mono text-gray-500">
-                  {bot.trash.length}
-                </span>
+                {bot.trash.length > 0 ? (
+                  <>
+                    <img
+                      src={bot.trash[bot.trash.length - 1].image}
+                      alt={bot.trash[bot.trash.length - 1].name}
+                      className="absolute inset-0 w-full h-full object-cover opacity-65 group-hover:opacity-90 transition-opacity"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-black/85" />
+                    <span className="relative text-[7px] sm:text-[8px] font-mono text-[#FF003C] font-black uppercase tracking-wider text-center truncate max-w-full px-1 z-10">
+                      {bot.trash[bot.trash.length - 1].name}
+                    </span>
+                    <span className="relative text-sm sm:text-base font-black font-mono text-white drop-shadow z-10">
+                      {bot.trash.length}
+                    </span>
+                    <span className="relative text-[6px] sm:text-[7px] text-[#FCEE0A] uppercase font-bold z-10">
+                      [VER TRASH]
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    <span className="text-[8px] sm:text-[9px] font-mono text-gray-500 uppercase font-bold mb-0.5">TRASH</span>
+                    <span className="text-base sm:text-lg font-black font-mono text-gray-600">0</span>
+                  </>
+                )}
               </div>
 
               {/* DECK RIVAL */}
@@ -2770,6 +2906,29 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                               </div>
                             )}
 
+                            {/* Opción Habilidad de Leyenda (si está boca arriba y lista) */}
+                            {leg.isFaceUp && !leg.isSpent && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setLegendMenuId(null);
+                                  handleActivateLegendAbility(leg.instanceId);
+                                }}
+                                className="w-full py-1.5 px-2 text-left flex items-center justify-between rounded text-[10px] font-black uppercase transition-all bg-[#0dfceb]/20 hover:bg-[#0dfceb] text-[#0dfceb] hover:text-black border border-[#0dfceb]/60 shadow-[0_0_12px_rgba(13,252,235,0.3)] cursor-pointer hover:scale-[1.02] mb-1"
+                              >
+                                <span className="flex items-center gap-1.5">
+                                  <span>⚡</span>
+                                  <span>
+                                    {leg.id === 'CP-104' || leg.slug?.includes('river-ward')
+                                      ? 'EQUIPAR GEAR GRATIS'
+                                      : 'ACTIVAR HABILIDAD (↷)'}
+                                  </span>
+                                </span>
+                                <span className="text-[9px] font-bold">↷</span>
+                              </button>
+                            )}
+
                             {/* Opción 2: SACAR EDDIE (si está enderezada) */}
                             {!leg.isSpent && (
                               <button
@@ -2803,29 +2962,10 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                               </div>
                             )}
 
-                            {/* Opción 3: Si ya está girada pero aún quedan eddies en reserva: ENDEREZAR */}
-                            {leg.isSpent && availableEddies > 0 && !isTurn1Penalty && (
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setLegendMenuId(null);
-                                  handleToggleLegend(leg.instanceId);
-                                }}
-                                className="w-full py-1.5 px-2 text-left flex items-center justify-between rounded text-[10px] font-black uppercase bg-[#0dfceb]/20 hover:bg-[#0dfceb] text-[#0dfceb] hover:text-black border border-[#0dfceb]/60 cursor-pointer shadow hover:scale-[1.02]"
-                              >
-                                <span className="flex items-center gap-1.5">
-                                  <span>🔄</span>
-                                  <span>ENDEREZAR</span>
-                                </span>
-                                <span className="text-[9px] font-bold">-1 €$</span>
-                              </button>
-                            )}
-
-                            {/* Si está girada y ya fue consumida */}
-                            {leg.isSpent && availableEddies === 0 && !isTurn1Penalty && (
-                              <div className="text-[9px] text-gray-400 italic text-center py-1 bg-black/60 rounded border border-gray-800 mb-1">
-                                Eddie ya consumido en cartas
+                            {/* Estado si está girada */}
+                            {leg.isSpent && !isTurn1Penalty && (
+                              <div className="text-[9px] text-gray-400 italic text-center py-1.5 px-2 bg-black/60 rounded border border-gray-800 mb-1 leading-tight">
+                                Girada. <span className="text-[#FCEE0A] not-italic font-bold">Usa DESHACER</span> si te has equivocado.
                               </div>
                             )}
 
@@ -3061,15 +3201,41 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
 
               {/* TRASH JUGADOR */}
               <div
-                onClick={() => p.trash.length > 0 && setInspectedCard(p.trash[p.trash.length - 1])}
+                onClick={() => {
+                  if (p.trash.length > 0) {
+                    setViewingTrashModal({ playerKey: 'player', title: 'TUS DESCARTES (TRASH)' });
+                  }
+                }}
                 onContextMenu={(e) => p.trash.length > 0 && handleCardRightClick(e, p.trash[p.trash.length - 1])}
-                className="h-16 sm:h-20 rounded-2xl border border-[#0dfceb]/30 bg-[#060b14]/80 flex flex-col items-center justify-center p-1 relative shadow-md select-none cursor-pointer hover:border-[#FCEE0A]"
-                title={`Descartes (Trash): ${p.trash.length} cartas (clic izq o derecho para inspeccionar)`}
+                className={`h-16 sm:h-20 rounded-2xl border border-[#0dfceb]/40 bg-[#060b14] flex flex-col items-center justify-center p-1 relative shadow-md select-none overflow-hidden ${
+                  p.trash.length > 0 ? 'cursor-pointer hover:border-[#0dfceb] hover:shadow-[0_0_15px_rgba(13,252,235,0.5)] group' : ''
+                }`}
+                title={`Descartes: ${p.trash.length} cartas (Clic para ver todas // Clic derecho para pantalla completa)`}
               >
-                <span className="text-[8px] sm:text-[9px] font-mono text-gray-400 uppercase font-bold mb-0.5">TRASH</span>
-                <span className="text-base sm:text-lg font-black font-mono text-gray-400">
-                  {p.trash.length}
-                </span>
+                {p.trash.length > 0 ? (
+                  <>
+                    <img
+                      src={p.trash[p.trash.length - 1].image}
+                      alt={p.trash[p.trash.length - 1].name}
+                      className="absolute inset-0 w-full h-full object-cover opacity-65 group-hover:opacity-90 transition-opacity"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-black/85" />
+                    <span className="relative text-[7px] sm:text-[8px] font-mono text-[#0dfceb] font-black uppercase tracking-wider text-center truncate max-w-full px-1 z-10">
+                      {p.trash[p.trash.length - 1].name}
+                    </span>
+                    <span className="relative text-sm sm:text-base font-black font-mono text-white drop-shadow z-10">
+                      {p.trash.length}
+                    </span>
+                    <span className="relative text-[6px] sm:text-[7px] text-[#FCEE0A] uppercase font-bold z-10">
+                      [VER TRASH]
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    <span className="text-[8px] sm:text-[9px] font-mono text-gray-400 uppercase font-bold mb-0.5">TRASH</span>
+                    <span className="text-base sm:text-lg font-black font-mono text-gray-500">0</span>
+                  </>
+                )}
               </div>
             </div>
           </div>
@@ -3317,7 +3483,8 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                   isTrash={true}
                   topCard={p.trash.length > 0 ? p.trash[p.trash.length - 1] : null}
                   onClick={() =>
-                    p.trash.length > 0 && setInspectedCard(p.trash[p.trash.length - 1])
+                    p.trash.length > 0 &&
+                    setViewingTrashModal({ playerKey: 'player', title: 'TUS DESCARTES (TRASH)' })
                   }
                   onContextMenu={(e) =>
                     p.trash.length > 0 && handleCardRightClick(e, p.trash[p.trash.length - 1])
@@ -3658,29 +3825,38 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
               </button>
             </div>
 
-            <div className="flex-1 overflow-y-auto space-y-1.5 pr-2">
+            <div className="flex-1 overflow-y-auto space-y-1.5 pr-2 cyber-scrollbar font-mono text-xs">
               {gameState.actionLog.length === 0 ? (
                 <span className="text-gray-600 italic">No hay acciones registradas aún.</span>
               ) : (
-                gameState.actionLog.map((log) => (
-                  <div
-                    key={log.id}
-                    className="flex items-start gap-2 py-0.5 border-b border-gray-900"
-                  >
-                    <span className="text-gray-600 text-[10px]">[{log.timestamp}]</span>
-                    <span
-                      className={
-                        log.player === 'player'
-                          ? 'text-[#0dfceb]'
-                          : log.player === 'bot'
-                          ? 'text-[#FF003C]'
-                          : 'text-[#FCEE0A]'
-                      }
+                gameState.actionLog.map((logItem, idx) => {
+                  const isObj = typeof logItem === 'object' && logItem !== null;
+                  const text = isObj ? logItem.text : String(logItem || '');
+                  const time = isObj && logItem.timestamp ? logItem.timestamp : null;
+                  const isPlayer = text.includes('Netrunner') || text.includes('(Tú)') || text.includes('Jugador 1') || (isObj && logItem.player === 'player');
+                  const isBot = text.includes('Rival') || text.includes('Bot') || text.includes('Jugador 2') || (isObj && logItem.player === 'bot');
+                  const colorClass = isPlayer
+                    ? 'text-[#0dfceb]'
+                    : isBot
+                    ? 'text-[#FF003C]'
+                    : text.includes('//') || text.includes('==')
+                    ? 'text-gray-500 font-bold'
+                    : 'text-[#FCEE0A]';
+
+                  return (
+                    <div
+                      key={isObj ? logItem.id || idx : idx}
+                      className="flex items-start gap-2 py-1 px-1.5 border-b border-gray-900/60 hover:bg-white/[0.02] rounded transition-colors"
                     >
-                      {log.text}
-                    </span>
-                  </div>
-                ))
+                      <span className="text-gray-600 text-[10px] shrink-0 font-mono select-none pt-0.5">
+                        {time ? `[${time}]` : `[#${gameState.actionLog.length - idx}]`}
+                      </span>
+                      <span className={`break-words leading-relaxed ${colorClass}`}>
+                        {text}
+                      </span>
+                    </div>
+                  );
+                })
               )}
             </div>
           </div>
@@ -3874,7 +4050,12 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
               <div className="bg-[#000000] border border-[#FF003C]/60 p-3 rounded flex flex-col sm:flex-row items-center justify-between gap-3 shadow-inner">
                 {/* Atacante (Rival) */}
                 <div className="flex items-center gap-3">
-                  <div className="w-16 h-22 rounded border-2 border-[#FF003C] overflow-hidden shrink-0 bg-black shadow-[0_0_15px_rgba(255,0,60,0.4)]">
+                  <div
+                    onClick={() => handleCardRightClick(null, { name: reaction.attackerName, image: reaction.attackerImage })}
+                    onContextMenu={(e) => handleCardRightClick(e, { name: reaction.attackerName, image: reaction.attackerImage })}
+                    className="w-16 h-22 rounded border-2 border-[#FF003C] overflow-hidden shrink-0 bg-black shadow-[0_0_15px_rgba(255,0,60,0.4)] cursor-pointer hover:scale-105 transition-transform"
+                    title="Clic para ver carta en PANTALLA COMPLETA"
+                  >
                     <img
                       src={reaction.attackerImage}
                       alt={reaction.attackerName}
@@ -4180,7 +4361,12 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
               {/* Instrucciones */}
               <div className="bg-[#000000] border border-[#0dfceb]/40 p-3 rounded flex items-center gap-3">
                 {choice.sourceCardImage && (
-                  <div className="w-12 h-16 rounded border border-[#0dfceb] overflow-hidden shrink-0 bg-black">
+                  <div
+                    onClick={() => handleCardRightClick(null, { name: choice.sourceCardName, image: choice.sourceCardImage })}
+                    onContextMenu={(e) => handleCardRightClick(e, { name: choice.sourceCardName, image: choice.sourceCardImage })}
+                    className="w-12 h-16 rounded border border-[#0dfceb] overflow-hidden shrink-0 bg-black cursor-pointer hover:scale-105 transition-transform"
+                    title="Clic para ver carta en PANTALLA COMPLETA"
+                  >
                     <img src={choice.sourceCardImage} alt={choice.sourceCardName} className="w-full h-full object-cover" />
                   </div>
                 )}
@@ -4319,7 +4505,12 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
 
               {/* Resumen */}
               <div className="bg-[#000000] border border-[#FCEE0A]/40 p-3 rounded flex items-center gap-3">
-                <div className="w-12 h-16 rounded border border-[#FF003C] overflow-hidden shrink-0 bg-black">
+                <div
+                  onClick={() => handleCardRightClick(null, attackerUnit)}
+                  onContextMenu={(e) => handleCardRightClick(e, attackerUnit)}
+                  className="w-12 h-16 rounded border border-[#FF003C] overflow-hidden shrink-0 bg-black cursor-pointer hover:scale-105 transition-transform"
+                  title="Clic para ver atacante en PANTALLA COMPLETA"
+                >
                   <img src={attackerUnit.image} alt={attackerUnit.name} className="w-full h-full object-cover" />
                 </div>
                 <div>
@@ -4416,6 +4607,218 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                   }`}
                 >
                   ⚡ ROBAR {selectedDice.length} GIG(S)
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        );
+      })()}
+
+      {/* 5.8. MODAL DE INSPECCIÓN COMPLETA DE TRASH / CEMENTERIO */}
+      {viewingTrashModal && (() => {
+        const targetPlayer = gameState[viewingTrashModal.playerKey || 'bot'];
+        const trashList = targetPlayer?.trash || [];
+        const isBot = viewingTrashModal.playerKey === 'bot';
+
+        return (
+          <div
+            className="fixed inset-0 z-50 bg-[#000000]/90 backdrop-blur-md flex items-center justify-center p-3 sm:p-5 font-mono select-none"
+            onClick={() => setViewingTrashModal(null)}
+          >
+            <motion.div
+              initial={{ scale: 0.94, opacity: 0, y: 15 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              onClick={(e) => e.stopPropagation()}
+              style={{ clipPath: CYBER_CLIP }}
+              className={`max-w-4xl w-full bg-[#070a10]/98 border-2 ${
+                isBot ? 'border-[#FF003C] shadow-[0_0_60px_rgba(255,0,60,0.45)]' : 'border-[#0dfceb] shadow-[0_0_60px_rgba(13,252,235,0.45)]'
+              } p-4 sm:p-6 space-y-4 relative max-h-[88vh] flex flex-col`}
+            >
+              {/* Cabecera */}
+              <div className="flex items-center justify-between border-b border-gray-800 pb-3">
+                <div className="flex items-center gap-2.5">
+                  <span className={`w-3 h-3 rounded-full ${isBot ? 'bg-[#FF003C]' : 'bg-[#0dfceb]'} animate-pulse`} />
+                  <div>
+                    <h3 className={`text-sm sm:text-base font-black uppercase ${isBot ? 'text-[#FF003C]' : 'text-[#0dfceb]'}`}>
+                      {viewingTrashModal.title}
+                    </h3>
+                    <span className="text-[10px] text-gray-400 block font-mono">
+                      {trashList.length} cartas en el cementerio (clic o botón derecho para pantalla completa)
+                    </span>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setViewingTrashModal(null)}
+                  className="p-1.5 px-3 bg-[#000000] border border-gray-700 hover:border-white text-gray-300 hover:text-white cursor-pointer font-bold text-xs"
+                >
+                  ✕ ESC
+                </button>
+              </div>
+
+              {/* Grid de cartas del Trash */}
+              <div className="flex-1 overflow-y-auto pr-2 cyber-scrollbar">
+                {trashList.length === 0 ? (
+                  <div className="py-12 text-center text-gray-500 font-mono text-sm">
+                    El cementerio está vacío. No hay cartas jugadas ni destruidas todavía.
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+                    {trashList.map((card, idx) => (
+                      <div
+                        key={card.instanceId || idx}
+                        onClick={() => setInspectedCard(card)}
+                        onContextMenu={(e) => handleCardRightClick(e, card)}
+                        className={`relative aspect-[7/10] rounded overflow-hidden border transition-all duration-150 cursor-pointer group bg-black hover:scale-105 shadow-md ${
+                          isBot ? 'border-[#FF003C]/40 hover:border-[#FF003C]' : 'border-[#0dfceb]/40 hover:border-[#0dfceb]'
+                        }`}
+                        title="Clic izq o derecho para ver en PANTALLA COMPLETA"
+                      >
+                        <img src={card.image} alt={card.name} className="w-full h-full object-cover" />
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-transparent to-black/60 pointer-events-none" />
+                        <div className="absolute top-1 left-1 px-1 bg-black/80 text-[7px] text-gray-300 rounded font-bold uppercase z-10">
+                          #{idx + 1} • {card.officialType || 'CARD'}
+                        </div>
+                        <div className="absolute bottom-1 inset-x-1 text-center z-10">
+                          <span className="text-[8px] font-black text-white uppercase truncate block">
+                            {card.name}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          </div>
+        );
+      })()}
+
+      {/* 5.9. MODAL DE ACTIVACIÓN DE RIVER WARD: EQUIPAR GEAR GRATIS */}
+      {pendingLegendGearModal && (() => {
+        const { eligibleGears, selectedGearId, selectedTargetUnitId } = pendingLegendGearModal;
+        const p = gameState.player;
+        const friendlyUnits = p.field || [];
+
+        return (
+          <div
+            className="fixed inset-0 z-50 bg-[#000000]/90 backdrop-blur-md flex items-center justify-center p-3 sm:p-5 font-mono select-none"
+            onClick={() => setPendingLegendGearModal(null)}
+          >
+            <motion.div
+              initial={{ scale: 0.94, opacity: 0, y: 15 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              onClick={(e) => e.stopPropagation()}
+              style={{ clipPath: CYBER_CLIP }}
+              className="max-w-2xl w-full bg-[#070a10]/98 border-2 border-[#0dfceb] p-4 sm:p-6 space-y-4 shadow-[0_0_60px_rgba(13,252,235,0.45)] relative max-h-[90vh] overflow-y-auto cyber-scrollbar"
+            >
+              <div className="flex items-center justify-between border-b border-[#0dfceb]/40 pb-2.5">
+                <div className="flex items-center gap-2">
+                  <span className="w-3 h-3 bg-[#0dfceb] rounded-full animate-ping" />
+                  <span className="text-sm font-black uppercase text-[#0dfceb]">
+                    🔫 RIVER WARD // EQUIPAR GEAR GRATIS (COSTE ≤ 2 €$)
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setPendingLegendGearModal(null)}
+                  className="p-1 px-2.5 bg-black border border-gray-700 hover:border-white text-gray-300 text-xs font-bold"
+                >
+                  ✕ CANCELAR
+                </button>
+              </div>
+
+              <p className="text-xs text-gray-300 leading-relaxed">
+                Habilidad activada de River Ward (↷): Puedes jugar un Gear de coste 2 o menos desde tu mano gratis y equiparlo a una de tus unidades.
+              </p>
+
+              {/* Paso 1: Seleccionar Gear de la Mano */}
+              <div>
+                <span className="text-[10px] text-[#FCEE0A] font-black uppercase block mb-1.5">
+                  1. SELECCIONA EL GEAR DE TU MANO (COSTE ≤ 2 €$):
+                </span>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+                  {eligibleGears.map((g) => {
+                    const isSelected = selectedGearId === g.instanceId;
+                    return (
+                      <div
+                        key={g.instanceId}
+                        onClick={() =>
+                          setPendingLegendGearModal((prev) => ({
+                            ...prev,
+                            selectedGearId: g.instanceId
+                          }))
+                        }
+                        onContextMenu={(e) => handleCardRightClick(e, g)}
+                        className={`p-2 rounded border-2 transition-all cursor-pointer flex flex-col justify-between ${
+                          isSelected
+                            ? 'bg-[#0dfceb]/15 border-[#0dfceb] shadow-[0_0_15px_rgba(13,252,235,0.6)]'
+                            : 'bg-black/60 border-gray-800 hover:border-gray-600'
+                        }`}
+                        title="Clic izq para seleccionar // Clic DERECHO para ver en PANTALLA COMPLETA"
+                      >
+                        <div className="flex items-center gap-2 mb-1">
+                          <img src={g.image} alt={g.name} className="w-10 h-14 object-cover rounded border border-gray-700 shrink-0" />
+                          <div className="min-w-0">
+                            <span className="text-[10px] font-black text-white uppercase block truncate">{g.name}</span>
+                            <span className="text-[9px] text-[#0dfceb] block">Coste: {g.costNum || g.parsedCost || 0} €$</span>
+                            <span className="text-[9px] text-[#FCEE0A] block font-bold">{g.powerVal || g.power || '+Fuerza'}</span>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Paso 2: Seleccionar Unidad Amiga a Equipar */}
+              <div>
+                <span className="text-[10px] text-[#FCEE0A] font-black uppercase block mb-1.5">
+                  2. SELECCIONA LA UNIDAD OBJETIVO EN TU CAMPO:
+                </span>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+                  {friendlyUnits.map((u) => {
+                    const isSelected = selectedTargetUnitId === u.instanceId;
+                    return (
+                      <div
+                        key={u.instanceId}
+                        onClick={() =>
+                          setPendingLegendGearModal((prev) => ({
+                            ...prev,
+                            selectedTargetUnitId: u.instanceId
+                          }))
+                        }
+                        onContextMenu={(e) => handleCardRightClick(e, u)}
+                        className={`p-2 rounded border-2 transition-all cursor-pointer flex items-center gap-2 ${
+                          isSelected
+                            ? 'bg-[#0dfceb]/15 border-[#0dfceb] shadow-[0_0_15px_rgba(13,252,235,0.6)]'
+                            : 'bg-black/60 border-gray-800 hover:border-gray-600'
+                        }`}
+                        title="Clic izq para seleccionar // Clic DERECHO para ver en PANTALLA COMPLETA"
+                      >
+                        <img src={u.image} alt={u.name} className="w-10 h-14 object-cover rounded border border-gray-700 shrink-0" />
+                        <div className="min-w-0">
+                          <span className="text-[10px] font-black text-white uppercase block truncate">{u.name}</span>
+                          <span className="text-[9px] text-[#FCEE0A] font-bold block">⚡ Fuerza: {u.currentPower}</span>
+                          <span className="text-[8px] text-gray-400 block">{u.gear?.length || 0} Gears equipados</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Botón de Confirmar */}
+              <div className="pt-2 border-t border-[#0dfceb]/30 flex justify-end">
+                <button
+                  type="button"
+                  disabled={!selectedGearId || !selectedTargetUnitId}
+                  onClick={handleConfirmRiverWardEquip}
+                  style={{ clipPath: CYBER_BUTTON }}
+                  className="px-5 py-2 bg-[#0dfceb] hover:bg-white text-black font-black uppercase text-xs transition-all shadow-[0_0_20px_rgba(13,252,235,0.7)] cursor-pointer disabled:opacity-40 disabled:pointer-events-none"
+                >
+                  ⚡ EQUIPAR GRATIS Y GIRAR A RIVER WARD
                 </button>
               </div>
             </motion.div>
