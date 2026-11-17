@@ -301,7 +301,7 @@ function CyberDeckPile({
   onClick = null,
   onContextMenu = null,
   label = 'MAZO',
-  sizeClass = 'w-16 sm:w-20 h-22 sm:h-28'
+  sizeClass = 'w-16 sm:w-20 aspect-[5/7]'
 }) {
   return (
     <div
@@ -310,7 +310,9 @@ function CyberDeckPile({
       style={{ clipPath: CYBER_CLIP }}
       className={`relative ${sizeClass} overflow-hidden select-none cursor-pointer transition-all hover:scale-105 shrink-0 shadow-lg ${
         isTrash
-          ? 'bg-[#070a10] border-2 border-dashed border-[#0dfceb]/40 hover:border-[#0dfceb]'
+          ? topCard
+            ? 'bg-[#070a10] border-2 border-[#0dfceb] shadow-[0_0_15px_rgba(13,252,235,0.4)] hover:shadow-[0_0_20px_rgba(13,252,235,0.7)]'
+            : 'bg-[#070a10] border-2 border-dashed border-[#0dfceb]/40 hover:border-[#0dfceb]'
           : 'bg-[#FCEE0A] border-2 border-black hover:shadow-[0_0_20px_rgba(252,238,10,0.6)]'
       }`}
       title={`${label}: ${count} cartas`}
@@ -344,11 +346,14 @@ function CyberDeckPile({
       ) : (
         <div className="w-full h-full relative overflow-hidden flex flex-col items-center justify-center bg-[#070a10]">
           {topCard ? (
-            <img
-              src={topCard.image}
-              alt="Trash"
-              className="w-full h-full object-cover opacity-75"
-            />
+            <>
+              <img
+                src={topCard.image}
+                alt="Trash"
+                className="w-full h-full object-cover"
+              />
+              <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-transparent to-black/75 pointer-events-none" />
+            </>
           ) : (
             <div className="text-center p-1 font-mono text-[8px] sm:text-[9px] text-gray-500">
               TRASH
@@ -356,10 +361,11 @@ function CyberDeckPile({
               VACÍO
             </div>
           )}
-          <div className="absolute bottom-1 right-1 px-1.5 py-0.5 bg-black text-[#FF003C] border border-[#FF003C]/40 font-mono font-black text-[9px] sm:text-[10px] rounded shadow">
-            {count}
+          <div className="absolute bottom-1 right-1 px-1.5 py-0.5 bg-black text-[#FF003C] border border-[#FF003C]/40 font-mono font-black text-[9px] sm:text-[10px] rounded shadow z-10 flex items-center gap-0.5">
+            <span>🗑️</span>
+            <span>{count}</span>
           </div>
-          <div className="absolute top-1 left-1 px-1 bg-black text-gray-400 font-mono font-black text-[7px] sm:text-[8px] uppercase tracking-wider">
+          <div className="absolute top-1 left-1 px-1 bg-black text-gray-300 font-mono font-black text-[7px] sm:text-[8px] uppercase tracking-wider z-10">
             {label}
           </div>
         </div>
@@ -2578,55 +2584,112 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
             </div>
 
             {/* 1.B COLUMNA DERECHA: TRASH (ARRIBA) Y DECK (ABAJO) DEL RIVAL */}
-            <div className="flex flex-col gap-1.5 shrink-0 w-16 sm:w-20 md:w-24">
-              {/* TRASH RIVAL */}
-              <div
-                onClick={() => {
-                  if (bot.trash.length > 0) {
-                    setViewingTrashModal({ playerKey: 'bot', title: 'DESCARTE DEL RIVAL (TRASH)' });
-                  }
-                }}
-                onContextMenu={(e) => bot.trash.length > 0 && handleCardRightClick(e, bot.trash[bot.trash.length - 1])}
-                className={`h-16 sm:h-20 rounded-2xl border border-[#FF003C]/40 bg-[#060b14] flex flex-col items-center justify-center p-1 relative shadow-md select-none overflow-hidden ${
-                  bot.trash.length > 0 ? 'cursor-pointer hover:border-[#FF003C] hover:shadow-[0_0_15px_rgba(255,0,60,0.5)] group' : ''
-                }`}
-                title={`Descartes del Rival: ${bot.trash.length} cartas (Clic para ver todas // Clic derecho para pantalla completa)`}
-              >
-                {bot.trash.length > 0 ? (
-                  <>
-                    <img
-                      src={bot.trash[bot.trash.length - 1].image}
-                      alt={bot.trash[bot.trash.length - 1].name}
-                      className="absolute inset-0 w-full h-full object-cover opacity-65 group-hover:opacity-90 transition-opacity"
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-black/85" />
-                    <span className="relative text-[7px] sm:text-[8px] font-mono text-[#FF003C] font-black uppercase tracking-wider text-center truncate max-w-full px-1 z-10">
-                      {bot.trash[bot.trash.length - 1].name}
-                    </span>
-                    <span className="relative text-sm sm:text-base font-black font-mono text-white drop-shadow z-10">
-                      {bot.trash.length}
-                    </span>
-                    <span className="relative text-[6px] sm:text-[7px] text-[#FCEE0A] uppercase font-bold z-10">
-                      [VER TRASH]
-                    </span>
-                  </>
-                ) : (
-                  <>
-                    <span className="text-[8px] sm:text-[9px] font-mono text-gray-500 uppercase font-bold mb-0.5">TRASH</span>
-                    <span className="text-base sm:text-lg font-black font-mono text-gray-600">0</span>
-                  </>
-                )}
-              </div>
+            <div className="flex flex-col justify-between gap-1.5 sm:gap-2 shrink-0 w-16 sm:w-20 md:w-24">
+              {/* TRASH RIVAL (ÚLTIMA CARTA JUGADA EN MINIATURA) */}
+              {(() => {
+                const lastTrashCard = bot.trash && bot.trash.length > 0 ? bot.trash[bot.trash.length - 1] : null;
+                return (
+                  <div
+                    onClick={() => {
+                      if (bot.trash.length > 0) {
+                        setViewingTrashModal({ playerKey: 'bot', title: 'DESCARTE DEL RIVAL (TRASH)' });
+                      }
+                    }}
+                    onContextMenu={(e) => {
+                      if (lastTrashCard) {
+                        handleCardRightClick(e, lastTrashCard);
+                      }
+                    }}
+                    style={{ clipPath: CYBER_CLIP }}
+                    className={`relative w-full aspect-[5/7] rounded-xl overflow-hidden border-2 transition-all select-none ${
+                      lastTrashCard
+                        ? 'border-[#FF003C] bg-[#070a10] shadow-[0_0_15px_rgba(255,0,60,0.45)] cursor-pointer hover:scale-105 hover:shadow-[0_0_25px_rgba(255,0,60,0.8)] hover:border-[#FCEE0A] group'
+                        : 'border-dashed border-[#FF003C]/35 bg-[#060b14]/90 flex flex-col items-center justify-center p-1'
+                    }`}
+                    title={
+                      lastTrashCard
+                        ? `Última carta en Descarte Rival: "${lastTrashCard.name}" • Total: ${bot.trash.length} cartas (Clic izq: ver todas // Clic DERECHO: pantalla completa)`
+                        : 'Descarte del Rival (Trash vacío - 0 cartas)'
+                    }
+                  >
+                    {lastTrashCard ? (
+                      <>
+                        {/* Miniatura nítida de la última carta jugada / enviada al descarte */}
+                        <img
+                          src={lastTrashCard.image}
+                          alt={lastTrashCard.name}
+                          className="w-full h-full object-cover object-center transition-transform duration-200 group-hover:scale-105"
+                        />
+                        {/* Viñeta sutil en esquinas para legibilidad de badges */}
+                        <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-transparent to-black/75 pointer-events-none" />
 
-              {/* DECK RIVAL */}
+                        {/* Badge superior izquierdo: DESCARTE */}
+                        <div className="absolute top-1 left-1 px-1 py-0.2 bg-black/90 text-[#FF003C] font-mono font-black text-[6px] sm:text-[7px] uppercase tracking-wider rounded border border-[#FF003C]/60 z-10">
+                          DESCARTE
+                        </div>
+
+                        {/* Nombre de la carta en la parte inferior */}
+                        <div className="absolute bottom-5 inset-x-1 px-1 py-0.5 bg-black/90 rounded text-[6px] sm:text-[7px] font-mono text-white font-bold truncate text-center z-10 border border-[#FF003C]/40">
+                          {lastTrashCard.name}
+                        </div>
+
+                        {/* Contador de cartas en Trash */}
+                        <div className="absolute bottom-1 right-1 px-1.5 py-0.5 bg-black/95 text-[#FF003C] border border-[#FF003C] font-mono font-black text-[8px] sm:text-[10px] rounded shadow-[0_0_8px_rgba(255,0,60,0.6)] z-10 flex items-center gap-0.5">
+                          <span>🗑️</span>
+                          <span>{bot.trash.length}</span>
+                        </div>
+
+                        {/* Overlay hover para avisar de clic */}
+                        <div className="absolute top-1 right-1 px-1 bg-black/90 text-[#FCEE0A] font-mono text-[6px] uppercase font-bold rounded opacity-0 group-hover:opacity-100 transition-opacity z-10 border border-[#FCEE0A]/40">
+                          VER
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <div className="absolute top-1 left-1 px-1 py-0.2 bg-black/80 text-gray-400 font-mono font-black text-[6px] sm:text-[7px] uppercase tracking-wider rounded border border-gray-700">
+                          DESCARTE
+                        </div>
+                        <div className="text-center font-mono text-[8px] sm:text-[9px] font-bold text-gray-500 leading-tight">
+                          TRASH
+                          <br />
+                          VACÍO
+                        </div>
+                        <div className="absolute bottom-1 right-1 px-1.5 py-0.5 bg-black/90 text-gray-500 border border-gray-700 font-mono font-black text-[8px] sm:text-[9px] rounded">
+                          0
+                        </div>
+                      </>
+                    )}
+                  </div>
+                );
+              })()}
+
+              {/* DECK RIVAL (MAZO CON REVERSO AMARILLO OFICIAL Y CONTADOR NEÓN) */}
               <div
-                className="flex-1 rounded-2xl border border-[#FF003C]/30 bg-[#060b14]/80 flex flex-col items-center justify-center p-1.5 relative shadow-md select-none"
-                title={`Mazo del Rival (Deck): ${bot.deck.length} cartas`}
+                style={{ clipPath: CYBER_CLIP }}
+                className="relative w-full aspect-[5/7] rounded-xl overflow-hidden border-2 border-[#FF003C]/50 bg-[#070a10] shadow-md select-none group transition-transform hover:scale-105"
+                title={`Mazo del Rival (Deck): ${bot.deck.length} cartas restantes`}
               >
-                <span className="text-[8px] sm:text-[9px] font-mono text-gray-500 uppercase font-bold mb-0.5">DECK</span>
-                <span className="text-xl sm:text-2xl font-black font-mono text-[#39FF14] drop-shadow-[0_0_8px_rgba(57,255,20,0.7)]">
+                <img
+                  src="/images/back_normal.png"
+                  alt="Mazo Rival"
+                  className="w-full h-full object-cover pointer-events-none opacity-90"
+                  onError={(e) => {
+                    e.currentTarget.style.display = 'none';
+                  }}
+                />
+                <div
+                  className="absolute inset-0 opacity-20 pointer-events-none"
+                  style={{
+                    backgroundImage:
+                      'repeating-linear-gradient(45deg, #000 0, #000 2px, transparent 0, transparent 6px)'
+                  }}
+                />
+                <div className="absolute top-1 left-1 px-1 py-0.2 bg-black/90 text-[#FF003C] font-mono font-black text-[6px] sm:text-[7px] uppercase tracking-wider rounded border border-[#FF003C]/40">
+                  DECK RIVAL
+                </div>
+                <div className="absolute bottom-1 right-1 px-1.5 py-0.5 bg-black/90 text-[#39FF14] border border-[#39FF14]/50 font-mono font-black text-[10px] sm:text-xs rounded shadow-[0_0_8px_rgba(57,255,20,0.6)]">
                   {bot.deck.length}
-                </span>
+                </div>
               </div>
             </div>
           </div>
@@ -3449,56 +3512,113 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
             </div>
 
             {/* 3.B COLUMNA DERECHA DEL JUGADOR: DECK (ARRIBA) Y TRASH (ABAJO) */}
-            <div className="flex flex-col gap-1.5 shrink-0 w-16 sm:w-20 md:w-24">
-              {/* DECK JUGADOR */}
+            <div className="flex flex-col justify-between gap-1.5 sm:gap-2 shrink-0 w-16 sm:w-20 md:w-24">
+              {/* DECK JUGADOR (MAZO CON REVERSO AMARILLO OFICIAL Y CONTADOR NEÓN) */}
               <div
-                className="flex-1 rounded-2xl border border-[#0dfceb]/30 bg-[#060b14]/80 flex flex-col items-center justify-center p-1.5 relative shadow-md select-none"
-                title={`Mazo principal (Deck): ${p.deck.length} cartas restantes`}
+                style={{ clipPath: CYBER_CLIP }}
+                className="relative w-full aspect-[5/7] rounded-xl overflow-hidden border-2 border-[#0dfceb]/50 bg-[#070a10] shadow-md select-none group transition-transform hover:scale-105"
+                title={`Tu Mazo (Deck): ${p.deck.length} cartas restantes`}
               >
-                <span className="text-[8px] sm:text-[9px] font-mono text-gray-400 uppercase font-bold mb-0.5">DECK</span>
-                <span className="text-xl sm:text-2xl font-black font-mono text-[#39FF14] drop-shadow-[0_0_8px_rgba(57,255,20,0.7)]">
+                <img
+                  src="/images/back_normal.png"
+                  alt="Tu Mazo"
+                  className="w-full h-full object-cover pointer-events-none opacity-90"
+                  onError={(e) => {
+                    e.currentTarget.style.display = 'none';
+                  }}
+                />
+                <div
+                  className="absolute inset-0 opacity-20 pointer-events-none"
+                  style={{
+                    backgroundImage:
+                      'repeating-linear-gradient(45deg, #000 0, #000 2px, transparent 0, transparent 6px)'
+                  }}
+                />
+                <div className="absolute top-1 left-1 px-1 py-0.2 bg-black/90 text-[#FCEE0A] font-mono font-black text-[6px] sm:text-[7px] uppercase tracking-wider rounded border border-[#FCEE0A]/40">
+                  TU MAZO
+                </div>
+                <div className="absolute bottom-1 right-1 px-1.5 py-0.5 bg-black/90 text-[#39FF14] border border-[#39FF14]/50 font-mono font-black text-[10px] sm:text-xs rounded shadow-[0_0_8px_rgba(57,255,20,0.6)]">
                   {p.deck.length}
-                </span>
+                </div>
               </div>
 
-              {/* TRASH JUGADOR */}
-              <div
-                onClick={() => {
-                  if (p.trash.length > 0) {
-                    setViewingTrashModal({ playerKey: 'player', title: 'TUS DESCARTES (TRASH)' });
-                  }
-                }}
-                onContextMenu={(e) => p.trash.length > 0 && handleCardRightClick(e, p.trash[p.trash.length - 1])}
-                className={`h-16 sm:h-20 rounded-2xl border border-[#0dfceb]/40 bg-[#060b14] flex flex-col items-center justify-center p-1 relative shadow-md select-none overflow-hidden ${
-                  p.trash.length > 0 ? 'cursor-pointer hover:border-[#0dfceb] hover:shadow-[0_0_15px_rgba(13,252,235,0.5)] group' : ''
-                }`}
-                title={`Descartes: ${p.trash.length} cartas (Clic para ver todas // Clic derecho para pantalla completa)`}
-              >
-                {p.trash.length > 0 ? (
-                  <>
-                    <img
-                      src={p.trash[p.trash.length - 1].image}
-                      alt={p.trash[p.trash.length - 1].name}
-                      className="absolute inset-0 w-full h-full object-cover opacity-65 group-hover:opacity-90 transition-opacity"
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-black/85" />
-                    <span className="relative text-[7px] sm:text-[8px] font-mono text-[#0dfceb] font-black uppercase tracking-wider text-center truncate max-w-full px-1 z-10">
-                      {p.trash[p.trash.length - 1].name}
-                    </span>
-                    <span className="relative text-sm sm:text-base font-black font-mono text-white drop-shadow z-10">
-                      {p.trash.length}
-                    </span>
-                    <span className="relative text-[6px] sm:text-[7px] text-[#FCEE0A] uppercase font-bold z-10">
-                      [VER TRASH]
-                    </span>
-                  </>
-                ) : (
-                  <>
-                    <span className="text-[8px] sm:text-[9px] font-mono text-gray-400 uppercase font-bold mb-0.5">TRASH</span>
-                    <span className="text-base sm:text-lg font-black font-mono text-gray-500">0</span>
-                  </>
-                )}
-              </div>
+              {/* TRASH JUGADOR (ÚLTIMA CARTA JUGADA EN MINIATURA) */}
+              {(() => {
+                const lastTrashCard = p.trash && p.trash.length > 0 ? p.trash[p.trash.length - 1] : null;
+                return (
+                  <div
+                    onClick={() => {
+                      if (p.trash.length > 0) {
+                        setViewingTrashModal({ playerKey: 'player', title: 'TUS DESCARTES (TRASH)' });
+                      }
+                    }}
+                    onContextMenu={(e) => {
+                      if (lastTrashCard) {
+                        handleCardRightClick(e, lastTrashCard);
+                      }
+                    }}
+                    style={{ clipPath: CYBER_CLIP }}
+                    className={`relative w-full aspect-[5/7] rounded-xl overflow-hidden border-2 transition-all select-none ${
+                      lastTrashCard
+                        ? 'border-[#0dfceb] bg-[#070a10] shadow-[0_0_15px_rgba(13,252,235,0.45)] cursor-pointer hover:scale-105 hover:shadow-[0_0_25px_rgba(13,252,235,0.8)] hover:border-[#FCEE0A] group'
+                        : 'border-dashed border-[#0dfceb]/35 bg-[#060b14]/90 flex flex-col items-center justify-center p-1'
+                    }`}
+                    title={
+                      lastTrashCard
+                        ? `Última carta en tus Descartes: "${lastTrashCard.name}" • Total: ${p.trash.length} cartas (Clic izq: ver todas // Clic DERECHO: pantalla completa)`
+                        : 'Tus Descartes (Trash vacío - 0 cartas)'
+                    }
+                  >
+                    {lastTrashCard ? (
+                      <>
+                        {/* Miniatura nítida de la última carta jugada / enviada al descarte */}
+                        <img
+                          src={lastTrashCard.image}
+                          alt={lastTrashCard.name}
+                          className="w-full h-full object-cover object-center transition-transform duration-200 group-hover:scale-105"
+                        />
+                        {/* Viñeta sutil en esquinas para legibilidad de badges */}
+                        <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-transparent to-black/75 pointer-events-none" />
+
+                        {/* Badge superior izquierdo: DESCARTE */}
+                        <div className="absolute top-1 left-1 px-1 py-0.2 bg-black/90 text-[#0dfceb] font-mono font-black text-[6px] sm:text-[7px] uppercase tracking-wider rounded border border-[#0dfceb]/60 z-10">
+                          DESCARTE
+                        </div>
+
+                        {/* Nombre de la carta en la parte inferior */}
+                        <div className="absolute bottom-5 inset-x-1 px-1 py-0.5 bg-black/90 rounded text-[6px] sm:text-[7px] font-mono text-white font-bold truncate text-center z-10 border border-[#0dfceb]/40">
+                          {lastTrashCard.name}
+                        </div>
+
+                        {/* Contador de cartas en Trash */}
+                        <div className="absolute bottom-1 right-1 px-1.5 py-0.5 bg-black/95 text-[#0dfceb] border border-[#0dfceb] font-mono font-black text-[8px] sm:text-[10px] rounded shadow-[0_0_8px_rgba(13,252,235,0.6)] z-10 flex items-center gap-0.5">
+                          <span>🗑️</span>
+                          <span>{p.trash.length}</span>
+                        </div>
+
+                        {/* Overlay hover para avisar de clic */}
+                        <div className="absolute top-1 right-1 px-1 bg-black/90 text-[#FCEE0A] font-mono text-[6px] uppercase font-bold rounded opacity-0 group-hover:opacity-100 transition-opacity z-10 border border-[#FCEE0A]/40">
+                          VER
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <div className="absolute top-1 left-1 px-1 py-0.2 bg-black/80 text-gray-400 font-mono font-black text-[6px] sm:text-[7px] uppercase tracking-wider rounded border border-gray-700">
+                          DESCARTE
+                        </div>
+                        <div className="text-center font-mono text-[8px] sm:text-[9px] font-bold text-gray-500 leading-tight">
+                          TRASH
+                          <br />
+                          VACÍO
+                        </div>
+                        <div className="absolute bottom-1 right-1 px-1.5 py-0.5 bg-black/90 text-gray-500 border border-gray-700 font-mono font-black text-[8px] sm:text-[9px] rounded">
+                          0
+                        </div>
+                      </>
+                    )}
+                  </div>
+                );
+              })()}
             </div>
           </div>
         </main>
@@ -3731,29 +3851,8 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
               })}
             </div>
 
-            {/* LADO DERECHO: Pilas de Mazo (deck) y Descartes (trash) + Botón de Terminar Turno */}
-            <div className="flex items-center gap-2.5 sm:gap-3 shrink-0">
-              <div className="flex items-center gap-1.5 sm:gap-2">
-                <CyberDeckPile
-                  label="TU MAZO"
-                  count={p.deck.length}
-                  isTrash={false}
-                />
-                <CyberDeckPile
-                  label="DESCARTE"
-                  count={p.trash.length}
-                  isTrash={true}
-                  topCard={p.trash.length > 0 ? p.trash[p.trash.length - 1] : null}
-                  onClick={() =>
-                    p.trash.length > 0 &&
-                    setViewingTrashModal({ playerKey: 'player', title: 'TUS DESCARTES (TRASH)' })
-                  }
-                  onContextMenu={(e) =>
-                    p.trash.length > 0 && handleCardRightClick(e, p.trash[p.trash.length - 1])
-                  }
-                />
-              </div>
-
+            {/* LADO DERECHO DEL DOCK: Botón de Terminar Turno */}
+            <div className="flex items-center shrink-0">
               <button
                 type="button"
                 disabled={!isMyTurn}
