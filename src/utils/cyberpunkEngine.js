@@ -181,8 +181,8 @@ export function createInitialGameState(playerDeckInput, botDeckInput, allCards =
 
     const merged = found
       ? {
-          ...found,
           ...c,
+          ...found,
           cost: found.cost || c.cost,
           power: found.power || c.power,
           officialType: found.officialType || c.officialType,
@@ -191,11 +191,19 @@ export function createInitialGameState(playerDeckInput, botDeckInput, allCards =
         }
       : c;
 
+    const parsedCost = found && (found.costNum !== undefined && found.costNum !== null)
+      ? Number(found.costNum)
+      : parseCardCost(merged.cost);
+
+    const parsedPower = found && (found.powerVal !== undefined && found.powerVal !== null)
+      ? parseCardPower(found.powerVal)
+      : parseCardPower(merged.power);
+
     return {
       ...merged,
       instanceId: `${prefix}-c-${idx}-${Date.now()}`,
-      parsedCost: parseCardCost(merged.cost),
-      parsedPower: parseCardPower(merged.power)
+      parsedCost,
+      parsedPower
     };
   };
 

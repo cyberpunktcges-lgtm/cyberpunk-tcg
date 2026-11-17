@@ -2415,9 +2415,9 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                     alt={displayCard.name}
                     className="w-full h-full object-cover"
                   />
-                  {displayCard.currentPower !== undefined && (
+                  {(displayCard.currentPower !== undefined || (displayCard.parsedPower !== undefined && displayCard.parsedPower > 0)) && (
                     <div className="absolute bottom-1 right-1 px-2 py-0.5 bg-[#FCEE0A] text-[#070a10] font-mono font-black text-xs shadow-md rounded">
-                      ⚡ {displayCard.currentPower}
+                      ⚡ {displayCard.currentPower !== undefined ? displayCard.currentPower : displayCard.parsedPower}
                     </div>
                   )}
 
@@ -6418,10 +6418,10 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
               )}
 
               {/* Badge de Poder en esquina inferior derecha */}
-              {displayCard.currentPower !== undefined && (
+              {(displayCard.currentPower !== undefined || (displayCard.parsedPower !== undefined && displayCard.parsedPower > 0)) && (
                 <div className="absolute bottom-2 right-2 px-3 py-1 bg-[#FCEE0A] text-[#070a10] font-mono font-black text-sm shadow-xl rounded flex items-center gap-1">
                   <span>⚡</span>
-                  <span>{displayCard.currentPower} FUERZA</span>
+                  <span>{displayCard.currentPower !== undefined ? displayCard.currentPower : displayCard.parsedPower} FUERZA</span>
                 </div>
               )}
             </div>
