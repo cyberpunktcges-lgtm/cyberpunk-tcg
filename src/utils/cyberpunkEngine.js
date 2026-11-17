@@ -30,11 +30,40 @@ export const DICE_CONFIG = {
 export const FIXER_DICE_ORDER = ['d4', 'd6', 'd8', 'd10', 'd12', 'd20'];
 
 /**
- * Lanza un dado poliédrico
+ * Lanza un dado D20 con entropía criptográfica uniforme (sin sesgos ni rachas repetitivas)
+ */
+export function rollSecureD20() {
+  if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
+    const buf = new Uint32Array(1);
+    // 2^32 = 4294967296. Múltiplo exacto de 20 más cercano: 4294967280 (evita sesgo de módulo)
+    const limit = 4294967280;
+    let rand;
+    do {
+      crypto.getRandomValues(buf);
+      rand = buf[0];
+    } while (rand >= limit);
+    return (rand % 20) + 1;
+  }
+  return Math.floor(Math.random() * 20) + 1;
+}
+
+/**
+ * Lanza un dado poliédrico con entropía segura
  */
 export function rollDie(dieType) {
   const config = DICE_CONFIG[dieType] || DICE_CONFIG.d6;
-  return Math.floor(Math.random() * config.max) + 1;
+  const max = config.max || 6;
+  if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
+    const buf = new Uint32Array(1);
+    const limit = 4294967296 - (4294967296 % max);
+    let rand;
+    do {
+      crypto.getRandomValues(buf);
+      rand = buf[0];
+    } while (rand >= limit);
+    return (rand % max) + 1;
+  }
+  return Math.floor(Math.random() * max) + 1;
 }
 
 /**
@@ -235,15 +264,15 @@ export function createInitialGameState(playerDeckInput, botDeckInput, allCards =
       'Decide si conservar tu mano o realizar tu único Mulligan de 6 cartas.'
     ];
   } else {
-    // Primera partida: Tirada de D20 inicial entre ambos jugadores
-    let pRoll = Math.floor(Math.random() * 20) + 1;
-    let bRoll = Math.floor(Math.random() * 20) + 1;
+    // Primera partida: Tirada de D20 inicial entre ambos jugadores con entropía uniforme
+    let pRoll = rollSecureD20();
+    let bRoll = rollSecureD20();
     while (pRoll === bRoll) {
-      bRoll = Math.floor(Math.random() * 20) + 1;
+      bRoll = rollSecureD20();
     }
     const rollWinner = pRoll > bRoll ? 'player' : 'bot';
-    // Si gana el bot la tirada, la IA randomiza quién empieza (50% jugador, 50% bot)
-    const botDecidedStarter = rollWinner === 'bot' ? (Math.random() < 0.5 ? 'bot' : 'player') : null;
+    // Si gana el bot la tirada, la IA decide quién empieza (50% jugador, 50% bot)
+    const botDecidedStarter = rollWinner === 'bot' ? (rollSecureD20() <= 10 ? 'bot' : 'player') : null;
 
     pendingFirstPlayerSelection = {
       playerRoll: pRoll,

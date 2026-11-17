@@ -50,6 +50,7 @@ import {
   getEligibleFixerDice,
   rollInGig,
   rollDie,
+  rollSecureD20,
   parseCardPower,
   parseCardCost,
   isCardVendible,
@@ -109,21 +110,32 @@ function PolyhedralDie({
   isWaiting = false,
   isStolen = false,
   size = 40,
-  label = ''
+  label = '',
+  colorScheme = null // 'yellow' | 'red' | null
 }) {
   const normType = (type || 'd6').toLowerCase();
 
-  const strokeColor = isWaiting
+  let strokeColor = isWaiting
     ? '#374151'
     : isStolen
     ? '#FF003C'
     : '#0dfceb';
-  const fillColor = isWaiting
+  let fillColor = isWaiting
     ? '#090d16'
     : isStolen
     ? 'rgba(255, 0, 60, 0.25)'
     : 'rgba(13, 252, 235, 0.20)';
-  const textColor = isWaiting ? '#6b7280' : isStolen ? '#ffffff' : '#FCEE0A';
+  let textColor = isWaiting ? '#6b7280' : isStolen ? '#ffffff' : '#FCEE0A';
+
+  if (colorScheme === 'yellow') {
+    strokeColor = '#FCEE0A';
+    fillColor = 'rgba(252, 238, 10, 0.22)';
+    textColor = '#FCEE0A';
+  } else if (colorScheme === 'red') {
+    strokeColor = '#FF003C';
+    fillColor = 'rgba(255, 0, 60, 0.25)';
+    textColor = '#FF003C';
+  }
 
   const renderShape = () => {
     switch (normType) {
@@ -212,7 +224,11 @@ function PolyhedralDie({
         <svg
           viewBox="0 0 50 50"
           className={`w-full h-full ${
-            !isWaiting
+            colorScheme === 'yellow'
+              ? 'drop-shadow-[0_0_12px_rgba(252,238,10,0.75)]'
+              : colorScheme === 'red'
+              ? 'drop-shadow-[0_0_12px_rgba(255,0,60,0.75)]'
+              : !isWaiting
               ? isStolen
                 ? 'drop-shadow-[0_0_8px_rgba(255,0,60,0.7)]'
                 : 'drop-shadow-[0_0_8px_rgba(13,252,235,0.6)]'
@@ -224,7 +240,7 @@ function PolyhedralDie({
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
           {value !== null ? (
             <span
-              className="font-mono font-black text-xs sm:text-sm drop-shadow-[0_0_4px_#000]"
+              className={`font-mono font-black drop-shadow-[0_0_4px_#000] ${size >= 80 ? 'text-2xl sm:text-3xl' : 'text-xs sm:text-sm'}`}
               style={{ color: textColor }}
             >
               {value}
@@ -248,203 +264,7 @@ function PolyhedralDie({
 }
 
 // =========================================================================
-// COMPONENTE DADO D20 POLIÉDRICO CYBERPUNK (10 FACETAS 3D Y ANIMACIÓN)
-// =========================================================================
-function CyberD20Die({
-  value,
-  theme = 'yellow', // 'yellow' | 'red'
-  isRolling = false,
-  isWinner = false,
-  isLoser = false,
-  size = 110
-}) {
-  const isYellow = theme === 'yellow';
-  const primaryColor = isYellow ? '#FCEE0A' : '#FF003C';
-  const darkBg = isYellow ? '#151300' : '#170106';
-  const baseFill = isYellow ? '252, 238, 10' : '255, 0, 60';
-
-  return (
-    <motion.div
-      animate={
-        isRolling
-          ? {
-              rotateZ: isYellow ? [0, -32, 28, -36, 24, -16, 0] : [0, 32, -28, 36, -24, 16, 0],
-              scale: [0.9, 1.14, 0.92, 1.1, 0.95, 1],
-              y: isYellow ? [-16, 12, -14, 8, -16] : [14, -14, 10, -12, 14]
-            }
-          : isWinner
-          ? {
-              scale: [1, 1.25, 0.96, 1.06, 1],
-              rotateZ: [0, -6, 6, -3, 3, 0]
-            }
-          : { scale: 1, rotateZ: 0, y: 0 }
-      }
-      transition={
-        isRolling
-          ? { repeat: Infinity, duration: 0.55, ease: 'easeInOut' }
-          : { duration: 0.55, ease: 'easeOut' }
-      }
-      style={{
-        filter: isWinner
-          ? `drop-shadow(0 0 25px ${primaryColor}) drop-shadow(0 0 40px ${primaryColor}88)`
-          : isRolling
-          ? `drop-shadow(0 0 20px ${primaryColor})`
-          : `drop-shadow(0 0 10px ${primaryColor}88)`
-      }}
-      className={`relative flex items-center justify-center select-none ${
-        isLoser ? 'opacity-55 grayscale-[30%]' : 'opacity-100'
-      }`}
-    >
-      <svg
-        width={size}
-        height={size}
-        viewBox="0 0 100 100"
-        className="overflow-visible"
-      >
-        <defs>
-          <radialGradient id={`d20-grad-${theme}`} cx="50%" cy="50%" r="50%">
-            <stop offset="0%" stopColor={primaryColor} stopOpacity="0.45" />
-            <stop offset="75%" stopColor={primaryColor} stopOpacity="0.15" />
-            <stop offset="100%" stopColor={darkBg} stopOpacity="0.95" />
-          </radialGradient>
-        </defs>
-
-        {/* Polígono base icosaédrico exterior */}
-        <polygon
-          points="50,6 89,28 89,72 50,94 11,72 11,28"
-          fill={darkBg}
-          stroke={primaryColor}
-          strokeWidth="3.2"
-          strokeLinejoin="round"
-        />
-
-        {/* 10 Facetas triangulares de proyección isométrica frontal */}
-        {/* Faceta 1: Central invertida (donde se sitúa el número) */}
-        <polygon
-          points="32,38 68,38 50,70"
-          fill={`url(#d20-grad-${theme})`}
-          stroke={primaryColor}
-          strokeWidth="2.2"
-          strokeLinejoin="round"
-        />
-
-        {/* Faceta 2: Superior Central */}
-        <polygon
-          points="50,6 32,38 68,38"
-          fill={`rgba(${baseFill}, 0.24)`}
-          stroke={primaryColor}
-          strokeWidth="1.6"
-          strokeLinejoin="round"
-        />
-
-        {/* Faceta 3: Superior Derecha */}
-        <polygon
-          points="50,6 89,28 68,38"
-          fill={`rgba(${baseFill}, 0.34)`}
-          stroke={primaryColor}
-          strokeWidth="1.6"
-          strokeLinejoin="round"
-        />
-
-        {/* Faceta 4: Lateral Derecha Superior */}
-        <polygon
-          points="89,28 89,72 68,38"
-          fill={`rgba(${baseFill}, 0.18)`}
-          stroke={primaryColor}
-          strokeWidth="1.6"
-          strokeLinejoin="round"
-        />
-
-        {/* Faceta 5: Lateral Derecha Inferior */}
-        <polygon
-          points="89,72 68,38 50,70"
-          fill={`rgba(${baseFill}, 0.28)`}
-          stroke={primaryColor}
-          strokeWidth="1.6"
-          strokeLinejoin="round"
-        />
-
-        {/* Faceta 6: Inferior Derecha */}
-        <polygon
-          points="89,72 50,94 50,70"
-          fill={`rgba(${baseFill}, 0.12)`}
-          stroke={primaryColor}
-          strokeWidth="1.6"
-          strokeLinejoin="round"
-        />
-
-        {/* Faceta 7: Inferior Izquierda */}
-        <polygon
-          points="50,94 11,72 50,70"
-          fill={`rgba(${baseFill}, 0.14)`}
-          stroke={primaryColor}
-          strokeWidth="1.6"
-          strokeLinejoin="round"
-        />
-
-        {/* Faceta 8: Lateral Izquierda Inferior */}
-        <polygon
-          points="11,72 32,38 50,70"
-          fill={`rgba(${baseFill}, 0.30)`}
-          stroke={primaryColor}
-          strokeWidth="1.6"
-          strokeLinejoin="round"
-        />
-
-        {/* Faceta 9: Lateral Izquierda Superior */}
-        <polygon
-          points="11,72 11,28 32,38"
-          fill={`rgba(${baseFill}, 0.20)`}
-          stroke={primaryColor}
-          strokeWidth="1.6"
-          strokeLinejoin="round"
-        />
-
-        {/* Faceta 10: Superior Izquierda */}
-        <polygon
-          points="11,28 50,6 32,38"
-          fill={`rgba(${baseFill}, 0.26)`}
-          stroke={primaryColor}
-          strokeWidth="1.6"
-          strokeLinejoin="round"
-        />
-
-        {/* Borde exterior reforzado */}
-        <polygon
-          points="50,6 89,28 89,72 50,94 11,72 11,28"
-          fill="none"
-          stroke={primaryColor}
-          strokeWidth="3.2"
-          strokeLinejoin="round"
-        />
-
-        {/* Número central del D20 */}
-        <text
-          x="50"
-          y="52"
-          textAnchor="middle"
-          dominantBaseline="central"
-          fill="#FFFFFF"
-          fontSize={value >= 10 ? '22' : '26'}
-          fontWeight="900"
-          fontFamily="ui-monospace, monospace"
-          stroke="#000000"
-          strokeWidth="0.8"
-          paintOrder="stroke fill"
-          style={{
-            filter: `drop-shadow(0 0 8px ${primaryColor})`,
-            letterSpacing: '-1px'
-          }}
-        >
-          {value}
-        </text>
-      </svg>
-    </motion.div>
-  );
-}
-
-// =========================================================================
-// MODAL ANIMADO DE TIRADA DE D20 (DADOS AMARILLO Y ROJO)
+// MODAL ANIMADO DE TIRADA DE D20 (DADOS AMARILLO Y ROJO CON ANIMACIÓN DE JUEGO)
 // =========================================================================
 function CyberD20RollModal({ selection, onConfirmStarter, onReroll }) {
   const { playerRoll, botRoll, rollWinner, botDecidedStarter } = selection;
@@ -452,8 +272,8 @@ function CyberD20RollModal({ selection, onConfirmStarter, onReroll }) {
 
   const [isRolling, setIsRolling] = useState(true);
   const [hasLanded, setHasLanded] = useState(false);
-  const [displayPlayerRoll, setDisplayPlayerRoll] = useState(() => Math.floor(Math.random() * 20) + 1);
-  const [displayBotRoll, setDisplayBotRoll] = useState(() => Math.floor(Math.random() * 20) + 1);
+  const [displayPlayerRoll, setDisplayPlayerRoll] = useState(() => rollSecureD20());
+  const [displayBotRoll, setDisplayBotRoll] = useState(() => rollSecureD20());
   const [rollProgress, setRollProgress] = useState(0);
 
   useEffect(() => {
@@ -462,19 +282,19 @@ function CyberD20RollModal({ selection, onConfirmStarter, onReroll }) {
     setRollProgress(0);
 
     const startTime = Date.now();
-    const duration = 1600; // 1.6 segundos de rodaje
+    const duration = 1300; // ~1.3 segundos de rodaje enérgico
 
-    // Barajeo rápido de números mientras giran los dados
+    // Barajeo rápido de números con entropía criptográfica uniforme rollSecureD20()
     const shuffleInterval = setInterval(() => {
-      setDisplayPlayerRoll(Math.floor(Math.random() * 20) + 1);
-      setDisplayBotRoll(Math.floor(Math.random() * 20) + 1);
+      setDisplayPlayerRoll(rollSecureD20());
+      setDisplayBotRoll(rollSecureD20());
 
       const elapsed = Date.now() - startTime;
       const progressPercent = Math.min(100, Math.floor((elapsed / duration) * 100));
       setRollProgress(progressPercent);
-    }, 55);
+    }, 65);
 
-    // Detención e impacto final en los valores generados
+    // Detención e impacto final exactamente en los valores calculados
     const landTimeout = setTimeout(() => {
       clearInterval(shuffleInterval);
       setDisplayPlayerRoll(playerRoll);
@@ -499,13 +319,17 @@ function CyberD20RollModal({ selection, onConfirmStarter, onReroll }) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-[#000000]/92 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 font-mono select-none">
+    <div className="fixed inset-0 z-50 bg-[#000000]/90 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 font-mono select-none">
       <motion.div
         initial={{ scale: 0.92, opacity: 0, y: 15 }}
         animate={{ scale: 1, opacity: 1, y: 0 }}
         style={{ clipPath: CYBER_CLIP }}
-        className="max-w-2xl w-full bg-[#070a10]/98 border-2 border-[#0dfceb] p-5 sm:p-8 text-center space-y-5 sm:space-y-6 shadow-[0_0_80px_rgba(13,252,235,0.45)] relative max-h-[92vh] overflow-y-auto cyber-scrollbar"
+        className="max-w-2xl w-full bg-[#070a10] border-2 border-[#0dfceb] p-6 sm:p-8 text-center space-y-6 shadow-[0_0_80px_rgba(13,252,235,0.45)] relative max-h-[92vh] overflow-y-auto cyber-scrollbar"
       >
+        {/* Rayos láser animados idénticos a la animación de juego */}
+        <div className="absolute inset-x-0 h-0.5 bg-gradient-to-r from-transparent via-[#0dfceb] to-transparent top-0 animate-pulse" />
+        <div className="absolute inset-x-0 h-0.5 bg-gradient-to-r from-transparent via-[#FCEE0A] to-transparent bottom-0 animate-pulse" />
+
         {/* Cabecera */}
         <div className="flex items-center justify-between border-b border-[#0dfceb]/40 pb-3">
           <div className="flex items-center gap-2">
@@ -514,97 +338,171 @@ function CyberD20RollModal({ selection, onConfirmStarter, onReroll }) {
               INICIO DE PARTIDA // TIRADA DE D20
             </span>
           </div>
-          <span className="text-[10px] text-[#FCEE0A] uppercase font-bold tracking-widest hidden sm:inline">
-            DECISIÓN DE PRIMER TURNO
+          <span className="text-[10px] text-[#0dfceb] uppercase tracking-widest font-bold">
+            {hasLanded ? '// DADOS D20 FIJADOS //' : '// LANZANDO DADOS EN NIGHT CITY //'}
           </span>
         </div>
 
         {/* Explicación oficial */}
         <p className="text-xs sm:text-sm text-gray-300 leading-relaxed max-w-lg mx-auto">
-          Al comenzar en Night City, ambos jugadores tiran su dado <strong>D20</strong>. Quien saque la puntuación más alta <strong>elige si sale él primero o sale el oponente</strong>.
+          Al comenzar la partida en Night City, ambos jugadores lanzan su dado <strong>D20</strong>. El jugador con la puntuación más alta <strong>elige si sale él primero o sale el oponente</strong>.
         </p>
 
-        {/* Zona de Duelo: Dado Amarillo (Jugador) vs Dado Rojo (Rival) */}
-        <div className="grid grid-cols-2 gap-3 sm:gap-6 py-2 max-w-lg mx-auto items-stretch">
+        {/* Zona de Duelo: Dado Amarillo (Tú) vs Dado Rojo (Rival) con animación idéntica a rollingAnimation */}
+        <div className="grid grid-cols-2 gap-4 sm:gap-6 py-2 max-w-lg mx-auto items-stretch">
           {/* 1. DADO DEL JUGADOR: AMARILLO (#FCEE0A) */}
           <div
-            className={`p-3.5 sm:p-5 rounded-xl border-2 transition-all duration-300 flex flex-col items-center justify-between gap-3 relative overflow-hidden ${
+            style={{ clipPath: CYBER_CLIP }}
+            className={`p-4 sm:p-6 rounded border-2 transition-all duration-300 flex flex-col items-center justify-between gap-3 relative overflow-hidden ${
               hasLanded && playerWon
-                ? 'border-[#FCEE0A] bg-gradient-to-b from-[#FCEE0A]/20 via-black/80 to-black/95 shadow-[0_0_40px_rgba(252,238,10,0.45)] scale-105'
-                : 'border-[#FCEE0A]/40 bg-black/60 shadow-[0_0_20px_rgba(252,238,10,0.15)]'
+                ? 'border-[#FCEE0A] bg-gradient-to-b from-[#FCEE0A]/20 via-[#070a10] to-[#070a10] shadow-[0_0_45px_rgba(252,238,10,0.5)] scale-105'
+                : 'border-[#FCEE0A]/40 bg-[#070a10] shadow-[0_0_20px_rgba(252,238,10,0.15)]'
             }`}
           >
-            <div className="flex items-center gap-1.5 text-[10px] sm:text-xs font-black uppercase text-[#FCEE0A] tracking-wider">
+            {/* Rayos láser en la tarjeta */}
+            <div className="absolute inset-x-0 h-0.5 bg-gradient-to-r from-transparent via-[#FCEE0A] to-transparent top-0 animate-pulse" />
+            <div className="absolute inset-x-0 h-0.5 bg-gradient-to-r from-transparent via-[#FCEE0A] to-transparent bottom-0 animate-pulse" />
+
+            <div className="flex items-center gap-1.5 text-[11px] sm:text-xs font-black uppercase text-[#FCEE0A] tracking-wider z-10">
               <span className="w-2 h-2 rounded-full bg-[#FCEE0A] animate-pulse" />
               <span>TU DADO D20</span>
             </div>
 
-            <div className="py-2">
-              <CyberD20Die
-                theme="yellow"
+            {/* Dado girando a toda velocidad como cuando juegas */}
+            <motion.div
+              animate={
+                hasLanded
+                  ? { rotate: 0, scale: [1.3, 1], y: [-12, 0] }
+                  : {
+                      rotate: [0, 90, 180, 270, 360],
+                      scale: [0.95, 1.15, 0.95, 1.1, 1],
+                      y: [0, -10, 5, -5, 0]
+                    }
+              }
+              transition={
+                hasLanded
+                  ? { duration: 0.45, type: 'spring' }
+                  : { repeat: Infinity, duration: 0.45, ease: 'linear' }
+              }
+              className="my-3 relative flex items-center justify-center"
+            >
+              <PolyhedralDie
+                type="d20"
                 value={displayPlayerRoll}
-                isRolling={isRolling}
-                isWinner={hasLanded && playerWon}
-                isLoser={hasLanded && !playerWon}
                 size={110}
+                isWaiting={false}
+                isStolen={false}
+                colorScheme="yellow"
               />
-            </div>
+            </motion.div>
 
-            <div className="w-full text-center">
-              {isRolling ? (
-                <span className="inline-block px-2.5 py-1 bg-[#FCEE0A]/20 text-[#FCEE0A] border border-[#FCEE0A]/50 text-[9px] sm:text-[10px] font-black uppercase rounded animate-pulse">
-                  🎲 RODANDO...
+            {/* Tipografía idéntica a la animación de juego */}
+            <div className="space-y-1 w-full text-center z-10">
+              <h4 className="text-3xl sm:text-4xl font-black uppercase tracking-wider text-white">
+                D20:{' '}
+                <span
+                  className={
+                    hasLanded
+                      ? playerWon
+                        ? 'text-[#FCEE0A] drop-shadow-[0_0_20px_#FCEE0A]'
+                        : 'text-gray-500'
+                      : 'text-[#FCEE0A]'
+                  }
+                >
+                  {displayPlayerRoll}
                 </span>
-              ) : playerWon ? (
-                <span className="inline-block px-3 py-1 bg-[#FCEE0A] text-black text-[10px] sm:text-xs font-black uppercase rounded shadow-[0_0_15px_rgba(252,238,10,0.8)]">
-                  🏆 ¡GANADOR!
-                </span>
-              ) : (
-                <span className="inline-block px-2 py-0.5 bg-gray-900 text-gray-400 border border-gray-700 text-[9px] font-bold uppercase rounded">
-                  PUNTOS: {playerRoll}
-                </span>
-              )}
+              </h4>
+              <span className="text-xs block font-bold text-gray-400">
+                {hasLanded ? (
+                  playerWon ? (
+                    <span className="inline-block px-2.5 py-0.5 bg-[#FCEE0A] text-black font-black uppercase rounded shadow">
+                      🏆 ¡GANADOR!
+                    </span>
+                  ) : (
+                    <span>Puntuación: {playerRoll}</span>
+                  )
+                ) : (
+                  '🎲 Rodando...'
+                )}
+              </span>
             </div>
           </div>
 
           {/* 2. DADO DEL RIVAL: ROJO (#FF003C) */}
           <div
-            className={`p-3.5 sm:p-5 rounded-xl border-2 transition-all duration-300 flex flex-col items-center justify-between gap-3 relative overflow-hidden ${
+            style={{ clipPath: CYBER_CLIP }}
+            className={`p-4 sm:p-6 rounded border-2 transition-all duration-300 flex flex-col items-center justify-between gap-3 relative overflow-hidden ${
               hasLanded && !playerWon
-                ? 'border-[#FF003C] bg-gradient-to-b from-[#FF003C]/20 via-black/80 to-black/95 shadow-[0_0_40px_rgba(255,0,60,0.45)] scale-105'
-                : 'border-[#FF003C]/40 bg-black/60 shadow-[0_0_20px_rgba(255,0,60,0.15)]'
+                ? 'border-[#FF003C] bg-gradient-to-b from-[#FF003C]/20 via-[#070a10] to-[#070a10] shadow-[0_0_45px_rgba(255,0,60,0.5)] scale-105'
+                : 'border-[#FF003C]/40 bg-[#070a10] shadow-[0_0_20px_rgba(255,0,60,0.15)]'
             }`}
           >
-            <div className="flex items-center gap-1.5 text-[10px] sm:text-xs font-black uppercase text-[#FF003C] tracking-wider">
+            {/* Rayos láser en la tarjeta */}
+            <div className="absolute inset-x-0 h-0.5 bg-gradient-to-r from-transparent via-[#FF003C] to-transparent top-0 animate-pulse" />
+            <div className="absolute inset-x-0 h-0.5 bg-gradient-to-r from-transparent via-[#FF003C] to-transparent bottom-0 animate-pulse" />
+
+            <div className="flex items-center gap-1.5 text-[11px] sm:text-xs font-black uppercase text-[#FF003C] tracking-wider z-10">
               <span className="w-2 h-2 rounded-full bg-[#FF003C] animate-pulse" />
               <span>D20 DEL RIVAL</span>
             </div>
 
-            <div className="py-2">
-              <CyberD20Die
-                theme="red"
+            {/* Dado girando a toda velocidad como cuando juegas */}
+            <motion.div
+              animate={
+                hasLanded
+                  ? { rotate: 0, scale: [1.3, 1], y: [-12, 0] }
+                  : {
+                      rotate: [0, -90, -180, -270, -360],
+                      scale: [0.95, 1.15, 0.95, 1.1, 1],
+                      y: [0, 10, -5, 5, 0]
+                    }
+              }
+              transition={
+                hasLanded
+                  ? { duration: 0.45, type: 'spring' }
+                  : { repeat: Infinity, duration: 0.45, ease: 'linear' }
+              }
+              className="my-3 relative flex items-center justify-center"
+            >
+              <PolyhedralDie
+                type="d20"
                 value={displayBotRoll}
-                isRolling={isRolling}
-                isWinner={hasLanded && !playerWon}
-                isLoser={hasLanded && playerWon}
                 size={110}
+                isWaiting={false}
+                isStolen={false}
+                colorScheme="red"
               />
-            </div>
+            </motion.div>
 
-            <div className="w-full text-center">
-              {isRolling ? (
-                <span className="inline-block px-2.5 py-1 bg-[#FF003C]/20 text-[#FF003C] border border-[#FF003C]/50 text-[9px] sm:text-[10px] font-black uppercase rounded animate-pulse">
-                  🎲 RODANDO...
+            {/* Tipografía idéntica a la animación de juego */}
+            <div className="space-y-1 w-full text-center z-10">
+              <h4 className="text-3xl sm:text-4xl font-black uppercase tracking-wider text-white">
+                D20:{' '}
+                <span
+                  className={
+                    hasLanded
+                      ? !playerWon
+                        ? 'text-[#FF003C] drop-shadow-[0_0_20px_#FF003C]'
+                        : 'text-gray-500'
+                      : 'text-[#FF003C]'
+                  }
+                >
+                  {displayBotRoll}
                 </span>
-              ) : !playerWon ? (
-                <span className="inline-block px-3 py-1 bg-[#FF003C] text-white text-[10px] sm:text-xs font-black uppercase rounded shadow-[0_0_15px_rgba(255,0,60,0.8)]">
-                  🤖 ¡GANADOR!
-                </span>
-              ) : (
-                <span className="inline-block px-2 py-0.5 bg-gray-900 text-gray-400 border border-gray-700 text-[9px] font-bold uppercase rounded">
-                  PUNTOS: {botRoll}
-                </span>
-              )}
+              </h4>
+              <span className="text-xs block font-bold text-gray-400">
+                {hasLanded ? (
+                  !playerWon ? (
+                    <span className="inline-block px-2.5 py-0.5 bg-[#FF003C] text-white font-black uppercase rounded shadow">
+                      🤖 ¡GANADOR!
+                    </span>
+                  ) : (
+                    <span>Puntuación: {botRoll}</span>
+                  )
+                ) : (
+                  '🎲 Rodando...'
+                )}
+              </span>
             </div>
           </div>
         </div>
@@ -1811,16 +1709,16 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
     }
   };
 
-  // Volver a tirar los dados D20 para decidir quién empieza
+  // Volver a tirar los dados D20 para decidir quién empieza (entropía criptográfica uniforme)
   const handleRerollD20 = () => {
     if (!gameState || !gameState.pendingFirstPlayerSelection) return;
-    let pRoll = Math.floor(Math.random() * 20) + 1;
-    let bRoll = Math.floor(Math.random() * 20) + 1;
+    let pRoll = rollSecureD20();
+    let bRoll = rollSecureD20();
     while (pRoll === bRoll) {
-      bRoll = Math.floor(Math.random() * 20) + 1;
+      bRoll = rollSecureD20();
     }
     const rollWinner = pRoll > bRoll ? 'player' : 'bot';
-    const botDecidedStarter = rollWinner === 'bot' ? (Math.random() < 0.5 ? 'bot' : 'player') : null;
+    const botDecidedStarter = rollWinner === 'bot' ? (rollSecureD20() <= 10 ? 'bot' : 'player') : null;
 
     setGameState((prev) => {
       if (!prev) return prev;
