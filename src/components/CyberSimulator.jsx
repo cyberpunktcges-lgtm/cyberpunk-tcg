@@ -29,6 +29,7 @@ import {
 } from 'lucide-react';
 import {
   createInitialGameState,
+  applyStartingPlayer,
   calculateStreetCred,
   getAvailableEddies,
   getTotalAvailableEddies,
@@ -441,6 +442,9 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
   // Modal de activación de River Ward u otras leyendas para elegir Gear y Unidad destino
   const [pendingLegendGearModal, setPendingLegendGearModal] = useState(null);
 
+  // Modal de solicitud y aceptación de revancha tras finalizar una partida
+  const [rematchModal, setRematchModal] = useState(null);
+
   // Drawer / menú lateral HUD para resoluciones móviles y tablets (< lg)
   const [isHudOpen, setIsHudOpen] = useState(false);
 
@@ -494,6 +498,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
         setShowLogModal(false);
         setViewingTrashModal(null);
         setPendingLegendGearModal(null);
+        setRematchModal(null);
       }
     };
     window.addEventListener('keydown', handleKeyDown);
@@ -1241,7 +1246,13 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
   }, []);
 
   // Inicializar o reiniciar partida (preserva guardado si forceNew es false)
-  const handleStartGame = (pDeckIdx = selectedPlayerDeckIdx, bDeckIdx = selectedBotDeckIdx, forceNew = false) => {
+  const handleStartGame = (
+    pDeckIdx = selectedPlayerDeckIdx,
+    bDeckIdx = selectedBotDeckIdx,
+    forceNew = false,
+    startingPlayer = null,
+    isRematch = false
+  ) => {
     if (!forceNew) {
       const saved = loadSavedGame();
       if (saved && saved.gameState) {
@@ -1265,7 +1276,10 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
     const bDeck =
       availableDecks[bDeckIdx] || availableDecks[1] || availableDecks[0] || { deckList: [], legends: [] };
 
-    const initial = createInitialGameState(pDeck, bDeck, initialCards);
+    const initial = createInitialGameState(pDeck, bDeck, initialCards, {
+      startingPlayer,
+      isRematch
+    });
     setGameState(initial);
     setHistory([]);
     setSelectedHandCard(null);
@@ -1287,11 +1301,43 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
     }
   };
 
+  // Confirmar la elección de quién empieza tras la tirada de D20 inicial
+  const handleConfirmStartingPlayer = (starterKey) => {
+    if (!gameState || !gameState.pendingFirstPlayerSelection) return;
+    const { playerRoll, botRoll, rollWinner } = gameState.pendingFirstPlayerSelection;
+    applyStartingPlayer(gameState, starterKey);
+
+    const winnerText = rollWinner === 'player' ? 'Tú' : 'El Rival';
+    const starterText = starterKey === 'player' ? 'Netrunner (Tú)' : 'AI Netrunner (Bot)';
+
+    gameState.actionLog.unshift(
+      `🎲 [Elección de Primer Turno] Tras la tirada de D20 (${playerRoll} vs ${botRoll}, ganó ${winnerText}), se determinó que el primer turno lo jugará: ${starterText}.`
+    );
+
+    delete gameState.pendingFirstPlayerSelection;
+    setGameState({ ...gameState });
+
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem(
+          CP_SIM_STORAGE_KEY,
+          JSON.stringify({
+            gameState,
+            selectedPlayerDeckIdx,
+            selectedBotDeckIdx,
+            history,
+            savedAt: Date.now()
+          })
+        );
+      } catch {}
+    }
+  };
+
   // Reiniciar partida con aviso de confirmación
   const handleResetGame = () => {
     if (
       window.confirm(
-        '¿Deseas iniciar una nueva partida?\nSe reiniciará la mesa de combate y volverás a la fase inicial de elección de mano (Keep/Mulligan) y tirada de Gig en el Fixer.'
+        '¿Deseas iniciar una nueva partida?\nSe reiniciará la mesa de combate, se realizará una nueva tirada de D20 para decidir quién empieza y volverás a la fase inicial de Keep/Mulligan.'
       )
     ) {
       try {
@@ -1306,6 +1352,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
       setPreviewCard(null);
       setHistory([]);
       setHolocall(null);
+      setRematchModal(null);
       handleStartGame(selectedPlayerDeckIdx, selectedBotDeckIdx, true);
     }
   };
@@ -3731,8 +3778,141 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
           MENÚS DESPLEGABLES / FLOTANTES (Fondo Translúcido y font-mono)
          ===================================================================== */}
 
+      {/* 0. MODAL DE TIRADA DE D20 INICIAL (ELECCIÓN DE PRIMER TURNO) */}
+      {gameState?.pendingFirstPlayerSelection && (() => {
+        const { playerRoll, botRoll, rollWinner, botDecidedStarter } = gameState.pendingFirstPlayerSelection;
+        const playerWon = rollWinner === 'player';
+
+        return (
+          <div className="fixed inset-0 z-50 bg-[#000000]/90 backdrop-blur-md flex items-center justify-center p-4 font-mono select-none">
+            <motion.div
+              initial={{ scale: 0.94, opacity: 0, y: 15 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              style={{ clipPath: CYBER_CLIP }}
+              className="max-w-2xl w-full bg-[#070a10]/98 border-2 border-[#0dfceb] p-6 sm:p-8 text-center space-y-6 shadow-[0_0_70px_rgba(13,252,235,0.45)] relative max-h-[90vh] overflow-y-auto cyber-scrollbar"
+            >
+              {/* Cabecera */}
+              <div className="flex items-center justify-between border-b border-[#0dfceb]/40 pb-3">
+                <div className="flex items-center gap-2">
+                  <span className="w-3 h-3 bg-[#0dfceb] rounded-full animate-ping" />
+                  <span className="text-xs sm:text-sm font-black uppercase tracking-wider text-[#0dfceb]">
+                    INICIO DE PARTIDA // TIRADA DE D20
+                  </span>
+                </div>
+                <span className="text-[10px] text-[#FCEE0A] uppercase font-bold tracking-widest">
+                  DECISIÓN DE PRIMER TURNO
+                </span>
+              </div>
+
+              {/* Explicación oficial */}
+              <p className="text-xs sm:text-sm text-gray-300 leading-relaxed max-w-lg mx-auto">
+                Al comenzar la partida en Night City, ambos jugadores lanzan su dado <strong>D20</strong>. El jugador con la puntuación más alta <strong>elige si sale él primero o sale el oponente</strong>.
+              </p>
+
+              {/* Duelo de dados D20 */}
+              <div className="grid grid-cols-2 gap-4 sm:gap-6 py-2 max-w-md mx-auto">
+                {/* Dado del Jugador */}
+                <div className={`p-4 rounded border-2 transition-all flex flex-col items-center justify-center gap-2 ${
+                  playerWon
+                    ? 'border-[#0dfceb] bg-[#0dfceb]/10 shadow-[0_0_30px_rgba(13,252,235,0.35)] scale-105'
+                    : 'border-gray-700 bg-black/60 opacity-70'
+                }`}>
+                  <span className="text-[10px] sm:text-xs font-black uppercase text-[#0dfceb] tracking-wider">
+                    TU DADO D20
+                  </span>
+                  <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full border-2 border-[#0dfceb] flex items-center justify-center bg-black/90 shadow-inner">
+                    <span className="text-2xl sm:text-3xl font-black text-white font-mono">
+                      {playerRoll}
+                    </span>
+                  </div>
+                  {playerWon && (
+                    <span className="px-2 py-0.5 bg-[#0dfceb] text-black text-[9px] font-black uppercase rounded shadow">
+                      🏆 ¡GANADOR!
+                    </span>
+                  )}
+                </div>
+
+                {/* Dado del Rival */}
+                <div className={`p-4 rounded border-2 transition-all flex flex-col items-center justify-center gap-2 ${
+                  !playerWon
+                    ? 'border-[#FF003C] bg-[#FF003C]/10 shadow-[0_0_30px_rgba(255,0,60,0.35)] scale-105'
+                    : 'border-gray-700 bg-black/60 opacity-70'
+                }`}>
+                  <span className="text-[10px] sm:text-xs font-black uppercase text-[#FF003C] tracking-wider">
+                    D20 DEL RIVAL
+                  </span>
+                  <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full border-2 border-[#FF003C] flex items-center justify-center bg-black/90 shadow-inner">
+                    <span className="text-2xl sm:text-3xl font-black text-white font-mono">
+                      {botRoll}
+                    </span>
+                  </div>
+                  {!playerWon && (
+                    <span className="px-2 py-0.5 bg-[#FF003C] text-white text-[9px] font-black uppercase rounded shadow">
+                      🤖 ¡GANADOR!
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* Panel de decisión */}
+              {playerWon ? (
+                <div className="space-y-4 pt-1">
+                  <div className="p-3 bg-[#0dfceb]/10 border border-[#0dfceb]/40 rounded">
+                    <h4 className="text-sm font-black text-[#FCEE0A] uppercase">
+                      ¡HAS GANADO LA TIRADA ({playerRoll} vs {botRoll})!
+                    </h4>
+                    <p className="text-xs text-gray-300 mt-1">
+                      Elige quién jugará el primer turno de la partida:
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-lg mx-auto">
+                    <button
+                      type="button"
+                      onClick={() => handleConfirmStartingPlayer('player')}
+                      style={{ clipPath: CYBER_BUTTON }}
+                      className="py-3.5 px-4 bg-[#0dfceb] hover:bg-white text-black font-black text-xs uppercase tracking-wider cursor-pointer transition-all shadow-[0_0_20px_rgba(13,252,235,0.6)]"
+                    >
+                      🚀 SALIR YO PRIMERO
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleConfirmStartingPlayer('bot')}
+                      style={{ clipPath: CYBER_BUTTON }}
+                      className="py-3.5 px-4 bg-black border-2 border-[#FCEE0A] hover:bg-[#FCEE0A] hover:text-black text-[#FCEE0A] font-black text-xs uppercase tracking-wider cursor-pointer transition-all shadow-[0_0_20px_rgba(252,238,10,0.3)]"
+                    >
+                      🛡️ QUE SALGA EL RIVAL
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-4 pt-1">
+                  <div className="p-3 bg-red-950/30 border border-[#FF003C]/40 rounded text-left sm:text-center">
+                    <h4 className="text-sm font-black text-[#FF003C] uppercase">
+                      EL RIVAL HA GANADO LA TIRADA ({botRoll} vs {playerRoll})
+                    </h4>
+                    <p className="text-xs text-gray-200 mt-1">
+                      🤖 El rival ha tomado su decisión táctica: <strong>{botDecidedStarter === 'bot' ? 'Ha decidido salir él primero.' : 'Ha decidido cederte la iniciativa y que salgas tú primero.'}</strong>
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => handleConfirmStartingPlayer(botDecidedStarter)}
+                    style={{ clipPath: CYBER_BUTTON }}
+                    className="py-3.5 px-6 bg-[#0dfceb] hover:bg-white text-black font-black text-xs uppercase tracking-widest cursor-pointer transition-all shadow-[0_0_20px_rgba(13,252,235,0.6)]"
+                  >
+                    CONTINUAR // RESOLVER MULLIGAN
+                  </button>
+                </div>
+              )}
+            </motion.div>
+          </div>
+        );
+      })()}
+
       {/* 1. MODAL FLOTANTE DE MULLIGAN (INICIO DE PARTIDA) - ANCHO EXPANDIDO */}
-      {!gameState.mulliganDecided && (
+      {!gameState.mulliganDecided && !gameState.pendingFirstPlayerSelection && (
         <div className="fixed inset-0 z-50 bg-[#000000]/85 backdrop-blur-md flex items-center justify-center p-4 font-mono">
           <div
             style={{ clipPath: CYBER_CLIP }}
@@ -4202,26 +4382,108 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
               </p>
             </div>
 
+            <div className="space-y-3 pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  // El oponente acepta la revancha y la IA elige quién sale (randomizado)
+                  const botWantsToGoFirst = Math.random() < 0.5;
+                  const starter = botWantsToGoFirst ? 'bot' : 'player';
+                  setRematchModal({
+                    isOpen: true,
+                    botWantsToGoFirst,
+                    starter
+                  });
+                }}
+                style={{ clipPath: CYBER_BUTTON }}
+                className="w-full py-3.5 bg-[#0dfceb] hover:bg-white text-black font-black text-xs uppercase tracking-widest cursor-pointer transition-all shadow-[0_0_20px_rgba(13,252,235,0.7)] flex items-center justify-center gap-2"
+              >
+                <Swords className="w-4 h-4" />
+                <span>⚔️ SOLICITAR REVANCHA AL RIVAL</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  try {
+                    if (typeof window !== 'undefined') {
+                      localStorage.removeItem(CP_SIM_STORAGE_KEY);
+                    }
+                  } catch {}
+                  setRematchModal(null);
+                  handleStartGame(selectedPlayerDeckIdx, selectedBotDeckIdx, true);
+                }}
+                style={{ clipPath: CYBER_BUTTON }}
+                className="w-full py-2.5 bg-black/80 border border-gray-700 hover:border-[#FCEE0A] text-gray-400 hover:text-[#FCEE0A] font-black text-xs uppercase tracking-widest cursor-pointer transition-all"
+              >
+                🔄 NUEVA PARTIDA (REINICIAR MESA Y D20)
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 5.1. MODAL DE REVANCHA ACEPTADA POR EL RIVAL (LA IA ELIGE QUIÉN SALE) */}
+      {rematchModal?.isOpen && (
+        <div className="fixed inset-0 z-50 bg-[#000000]/90 backdrop-blur-md flex items-center justify-center p-4 font-mono select-none">
+          <motion.div
+            initial={{ scale: 0.94, opacity: 0, y: 15 }}
+            animate={{ scale: 1, opacity: 1, y: 0 }}
+            style={{ clipPath: CYBER_CLIP }}
+            className="max-w-lg w-full bg-[#070a10]/98 border-2 border-[#0dfceb] p-6 text-center space-y-5 shadow-[0_0_60px_rgba(13,252,235,0.45)]"
+          >
+            <div className="flex items-center justify-center gap-2">
+              <span className="w-3 h-3 bg-[#0dfceb] rounded-full animate-ping" />
+              <span className="text-xs font-black uppercase tracking-widest text-[#0dfceb]">
+                REVANCHA // NIGHT CITY
+              </span>
+            </div>
+
+            <div className="space-y-2">
+              <span className="text-4xl block">⚔️</span>
+              <h3 className="text-2xl font-black text-white uppercase tracking-wider">
+                ¡EL RIVAL HA ACEPTADO LA REVANCHA!
+              </h3>
+              <p className="text-xs text-gray-300 leading-relaxed">
+                El rival acepta volver a enfrentarse a ti. En Cyberpunk TCG, en la revancha <strong>es el oponente (la IA) quien elige quién empieza el primer turno</strong>.
+              </p>
+            </div>
+
+            {/* Decisión de la IA */}
+            <div className="p-4 rounded border-2 border-[#FCEE0A]/60 bg-[#FCEE0A]/10 space-y-2 text-left">
+              <div className="flex items-center gap-2">
+                <span className="px-2 py-0.5 bg-[#FCEE0A] text-black font-black text-[9px] uppercase rounded">
+                  DECISIÓN DEL RIVAL (IA)
+                </span>
+                <span className="text-xs font-black text-white uppercase">
+                  {rematchModal.botWantsToGoFirst ? 'EL RIVAL SALE PRIMERO' : 'EL RIVAL TE CEDE EL TURNO (SALES TÚ)'}
+                </span>
+              </div>
+              <p className="text-xs text-gray-200">
+                {rematchModal.botWantsToGoFirst
+                  ? '🤖 "Esta vez tomaré la iniciativa desde el primer turno. Salgo yo primero."'
+                  : '🤝 "Adelante, Netrunner. Te concedo el primer turno de nuevo. Veamos qué tienes preparado."'}
+              </p>
+            </div>
+
             <button
               type="button"
               onClick={() => {
+                const starter = rematchModal.starter;
+                setRematchModal(null);
                 try {
                   if (typeof window !== 'undefined') {
                     localStorage.removeItem(CP_SIM_STORAGE_KEY);
                   }
                 } catch {}
-                handleStartGame(selectedPlayerDeckIdx, selectedBotDeckIdx, true);
+                handleStartGame(selectedPlayerDeckIdx, selectedBotDeckIdx, true, starter, true);
               }}
               style={{ clipPath: CYBER_BUTTON }}
-              className={`w-full py-3.5 font-black text-xs uppercase tracking-widest cursor-pointer transition-all ${
-                gameState.winner === 'player'
-                  ? 'bg-[#FCEE0A] hover:bg-[#0dfceb] text-[#070a10] shadow-[0_0_20px_rgba(252,238,10,0.5)]'
-                  : 'bg-[#FF003C] hover:bg-white text-white hover:text-[#070a10] shadow-[0_0_20px_rgba(255,0,60,0.5)]'
-              }`}
+              className="w-full py-3.5 bg-[#0dfceb] hover:bg-white text-black font-black text-xs uppercase tracking-widest cursor-pointer shadow-[0_0_20px_rgba(13,252,235,0.7)] transition-all"
             >
-              JUGAR OTRA PARTIDA
+              🚀 COMENZAR REVANCHA
             </button>
-          </div>
+          </motion.div>
         </div>
       )}
 

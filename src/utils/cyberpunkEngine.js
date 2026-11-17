@@ -133,7 +133,7 @@ export function shuffleDeck(cards) {
  * 5. Mano inicial de 6 cartas.
  * 6. Opción de 1 Mulligan por partida.
  */
-export function createInitialGameState(playerDeckInput, botDeckInput, allCards = []) {
+export function createInitialGameState(playerDeckInput, botDeckInput, allCards = [], options = {}) {
   // Mapa de búsqueda rápida de la base de datos oficial
   const cardLookup = new Map();
   allCards.forEach((c) => {
@@ -189,9 +189,6 @@ export function createInitialGameState(playerDeckInput, botDeckInput, allCards =
 
   // 1. Preparar mazo y leyendas del jugador (posicionadas aleatoriamente al inicio)
   const shuffledRawPlayerLegends = shuffleDeck([...(playerDeckInput.legends || [])]).slice(0, 3);
-  const playerLegends = shuffledRawPlayerLegends.map((l, idx) =>
-    enrichLegend(l, 'p', idx, idx < 2)
-  );
 
   // Expandir mazo del jugador por qty
   const rawPlayerCards = [];
@@ -205,9 +202,6 @@ export function createInitialGameState(playerDeckInput, botDeckInput, allCards =
 
   // 2. Preparar mazo y leyendas del Bot (posicionadas aleatoriamente al inicio)
   const shuffledRawBotLegends = shuffleDeck([...(botDeckInput.legends || [])]).slice(0, 3);
-  const botLegends = shuffledRawBotLegends.map((l, idx) =>
-    enrichLegend(l, 'b', idx, false)
-  );
 
   const rawBotCards = [];
   (botDeckInput.deckList || botDeckInput.cards || []).forEach((c) => {
@@ -222,24 +216,74 @@ export function createInitialGameState(playerDeckInput, botDeckInput, allCards =
   const playerHand = shuffledPlayerDeck.splice(0, 6);
   const botHand = shuffledBotDeck.splice(0, 6);
 
-  const initialLog = [
-    '// SISTEMA DE COMBATE NETWATCH INICIALIZADO',
-    '// REGLAMENTO OFICIAL NIGHT CITY (SET 01)',
-    'Partida iniciada: Jugador 1 (Tú) vs Jugador 2 (Bot).',
-    'Penalización de Turno 1: Tus 2 leyendas de la izquierda empiezan giradas y no se enderezan en este primer turno.',
-    'Ambos jugadores tienen 6 dados en el Fixer (D4 hasta D20) y 6 cartas en mano.',
-    'Decide si conservar tu mano o realizar tu único Mulligan de 6 cartas.'
-  ];
+  // Determinación de quién empieza:
+  // Si se especifica startingPlayer (ej. en una revancha decidida por la IA):
+  let initialActivePlayer = options.startingPlayer || 'player';
+  let pendingFirstPlayerSelection = null;
+  let initialLog = [];
+
+  if (options.startingPlayer) {
+    const isBot = options.startingPlayer === 'bot';
+    initialLog = [
+      '// SISTEMA DE COMBATE NETWATCH INICIALIZADO',
+      '// REGLAMENTO OFICIAL NIGHT CITY (SET 01)',
+      options.isRematch
+        ? `⚔️ PARTIDA DE REVANCHA: ¡El rival aceptó la revancha y decidió que ${isBot ? 'sale ÉL primero' : 'sales TÚ primero'}!`
+        : `Partida iniciada: El primer turno lo jugará ${isBot ? 'AI Netrunner (Bot)' : 'Netrunner (Tú)'}.`,
+      `Penalización de Turno 1: Las 2 leyendas izquierdas de ${isBot ? 'el Bot' : 'tu zona'} empiezan giradas y no se enderezan este primer turno.`,
+      'Ambos jugadores tienen 6 dados en el Fixer (D4 hasta D20) y 6 cartas en mano.',
+      'Decide si conservar tu mano o realizar tu único Mulligan de 6 cartas.'
+    ];
+  } else {
+    // Primera partida: Tirada de D20 inicial entre ambos jugadores
+    let pRoll = Math.floor(Math.random() * 20) + 1;
+    let bRoll = Math.floor(Math.random() * 20) + 1;
+    while (pRoll === bRoll) {
+      bRoll = Math.floor(Math.random() * 20) + 1;
+    }
+    const rollWinner = pRoll > bRoll ? 'player' : 'bot';
+    // Si gana el bot la tirada, la IA randomiza quién empieza (50% jugador, 50% bot)
+    const botDecidedStarter = rollWinner === 'bot' ? (Math.random() < 0.5 ? 'bot' : 'player') : null;
+
+    pendingFirstPlayerSelection = {
+      playerRoll: pRoll,
+      botRoll: bRoll,
+      rollWinner,
+      botDecidedStarter
+    };
+
+    initialLog = [
+      '// SISTEMA DE COMBATE NETWATCH INICIALIZADO',
+      '// REGLAMENTO OFICIAL NIGHT CITY (SET 01)',
+      `🎲 Tirada de D20 inicial: Tú [${pRoll}] vs Rival [${bRoll}].`,
+      rollWinner === 'player'
+        ? '🏆 ¡Has ganado la tirada de D20! Elige si sales tú primero o sale el oponente.'
+        : `🤖 El rival ha ganado la tirada de D20 y ha decidido: ${botDecidedStarter === 'bot' ? 'Salir él primero' : 'Que salgas tú primero'}.`
+    ];
+  }
+
+  // Leyendas con penalización de Turno 1 (solo para el jugador inicial si ya está determinado)
+  const isPlayerFirst = options.startingPlayer ? options.startingPlayer === 'player' : true;
+  const isBotFirst = options.startingPlayer ? options.startingPlayer === 'bot' : false;
+
+  const playerLegends = shuffledRawPlayerLegends.map((l, idx) =>
+    enrichLegend(l, 'p', idx, isPlayerFirst ? idx < 2 : false)
+  );
+
+  const botLegends = shuffledRawBotLegends.map((l, idx) =>
+    enrichLegend(l, 'b', idx, isBotFirst ? idx < 2 : false)
+  );
 
   const state = {
     turnNumber: 1,
-    activePlayer: 'player', // 'player' | 'bot'
+    activePlayer: initialActivePlayer, // 'player' | 'bot'
     phase: 'START', // 'START' | 'MAIN' | 'END'
     isGameOver: false,
     winner: null,
     overtime: false,
     combatEvent: null, // Si hay un ataque o evento en curso
     mulliganDecided: false, // Control de fase inicial de Keep / Mulligan
+    pendingFirstPlayerSelection, // Activo durante la tirada inicial de D20
     actionLog: initialLog,
 
     player: {
@@ -250,7 +294,7 @@ export function createInitialGameState(playerDeckInput, botDeckInput, allCards =
       field: [], // Unidades en juego
       trash: [], // Cementerio
       legends: playerLegends, // 3 slots de leyendas
-      legendsDoNotReadyTurn1: true, // Penalización oficial del primer jugador
+      legendsDoNotReadyTurn1: isPlayerFirst, // Penalización oficial del primer jugador
       eddies: [], // Cartas boca abajo que dan 1 €$ cada una
       floatingEddies: 0, // Eddies actualmente girados listos para gastar
       fixerDice: ['d4', 'd6', 'd8', 'd10', 'd12', 'd20'],
@@ -267,7 +311,7 @@ export function createInitialGameState(playerDeckInput, botDeckInput, allCards =
       field: [],
       trash: [],
       legends: botLegends,
-      legendsDoNotReadyTurn1: false,
+      legendsDoNotReadyTurn1: isBotFirst,
       eddies: [],
       floatingEddies: 0,
       fixerDice: ['d4', 'd6', 'd8', 'd10', 'd12', 'd20'],
@@ -278,6 +322,34 @@ export function createInitialGameState(playerDeckInput, botDeckInput, allCards =
   };
 
   return state;
+}
+
+/**
+ * Aplica la elección del jugador inicial tras la tirada de D20 o revancha:
+ * Ajusta activePlayer y la penalización oficial de Turno 1 en las 2 primeras leyendas.
+ */
+export function applyStartingPlayer(state, starterKey) {
+  if (!state) return;
+  state.activePlayer = starterKey;
+  if (starterKey === 'player') {
+    state.player.legendsDoNotReadyTurn1 = true;
+    state.bot.legendsDoNotReadyTurn1 = false;
+    (state.player.legends || []).forEach((l, idx) => {
+      l.isSpent = idx < 2;
+    });
+    (state.bot.legends || []).forEach((l) => {
+      l.isSpent = false;
+    });
+  } else {
+    state.bot.legendsDoNotReadyTurn1 = true;
+    state.player.legendsDoNotReadyTurn1 = false;
+    (state.bot.legends || []).forEach((l, idx) => {
+      l.isSpent = idx < 2;
+    });
+    (state.player.legends || []).forEach((l) => {
+      l.isSpent = false;
+    });
+  }
 }
 
 /**
