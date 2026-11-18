@@ -21,6 +21,7 @@ import {
   Sparkles,
   ArrowRight,
   Maximize2,
+  Minimize2,
   Undo2,
   Bot,
   User,
@@ -825,6 +826,65 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
 
   // Drawer / menú lateral HUD para resoluciones móviles y tablets (< lg)
   const [isHudOpen, setIsHudOpen] = useState(false);
+
+  // Estados de Adaptación de Resolución, Zoom y Pantalla Completa
+  const [zoomMode, setZoomMode] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('cyber_sim_zoom') || 'auto';
+    }
+    return 'auto';
+  });
+  const [autoScale, setAutoScale] = useState(1);
+  const [isKiroshiCollapsed, setIsKiroshiCollapsed] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('cyber_sim_kiroshi_collapsed') === 'true';
+    }
+    return false;
+  });
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  // Cálculo dinámico de autoScale para que todo el tablero encaje sin scroll vertical
+  useEffect(() => {
+    const handleResize = () => {
+      if (typeof window === 'undefined') return;
+      const h = window.innerHeight;
+      // Espacio disponible para el campo de batalla entre cabecera (~45px) y dock inferior (~135px)
+      const availH = Math.max(300, h - 180);
+      const refH = 570;
+      const calculatedScale = Math.min(1.0, Math.max(0.65, Math.round((availH / refH) * 100) / 100));
+      setAutoScale(calculatedScale);
+    };
+
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  // Escuchar cambios de Pantalla Completa nativa del navegador
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(Boolean(document.fullscreenElement));
+    };
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+  }, []);
+
+  const toggleFullscreen = () => {
+    if (typeof document === 'undefined') return;
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen().catch(() => {});
+    } else {
+      document.exitFullscreen().catch(() => {});
+    }
+  };
+
+  const effectiveScale = useMemo(() => {
+    if (zoomMode === '1') return 1;
+    if (zoomMode === '0.9') return 0.9;
+    if (zoomMode === '0.8') return 0.8;
+    if (zoomMode === '0.75') return 0.75;
+    return autoScale;
+  }, [zoomMode, autoScale]);
 
   // Menú contextual flotante sobre una Leyenda (elección entre HACER CALL y SACAR EDDIE)
   const [legendMenuId, setLegendMenuId] = useState(null);
@@ -2211,6 +2271,80 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
             <span className="tracking-wider text-[9px] uppercase">AUTOGUARDADO</span>
           </div>
 
+          {/* Selector de Zoom / Escala de Resolución */}
+          <div
+            style={{ clipPath: CYBER_BUTTON }}
+            className="flex items-center gap-1 px-2 py-1 bg-[#000000] border border-[#0dfceb]/40 text-xs font-mono text-[#0dfceb] shadow-[0_0_8px_rgba(13,252,235,0.15)]"
+            title="Ajusta el zoom para que todo el tablero encaje en tu pantalla sin scroll vertical"
+          >
+            <span className="hidden xl:inline text-[9px] font-bold text-gray-400 uppercase">ZOOM:</span>
+            <select
+              value={zoomMode}
+              onChange={(e) => {
+                setZoomMode(e.target.value);
+                try {
+                  localStorage.setItem('cyber_sim_zoom', e.target.value);
+                } catch (err) {}
+              }}
+              className="bg-transparent text-[#FCEE0A] font-black text-[11px] focus:outline-none cursor-pointer border-none py-0.5"
+            >
+              <option value="auto" className="bg-[#070a10] text-[#0dfceb]">
+                AUTO ({Math.round(autoScale * 100)}%)
+              </option>
+              <option value="1" className="bg-[#070a10] text-white">
+                100%
+              </option>
+              <option value="0.9" className="bg-[#070a10] text-white">
+                90%
+              </option>
+              <option value="0.8" className="bg-[#070a10] text-white">
+                80%
+              </option>
+              <option value="0.75" className="bg-[#070a10] text-white">
+                75%
+              </option>
+            </select>
+          </div>
+
+          {/* Botón Alternar Pantalla Completa (Fullscreen) */}
+          <button
+            type="button"
+            onClick={toggleFullscreen}
+            style={{ clipPath: CYBER_BUTTON }}
+            className={`p-1.5 bg-[#000000] border cursor-pointer transition-all hover:shadow-[0_0_15px_rgba(13,252,235,0.4)] ${
+              isFullscreen
+                ? 'border-[#FCEE0A] text-[#FCEE0A]'
+                : 'border-[#0dfceb]/40 hover:border-[#0dfceb] text-[#0dfceb] hover:text-white'
+            }`}
+            title={isFullscreen ? 'Salir de Pantalla Completa' : 'Pantalla Completa (Ocultar barras del navegador)'}
+          >
+            {isFullscreen ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
+          </button>
+
+          {/* Botón Desktop para Colapsar/Expandir Escáner Kiroshi y HUD lateral */}
+          <button
+            type="button"
+            onClick={() => {
+              setIsKiroshiCollapsed((prev) => {
+                const next = !prev;
+                try {
+                  localStorage.setItem('cyber_sim_kiroshi_collapsed', String(next));
+                } catch (err) {}
+                return next;
+              });
+            }}
+            style={{ clipPath: CYBER_BUTTON }}
+            className={`hidden lg:flex px-2 sm:px-2.5 py-1.5 font-bold uppercase items-center gap-1.5 cursor-pointer text-xs transition-all ${
+              !isKiroshiCollapsed
+                ? 'bg-[#0dfceb]/15 border border-[#0dfceb] text-[#0dfceb] shadow-[0_0_10px_rgba(13,252,235,0.3)]'
+                : 'bg-[#000000] border border-gray-700 text-gray-400 hover:border-[#0dfceb] hover:text-[#0dfceb]'
+            }`}
+            title={isKiroshiCollapsed ? 'Mostrar Escáner Kiroshi y HUD lateral' : 'Colapsar panel lateral para dar máximo espacio al tablero'}
+          >
+            <Eye className="w-3.5 h-3.5" />
+            <span className="hidden xl:inline">{isKiroshiCollapsed ? 'VER HUD' : 'HUD'}</span>
+          </button>
+
           {/* Botón Reglas Rápidas */}
           <button
             type="button"
@@ -2256,7 +2390,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
           CUERPO PRINCIPAL DEL JUEGO:
           [PANEL IZQUIERDO: HUD DEL JUGADOR Y RIVAL] [CAMPO DE BATALLA CENTRAL]
          ===================================================================== */}
-      <div className="relative z-10 flex-1 flex flex-row overflow-hidden w-full">
+      <div className="relative z-10 flex-1 flex flex-row overflow-hidden w-full min-h-0">
         {/* Backdrop para cerrar el HUD en móviles cuando está abierto */}
         {isHudOpen && (
           <div
@@ -2275,8 +2409,8 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
         <aside
           className={`
             ${isHudOpen ? 'fixed inset-y-0 left-0 z-40 w-72 sm:w-80 shadow-2xl bg-[#070a10] flex' : 'hidden'}
-            lg:flex lg:static lg:w-64 xl:w-80 lg:shadow-none
-            bg-[#070a10]/95 border-r border-[#0dfceb]/30 p-2.5 sm:p-3 flex-col justify-between font-mono shrink-0 overflow-y-auto space-y-3 pb-36 cyber-scrollbar
+            ${isKiroshiCollapsed ? 'lg:hidden' : 'lg:flex lg:static lg:w-64 xl:w-76 lg:shadow-none'}
+            bg-[#070a10]/95 border-r border-[#0dfceb]/30 p-2 sm:p-2.5 flex-col justify-between font-mono shrink-0 overflow-y-auto space-y-2.5 pb-3 sm:pb-4 cyber-scrollbar
           `}
         >
           {/* Botón de cierre en pantalla móvil */}
@@ -2677,13 +2811,35 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
           </div>
         </aside>
 
+        {/* Tab flotante en el lateral izquierdo cuando el Escáner Kiroshi está colapsado */}
+        {isKiroshiCollapsed && (
+          <button
+            type="button"
+            onClick={() => {
+              setIsKiroshiCollapsed(false);
+              try {
+                localStorage.setItem('cyber_sim_kiroshi_collapsed', 'false');
+              } catch (err) {}
+            }}
+            className="hidden lg:flex fixed left-0 top-1/2 -translate-y-1/2 z-40 bg-[#070a10]/95 border-r-2 border-y-2 border-[#0dfceb] text-[#0dfceb] hover:text-[#070a10] hover:bg-[#0dfceb] py-3.5 px-1 cursor-pointer shadow-[0_0_15px_rgba(13,252,235,0.4)] transition-all font-mono text-[9px] font-black uppercase tracking-wider items-center gap-1 select-none"
+            style={{ writingMode: 'vertical-rl' }}
+            title="Expandir Escáner Kiroshi y HUD lateral"
+          >
+            <ChevronRight className="w-3 h-3 rotate-180" />
+            <span>ESCÁNER KIROSHI</span>
+          </button>
+        )}
+
         {/* ===============================================================
             CAMPO DE BATALLA CENTRAL:
             - Dos zonas principales: CAMPO DE BATALLA (Unidades) y ZONA DE EDDIES (Cartas vendibles boca abajo)
             - Tanto las unidades como los eddies gastados se giran 90 grados
             - Ambas zonas cuentan con soporte Drag & Drop
            =============================================================== */}
-        <main className="flex-1 flex flex-col justify-between overflow-y-auto relative p-2 sm:p-3 pb-36 sm:pb-40 gap-2 font-mono">
+        <main
+          style={effectiveScale < 1 ? { zoom: effectiveScale } : undefined}
+          className="flex-1 min-h-0 flex flex-col justify-between overflow-y-auto relative p-1.5 sm:p-2.5 pb-2 gap-1.5 font-mono cyber-scrollbar"
+        >
           {/* ===============================================================
               1. SECCIÓN SUPERIOR: TAPETE DEL RIVAL (BOT) — MODO ESPEJO
               - Fila superior (Backline): Leyendas (3 slots a la izquierda) + Zona de Eddies (a la derecha)
@@ -2724,7 +2880,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
               </div>
 
               {/* FILA SUPERIOR (BACKLINE): LEYENDAS RIVAL A LA IZQUIERDA + EDDIES RIVAL A LA DERECHA */}
-              <div className="h-20 sm:h-24 md:h-28 flex gap-2 items-stretch w-full">
+              <div className="h-16 sm:h-20 md:h-24 flex gap-1.5 sm:gap-2 items-stretch w-full">
                 {/* LEYENDAS RIVAL (3 SLOTS) A LA IZQUIERDA */}
                 <div className="rounded-2xl border border-[#FF003C]/30 bg-[#060b14]/80 p-1.5 sm:p-2 flex items-center justify-center gap-1.5 sm:gap-2 shrink-0">
                   {bot.legends.map((leg, i) => (
@@ -3429,7 +3585,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                     }
                   }
                 }}
-                className={`flex-1 rounded-2xl border transition-all p-2.5 sm:p-3 min-h-[140px] sm:min-h-[160px] flex items-center relative overflow-x-auto ${
+                className={`flex-1 rounded-2xl border transition-all p-2 sm:p-2.5 min-h-[110px] sm:min-h-[125px] md:min-h-[145px] flex items-center relative overflow-x-auto ${
                   isDragOverField
                     ? 'border-[#0dfceb] bg-[#0dfceb]/15 shadow-[0_0_35px_rgba(13,252,235,0.45)]'
                     : 'border-[#0dfceb]/30 bg-[#060b14]/80'
@@ -3473,8 +3629,8 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                         }}
                         className={`transition-all duration-300 flex flex-col items-center justify-center shrink-0 ${
                           unit.isSpent
-                            ? 'w-32 sm:w-36 md:w-40 h-20 sm:h-24 md:h-28 my-1'
-                            : 'w-20 sm:w-24 md:w-28 h-28 sm:h-34 md:h-38'
+                            ? 'w-28 sm:w-32 md:w-36 h-18 sm:h-22 md:h-26 my-1'
+                            : 'w-16 sm:w-20 md:w-24 h-24 sm:h-28 md:h-34'
                         }`}
                       >
                         <motion.div
@@ -3526,7 +3682,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                           }}
                           onContextMenu={(e) => handleCardRightClick(e, unit)}
                           style={{ clipPath: CYBER_CARD_CLIP }}
-                          className={`w-20 sm:w-24 md:w-28 h-28 sm:h-34 md:h-38 bg-black border-2 transition-transform duration-300 cursor-pointer flex flex-col justify-between relative shadow-xl ${
+                          className={`w-16 sm:w-20 md:w-24 h-24 sm:h-28 md:h-34 bg-black border-2 transition-transform duration-300 cursor-pointer flex flex-col justify-between relative shadow-xl ${
                             isCurrentBlocker
                               ? 'border-[#0dfceb] ring-4 ring-[#0dfceb] -translate-y-2 scale-105'
                               : isEligibleBlocker
@@ -3644,7 +3800,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                   {Array.from({ length: Math.max(0, 4 - p.field.length) }).map((_, slotIdx) => (
                     <div
                       key={`p-slot-${slotIdx}`}
-                      className="w-20 sm:w-24 md:w-28 h-28 sm:h-34 md:h-38 rounded-xl border border-[#0dfceb]/20 bg-black/25 flex items-center justify-center pointer-events-none shrink-0"
+                      className="w-16 sm:w-20 md:w-24 h-24 sm:h-28 md:h-34 rounded-xl border border-[#0dfceb]/20 bg-black/25 flex items-center justify-center pointer-events-none shrink-0"
                     />
                   ))}
                 </div>
@@ -3693,7 +3849,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
               </div>
 
               {/* FILA INFERIOR (BACKLINE): LEYENDAS JUGADOR A LA IZQUIERDA + ZONA DE EDDIES JUGADOR */}
-              <div className="h-20 sm:h-24 md:h-28 flex gap-2 items-stretch w-full">
+              <div className="h-16 sm:h-20 md:h-24 flex gap-1.5 sm:gap-2 items-stretch w-full">
                 {/* 1. LEYENDAS JUGADOR (3 SLOTS) A LA IZQUIERDA */}
                 <div className={`rounded-2xl border border-[#0dfceb]/30 bg-[#060b14]/80 p-1.5 sm:p-2 flex items-center justify-center gap-1.5 sm:gap-2 shrink-0 ${
                   legendMenuId ? 'relative z-40' : ''
@@ -4274,12 +4430,11 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
       </div>
 
       {/* =====================================================================
-          ZONA INFERIOR FIJA (MANO Y MAZOS):
-          - Contenedor fijo en la parte inferior para la mano del jugador
-          - A los lados: pilas de Mazo (deck) y Descartes (trash) mostrando el
-            reverso amarillo sólido (#FCEE0A) con diseño en diagonal
+          ZONA INFERIOR (MANO Y ACCIONES):
+          - Contenedor flexible en la parte inferior para la mano del jugador
+          - Dock horizontal responsivo que se adapta a cualquier resolución
          ===================================================================== */}
-      <footer className="fixed bottom-0 left-0 right-0 z-30 bg-[#070a10]/95 backdrop-blur-md border-t-2 border-[#0dfceb]/40 shadow-[0_-10px_35px_rgba(0,0,0,0.85)] font-mono">
+      <footer className="relative z-30 shrink-0 bg-[#070a10]/95 backdrop-blur-md border-t-2 border-[#0dfceb]/40 shadow-[0_-10px_35px_rgba(0,0,0,0.85)] font-mono overflow-visible">
         <div className="max-w-7xl mx-auto px-3 sm:px-5 py-2">
           {/* Barra Superior del Dock: Estado o Acciones de la Carta Seleccionada */}
           <div className="flex flex-wrap items-center justify-between text-xs border-b border-[#0dfceb]/20 pb-1.5 mb-1.5">
@@ -4423,7 +4578,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
               [CARRUSEL DE MANO IZQUIERDA/CENTRO] [PILAS DE MAZO Y TRASH A LA DERECHA] [BOTÓN TERMINAR TURNO DERECHA] */}
           <div className="flex items-center justify-between gap-3">
             {/* IZQUIERDA/CENTRO: Carrusel de cartas de la mano con Framer Motion (hover lift) */}
-            <div className="flex-1 flex items-center justify-start sm:justify-center gap-2 overflow-x-auto py-1 px-2">
+            <div className="flex-1 flex items-center justify-start sm:justify-center gap-2 overflow-x-auto overflow-y-visible pt-2.5 pb-1 px-2">
               {p.hand.map((card) => {
                 const isSelected = selectedHandCard?.instanceId === card.instanceId;
                 const canAfford = availableEddies >= (card.parsedCost || 0);
@@ -4459,7 +4614,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                     }}
                     onContextMenu={(e) => handleCardRightClick(e, card)}
                     style={{ clipPath: CYBER_CARD_CLIP }}
-                    className={`w-14 sm:w-18 md:w-22 h-20 sm:h-26 md:h-30 bg-black border transition-all duration-150 cursor-grab active:cursor-grabbing shrink-0 relative shadow-lg ${
+                    className={`w-13 sm:w-16 md:w-20 h-19 sm:h-24 md:h-28 bg-black border transition-all duration-150 cursor-grab active:cursor-grabbing shrink-0 relative shadow-lg ${
                       isSelected
                         ? 'border-[#FCEE0A] shadow-[0_0_25px_rgba(252,238,10,0.85)] -translate-y-4 scale-110 z-30'
                         : isJustDrawn
