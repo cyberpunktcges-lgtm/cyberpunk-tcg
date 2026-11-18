@@ -2596,8 +2596,8 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
            =============================================================== */}
         <aside
           className={`
-            ${isHudOpen ? 'fixed inset-y-0 left-0 z-40 w-72 sm:w-80 shadow-2xl bg-[#070a10] flex' : 'hidden'}
-            ${isKiroshiCollapsed ? 'lg:hidden' : 'lg:flex lg:static lg:w-64 xl:w-76 lg:shadow-none'}
+            ${isHudOpen ? 'fixed inset-y-0 left-0 z-40 w-80 sm:w-88 shadow-2xl bg-[#070a10] flex' : 'hidden'}
+            ${isKiroshiCollapsed ? 'lg:hidden' : 'lg:flex lg:static lg:w-72 xl:w-80 2xl:w-88 lg:shadow-none'}
             bg-[#070a10]/95 border-r border-[#0dfceb]/30 p-2 sm:p-2.5 flex-col justify-between font-mono shrink-0 overflow-y-auto space-y-2.5 pb-3 sm:pb-4 cyber-scrollbar
           `}
         >
@@ -2722,144 +2722,68 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
             </div>
 
             {displayCard ? (
-              <div className="w-full flex flex-col items-center gap-1.5">
-                {/* Imagen de la Carta en Miniatura Compacta (al hacer hover sale a tamaño completo) */}
+              <div className="w-full flex flex-col items-center">
+                {/* Carta a Máximo Tamaño en el Escáner Kiroshi */}
                 <div
-                  onMouseEnter={() => setIsKiroshiHoverZoom(true)}
-                  onMouseLeave={() => setIsKiroshiHoverZoom(false)}
                   onClick={() => setInspectedCard(displayCard)}
                   onContextMenu={(e) => handleCardRightClick(e, displayCard)}
-                  className="relative w-28 sm:w-32 aspect-[7/10] rounded overflow-hidden border-2 border-[#FCEE0A] shadow-[0_0_15px_rgba(252,238,10,0.4)] bg-black cursor-pointer group transition-transform duration-200 hover:scale-[1.03] shrink-0"
-                  title="Clic izquierdo o derecho para ver en PANTALLA COMPLETA // Pasa el ratón para ver a tamaño completo"
+                  className="relative w-full aspect-[7/10] rounded-lg overflow-hidden border-2 border-[#FCEE0A] shadow-[0_0_25px_rgba(252,238,10,0.45)] bg-black cursor-pointer group transition-all duration-200 hover:border-[#0dfceb] hover:shadow-[0_0_35px_rgba(13,252,235,0.6)] shrink-0"
+                  title="Clic para ampliar a pantalla completa // Clic derecho para opciones"
                 >
                   <img
                     src={displayCard.image}
                     alt={displayCard.name}
-                    className="w-full h-full object-cover"
+                    className="w-full h-full object-contain bg-black"
                   />
+
+                  {/* Insignia de Poder Dinámico si está en juego y modificado */}
                   {(displayCard.currentPower !== undefined || (displayCard.parsedPower !== undefined && displayCard.parsedPower > 0)) && (
-                    <div className="absolute bottom-1 right-1 px-2 py-0.5 bg-[#FCEE0A] text-[#070a10] font-mono font-black text-xs shadow-md rounded">
-                      ⚡ {displayCard.currentPower !== undefined ? displayCard.currentPower : displayCard.parsedPower}
+                    <div className="absolute bottom-1.5 right-1.5 px-2.5 py-0.5 bg-[#FCEE0A] text-[#070a10] font-mono font-black text-xs sm:text-sm shadow-xl rounded border border-black flex items-center gap-1">
+                      <span>⚡</span>
+                      <span>{displayCard.currentPower !== undefined ? displayCard.currentPower : displayCard.parsedPower}</span>
                     </div>
                   )}
 
-                  {/* Overlay indicando tamaño completo */}
-                  <div className="absolute inset-0 bg-[#0dfceb]/15 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
-                    <span className="px-2 py-0.5 bg-black/85 border border-[#0dfceb] text-[#0dfceb] text-[8px] font-mono font-black uppercase rounded shadow">
-                      🔍 TAMAÑO COMPLETO
-                    </span>
-                  </div>
-                </div>
-
-                {/* Nombre y Coste */}
-                <div className="w-full flex items-center justify-between px-1 text-xs mt-0.5">
-                  <span className="font-black text-white truncate max-w-[170px] uppercase">
-                    {displayCard.name}
-                  </span>
-                  <span className="text-[#0dfceb] font-black shrink-0">
-                    {displayCard.parsedCost !== undefined && displayCard.parsedCost !== null
-                      ? `${displayCard.parsedCost} €$`
-                      : 'LEYENDA'}
-                  </span>
-                </div>
-
-                {/* Si es una leyenda boca abajo del jugador, avisar en qué slot está */}
-                {p.legends.some((l) => l.instanceId === displayCard.instanceId) && !displayCard.isFaceUp && (
-                  <div className="w-full bg-[#0dfceb]/15 border border-[#0dfceb]/40 px-2 py-0.5 rounded text-[8px] font-mono text-[#0dfceb] font-bold text-center mt-1">
-                    👑 TU LEYENDA (SLOT #{p.legends.findIndex((l) => l.instanceId === displayCard.instanceId) + 1} • BOCA ABAJO)
-                  </div>
-                )}
-
-                {/* Tipo oficial */}
-                {(() => {
-                  const type = getCardType(displayCard);
-                  const isProg = type === 'PROGRAM';
-                  const isGr = type === 'GEAR';
-                  return (
-                    <div className="w-full flex items-center gap-1.5 px-1 text-[8px] font-bold">
-                      <span className={`px-1.5 py-0.2 rounded uppercase ${
-                        isProg ? 'bg-[#0dfceb]/20 text-[#0dfceb] border border-[#0dfceb]/40' :
-                        isGr ? 'bg-[#FCEE0A]/20 text-[#FCEE0A] border border-[#FCEE0A]/40' :
-                        'bg-gray-800 text-gray-300'
-                      }`}>
-                        {isProg ? '💾 PROGRAMA (A TRASH TRAS LANZARSE)' :
-                         isGr ? '🔧 GEAR (EQUIPABLE A UNIDAD/LEYENDA)' :
-                         type}
-                      </span>
+                  {/* Insignia de Gear equipado si tiene */}
+                  {displayCard.gear && displayCard.gear.length > 0 && (
+                    <div className="absolute top-1.5 right-1.5 px-2 py-0.5 bg-[#FCEE0A] text-black font-mono font-black text-[9px] uppercase shadow-lg rounded border border-black flex items-center gap-1">
+                      <span>🔧</span>
+                      <span>{displayCard.gear.length} GEAR</span>
                     </div>
-                  );
-                })()}
+                  )}
 
-                {/* Lista de Gears equipados si los tiene */}
-                {displayCard.gear && displayCard.gear.length > 0 && (
-                  <div className="w-full bg-[#070a10] border border-[#FCEE0A]/40 rounded p-1 text-[8px] space-y-0.5">
-                    <span className="text-[#FCEE0A] font-bold block uppercase">
-                      🔧 EQUIPO ANEXADO ({displayCard.gear.length}):
-                    </span>
-                    {displayCard.gear.map((g, gi) => (
-                      <div key={gi} className="flex justify-between text-gray-300">
-                        <span className="truncate max-w-[130px]">• {g.name}</span>
-                        <span className="text-[#0dfceb] font-bold">{g.powerVal || g.power || ''}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {/* Palabras clave (100% seguro para string, array o undefined) */}
-                {(() => {
-                  const kws = getCardKeywordsArray(displayCard);
-                  if (kws.length === 0) return null;
-                  return (
-                    <div className="w-full flex flex-wrap gap-1 px-1">
-                      {kws.map((kw, idx) => (
-                        <span
-                          key={idx}
-                          className="px-1.5 py-0.2 bg-[#0dfceb]/20 text-[#0dfceb] border border-[#0dfceb]/40 text-[8px] font-bold uppercase rounded"
-                        >
-                          {kw}
+                  {/* Estado especial sobreimpreso si está gastada o en lag */}
+                  {(displayCard.isSpent || displayCard.isLagging) && (
+                    <div className="absolute top-1.5 left-1.5 flex flex-col gap-1">
+                      {displayCard.isSpent && (
+                        <span className="px-1.5 py-0.5 bg-[#FF003C] text-white font-mono font-black text-[8px] uppercase rounded shadow">
+                          GASTADA
                         </span>
-                      ))}
+                      )}
+                      {displayCard.isLagging && (
+                        <span className="px-1.5 py-0.5 bg-[#FF003C] text-white font-mono font-black text-[8px] uppercase rounded shadow">
+                          LAG
+                        </span>
+                      )}
                     </div>
-                  );
-                })()}
+                  )}
 
-                {/* Estados especiales: Gastada o Lag */}
-                {(displayCard.isSpent || displayCard.isLagging) && (
-                  <div className="w-full flex items-center gap-2 px-1 text-[8px] font-bold">
-                    {displayCard.isSpent && (
-                      <span className="text-[#FF003C] uppercase">⚠ GASTADA</span>
-                    )}
-                    {displayCard.isLagging && (
-                      <span className="text-[#FF003C] uppercase">⚠ LAG (ESTE TURNO)</span>
-                    )}
+                  {/* Hint al pasar el ratón */}
+                  <div className="absolute inset-0 bg-[#0dfceb]/10 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
+                    <span className="px-2.5 py-1 bg-black/90 border border-[#0dfceb] text-[#0dfceb] text-[8px] font-mono font-black uppercase rounded shadow-lg">
+                      🔍 CLIC // AMPLIAR
+                    </span>
                   </div>
-                )}
-
-                {/* Texto de reglas oficial de la carta (Motor de Habilidades) */}
-                {(() => {
-                  const rules = getCardRulesText(displayCard);
-                  if (!rules) return null;
-                  return (
-                    <div className="w-full bg-[#030712] border border-[#0dfceb]/35 rounded p-1.5 text-[9px] font-mono space-y-1 text-gray-200 leading-snug shadow-sm">
-                      <div className="flex items-center gap-1 text-[8px] font-bold text-[#0dfceb] uppercase tracking-wider border-b border-[#0dfceb]/20 pb-0.5">
-                        <Sparkles className="w-2.5 h-2.5 text-[#FCEE0A]" />
-                        <span>REGLAS / HABILIDAD:</span>
-                      </div>
-                      <div className="whitespace-pre-line text-gray-300">
-                        {rules}
-                      </div>
-                    </div>
-                  );
-                })()}
+                </div>
 
                 {/* Si la carta mostrada es una Leyenda del jugador boca abajo, ofrecer botón directo de Call */}
                 {p.legends.some((l) => l.instanceId === displayCard.instanceId) && !displayCard.isFaceUp && (
-                  <div className="w-full pt-2 mt-1 border-t border-[#0dfceb]/30">
+                  <div className="w-full pt-1.5 mt-1 border-t border-[#0dfceb]/30">
                     <button
                       type="button"
                       disabled={p.hasCalledLegendThisTurn}
                       onClick={() => handleCallLegendAction(displayCard.instanceId)}
-                      className={`w-full py-2 px-2.5 rounded font-mono font-black text-[10px] uppercase tracking-wider flex items-center justify-between transition-all ${
+                      className={`w-full py-1.5 px-2.5 rounded font-mono font-black text-[10px] uppercase tracking-wider flex items-center justify-between transition-all ${
                         p.hasCalledLegendThisTurn
                           ? 'bg-gray-900 text-gray-500 border border-gray-800 cursor-not-allowed'
                           : availableEddies > 0
@@ -2874,23 +2798,90 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                       <span className="text-[9px] px-1.5 py-0.5 bg-black text-[#0dfceb] rounded">1 €$</span>
                     </button>
                     {p.hasCalledLegendThisTurn && (
-                      <span className="text-[8px] text-gray-500 block text-center mt-1">
+                      <span className="text-[8px] text-gray-500 block text-center mt-0.5">
                         Límite alcanzado: 1 llamada por turno.
                       </span>
                     )}
                   </div>
                 )}
+
+                {/* Información detallada opcional desplazada más abajo */}
+                <details className="w-full mt-1.5 group border-t border-[#0dfceb]/20 pt-1">
+                  <summary className="text-[8px] font-mono font-bold text-gray-400 hover:text-[#0dfceb] cursor-pointer flex items-center justify-between uppercase tracking-wider select-none py-0.5">
+                    <span className="flex items-center gap-1">
+                      <span>▸</span>
+                      <span>DETALLES TÁCTICOS</span>
+                    </span>
+                    <span className="text-[#0dfceb] text-[8px] font-black">
+                      {displayCard.name}
+                    </span>
+                  </summary>
+
+                  <div className="pt-1.5 space-y-1 text-[8px] font-mono">
+                    <div className="flex justify-between items-center text-white font-bold pb-0.5 border-b border-gray-800">
+                      <span className="truncate">{displayCard.name}</span>
+                      <span className="text-[#0dfceb] shrink-0 font-black">
+                        {displayCard.parsedCost !== undefined && displayCard.parsedCost !== null ? `${displayCard.parsedCost} €$` : 'LEYENDA'}
+                      </span>
+                    </div>
+
+                    {/* Gears equipados */}
+                    {displayCard.gear && displayCard.gear.length > 0 && (
+                      <div className="bg-[#070a10] border border-[#FCEE0A]/40 rounded p-1 text-[8px] space-y-0.5">
+                        <span className="text-[#FCEE0A] font-bold block uppercase">
+                          🔧 EQUIPO ANEXADO ({displayCard.gear.length}):
+                        </span>
+                        {displayCard.gear.map((g, gi) => (
+                          <div key={gi} className="flex justify-between text-gray-300">
+                            <span className="truncate max-w-[150px]">• {g.name}</span>
+                            <span className="text-[#0dfceb] font-bold">{g.powerVal || g.power || ''}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Palabras clave */}
+                    {(() => {
+                      const kws = getCardKeywordsArray(displayCard);
+                      if (kws.length === 0) return null;
+                      return (
+                        <div className="flex flex-wrap gap-1">
+                          {kws.map((kw, idx) => (
+                            <span key={idx} className="px-1.5 py-0.2 bg-[#0dfceb]/20 text-[#0dfceb] border border-[#0dfceb]/40 text-[7px] font-bold uppercase rounded">
+                              {kw}
+                            </span>
+                          ))}
+                        </div>
+                      );
+                    })()}
+
+                    {/* Reglas de la carta */}
+                    {(() => {
+                      const rules = getCardRulesText(displayCard);
+                      if (!rules) return null;
+                      return (
+                        <div className="bg-[#030712] border border-[#0dfceb]/35 rounded p-1 text-[8px] text-gray-300 leading-snug">
+                          <div className="flex items-center gap-1 text-[7px] font-bold text-[#0dfceb] uppercase pb-0.5 border-b border-[#0dfceb]/20 mb-0.5">
+                            <Sparkles className="w-2 h-2 text-[#FCEE0A]" />
+                            <span>TEXTO DE REGLAS:</span>
+                          </div>
+                          <div className="whitespace-pre-line">{rules}</div>
+                        </div>
+                      );
+                    })()}
+                  </div>
+                </details>
               </div>
             ) : (
-              <div className="flex-1 flex flex-col items-center justify-center text-center p-3 text-gray-500 py-6">
-                <div className="w-10 h-10 rounded-full border border-dashed border-[#0dfceb]/40 flex items-center justify-center mb-2 animate-pulse">
-                  <span className="text-[#0dfceb] text-base font-black">⊕</span>
+              <div className="w-full aspect-[7/10] rounded-lg border border-dashed border-[#0dfceb]/30 bg-[#070a10]/50 flex flex-col items-center justify-center p-3 text-center select-none">
+                <div className="w-10 h-10 rounded-full border border-dashed border-[#0dfceb]/50 flex items-center justify-center mb-2 animate-pulse">
+                  <span className="text-[#0dfceb] text-lg font-black">⊕</span>
                 </div>
-                <span className="text-[10px] text-gray-400 uppercase font-bold block mb-1">
-                  PASA EL RATÓN SOBRE UNA CARTA
+                <span className="text-[10px] text-[#0dfceb] uppercase font-black tracking-widest block mb-1">
+                  ESCÁNER ACTIVO
                 </span>
-                <span className="text-[8px] text-gray-600 block max-w-[180px]">
-                  Pasa el cursor sobre cualquier carta boca arriba en el campo, leyendas o mano para verla en grande.
+                <span className="text-[8px] text-gray-400 block max-w-[190px] leading-relaxed">
+                  Pasa el cursor sobre cualquier carta en juego, leyendas o mano para escanearla en tamaño grande.
                 </span>
               </div>
             )}
