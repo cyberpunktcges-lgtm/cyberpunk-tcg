@@ -189,6 +189,7 @@ export default function CyberpunkPortal({
   }, [cmsState.tournaments, cmsState.pastTournaments]);
 
   const altArtCards = (cmsState.altArtCards || []).slice(0, 3);
+  const forumUrl = 'https://foro.cyberpunktcg.es';
   const allCards = initialCards || [];
 
   // Estados de filtrado de Noticias (Portada y Página /noticias)
@@ -1118,7 +1119,14 @@ export default function CyberpunkPortal({
       badge: `${allCards.length}`
     },
     { id: 'mazos', name: 'Mazos', href: '/mazos', icon: Layers, badge: 'META' },
-    { id: 'torneos', name: 'Torneos', href: '/torneos', icon: Trophy }
+    { id: 'torneos', name: 'Torneos', href: '/torneos', icon: Trophy },
+    {
+      id: 'foro',
+      name: 'Foro',
+      href: forumUrl,
+      icon: MessageSquare,
+      external: true
+    }
   ];
 
   // Categorías únicas de noticias
@@ -4735,6 +4743,20 @@ export default function CyberpunkPortal({
           </div>
 
           <div className="flex flex-wrap items-center justify-center md:justify-end gap-5">
+            <a
+              href="https://foro.cyberpunktcg.es"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-[#00F0FF] hover:text-[#FCEE0A] font-bold uppercase transition-colors flex items-center gap-1.5"
+              title="Abrir foro de la comunidad en nueva pestaña"
+            >
+              <MessageSquare className="w-3.5 h-3.5" />
+              <span>FORO COMUNIDAD</span>
+              <ExternalLink className="w-3 h-3 opacity-70" />
+            </a>
+
+            <span className="text-gray-700 hidden sm:inline">•</span>
+
             <a
               href="mailto:cyberpunktcges@gmail.com"
               className="text-gray-300 hover:text-[#FCEE0A] font-bold transition-colors flex items-center gap-1.5 bg-[#070a10] border border-gray-800 hover:border-[#FCEE0A] px-3 py-1.5"
