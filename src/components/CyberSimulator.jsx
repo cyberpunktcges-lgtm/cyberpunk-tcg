@@ -3299,7 +3299,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
               </div>
 
               {/* FRONTLINE: CAMPO DE BATALLA DEL RIVAL (FIELD) — CARTAS MÁS PEQUEÑAS CON HOVER PREVIEW */}
-              <div className="flex-1 rounded-2xl border border-[#FF003C]/30 bg-[#060b14]/80 p-2 sm:p-2.5 min-h-[90px] sm:min-h-[110px] flex items-center relative overflow-x-auto">
+              <div className="flex-1 rounded-2xl border border-[#FF003C]/30 bg-[#060b14]/80 p-2 sm:p-2.5 pt-6 pb-2 min-h-[135px] sm:min-h-[150px] md:min-h-[165px] flex items-center relative overflow-x-auto overflow-y-hidden">
                 <div className="flex items-center gap-2.5 sm:gap-3 w-full justify-start">
                   {bot.field.map((unit) => {
                     const canAttackThisUnit =
@@ -3316,12 +3316,56 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                           setPreviewCard(unit);
                         }}
                         onMouseLeave={() => setHoveredCard(null)}
-                        className={`transition-all duration-300 flex items-center justify-center shrink-0 ${
+                        className={`relative transition-all duration-300 flex flex-col items-center justify-center shrink-0 ${
                           unit.isSpent
                             ? 'w-24 sm:w-28 h-16 sm:h-20 my-0.5'
                             : 'w-14 sm:w-16 md:w-20 h-20 sm:h-24 md:h-28'
                         }`}
                       >
+                        {/* GEARS EQUIPADOS AL RIVAL (Sobresaliendo por detrás escalonados hacia arriba y a la derecha) */}
+                        {unit.gear && unit.gear.length > 0 && unit.gear.map((g, gIdx) => {
+                          const offsetTop = (gIdx + 1) * 20;
+                          const offsetLeft = (gIdx + 1) * 4;
+                          return (
+                            <div
+                              key={g.instanceId || `bot-gear-bg-${gIdx}`}
+                              style={{
+                                clipPath: CYBER_CARD_CLIP,
+                                top: `-${offsetTop}px`,
+                                left: `${offsetLeft}px`,
+                                zIndex: gIdx + 1,
+                              }}
+                              onMouseEnter={(e) => {
+                                e.stopPropagation();
+                                setHoveredCard(g);
+                                setPreviewCard(g);
+                              }}
+                              onMouseLeave={() => setHoveredCard(null)}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setInspectedCard(g);
+                              }}
+                              onContextMenu={(e) => handleCardRightClick(e, g)}
+                              className="absolute w-14 sm:w-16 md:w-20 h-20 sm:h-24 md:h-28 bg-[#070a10] border-2 border-[#FF003C] shadow-[0_0_12px_rgba(255,0,60,0.7)] hover:border-[#FCEE0A] hover:shadow-[0_0_18px_rgba(252,238,10,0.9)] hover:-translate-y-1 transition-all cursor-pointer group pointer-events-auto"
+                              title={`Gear equipado en el rival: ${g.name} (${g.powerVal || g.power || '+Fuerza'}) - Clic para ver`}
+                            >
+                              {g.image && (
+                                <img
+                                  src={g.image}
+                                  alt={g.name}
+                                  className="w-full h-full object-cover object-top opacity-90 group-hover:opacity-100 transition-opacity"
+                                />
+                              )}
+                              <div className="absolute top-0 inset-x-0 bg-black/90 border-b border-[#FF003C] px-1 py-0.5 flex items-center justify-between text-[6px] sm:text-[7px] font-mono font-black text-[#FF003C]">
+                                <span className="truncate max-w-[70%]">🔧 {g.name}</span>
+                                <span className="text-[#FCEE0A] shrink-0 font-black">
+                                  {g.powerVal || g.power || 'GEAR'}
+                                </span>
+                              </div>
+                            </div>
+                          );
+                        })}
+
                         <motion.div
                           layout
                           initial={{ opacity: 0, scale: 0.8 }}
@@ -3354,7 +3398,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                           }}
                           onContextMenu={(e) => handleCardRightClick(e, unit)}
                           style={{ clipPath: CYBER_CARD_CLIP }}
-                          className={`w-14 sm:w-16 md:w-20 h-20 sm:h-24 md:h-28 bg-black border-2 transition-transform duration-300 cursor-pointer flex flex-col justify-between relative shadow-xl ${
+                          className={`w-14 sm:w-16 md:w-20 h-20 sm:h-24 md:h-28 bg-black border-2 transition-transform duration-300 cursor-pointer flex flex-col justify-between relative shadow-xl z-10 ${
                             canAttackThisUnit
                               ? 'border-[#FF003C] ring-2 ring-[#FF003C] shadow-[0_0_20px_rgba(255,0,60,0.9)] animate-pulse rotate-90'
                               : unit.isSpent
@@ -3421,12 +3465,12 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                           )}
                         </motion.div>
 
-                        {/* GEARS EQUIPADOS AL RIVAL (Sobresaliendo por debajo de la unidad) */}
+                        {/* GEARS EQUIPADOS AL RIVAL (Chips identificativos debajo de la unidad) */}
                         {unit.gear && unit.gear.length > 0 && (
-                          <div className="w-full flex flex-col items-center -mt-1 z-0">
+                          <div className="w-full flex flex-col items-center mt-1 z-20 space-y-0.5">
                             {unit.gear.map((g, gIdx) => (
                               <div
-                                key={g.instanceId || gIdx}
+                                key={g.instanceId || `bot-chip-${gIdx}`}
                                 onMouseEnter={(e) => {
                                   e.stopPropagation();
                                   setHoveredCard(g);
@@ -3439,13 +3483,13 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                                 }}
                                 onContextMenu={(e) => handleCardRightClick(e, g)}
                                 style={{ clipPath: CYBER_CARD_CLIP }}
-                                className="w-[92%] h-5 sm:h-6 bg-[#070a10] border border-[#FF003C]/80 flex items-center justify-between px-1 py-0.5 cursor-pointer shadow hover:border-[#FCEE0A] transition-all -mt-0.5 group"
-                                title={`Gear equipado: ${g.name} (${g.power || '+Fuerza'}) - Clic para ver`}
+                                className="w-full h-5 sm:h-6 bg-[#070a10] border border-[#FF003C] hover:bg-[#FF003C] hover:text-white text-[#FF003C] flex items-center justify-between px-1.5 py-0.5 cursor-pointer shadow hover:border-[#FCEE0A] transition-all group"
+                                title={`Gear equipado: ${g.name} (${g.powerVal || g.power || '+Fuerza'}) - Clic para ver`}
                               >
-                                <span className="text-[6px] sm:text-[7px] text-[#FF003C] group-hover:text-white truncate font-bold">
+                                <span className="text-[6px] sm:text-[7px] group-hover:text-white truncate font-bold">
                                   🔧 {g.name}
                                 </span>
-                                <span className="text-[6px] sm:text-[7px] font-black text-[#FCEE0A] shrink-0">
+                                <span className="text-[6px] sm:text-[7px] font-black text-[#FCEE0A] group-hover:text-white shrink-0">
                                   {g.powerVal || g.power || 'GEAR'}
                                 </span>
                               </div>
@@ -3773,7 +3817,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                     }
                   }
                 }}
-                className={`flex-1 rounded-2xl border transition-all p-2 sm:p-2.5 min-h-[110px] sm:min-h-[125px] md:min-h-[145px] flex items-center relative overflow-x-auto ${
+                className={`flex-1 rounded-2xl border transition-all p-2 sm:p-2.5 pt-7 pb-2 min-h-[150px] sm:min-h-[165px] md:min-h-[185px] flex items-center relative overflow-x-auto overflow-y-hidden ${
                   isDragOverField
                     ? 'border-[#0dfceb] bg-[#0dfceb]/15 shadow-[0_0_35px_rgba(13,252,235,0.45)]'
                     : 'border-[#0dfceb]/30 bg-[#060b14]/80'
@@ -3815,12 +3859,56 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                             handlePlayCard(draggedCardId, unit.instanceId);
                           }
                         }}
-                        className={`transition-all duration-300 flex flex-col items-center justify-center shrink-0 ${
+                        className={`relative transition-all duration-300 flex flex-col items-center justify-center shrink-0 ${
                           unit.isSpent
                             ? 'w-28 sm:w-32 md:w-36 h-18 sm:h-22 md:h-26 my-1'
                             : 'w-16 sm:w-20 md:w-24 h-24 sm:h-28 md:h-34'
                         }`}
                       >
+                        {/* GEARS EQUIPADOS AL JUGADOR (Sobresaliendo por detrás escalonados hacia arriba y a la derecha) */}
+                        {unit.gear && unit.gear.length > 0 && unit.gear.map((g, gIdx) => {
+                          const offsetTop = (gIdx + 1) * 22;
+                          const offsetLeft = (gIdx + 1) * 4;
+                          return (
+                            <div
+                              key={g.instanceId || `player-gear-bg-${gIdx}`}
+                              style={{
+                                clipPath: CYBER_CARD_CLIP,
+                                top: `-${offsetTop}px`,
+                                left: `${offsetLeft}px`,
+                                zIndex: gIdx + 1,
+                              }}
+                              onMouseEnter={(e) => {
+                                e.stopPropagation();
+                                setHoveredCard(g);
+                                setPreviewCard(g);
+                              }}
+                              onMouseLeave={() => setHoveredCard(null)}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setInspectedCard(g);
+                              }}
+                              onContextMenu={(e) => handleCardRightClick(e, g)}
+                              className="absolute w-16 sm:w-20 md:w-24 h-24 sm:h-28 md:h-34 bg-[#070a10] border-2 border-[#FCEE0A] shadow-[0_0_15px_rgba(252,238,10,0.8)] hover:border-[#0dfceb] hover:shadow-[0_0_20px_rgba(13,252,235,0.95)] hover:-translate-y-1 transition-all cursor-pointer group pointer-events-auto"
+                              title={`Gear equipado: ${g.name} (${g.powerVal || g.power || '+Fuerza'}) - Clic para ver carta completa`}
+                            >
+                              {g.image && (
+                                <img
+                                  src={g.image}
+                                  alt={g.name}
+                                  className="w-full h-full object-cover object-top opacity-90 group-hover:opacity-100 transition-opacity"
+                                />
+                              )}
+                              <div className="absolute top-0 inset-x-0 bg-black/90 border-b border-[#FCEE0A] px-1 py-0.5 flex items-center justify-between text-[7px] sm:text-[8px] font-mono font-black text-[#FCEE0A]">
+                                <span className="truncate max-w-[70%]">🔧 {g.name}</span>
+                                <span className="text-[#0dfceb] shrink-0 font-black">
+                                  {g.powerVal || g.power || 'GEAR'}
+                                </span>
+                              </div>
+                            </div>
+                          );
+                        })}
+
                         <motion.div
                           layout
                           initial={{ opacity: 0, scale: 0.8 }}
@@ -3870,7 +3958,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                           }}
                           onContextMenu={(e) => handleCardRightClick(e, unit)}
                           style={{ clipPath: CYBER_CARD_CLIP }}
-                          className={`w-16 sm:w-20 md:w-24 h-24 sm:h-28 md:h-34 bg-black border-2 transition-transform duration-300 cursor-pointer flex flex-col justify-between relative shadow-xl ${
+                          className={`w-16 sm:w-20 md:w-24 h-24 sm:h-28 md:h-34 bg-black border-2 transition-transform duration-300 cursor-pointer flex flex-col justify-between relative z-10 shadow-xl ${
                             isCurrentBlocker
                               ? 'border-[#0dfceb] ring-4 ring-[#0dfceb] -translate-y-2 scale-105'
                               : isEligibleBlocker
@@ -3947,12 +4035,12 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                           )}
                         </motion.div>
 
-                        {/* GEARS EQUIPADOS AL JUGADOR (Sobresaliendo por debajo de la unidad) */}
+                        {/* GEARS EQUIPADOS AL JUGADOR (Chips identificativos debajo de la unidad) */}
                         {unit.gear && unit.gear.length > 0 && (
-                          <div className="w-full flex flex-col items-center -mt-2 z-0">
+                          <div className="w-full flex flex-col items-center mt-1 z-20 space-y-0.5">
                             {unit.gear.map((g, gIdx) => (
                               <div
-                                key={g.instanceId || gIdx}
+                                key={g.instanceId || `p-chip-${gIdx}`}
                                 onMouseEnter={(e) => {
                                   e.stopPropagation();
                                   setHoveredCard(g);
@@ -3965,15 +4053,13 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                                 }}
                                 onContextMenu={(e) => handleCardRightClick(e, g)}
                                 style={{ clipPath: CYBER_CARD_CLIP }}
-                                className="w-[92%] h-6 sm:h-7 bg-[#070a10] border border-[#FCEE0A] flex items-center justify-between px-1.5 py-0.5 cursor-pointer shadow-[0_4px_10px_rgba(0,0,0,0.8)] hover:border-[#0dfceb] transition-all -mt-1 group"
-                                title={`Gear equipado: ${g.name} (${g.power || '+Fuerza'}) - Clic para ver`}
+                                className="w-full h-6 sm:h-7 bg-[#070a10] border border-[#FCEE0A] hover:bg-[#FCEE0A] hover:text-black text-[#FCEE0A] flex items-center justify-between px-1.5 py-0.5 cursor-pointer shadow hover:border-[#0dfceb] transition-all group"
+                                title={`Gear equipado: ${g.name} (${g.powerVal || g.power || '+Fuerza'}) - Clic para ver`}
                               >
-                                <div className="flex items-center gap-1 min-w-0">
-                                  <span className="text-[7px] sm:text-[8px] text-[#FCEE0A] group-hover:text-white truncate font-bold">
-                                    🔧 {g.name}
-                                  </span>
-                                </div>
-                                <span className="text-[7px] sm:text-[8px] font-black text-[#0dfceb] shrink-0">
+                                <span className="text-[7px] sm:text-[8px] group-hover:text-black truncate font-bold">
+                                  🔧 {g.name}
+                                </span>
+                                <span className="text-[7px] sm:text-[8px] font-black text-[#0dfceb] group-hover:text-black shrink-0">
                                   {g.powerVal || g.power || 'GEAR'}
                                 </span>
                               </div>
