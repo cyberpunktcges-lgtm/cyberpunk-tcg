@@ -1423,8 +1423,8 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
       `⚔️ [FASE 1: DECLARACIÓN DE ATAQUE] ${gameState.player.name} gira a "${selectedFieldUnit.name}" [Fuerza: ${selectedFieldUnit.currentPower}] y ataca a ${targetDesc}. (Trigger ATTACK ejecutado).`
     );
 
-    // Si el trigger de ataque disparó una elección interactiva (cartas o modal), pausar combate
-    if (gameState.pendingCardChoice || gameState.pendingModalChoice) {
+    // Si el trigger de ataque disparó una elección interactiva (cartas, modal o selección de objetivo), pausar combate
+    if (gameState.pendingCardChoice || gameState.pendingModalChoice || gameState.pendingTargetSelection) {
       gameState.pendingAttackContinuation = {
         targetType,
         targetUnitId,
@@ -1539,6 +1539,21 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
 
     // Dexter DeShawn
     if (optionId === 'DEXTER_BUFF') {
+      if ((p.field || []).length > 1) {
+        gameState.pendingTargetSelection = {
+          actionType: 'TARGET_UNIT',
+          effectType: 'BUFF',
+          amount: 2,
+          targetScope: 'FRIENDLY_UNITS',
+          title: '💼 DEXTER DESHAWN // MEJORAR FUERZA',
+          prompt: 'Selecciona una unidad amiga para otorgarle +2 de poder este turno:',
+          sourceCardName: 'Dexter DeShawn',
+          sourceCardImage: choice.sourceCardImage
+        };
+        delete gameState.pendingModalChoice;
+        setGameState({ ...gameState });
+        return;
+      }
       const target = p.field && p.field.length > 0 ? p.field[0] : null;
       if (target) {
         target.currentPower = (target.currentPower || target.power || 0) + 2;
@@ -1559,6 +1574,27 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
 
     // Dum Dum
     else if (optionId === 'DUMDUM_SAC_GEAR') {
+      const allPlayerGears = [];
+      (p.field || []).forEach((u) => {
+        (u.gear || []).forEach((g) => {
+          allPlayerGears.push({ gear: g, unit: u });
+        });
+      });
+
+      if (allPlayerGears.length > 1) {
+        gameState.pendingTargetSelection = {
+          actionType: 'TARGET_GEAR',
+          gearAction: 'DUMDUM_REWARD',
+          title: '💉 DUM DUM // SACRIFICAR GEAR',
+          prompt: 'Selecciona el Gear que deseas destruir para robar 2 cartas:',
+          sourceCardName: 'Dum Dum',
+          sourceCardImage: choice.sourceCardImage
+        };
+        delete gameState.pendingModalChoice;
+        setGameState({ ...gameState });
+        return;
+      }
+
       let sacrificed = null;
       for (const unit of p.field || []) {
         if (unit.gear && unit.gear.length > 0) {
@@ -1591,6 +1627,20 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
 
     // Muamar Reyes
     else if (optionId === 'MUAMAR_PROTECT') {
+      if ((p.field || []).length > 1) {
+        gameState.pendingTargetSelection = {
+          actionType: 'TARGET_UNIT',
+          effectType: 'PROTECT',
+          targetScope: 'FRIENDLY_UNITS',
+          title: '🚗 MUAMAR REYES // INMUNIDAD EN COMBATE',
+          prompt: 'Selecciona una unidad amiga: no podrá ser derrotada en combate este turno:',
+          sourceCardName: 'Muamar Reyes',
+          sourceCardImage: choice.sourceCardImage
+        };
+        delete gameState.pendingModalChoice;
+        setGameState({ ...gameState });
+        return;
+      }
       const target = p.field && p.field.length > 0 ? p.field[0] : null;
       if (target) {
         target.cannotBeDefeatedThisTurn = true;
@@ -1611,7 +1661,22 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
 
     // Padre
     else if (optionId === 'PADRE_SPEND_RIVAL') {
-      const target = (opp.field || []).find((u) => !u.isSpent) || opp.field?.[0];
+      const eligible = (opp.field || []).filter((u) => !u.isSpent);
+      if (eligible.length > 1) {
+        gameState.pendingTargetSelection = {
+          actionType: 'TARGET_UNIT',
+          effectType: 'SPEND',
+          targetScope: 'RIVAL_UNITS',
+          title: '✝️ PADRE // GIRAR UNIDAD RIVAL',
+          prompt: 'Selecciona la unidad rival que deseas girar (Spend):',
+          sourceCardName: 'Padre',
+          sourceCardImage: choice.sourceCardImage
+        };
+        delete gameState.pendingModalChoice;
+        setGameState({ ...gameState });
+        return;
+      }
+      const target = eligible[0] || opp.field?.[0];
       if (target) {
         target.isSpent = true;
         gameState.actionLog.unshift(
@@ -1631,6 +1696,21 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
 
     // Wakako Okada
     else if (optionId === 'WAKAKO_DEBUFF_RIVAL') {
+      if ((opp.field || []).length > 1) {
+        gameState.pendingTargetSelection = {
+          actionType: 'TARGET_UNIT',
+          effectType: 'DEBUFF',
+          amount: 2,
+          targetScope: 'RIVAL_UNITS',
+          title: '🌸 WAKAKO OKADA // REDUCIR FUERZA',
+          prompt: 'Selecciona la unidad rival a la que deseas reducir 2 de poder este turno:',
+          sourceCardName: 'Wakako Okada',
+          sourceCardImage: choice.sourceCardImage
+        };
+        delete gameState.pendingModalChoice;
+        setGameState({ ...gameState });
+        return;
+      }
       const target = opp.field && opp.field.length > 0 ? opp.field[0] : null;
       if (target) {
         target.currentPower = Math.max(0, (target.currentPower || target.power || 0) - 2);
@@ -1651,6 +1731,21 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
 
     // Pyramid Song
     else if (optionId === 'PYRAMID_DEBUFF') {
+      if ((opp.field || []).length > 1) {
+        gameState.pendingTargetSelection = {
+          actionType: 'TARGET_UNIT',
+          effectType: 'DEBUFF',
+          amount: 4,
+          targetScope: 'RIVAL_UNITS',
+          title: '🌊 PYRAMID SONG // DEBILITAR UNIDAD RIVAL',
+          prompt: 'Selecciona la unidad rival a la que deseas reducir 4 de poder este turno:',
+          sourceCardName: 'Pyramid Song',
+          sourceCardImage: choice.sourceCardImage
+        };
+        delete gameState.pendingModalChoice;
+        setGameState({ ...gameState });
+        return;
+      }
       const target = opp.field && opp.field.length > 0 ? opp.field[0] : null;
       if (target) {
         target.currentPower = Math.max(0, (target.currentPower || target.power || 0) - 4);
@@ -1704,6 +1799,20 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
         `🎶 [Nocturne Op55N1] Robaste 2 cartas: ${drawnCards.join(', ')}.`
       );
     } else if (optionId === 'NOCTURNE_FREEZE_RIVAL') {
+      if ((opp.field || []).length > 1) {
+        gameState.pendingTargetSelection = {
+          actionType: 'TARGET_UNIT',
+          effectType: 'FREEZE',
+          targetScope: 'RIVAL_UNITS',
+          title: '🎶 NOCTURNE OP55N1 // CONGELAR UNIDAD RIVAL',
+          prompt: 'Selecciona una unidad rival: no podrá atacar hasta tu próximo turno:',
+          sourceCardName: 'Nocturne Op55N1',
+          sourceCardImage: choice.sourceCardImage
+        };
+        delete gameState.pendingModalChoice;
+        setGameState({ ...gameState });
+        return;
+      }
       const target = opp.field && opp.field.length > 0 ? opp.field[0] : null;
       if (target) {
         target.cannotAttackUntilNextTurn = true;
@@ -1722,6 +1831,220 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
     } else {
       setGameState({ ...gameState });
     }
+  };
+
+  // Manejador del Sistema Universal de Selección de Objetivos (Kiroshi Targeting System)
+  const handleResolveTargetSelection = (targetData) => {
+    if (!gameState?.pendingTargetSelection) return;
+    const sel = gameState.pendingTargetSelection;
+    const p = gameState.player;
+    const opp = gameState.bot;
+
+    if (sel.actionType === 'PEACE_OFFERING') {
+      if (sel.step === 1) {
+        gameState.pendingTargetSelection = {
+          ...sel,
+          step: 2,
+          prompt: `PASO 2 DE 2: El Gig seleccionado para MODIFICAR es ${targetData.die.toUpperCase()} (${targetData.owner === 'player' ? 'Tuyo' : 'Del Rival'}, valor actual ${targetData.value}). Ahora haz clic en el Gig cuyo valor deseas COPIAR:`,
+          selectedTargetGig: targetData
+        };
+        setGameState({ ...gameState });
+        return;
+      } else if (sel.step === 2) {
+        const targetGigInfo = sel.selectedTargetGig;
+        const sourceGigInfo = targetData;
+
+        const targetOwner = targetGigInfo.owner === 'player' ? p : opp;
+        const targetGig = (targetOwner.gigs || []).find((g) => g.die.toLowerCase() === targetGigInfo.die.toLowerCase());
+
+        if (targetGig) {
+          const oldVal = targetGig.value;
+          targetGig.value = sourceGigInfo.value;
+          gameState.actionLog.unshift(
+            `🕊️ [Peace Offering] Modificó el Gig ${targetGig.die.toUpperCase()} (${targetGigInfo.owner === 'player' ? 'tuyo' : 'del rival'}) de ${oldVal} a ${sourceGigInfo.value} (copiado del ${sourceGigInfo.die.toUpperCase()} ${sourceGigInfo.owner === 'player' ? 'tuyo' : 'del rival'}).`
+          );
+        }
+
+        const playerVals = (p.gigs || []).map((g) => g.value);
+        const hasValuePair = new Set(playerVals).size < playerVals.length;
+        if (hasValuePair) {
+          if (p.deck && p.deck.length > 0) {
+            const drawn = p.deck.shift();
+            drawn.isJustDrawn = true;
+            p.hand.push(drawn);
+            gameState.actionLog.unshift(
+              `🕊️ [Peace Offering] ¡Controlas un par de Gigs con el mismo valor! Robas 1 carta: "${drawn.name}".`
+            );
+          }
+        }
+
+        delete gameState.pendingTargetSelection;
+        const pendingAttack = gameState.pendingAttackContinuation;
+        delete gameState.pendingAttackContinuation;
+        if (pendingAttack) {
+          continueAttackAfterTrigger(pendingAttack);
+        } else {
+          setGameState({ ...gameState });
+        }
+      }
+    } else if (sel.actionType === 'ADJUST_GIG') {
+      const { gigInfo, delta } = targetData;
+      const owner = gigInfo.owner === 'player' ? p : opp;
+      const gig = (owner.gigs || []).find((g) => g.die.toLowerCase() === gigInfo.die.toLowerCase());
+      if (gig) {
+        const oldVal = gig.value;
+        const maxFace = parseInt(gig.die.replace(/\D/g, ''), 10) || 20;
+        gig.value = Math.max(1, Math.min(maxFace, (gig.value || 1) + delta));
+        gameState.actionLog.unshift(
+          `🎲 [${sel.sourceCardName}] Ajustó el Gig ${gig.die.toUpperCase()} (${gigInfo.owner === 'player' ? 'tuyo' : 'del rival'}) de ${oldVal} a ${gig.value} (${delta > 0 ? '+' + delta : delta}).`
+        );
+
+        if (sel.secondaryEffect === 'AFTERPARTY_DRAW') {
+          const values = (p.gigs || []).map((g) => g.value);
+          if (new Set(values).size >= 2 && p.deck && p.deck.length > 0) {
+            const drawn = p.deck.shift();
+            drawn.isJustDrawn = true;
+            p.hand.push(drawn);
+            gameState.actionLog.unshift(`🎉 [Afterparty at Lizzie's] ¡Tienes 2+ Gigs con valores distintos! Robas "${drawn.name}".`);
+          }
+        } else if (sel.secondaryEffect === 'INDUSTRIAL_DRAW') {
+          if ((p.gigs || []).some((g) => (g.value || 0) >= 8) && p.deck && p.deck.length > 0) {
+            const drawn = p.deck.shift();
+            drawn.isJustDrawn = true;
+            p.hand.push(drawn);
+            gameState.actionLog.unshift(`🏭 [Industrial Assembly] ¡Controlas un Gig con valor 8+! Robas "${drawn.name}".`);
+          }
+        } else if (sel.secondaryEffect === 'TRUST_NO_ONE_DRAW') {
+          if ((p.gigs || []).some((g) => g.value === 1) && p.deck && p.deck.length > 0) {
+            const drawn = p.deck.shift();
+            drawn.isJustDrawn = true;
+            p.hand.push(drawn);
+            gameState.actionLog.unshift(`🗡️ [Trust No One] ¡Controlas un Gig mínimo (valor 1)! Robas "${drawn.name}".`);
+          }
+        }
+      }
+      delete gameState.pendingTargetSelection;
+      const pendingAttack = gameState.pendingAttackContinuation;
+      delete gameState.pendingAttackContinuation;
+      if (pendingAttack) {
+        continueAttackAfterTrigger(pendingAttack);
+      } else {
+        setGameState({ ...gameState });
+      }
+    } else if (sel.actionType === 'SWAP_GIGS') {
+      if (sel.step === 1) {
+        gameState.pendingTargetSelection = {
+          ...sel,
+          step: 2,
+          prompt: `PASO 2 DE 2: Has seleccionado tu Gig ${targetData.die.toUpperCase()} (Valor ${targetData.value}). Ahora haz clic en el Gig del RIVAL para intercambiar:`,
+          selectedFriendlyGig: targetData
+        };
+        setGameState({ ...gameState });
+        return;
+      } else if (sel.step === 2) {
+        const friendlyGig = (p.gigs || []).find((g) => g.die.toLowerCase() === sel.selectedFriendlyGig.die.toLowerCase());
+        const rivalGig = (opp.gigs || []).find((g) => g.die.toLowerCase() === targetData.die.toLowerCase());
+        if (friendlyGig && rivalGig) {
+          const temp = friendlyGig.value;
+          friendlyGig.value = rivalGig.value;
+          rivalGig.value = temp;
+          gameState.actionLog.unshift(
+            `🚁 [${sel.sourceCardName}] Intercambió los valores del Gig ${friendlyGig.die.toUpperCase()} tuyo (${friendlyGig.value}) y el Gig ${rivalGig.die.toUpperCase()} rival (${rivalGig.value}).`
+          );
+        }
+        delete gameState.pendingTargetSelection;
+        const pendingAttack = gameState.pendingAttackContinuation;
+        delete gameState.pendingAttackContinuation;
+        if (pendingAttack) {
+          continueAttackAfterTrigger(pendingAttack);
+        } else {
+          setGameState({ ...gameState });
+        }
+      }
+    } else if (sel.actionType === 'TARGET_UNIT') {
+      const { unitInstanceId, ownerKey } = targetData;
+      const targetOwner = ownerKey === 'player' ? p : opp;
+      const unit = (targetOwner.field || []).find((u) => u.instanceId === unitInstanceId);
+      if (unit) {
+        if (sel.effectType === 'DEFEAT') {
+          const idx = targetOwner.field.indexOf(unit);
+          const [dead] = targetOwner.field.splice(idx, 1);
+          if (!targetOwner.trash) targetOwner.trash = [];
+          targetOwner.trash.push(dead);
+          gameState.actionLog.unshift(`💥 [${sel.sourceCardName}] Destruyó a la unidad "${dead.name}".`);
+        } else if (sel.effectType === 'BUFF') {
+          unit.currentPower = (unit.currentPower || unit.power || 0) + (sel.amount || 2);
+          gameState.actionLog.unshift(`⚡ [${sel.sourceCardName}] Otorgó +${sel.amount || 2} de poder a "${unit.name}" (Poder actual: ${unit.currentPower}).`);
+        } else if (sel.effectType === 'DEBUFF') {
+          unit.currentPower = Math.max(0, (unit.currentPower || unit.power || 0) - (sel.amount || 2));
+          gameState.actionLog.unshift(`🔻 [${sel.sourceCardName}] Redujo el poder de "${unit.name}" en ${sel.amount || 2} (Poder actual: ${unit.currentPower}).`);
+        } else if (sel.effectType === 'FREEZE') {
+          unit.cannotAttackUntilNextTurn = true;
+          gameState.actionLog.unshift(`🛑 [${sel.sourceCardName}] "${unit.name}" no podrá atacar hasta tu próximo turno.`);
+        } else if (sel.effectType === 'SPEND') {
+          unit.isSpent = true;
+          if (sel.cannotReady) unit.cannotReadyUntilNextTurn = true;
+          gameState.actionLog.unshift(`✝️ [${sel.sourceCardName}] Giró a la unidad rival "${unit.name}".`);
+        } else if (sel.effectType === 'PROTECT') {
+          unit.cannotBeDefeatedThisTurn = true;
+          gameState.actionLog.unshift(`🚗 [${sel.sourceCardName}] "${unit.name}" no podrá ser derrotada en combate este turno.`);
+        } else if (sel.effectType === 'BOTTOM_DECK') {
+          const idx = targetOwner.field.indexOf(unit);
+          const [dead] = targetOwner.field.splice(idx, 1);
+          if (!targetOwner.deck) targetOwner.deck = [];
+          targetOwner.deck.push(dead);
+          gameState.actionLog.unshift(`🌊 [${sel.sourceCardName}] "${dead.name}" fue enviada al fondo del mazo.`);
+        }
+      }
+      delete gameState.pendingTargetSelection;
+      const pendingAttack = gameState.pendingAttackContinuation;
+      delete gameState.pendingAttackContinuation;
+      if (pendingAttack) {
+        continueAttackAfterTrigger(pendingAttack);
+      } else {
+        setGameState({ ...gameState });
+      }
+    } else if (sel.actionType === 'TARGET_GEAR') {
+      const { unitInstanceId, gearInstanceId, ownerKey } = targetData;
+      const targetOwner = ownerKey === 'player' ? p : opp;
+      const unit = (targetOwner.field || []).find((u) => u.instanceId === unitInstanceId);
+      if (unit && unit.gear) {
+        const gIdx = unit.gear.findIndex((g) => g.instanceId === gearInstanceId);
+        if (gIdx !== -1) {
+          const [sacrificed] = unit.gear.splice(gIdx, 1);
+          if (!targetOwner.trash) targetOwner.trash = [];
+          targetOwner.trash.push(sacrificed);
+          gameState.actionLog.unshift(`🔧 [${sel.sourceCardName}] Destruyó el Gear "${sacrificed.name}".`);
+
+          if (sel.gearAction === 'DUMDUM_REWARD') {
+            const drawnCards = [];
+            for (let i = 0; i < 2 && p.deck && p.deck.length > 0; i++) {
+              const d = p.deck.shift();
+              d.isJustDrawn = true;
+              p.hand.push(d);
+              drawnCards.push(d.name);
+            }
+            gameState.actionLog.unshift(`💉 [Dum Dum] Robó 2 cartas: ${drawnCards.join(', ')}.`);
+          }
+        }
+      }
+      delete gameState.pendingTargetSelection;
+      const pendingAttack = gameState.pendingAttackContinuation;
+      delete gameState.pendingAttackContinuation;
+      if (pendingAttack) {
+        continueAttackAfterTrigger(pendingAttack);
+      } else {
+        setGameState({ ...gameState });
+      }
+    }
+  };
+
+  const handleCancelTargetSelection = () => {
+    if (!gameState?.pendingTargetSelection) return;
+    const name = gameState.pendingTargetSelection.sourceCardName || 'Habilidad';
+    delete gameState.pendingTargetSelection;
+    gameState.actionLog.unshift(`ℹ️ [${name}] Selección de objetivo cancelada.`);
+    setGameState({ ...gameState });
   };
 
   // Robar un dado de Gig específico del rival (al hacer clic sobre él en su barra de Gigs)
@@ -6484,6 +6807,445 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                   className="px-5 py-2 bg-[#0dfceb] hover:bg-white text-black font-black uppercase text-xs transition-all shadow-[0_0_20px_rgba(13,252,235,0.7)] cursor-pointer disabled:opacity-40 disabled:pointer-events-none"
                 >
                   ⚡ EQUIPAR GRATIS Y GIRAR A RIVER WARD
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        );
+      })()}
+
+      {/* 5.10. MODAL UNIVERSAL DE SELECCIÓN DE OBJETIVOS (KIROSHI TARGETING SYSTEM) */}
+      {gameState?.pendingTargetSelection && (() => {
+        const sel = gameState.pendingTargetSelection;
+        const playerGigs = gameState.player.gigs || [];
+        const botGigs = gameState.bot.gigs || [];
+        const playerUnits = gameState.player.field || [];
+        const botUnits = gameState.bot.field || [];
+
+        // Para selección de Gears
+        const allPlayerGears = [];
+        playerUnits.forEach((u) => {
+          (u.gear || []).forEach((g) => {
+            allPlayerGears.push({ gear: g, unit: u, ownerKey: 'player' });
+          });
+        });
+        const allBotGears = [];
+        botUnits.forEach((u) => {
+          (u.gear || []).forEach((g) => {
+            allBotGears.push({ gear: g, unit: u, ownerKey: 'bot' });
+          });
+        });
+
+        return (
+          <div className="fixed inset-0 z-50 bg-[#000000]/92 backdrop-blur-md flex items-center justify-center p-3 sm:p-5 font-mono select-none">
+            <motion.div
+              initial={{ scale: 0.94, opacity: 0, y: 15 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              style={{ clipPath: CYBER_CLIP }}
+              className="max-w-3xl w-full bg-[#070a10]/98 border-2 border-[#0dfceb] p-5 sm:p-6 space-y-4 shadow-[0_0_60px_rgba(13,252,235,0.45)] relative max-h-[90vh] overflow-y-auto cyber-scrollbar"
+            >
+              {/* Cabecera Kiroshi */}
+              <div className="flex items-center justify-between border-b border-[#0dfceb]/40 pb-3">
+                <div className="flex items-center gap-2.5">
+                  <span className="w-3.5 h-3.5 bg-[#0dfceb] rounded-full animate-ping" />
+                  <div>
+                    <span className="text-xs sm:text-sm font-black uppercase tracking-wider text-[#0dfceb] block">
+                      🎯 SISTEMA DE FIJACIÓN DE OBJETIVOS // KIROSHI OPTICS
+                    </span>
+                    <span className="text-[10px] text-gray-400 font-mono">
+                      {sel.title}
+                    </span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="px-2 py-0.5 bg-[#FCEE0A] text-black font-black text-[9px] uppercase tracking-wider rounded">
+                    {sel.step ? `PASO ${sel.step} DE 2` : 'OBJETIVO'}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleCancelTargetSelection}
+                    className="p-1 px-2.5 bg-black border border-gray-700 hover:border-red-500 hover:text-red-400 text-gray-400 text-xs font-bold transition-colors cursor-pointer"
+                  >
+                    ✕ ESC
+                  </button>
+                </div>
+              </div>
+
+              {/* Banner de la Carta Origen e Instrucción de Objetivo */}
+              <div className="bg-[#000000] border border-[#0dfceb]/40 p-3 rounded flex items-center gap-3.5 shadow-inner">
+                {sel.sourceCardImage && (
+                  <div
+                    onClick={() => setInspectedCard({ name: sel.sourceCardName, image: sel.sourceCardImage })}
+                    className="w-14 sm:w-16 aspect-[7/10] rounded border border-[#0dfceb] overflow-hidden shrink-0 bg-black cursor-pointer hover:scale-105 transition-transform"
+                    title="Clic para ver carta en pantalla completa"
+                  >
+                    <img src={sel.sourceCardImage} alt={sel.sourceCardName} className="w-full h-full object-cover" />
+                  </div>
+                )}
+                <div className="min-w-0 flex-1">
+                  <h4 className="text-xs sm:text-sm font-black text-[#FCEE0A] uppercase truncate">
+                    {sel.sourceCardName}
+                  </h4>
+                  <p className="text-xs sm:text-sm text-white font-bold leading-relaxed mt-1">
+                    {sel.prompt}
+                  </p>
+                  <span className="text-[9px] text-[#0dfceb] block mt-1 font-mono">
+                    Haz clic sobre cualquiera de los objetivos resaltados a continuación para fijar tu elección.
+                  </span>
+                </div>
+              </div>
+
+              {/* SECCIÓN 1: SELECCIÓN DE GIGS / DADOS (PEACE OFFERING, ADJUST GIG, SWAP GIGS) */}
+              {(sel.actionType === 'PEACE_OFFERING' || sel.actionType === 'ADJUST_GIG' || sel.actionType === 'SWAP_GIGS') && (
+                <div className="space-y-4 py-1">
+                  {/* TUS GIGS */}
+                  <div className="bg-[#000000]/80 border border-[#0dfceb]/40 rounded-xl p-3 space-y-2">
+                    <div className="flex items-center justify-between pb-1 border-b border-[#0dfceb]/20">
+                      <span className="text-[11px] font-black uppercase text-[#0dfceb] flex items-center gap-1.5">
+                        <span className="w-2 h-2 rounded-full bg-[#0dfceb]" />
+                        <span>TUS GIGS EN JUEGO ({playerGigs.length}):</span>
+                      </span>
+                      <span className="text-[9px] text-gray-400">Aliados</span>
+                    </div>
+
+                    {playerGigs.length === 0 ? (
+                      <span className="text-xs text-gray-500 italic block py-2">No tienes Gigs en juego actualmente.</span>
+                    ) : (
+                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5">
+                        {playerGigs.map((gig, gIdx) => {
+                          const dieKey = gig.die.toLowerCase();
+                          const isSelectedTarget = sel.selectedTargetGig?.owner === 'player' && sel.selectedTargetGig?.die.toLowerCase() === dieKey;
+
+                          return (
+                            <div
+                              key={`p-gig-${gIdx}`}
+                              className={`p-3 rounded-lg border-2 transition-all flex flex-col items-center gap-2 bg-[#050912] ${
+                                isSelectedTarget
+                                  ? 'border-[#0dfceb] bg-[#0dfceb]/20 shadow-[0_0_20px_rgba(13,252,235,0.7)] scale-105'
+                                  : 'border-gray-800 hover:border-[#FCEE0A] hover:bg-[#FCEE0A]/10 cursor-pointer hover:scale-105 shadow-md'
+                              }`}
+                              onClick={() => {
+                                if (sel.actionType === 'PEACE_OFFERING') {
+                                  handleResolveTargetSelection({ owner: 'player', die: dieKey, value: gig.value });
+                                } else if (sel.actionType === 'SWAP_GIGS') {
+                                  if (sel.step === 1) {
+                                    handleResolveTargetSelection({ owner: 'player', die: dieKey, value: gig.value });
+                                  }
+                                }
+                              }}
+                            >
+                              <PolyhedralDie
+                                type={dieKey}
+                                value={gig.value}
+                                isWaiting={false}
+                                isStolen={Boolean(gig.stolenFrom)}
+                                size={40}
+                              />
+                              <div className="text-center">
+                                <span className="text-xs font-black text-white uppercase block">
+                                  {gig.die.toUpperCase()}
+                                </span>
+                                <span className="text-[11px] text-[#FCEE0A] font-black block">
+                                  VALOR: {gig.value}
+                                </span>
+                              </div>
+
+                              {/* Si es acción de ajuste (+1/-1, etc.) */}
+                              {sel.actionType === 'ADJUST_GIG' ? (
+                                <div className="flex items-center gap-1.5 pt-1 w-full justify-center">
+                                  {sel.canDecrease && Array.from({ length: sel.maxDelta || 1 }).map((_, di) => (
+                                    <button
+                                      key={`dec-${di}`}
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleResolveTargetSelection({ gigInfo: { owner: 'player', die: dieKey, value: gig.value }, delta: -(di + 1) });
+                                      }}
+                                      className="px-2 py-1 bg-[#FF003C] hover:bg-white text-white hover:text-black font-black text-[10px] rounded transition-all cursor-pointer shadow"
+                                    >
+                                      -{di + 1}
+                                    </button>
+                                  ))}
+                                  {sel.canIncrease && Array.from({ length: sel.maxDelta || 1 }).map((_, di) => (
+                                    <button
+                                      key={`inc-${di}`}
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleResolveTargetSelection({ gigInfo: { owner: 'player', die: dieKey, value: gig.value }, delta: di + 1 });
+                                      }}
+                                      className="px-2 py-1 bg-[#0dfceb] hover:bg-white text-black font-black text-[10px] rounded transition-all cursor-pointer shadow"
+                                    >
+                                      +{di + 1}
+                                    </button>
+                                  ))}
+                                </div>
+                              ) : (
+                                <span className={`text-[8px] font-black px-2 py-0.5 rounded uppercase mt-0.5 ${
+                                  isSelectedTarget ? 'bg-[#0dfceb] text-black' : 'bg-gray-800 text-gray-300'
+                                }`}>
+                                  {isSelectedTarget ? '✓ MODIFICANDO' : '🎯 FIJAR OBJETIVO'}
+                                </span>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* GIGS DEL RIVAL */}
+                  <div className="bg-[#000000]/80 border border-[#FF003C]/40 rounded-xl p-3 space-y-2">
+                    <div className="flex items-center justify-between pb-1 border-b border-[#FF003C]/20">
+                      <span className="text-[11px] font-black uppercase text-[#FF003C] flex items-center gap-1.5">
+                        <span className="w-2 h-2 rounded-full bg-[#FF003C]" />
+                        <span>GIGS DEL RIVAL ({botGigs.length}):</span>
+                      </span>
+                      <span className="text-[9px] text-gray-400">Oponente</span>
+                    </div>
+
+                    {botGigs.length === 0 ? (
+                      <span className="text-xs text-gray-500 italic block py-2">El rival no tiene Gigs en juego actualmente.</span>
+                    ) : (
+                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5">
+                        {botGigs.map((gig, gIdx) => {
+                          const dieKey = gig.die.toLowerCase();
+                          const isSelectedTarget = sel.selectedTargetGig?.owner === 'bot' && sel.selectedTargetGig?.die.toLowerCase() === dieKey;
+
+                          return (
+                            <div
+                              key={`b-gig-${gIdx}`}
+                              className={`p-3 rounded-lg border-2 transition-all flex flex-col items-center gap-2 bg-[#050912] ${
+                                isSelectedTarget
+                                  ? 'border-[#0dfceb] bg-[#0dfceb]/20 shadow-[0_0_20px_rgba(13,252,235,0.7)] scale-105'
+                                  : 'border-gray-800 hover:border-[#FF003C] hover:bg-[#FF003C]/10 cursor-pointer hover:scale-105 shadow-md'
+                              }`}
+                              onClick={() => {
+                                if (sel.actionType === 'PEACE_OFFERING') {
+                                  handleResolveTargetSelection({ owner: 'bot', die: dieKey, value: gig.value });
+                                } else if (sel.actionType === 'SWAP_GIGS') {
+                                  if (sel.step === 2) {
+                                    handleResolveTargetSelection({ owner: 'bot', die: dieKey, value: gig.value });
+                                  }
+                                }
+                              }}
+                            >
+                              <PolyhedralDie
+                                type={dieKey}
+                                value={gig.value}
+                                isWaiting={false}
+                                isStolen={Boolean(gig.stolenFrom)}
+                                size={40}
+                              />
+                              <div className="text-center">
+                                <span className="text-xs font-black text-white uppercase block">
+                                  {gig.die.toUpperCase()}
+                                </span>
+                                <span className="text-[11px] text-[#FF003C] font-black block">
+                                  VALOR: {gig.value}
+                                </span>
+                              </div>
+
+                              {/* Si es acción de ajuste (+1/-1) */}
+                              {sel.actionType === 'ADJUST_GIG' ? (
+                                <div className="flex items-center gap-1.5 pt-1 w-full justify-center">
+                                  {sel.canDecrease && Array.from({ length: sel.maxDelta || 1 }).map((_, di) => (
+                                    <button
+                                      key={`dec-${di}`}
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleResolveTargetSelection({ gigInfo: { owner: 'bot', die: dieKey, value: gig.value }, delta: -(di + 1) });
+                                      }}
+                                      className="px-2 py-1 bg-[#FF003C] hover:bg-white text-white hover:text-black font-black text-[10px] rounded transition-all cursor-pointer shadow"
+                                    >
+                                      -{di + 1}
+                                    </button>
+                                  ))}
+                                  {sel.canIncrease && Array.from({ length: sel.maxDelta || 1 }).map((_, di) => (
+                                    <button
+                                      key={`inc-${di}`}
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleResolveTargetSelection({ gigInfo: { owner: 'bot', die: dieKey, value: gig.value }, delta: di + 1 });
+                                      }}
+                                      className="px-2 py-1 bg-[#0dfceb] hover:bg-white text-black font-black text-[10px] rounded transition-all cursor-pointer shadow"
+                                    >
+                                      +{di + 1}
+                                    </button>
+                                  ))}
+                                </div>
+                              ) : (
+                                <span className={`text-[8px] font-black px-2 py-0.5 rounded uppercase mt-0.5 ${
+                                  isSelectedTarget ? 'bg-[#0dfceb] text-black' : 'bg-gray-800 text-gray-300'
+                                }`}>
+                                  {isSelectedTarget ? '✓ MODIFICANDO' : '🎯 FIJAR OBJETIVO'}
+                                </span>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* SECCIÓN 2: SELECCIÓN DE UNIDADES (TARGET_UNIT: DEFEAT, BUFF, DEBUFF, FREEZE, SPEND, PROTECT) */}
+              {sel.actionType === 'TARGET_UNIT' && (
+                <div className="space-y-4 py-1">
+                  {/* UNIDADES AMIGAS (SI APLICA) */}
+                  {(sel.targetScope === 'FRIENDLY_UNITS' || sel.targetScope === 'ALL') && (
+                    <div className="bg-[#000000]/80 border border-[#0dfceb]/40 rounded-xl p-3 space-y-2">
+                      <span className="text-[11px] font-black uppercase text-[#0dfceb] block pb-1 border-b border-[#0dfceb]/20">
+                        TUS UNIDADES ({playerUnits.length}):
+                      </span>
+                      {playerUnits.length === 0 ? (
+                        <span className="text-xs text-gray-500 italic block py-2">No tienes unidades en el campo de batalla.</span>
+                      ) : (
+                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5">
+                          {playerUnits.map((u) => {
+                            const isEligible = sel.maxPower === undefined || (u.currentPower || u.power || 0) <= sel.maxPower;
+
+                            return (
+                              <div
+                                key={u.instanceId}
+                                onClick={() => {
+                                  if (isEligible) {
+                                    handleResolveTargetSelection({ unitInstanceId: u.instanceId, ownerKey: 'player' });
+                                  }
+                                }}
+                                onContextMenu={(e) => handleCardRightClick(e, u)}
+                                className={`p-2.5 rounded-lg border-2 transition-all flex flex-col items-center gap-1.5 bg-[#050912] ${
+                                  isEligible
+                                    ? 'border-[#0dfceb]/60 hover:border-[#0dfceb] hover:bg-[#0dfceb]/15 cursor-pointer hover:scale-105 shadow-md group'
+                                    : 'border-gray-800 opacity-40 grayscale cursor-not-allowed'
+                                }`}
+                                title={isEligible ? 'Clic para seleccionar como objetivo' : 'No cumple los requisitos de poder'}
+                              >
+                                <img src={u.image} alt={u.name} className="w-16 h-22 object-cover rounded border border-gray-700 shadow" />
+                                <span className="text-[10px] font-black text-white uppercase truncate max-w-full text-center">
+                                  {u.name}
+                                </span>
+                                <span className="text-[9px] font-black text-[#FCEE0A]">
+                                  ⚡ FUERZA: {u.currentPower}
+                                </span>
+                                <span className={`text-[8px] font-bold px-2 py-0.5 rounded uppercase ${
+                                  isEligible ? 'bg-[#0dfceb] text-black group-hover:bg-[#FCEE0A]' : 'bg-gray-800 text-gray-400'
+                                }`}>
+                                  {isEligible ? '🎯 SELECCIONAR' : 'NO ELEGIBLE'}
+                                </span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* UNIDADES DEL RIVAL (SI APLICA) */}
+                  {(sel.targetScope === 'RIVAL_UNITS' || sel.targetScope === 'ALL') && (
+                    <div className="bg-[#000000]/80 border border-[#FF003C]/40 rounded-xl p-3 space-y-2">
+                      <span className="text-[11px] font-black uppercase text-[#FF003C] block pb-1 border-b border-[#FF003C]/20">
+                        UNIDADES DEL RIVAL ({botUnits.length}):
+                      </span>
+                      {botUnits.length === 0 ? (
+                        <span className="text-xs text-gray-500 italic block py-2">El rival no tiene unidades en el campo de batalla.</span>
+                      ) : (
+                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5">
+                          {botUnits.map((u) => {
+                            const isEligible = sel.maxPower === undefined || (u.currentPower || u.power || 0) <= sel.maxPower;
+
+                            return (
+                              <div
+                                key={u.instanceId}
+                                onClick={() => {
+                                  if (isEligible) {
+                                    handleResolveTargetSelection({ unitInstanceId: u.instanceId, ownerKey: 'bot' });
+                                  }
+                                }}
+                                onContextMenu={(e) => handleCardRightClick(e, u)}
+                                className={`p-2.5 rounded-lg border-2 transition-all flex flex-col items-center gap-1.5 bg-[#050912] ${
+                                  isEligible
+                                    ? 'border-[#FF003C]/60 hover:border-[#FF003C] hover:bg-[#FF003C]/15 cursor-pointer hover:scale-105 shadow-md group'
+                                    : 'border-gray-800 opacity-40 grayscale cursor-not-allowed'
+                                }`}
+                                title={isEligible ? 'Clic para seleccionar como objetivo' : 'No cumple los requisitos de poder'}
+                              >
+                                <img src={u.image} alt={u.name} className="w-16 h-22 object-cover rounded border border-gray-700 shadow" />
+                                <span className="text-[10px] font-black text-white uppercase truncate max-w-full text-center">
+                                  {u.name}
+                                </span>
+                                <span className="text-[9px] font-black text-[#FF003C]">
+                                  ⚡ FUERZA: {u.currentPower}
+                                </span>
+                                <span className={`text-[8px] font-bold px-2 py-0.5 rounded uppercase ${
+                                  isEligible ? 'bg-[#FF003C] text-white group-hover:bg-white group-hover:text-black' : 'bg-gray-800 text-gray-400'
+                                }`}>
+                                  {isEligible ? '🎯 SELECCIONAR' : 'NO ELEGIBLE'}
+                                </span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* SECCIÓN 3: SELECCIÓN DE GEARS (TARGET_GEAR: SACRIFICE, DEFEAT) */}
+              {sel.actionType === 'TARGET_GEAR' && (
+                <div className="space-y-3 py-1">
+                  <div className="bg-[#000000]/80 border border-[#FCEE0A]/40 rounded-xl p-3 space-y-2">
+                    <span className="text-[11px] font-black uppercase text-[#FCEE0A] block pb-1 border-b border-[#FCEE0A]/20">
+                      GEARS EQUIPADOS EN TUS UNIDADES ({allPlayerGears.length}):
+                    </span>
+                    {allPlayerGears.length === 0 ? (
+                      <span className="text-xs text-gray-500 italic block py-2">No tienes ningún Gear equipado actualmente.</span>
+                    ) : (
+                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5">
+                        {allPlayerGears.map((item, gi) => (
+                          <div
+                            key={item.gear.instanceId || gi}
+                            onClick={() => {
+                              handleResolveTargetSelection({
+                                unitInstanceId: item.unit.instanceId,
+                                gearInstanceId: item.gear.instanceId,
+                                ownerKey: 'player'
+                              });
+                            }}
+                            onContextMenu={(e) => handleCardRightClick(e, item.gear)}
+                            className="p-2.5 rounded-lg border-2 border-[#FCEE0A]/60 hover:border-[#0dfceb] hover:bg-[#FCEE0A]/15 transition-all flex flex-col items-center gap-1.5 bg-[#050912] cursor-pointer hover:scale-105 shadow-md group"
+                          >
+                            <img src={item.gear.image} alt={item.gear.name} className="w-16 h-22 object-cover rounded border border-[#FCEE0A]" />
+                            <span className="text-[10px] font-black text-[#FCEE0A] uppercase truncate max-w-full text-center">
+                              🔧 {item.gear.name}
+                            </span>
+                            <span className="text-[8px] text-gray-300 block text-center truncate">
+                              En: {item.unit.name}
+                            </span>
+                            <span className="text-[8px] font-black px-2 py-0.5 rounded uppercase bg-[#FCEE0A] text-black group-hover:bg-[#0dfceb]">
+                              🎯 SACRIFICAR ESTE GEAR
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Botón de Cancelar / Omitir */}
+              <div className="pt-3 border-t border-[#0dfceb]/30 flex items-center justify-between">
+                <button
+                  type="button"
+                  onClick={handleCancelTargetSelection}
+                  style={{ clipPath: CYBER_BUTTON }}
+                  className="px-4 py-2 bg-black border border-gray-700 hover:border-red-500 text-gray-300 hover:text-red-400 font-bold uppercase text-xs transition-all cursor-pointer"
+                >
+                  ✕ CANCELAR OBJETIVO
                 </button>
               </div>
             </motion.div>

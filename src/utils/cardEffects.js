@@ -90,14 +90,33 @@ export function executeProgramEffect(state, playerKey, card) {
   // CP-005: Afterparty at Lizzie's
   // "Adjust a Gig by up to 1. If you control 2 or more Gigs with different values, draw 1."
   if (cardId === 'CP-005') {
-    if (p.gigs && p.gigs.length > 0) {
-      p.gigs[0].value = (p.gigs[0].value || 1) + 1;
-      state.actionLog.unshift(`🎉 [Afterparty at Lizzie's] Ajusta el Gig ${p.gigs[0].die.toUpperCase()} a ${p.gigs[0].value}.`);
+    const totalGigs = (p.gigs || []).length + (opp.gigs || []).length;
+    if (totalGigs === 0) {
+      state.actionLog.unshift(`🎉 [Afterparty at Lizzie's] No hay Gigs en juego para ajustar.`);
+      return { executed: true };
     }
-    const values = (p.gigs || []).map((g) => g.value);
-    const uniqueValues = new Set(values);
-    if (uniqueValues.size >= 2) {
-      drawCards(p, 1, state, cardName);
+    if (playerKey === 'player') {
+      state.pendingTargetSelection = {
+        actionType: 'ADJUST_GIG',
+        sourceCardId: 'CP-005',
+        sourceCardName: "Afterparty at Lizzie's",
+        sourceCardImage: card.image,
+        title: "🎉 AFTERPARTY AT LIZZIE'S // AJUSTAR GIG",
+        prompt: 'Selecciona cualquier Gig (tuyo o del rival) y elige ajustarlo en +1 o -1:',
+        maxDelta: 1,
+        canIncrease: true,
+        canDecrease: true,
+        secondaryEffect: 'AFTERPARTY_DRAW'
+      };
+    } else {
+      if (p.gigs && p.gigs.length > 0) {
+        p.gigs[0].value = (p.gigs[0].value || 1) + 1;
+        state.actionLog.unshift(`🎉 [Afterparty at Lizzie's Rival] Ajusta su Gig ${p.gigs[0].die.toUpperCase()} a ${p.gigs[0].value}.`);
+      }
+      const values = (p.gigs || []).map((g) => g.value);
+      if (new Set(values).size >= 2) {
+        drawCards(p, 1, state, cardName);
+      }
     }
     return { executed: true };
   }
@@ -148,20 +167,37 @@ export function executeProgramEffect(state, playerKey, card) {
   // CP-013: Bonnie and Clyde
   // "Defeat a rival Unit with power 4 or less. You may defeat 2 instead if a Rival controls at least 2 Gigs more than you."
   if (cardId === 'CP-013') {
-    const rivalMoreGigs = (opp.gigs?.length || 0) >= (p.gigs?.length || 0) + 2;
-    const maxToDefeat = rivalMoreGigs ? 2 : 1;
-    let defeatedCount = 0;
-    for (let i = (opp.field?.length || 0) - 1; i >= 0 && defeatedCount < maxToDefeat; i--) {
-      if ((opp.field[i].currentPower || opp.field[i].power || 0) <= 4) {
-        const [dead] = opp.field.splice(i, 1);
+    const eligibleUnits = (opp.field || []).filter((u) => (u.currentPower || u.power || 0) <= 4);
+    if (eligibleUnits.length === 0) {
+      state.actionLog.unshift(`ℹ️ [Bonnie and Clyde] El rival no tiene unidades con poder 4 o menos.`);
+      return { executed: true };
+    }
+    if (playerKey === 'player') {
+      if (eligibleUnits.length === 1) {
+        const [dead] = opp.field.splice(opp.field.indexOf(eligibleUnits[0]), 1);
         if (!opp.trash) opp.trash = [];
         opp.trash.push(dead);
-        defeatedCount++;
         state.actionLog.unshift(`💥 [Bonnie and Clyde] Destruye a la unidad rival "${dead.name}" (Poder <= 4).`);
+      } else {
+        state.pendingTargetSelection = {
+          actionType: 'TARGET_UNIT',
+          sourceCardId: 'CP-013',
+          sourceCardName: 'Bonnie and Clyde',
+          sourceCardImage: card.image,
+          title: '🔫 BONNIE AND CLYDE // DESTRUIR UNIDAD',
+          prompt: 'Selecciona la unidad rival que deseas destruir (Poder <= 4):',
+          effectType: 'DEFEAT',
+          targetScope: 'RIVAL_UNITS',
+          maxPower: 4
+        };
       }
-    }
-    if (defeatedCount === 0) {
-      state.actionLog.unshift(`ℹ️ [Bonnie and Clyde] El rival no tenía unidades con poder 4 o menos.`);
+    } else {
+      const target = [...eligibleUnits].sort((a,b) => b.currentPower - a.currentPower)[0];
+      const idx = opp.field.indexOf(target);
+      const [dead] = opp.field.splice(idx, 1);
+      if (!opp.trash) opp.trash = [];
+      opp.trash.push(dead);
+      state.actionLog.unshift(`💥 [Bonnie and Clyde Rival] Destruye a tu unidad "${dead.name}".`);
     }
     return { executed: true };
   }
@@ -204,9 +240,29 @@ export function executeProgramEffect(state, playerKey, card) {
   // CP-018: Chrome Reverie
   // "A rival Unit can't attack until your next turn. If you control a min Gig, you may Call a Legend for free."
   if (cardId === 'CP-018') {
-    if (opp.field && opp.field.length > 0) {
-      opp.field[0].cannotAttackUntilNextTurn = true;
-      state.actionLog.unshift(`🛑 [Chrome Reverie] "${opp.field[0].name}" no puede atacar hasta tu próximo turno.`);
+    const eligibleUnits = opp.field || [];
+    if (eligibleUnits.length === 0) {
+      state.actionLog.unshift(`🛑 [Chrome Reverie] El rival no tiene unidades en campo para congelar.`);
+    } else if (playerKey === 'player') {
+      if (eligibleUnits.length === 1) {
+        eligibleUnits[0].cannotAttackUntilNextTurn = true;
+        state.actionLog.unshift(`🛑 [Chrome Reverie] "${eligibleUnits[0].name}" no puede atacar hasta tu próximo turno.`);
+      } else {
+        state.pendingTargetSelection = {
+          actionType: 'TARGET_UNIT',
+          sourceCardId: 'CP-018',
+          sourceCardName: 'Chrome Reverie',
+          sourceCardImage: card.image,
+          title: '🛑 CHROME REVERIE // BLOQUEAR ATAQUE',
+          prompt: 'Selecciona una unidad rival: no podrá atacar hasta tu próximo turno:',
+          effectType: 'FREEZE',
+          targetScope: 'RIVAL_UNITS'
+        };
+      }
+    } else {
+      const target = [...eligibleUnits].sort((a,b) => b.currentPower - a.currentPower)[0];
+      target.cannotAttackUntilNextTurn = true;
+      state.actionLog.unshift(`🛑 [Chrome Reverie Rival] "${target.name}" no podrá atacar hasta su próximo turno.`);
     }
     const hasMinGig = (p.gigs || []).some((g) => g.value === 1);
     if (hasMinGig) {
@@ -311,13 +367,33 @@ export function executeProgramEffect(state, playerKey, card) {
 
   // CP-048: Industrial Assembly
   // "Increase a Gig by up to 4. If you control a Gig with 8+ value, draw 1."
-  if (cardId === 'CP-048') {
-    if (p.gigs && p.gigs.length > 0) {
-      p.gigs[0].value = (p.gigs[0].value || 1) + 4;
-      state.actionLog.unshift(`🏭 [Industrial Assembly] Aumenta el Gig ${p.gigs[0].die.toUpperCase()} en +4 (Nuevo valor: ${p.gigs[0].value}).`);
+  if (cardId === 'CP-048' || cardId === 'CP-071') {
+    const totalGigs = (p.gigs || []).length + (opp.gigs || []).length;
+    if (totalGigs === 0) {
+      state.actionLog.unshift(`🏭 [Industrial Assembly] No hay Gigs en juego.`);
+      return { executed: true };
     }
-    if ((p.gigs || []).some((g) => g.value >= 8)) {
-      drawCards(p, 1, state, cardName);
+    if (playerKey === 'player') {
+      state.pendingTargetSelection = {
+        actionType: 'ADJUST_GIG',
+        sourceCardId: card.id,
+        sourceCardName: 'Industrial Assembly',
+        sourceCardImage: card.image,
+        title: '🏭 INDUSTRIAL ASSEMBLY // AUMENTAR GIG',
+        prompt: 'Selecciona un Gig (tuyo o del rival) para aumentar su valor en hasta +4:',
+        maxDelta: 4,
+        canIncrease: true,
+        canDecrease: false,
+        secondaryEffect: 'INDUSTRIAL_DRAW'
+      };
+    } else {
+      if (p.gigs && p.gigs.length > 0) {
+        p.gigs[0].value = (p.gigs[0].value || 1) + 4;
+        state.actionLog.unshift(`🏭 [Industrial Assembly Rival] Aumenta el Gig ${p.gigs[0].die.toUpperCase()} en +4.`);
+      }
+      if ((p.gigs || []).some((g) => g.value >= 8)) {
+        drawCards(p, 1, state, cardName);
+      }
     }
     return { executed: true };
   }
@@ -356,11 +432,31 @@ export function executeProgramEffect(state, playerKey, card) {
   // CP-074: Memory Relapse
   // "Spend a rival Unit. It can't ready until your next turn. If your Street Cred is an even number, draw 1."
   if (cardId === 'CP-074') {
-    const target = (opp.field || []).find((u) => !u.isSpent) || opp.field?.[0];
-    if (target) {
+    const eligibleUnits = (opp.field || []).filter((u) => !u.isSpent);
+    if (eligibleUnits.length === 0) {
+      state.actionLog.unshift(`🧠 [Memory Relapse] El rival no tiene unidades enderezadas para girar.`);
+    } else if (playerKey === 'player') {
+      if (eligibleUnits.length === 1) {
+        eligibleUnits[0].isSpent = true;
+        eligibleUnits[0].cannotReadyUntilNextTurn = true;
+        state.actionLog.unshift(`🧠 [Memory Relapse] Gira a "${eligibleUnits[0].name}" y no podrá enderezarse hasta tu próximo turno.`);
+      } else {
+        state.pendingTargetSelection = {
+          actionType: 'TARGET_UNIT',
+          sourceCardId: 'CP-074',
+          sourceCardName: 'Memory Relapse',
+          sourceCardImage: card.image,
+          title: '🧠 MEMORY RELAPSE // GIRAR UNIDAD RIVAL',
+          prompt: 'Selecciona la unidad rival que deseas girar (no podrá enderezarse en su turno):',
+          effectType: 'SPEND',
+          targetScope: 'RIVAL_UNITS'
+        };
+      }
+    } else {
+      const target = eligibleUnits[0];
       target.isSpent = true;
       target.cannotReadyUntilNextTurn = true;
-      state.actionLog.unshift(`🧠 [Memory Relapse] Gira a "${target.name}" y no podrá enderezarse hasta tu próximo turno.`);
+      state.actionLog.unshift(`🧠 [Memory Relapse Rival] Gira a "${target.name}".`);
     }
     const streetCred = (p.gigs || []).reduce((sum, g) => sum + (g.value || 0), 0);
     if (streetCred % 2 === 0) {
@@ -408,14 +504,39 @@ export function executeProgramEffect(state, playerKey, card) {
   if (cardId === 'CP-088') {
     const d20 = (p.gigs || []).find((g) => g.die.toLowerCase() === 'd20') || p.gigs?.[0];
     const maxVal = d20 ? d20.value || 0 : 0;
-    const targetIdx = (opp.field || []).findIndex((u) => (u.currentPower || 0) <= maxVal);
-    if (targetIdx !== -1) {
-      const [dead] = opp.field.splice(targetIdx, 1);
+    const eligibleUnits = (opp.field || []).filter((u) => (u.currentPower || 0) <= maxVal);
+
+    if (eligibleUnits.length === 0) {
+      state.actionLog.unshift(`ℹ️ [Over the Edge] No hay unidades rivales con poder <= ${maxVal} (d20).`);
+      return { executed: true };
+    }
+
+    if (playerKey === 'player') {
+      if (eligibleUnits.length === 1) {
+        const [dead] = opp.field.splice(opp.field.indexOf(eligibleUnits[0]), 1);
+        if (!opp.trash) opp.trash = [];
+        opp.trash.push(dead);
+        state.actionLog.unshift(`💥 [Over the Edge] Destruye a "${dead.name}" (Poder <= ${maxVal} del Gig d20).`);
+      } else {
+        state.pendingTargetSelection = {
+          actionType: 'TARGET_UNIT',
+          sourceCardId: 'CP-088',
+          sourceCardName: 'Over the Edge',
+          sourceCardImage: card.image,
+          title: '💥 OVER THE EDGE // DESTRUIR UNIDAD',
+          prompt: `Selecciona la unidad rival que deseas destruir (Poder <= ${maxVal}):`,
+          effectType: 'DEFEAT',
+          targetScope: 'RIVAL_UNITS',
+          maxPower: maxVal
+        };
+      }
+    } else {
+      const target = [...eligibleUnits].sort((a,b) => b.currentPower - a.currentPower)[0];
+      const idx = opp.field.indexOf(target);
+      const [dead] = opp.field.splice(idx, 1);
       if (!opp.trash) opp.trash = [];
       opp.trash.push(dead);
-      state.actionLog.unshift(`💥 [Over the Edge] Destruye a "${dead.name}" (Poder <= ${maxVal} del Gig).`);
-    } else {
-      state.actionLog.unshift(`ℹ️ [Over the Edge] No hay unidades rivales con poder <= ${maxVal}.`);
+      state.actionLog.unshift(`💥 [Over the Edge Rival] Destruye a tu unidad "${dead.name}".`);
     }
     return { executed: true };
   }
@@ -423,10 +544,57 @@ export function executeProgramEffect(state, playerKey, card) {
   // CP-094: Peace Offering
   // "Set a Gig's value to the value of another Gig. Then, if you control a value-pair, draw 1."
   if (cardId === 'CP-094') {
-    if (p.gigs && p.gigs.length >= 2) {
-      p.gigs[1].value = p.gigs[0].value;
-      state.actionLog.unshift(`🕊️ [Peace Offering] Iguala el Gig ${p.gigs[1].die.toUpperCase()} al valor de ${p.gigs[0].die.toUpperCase()} (${p.gigs[0].value}).`);
-      drawCards(p, 1, state, cardName);
+    const totalGigs = (p.gigs || []).length + (opp.gigs || []).length;
+    if (totalGigs < 2) {
+      state.actionLog.unshift(`🕊️ [Peace Offering] No hay suficientes Gigs en juego (se requieren al menos 2 Gigs en total entre ambos jugadores).`);
+      return { executed: true };
+    }
+
+    if (playerKey === 'player') {
+      state.pendingTargetSelection = {
+        actionType: 'PEACE_OFFERING',
+        sourceCardId: 'CP-094',
+        sourceCardName: 'Peace Offering',
+        sourceCardImage: card.image,
+        title: '🕊️ PEACE OFFERING // PROGRAMA: COPIAR VALOR DE GIG',
+        prompt: 'PASO 1 DE 2: Haz clic en el Gig (dado) cuyo valor deseas MODIFICAR (puede ser tu Gig o del rival):',
+        step: 1,
+        targetScope: 'ALL_GIGS',
+        selectedTargetGig: null
+      };
+    } else {
+      // Lógica de IA para el rival
+      const allFriendly = p.gigs || [];
+      const allRival = opp.gigs || [];
+      let targetGig = null;
+      let sourceGig = null;
+
+      const allGigs = [...allFriendly, ...allRival];
+      const highestVal = Math.max(...allGigs.map((g) => g.value || 0));
+      const sourceObj = allGigs.find((g) => (g.value || 0) === highestVal);
+
+      const lowestFriendly = [...allFriendly].sort((a, b) => (a.value || 0) - (b.value || 0))[0];
+      if (lowestFriendly && sourceObj && (lowestFriendly.value || 0) < highestVal) {
+        targetGig = lowestFriendly;
+        sourceGig = sourceObj;
+      } else if (allFriendly.length >= 2) {
+        targetGig = allFriendly[1];
+        sourceGig = allFriendly[0];
+      }
+
+      if (targetGig && sourceGig) {
+        targetGig.value = sourceGig.value;
+        state.actionLog.unshift(
+          `🕊️ [Peace Offering Rival] El rival igualó su Gig ${targetGig.die.toUpperCase()} al valor ${sourceGig.value} del ${sourceGig.die.toUpperCase()}.`
+        );
+      }
+
+      // Comprobar par de valores del rival
+      const botVals = (p.gigs || []).map((g) => g.value);
+      if (new Set(botVals).size < botVals.length) {
+        drawCards(p, 1, state, cardName);
+        state.actionLog.unshift(`🕊️ [Peace Offering Rival] ¡El rival controla un par de Gigs con el mismo valor y roba 1 carta!`);
+      }
     }
     return { executed: true };
   }
@@ -952,12 +1120,29 @@ export function executeUnitPlayTrigger(state, playerKey, unitInstance) {
   // CP-070: MaxTac AV
   // "PLAY You may swap a friendly Gig with a rival Gig."
   if (cardId === 'CP-070') {
-    if (p.gigs?.length > 0 && opp.gigs?.length > 0) {
-      const pGig = p.gigs.shift();
-      const oppGig = opp.gigs.shift();
-      p.gigs.push(oppGig);
-      opp.gigs.push(pGig);
-      state.actionLog.unshift(`🚁 [MaxTac AV] Intercambia el Gig ${pGig.die.toUpperCase()} por el Gig rival ${oppGig.die.toUpperCase()}.`);
+    const friendlyGigs = p.gigs || [];
+    const rivalGigs = opp.gigs || [];
+    if (friendlyGigs.length === 0 || rivalGigs.length === 0) {
+      state.actionLog.unshift(`🚁 [MaxTac AV] Se requieren al menos 1 Gig amigable y 1 Gig rival para intercambiar.`);
+    } else if (playerKey === 'player') {
+      state.pendingTargetSelection = {
+        actionType: 'SWAP_GIGS',
+        sourceCardId: 'CP-070',
+        sourceCardName: 'MaxTac AV',
+        sourceCardImage: unitInstance.image,
+        title: '🚁 MAXTAC AV // INTERCAMBIO DE GIGS',
+        prompt: 'PASO 1 DE 2: Selecciona TU Gig que deseas intercambiar con el rival:',
+        step: 1
+      };
+    } else {
+      const lowestFriendly = [...friendlyGigs].sort((a, b) => a.value - b.value)[0];
+      const highestRival = [...rivalGigs].sort((a, b) => b.value - a.value)[0];
+      if (lowestFriendly && highestRival && highestRival.value > lowestFriendly.value) {
+        const temp = lowestFriendly.value;
+        lowestFriendly.value = highestRival.value;
+        highestRival.value = temp;
+        state.actionLog.unshift(`🚁 [MaxTac AV Rival] Intercambió los valores de su Gig ${lowestFriendly.die.toUpperCase()} (${lowestFriendly.value}) y el Gig rival ${highestRival.die.toUpperCase()} (${highestRival.value}).`);
+      }
     }
   }
 
@@ -967,12 +1152,35 @@ export function executeUnitPlayTrigger(state, playerKey, unitInstance) {
     const myCred = (p.gigs || []).reduce((s, g) => s + (g.value || 0), 0);
     const oppCred = (opp.gigs || []).reduce((s, g) => s + (g.value || 0), 0);
     if (myCred > oppCred) {
-      const targetIdx = (opp.field || []).findIndex((u) => (u.currentPower || 0) <= 5);
-      if (targetIdx !== -1) {
-        const [dead] = opp.field.splice(targetIdx, 1);
+      const eligibleUnits = (opp.field || []).filter((u) => (u.currentPower || 0) <= 5);
+      if (eligibleUnits.length === 0) {
+        state.actionLog.unshift(`ℹ️ [Minotaur] El rival no tiene unidades con poder <= 5.`);
+      } else if (playerKey === 'player') {
+        if (eligibleUnits.length === 1) {
+          const [dead] = opp.field.splice(opp.field.indexOf(eligibleUnits[0]), 1);
+          if (!opp.trash) opp.trash = [];
+          opp.trash.push(dead);
+          state.actionLog.unshift(`🤖 [Minotaur] Destruye a la unidad rival "${dead.name}" (Poder <= 5).`);
+        } else {
+          state.pendingTargetSelection = {
+            actionType: 'TARGET_UNIT',
+            sourceCardId: 'CP-076',
+            sourceCardName: 'Minotaur',
+            sourceCardImage: unitInstance.image,
+            title: '🤖 MINOTAUR // DESTRUIR UNIDAD RIVAL',
+            prompt: 'Selecciona la unidad rival que deseas destruir (Poder <= 5):',
+            effectType: 'DEFEAT',
+            targetScope: 'RIVAL_UNITS',
+            maxPower: 5
+          };
+        }
+      } else {
+        const target = [...eligibleUnits].sort((a, b) => b.currentPower - a.currentPower)[0];
+        const idx = opp.field.indexOf(target);
+        const [dead] = opp.field.splice(idx, 1);
         if (!opp.trash) opp.trash = [];
         opp.trash.push(dead);
-        state.actionLog.unshift(`🤖 [Minotaur] Destruye a la unidad rival "${dead.name}" (Poder <= 5).`);
+        state.actionLog.unshift(`🤖 [Minotaur Rival] Destruye a tu unidad "${dead.name}".`);
       }
     }
   }
@@ -981,9 +1189,28 @@ export function executeUnitPlayTrigger(state, playerKey, unitInstance) {
   // "PLAY Spend this Unit and a rival Unit."
   if (cardId === 'CP-087') {
     unitInstance.isSpent = true;
-    if (opp.field && opp.field.length > 0) {
-      opp.field[0].isSpent = true;
-      state.actionLog.unshift(`🦅 [Off-Duty Malfini] Se gira a sí mismo y gira a la unidad rival "${opp.field[0].name}".`);
+    const eligibleUnits = (opp.field || []).filter((u) => !u.isSpent);
+    if (eligibleUnits.length === 0) {
+      state.actionLog.unshift(`🦅 [Off-Duty Malfini] Se gira a sí mismo. (El rival no tiene unidades para girar).`);
+    } else if (playerKey === 'player') {
+      if (eligibleUnits.length === 1) {
+        eligibleUnits[0].isSpent = true;
+        state.actionLog.unshift(`🦅 [Off-Duty Malfini] Se gira a sí mismo y gira a la unidad rival "${eligibleUnits[0].name}".`);
+      } else {
+        state.pendingTargetSelection = {
+          actionType: 'TARGET_UNIT',
+          sourceCardId: 'CP-087',
+          sourceCardName: 'Off-Duty Malfini',
+          sourceCardImage: unitInstance.image,
+          title: '🦅 OFF-DUTY MALFINI // GIRAR UNIDAD RIVAL',
+          prompt: 'Selecciona la unidad rival que deseas girar (Spend):',
+          effectType: 'SPEND',
+          targetScope: 'RIVAL_UNITS'
+        };
+      }
+    } else {
+      eligibleUnits[0].isSpent = true;
+      state.actionLog.unshift(`🦅 [Off-Duty Malfini Rival] Gira a tu unidad "${eligibleUnits[0].name}".`);
     }
   }
 
