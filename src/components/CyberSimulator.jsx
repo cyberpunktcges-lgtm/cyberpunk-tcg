@@ -30,9 +30,17 @@ import {
   Layers
 } from 'lucide-react';
 import CyberAuthModal from './CyberAuthModal.jsx';
+import CyberProfileModal from './CyberProfileModal.jsx';
+import CyberMyDecksModal from './CyberMyDecksModal.jsx';
+import CyberUserDropdown from './CyberUserDropdown.jsx';
 import CyberDeckSelectorModal, { AvatarDisplay } from './CyberDeckSelectorModal.jsx';
-import { DEFAULT_PLAYER_AVATAR, DEFAULT_BOT_AVATAR } from '../data/avatars.js';
-import { subscribeToAuth, logoutUser } from '../utils/firebase.js';
+import { AVATARS, DEFAULT_PLAYER_AVATAR, DEFAULT_BOT_AVATAR } from '../data/avatars.js';
+import {
+  subscribeToAuth,
+  logoutUser,
+  getUserDecks,
+  getUserProfile
+} from '../utils/firebase.js';
 import {
   createInitialGameState,
   applyStartingPlayer,
@@ -893,7 +901,11 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
 
   // Autenticación con Firebase y gestión de mazos en la nube / local
   const [currentUser, setCurrentUser] = useState(null);
+  const [userProfile, setUserProfile] = useState(null);
+  const [userCloudDecks, setUserCloudDecks] = useState([]);
   const [showAuthModal, setShowAuthModal] = useState(false);
+  const [showProfileModal, setShowProfileModal] = useState(false);
+  const [showMyDecksModal, setShowMyDecksModal] = useState(false);
   const [showDeckSelectorModal, setShowDeckSelectorModal] = useState(false);
   const [activePlayerDeck, setActivePlayerDeck] = useState(null);
   const [activeBotDeck, setActiveBotDeck] = useState(null);
@@ -922,6 +934,25 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
   useEffect(() => {
     const unsubscribe = subscribeToAuth((user) => {
       setCurrentUser(user);
+      if (user?.uid) {
+        getUserDecks(user.uid)
+          .then((decks) => setUserCloudDecks(decks))
+          .catch(() => {});
+        getUserProfile(user.uid)
+          .then((p) => {
+            if (p) {
+              setUserProfile(p);
+              if (p.avatarId) {
+                const found = AVATARS.find((a) => a.id === p.avatarId);
+                if (found) setPlayerAvatar(found);
+              }
+            }
+          })
+          .catch(() => {});
+      } else {
+        setUserCloudDecks([]);
+        setUserProfile(null);
+      }
     });
     return () => unsubscribe();
   }, []);
@@ -2516,36 +2547,18 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
             <span className="hidden sm:inline">ELEGIR MAZO</span>
           </button>
 
-          {/* Chip de Identidad / Usuario (Firebase Auth) */}
-          {currentUser ? (
-            <button
-              type="button"
-              onClick={() => {
-                if (window.confirm(`Sesión activa: ${currentUser.email}\n¿Deseas cerrar sesión?`)) {
-                  logoutUser();
-                }
-              }}
-              style={{ clipPath: CYBER_BUTTON }}
-              className="hidden md:flex items-center gap-1.5 px-2.5 py-1.5 bg-[#000000] border border-[#39FF14]/50 hover:border-[#FF003C] text-[#39FF14] hover:text-[#FF003C] font-mono text-[10px] font-black uppercase transition-all cursor-pointer"
-              title={`Sesión iniciada como ${currentUser.displayName || currentUser.email}. Haz clic para cerrar sesión.`}
-            >
-              <span className="w-2 h-2 rounded-full bg-[#39FF14] animate-pulse" />
-              <span className="truncate max-w-[90px]">
-                {currentUser.displayName || currentUser.email?.split('@')[0]}
-              </span>
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={() => setShowAuthModal(true)}
-              style={{ clipPath: CYBER_BUTTON }}
-              className="hidden md:flex items-center gap-1.5 px-2.5 py-1.5 bg-[#000000] border border-[#0dfceb]/40 hover:border-[#0dfceb] text-[#0dfceb] hover:text-white font-mono text-[10px] font-black uppercase transition-all cursor-pointer shadow-[0_0_8px_rgba(13,252,235,0.15)]"
-              title="Inicia sesión o regístrate para guardar y usar tus mazos en la nube"
-            >
-              <User className="w-3.5 h-3.5 text-[#0dfceb]" />
-              <span>ENTRAR</span>
-            </button>
-          )}
+          {/* Menú Desplegable de Usuario Netrunner */}
+          <div className="flex items-center">
+            <CyberUserDropdown
+              currentUser={currentUser}
+              userProfile={userProfile}
+              userDecksCount={userCloudDecks.length}
+              onOpenAuthModal={() => setShowAuthModal(true)}
+              onOpenMyDecks={() => setShowMyDecksModal(true)}
+              onOpenProfile={() => setShowProfileModal(true)}
+              themeColor="#0dfceb"
+            />
+          </div>
 
           {/* Botón Nueva Partida */}
           <button
@@ -6769,7 +6782,52 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
         isOpen={showAuthModal}
         onClose={() => setShowAuthModal(false)}
         currentUser={currentUser}
-        onSuccess={(user) => setCurrentUser(user)}
+        onSuccess={(user) => {
+          setCurrentUser(user);
+          if (user?.uid) {
+            getUserDecks(user.uid).then((decks) => setUserCloudDecks(decks));
+            getUserProfile(user.uid).then((p) => {
+              if (p) {
+                setUserProfile(p);
+                if (p.avatarId) {
+                  const av = AVATARS.find((a) => a.id === p.avatarId);
+                  if (av) setPlayerAvatar(av);
+                }
+              }
+            });
+          }
+        }}
+      />
+
+      {/* Modal de Perfil de Usuario (Nombre, Apellidos, Melee.gg y Avatar) */}
+      <CyberProfileModal
+        isOpen={showProfileModal}
+        onClose={() => setShowProfileModal(false)}
+        currentUser={currentUser}
+        onProfileUpdated={(updated) => {
+          setUserProfile(updated);
+          if (updated.avatarId) {
+            const av = AVATARS.find((a) => a.id === updated.avatarId);
+            if (av) setPlayerAvatar(av);
+          }
+        }}
+      />
+
+      {/* Modal de Mis Mazos (Ver, Gestionar y Cargar Mazos en la Nube) */}
+      <CyberMyDecksModal
+        isOpen={showMyDecksModal}
+        onClose={() => setShowMyDecksModal(false)}
+        currentUser={currentUser}
+        decks={userCloudDecks}
+        onDecksChanged={() => {
+          if (currentUser?.uid) {
+            getUserDecks(currentUser.uid).then((decks) => setUserCloudDecks(decks));
+          }
+        }}
+        onLoadDeckToBuilder={(deck) => {
+          setShowMyDecksModal(false);
+          handleStartWithDecks(deck, activeBotDeck || availableDecks[selectedBotDeckIdx]);
+        }}
       />
 
       {/* Modal de Selección de Mazos y Avatares (Sala de Preparación de Partida) */}

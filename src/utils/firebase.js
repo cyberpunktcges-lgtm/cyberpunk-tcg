@@ -153,3 +153,68 @@ export async function deleteUserDeck(userId, deckId) {
   await deleteDoc(deckRef);
   return true;
 }
+
+// =========================================================================
+// GESTIÓN DE PERFIL DE USUARIO EN FIRESTORE
+// =========================================================================
+
+/**
+ * Guardar o actualizar datos de perfil del usuario
+ * @param {string} userId - UID del usuario autenticado
+ * @param {object} profileData - { firstName, lastName, displayName, avatarId, avatarImage, meleeUsername, city, favoriteFaction, bio }
+ */
+export async function saveUserProfile(userId, profileData) {
+  if (!userId) throw new Error('Usuario no autenticado');
+
+  const profileRef = doc(db, 'users', userId, 'profile', 'info');
+  const payload = {
+    ...profileData,
+    updatedAt: serverTimestamp()
+  };
+
+  await setDoc(profileRef, payload, { merge: true });
+
+  // Actualizar también displayName en Auth si cambió
+  if (profileData.displayName && auth.currentUser) {
+    try {
+      await updateProfile(auth.currentUser, { displayName: profileData.displayName });
+    } catch {}
+  }
+
+  // Guardar en caché local
+  try {
+    localStorage.setItem(`cp_profile_${userId}`, JSON.stringify(payload));
+  } catch {}
+
+  return payload;
+}
+
+/**
+ * Obtener perfil de usuario
+ * @param {string} userId - UID del usuario autenticado
+ */
+export async function getUserProfile(userId) {
+  if (!userId) return null;
+
+  try {
+    const profileRef = doc(db, 'users', userId, 'profile', 'info');
+    const snap = await getDoc(profileRef);
+    if (snap.exists()) {
+      const data = snap.data();
+      try {
+        localStorage.setItem(`cp_profile_${userId}`, JSON.stringify(data));
+      } catch {}
+      return data;
+    }
+  } catch (err) {
+    console.warn('Error al obtener perfil de Firestore:', err);
+  }
+
+  // Fallback a caché si Firestore tarda o falla
+  try {
+    const cached = localStorage.getItem(`cp_profile_${userId}`);
+    if (cached) return JSON.parse(cached);
+  } catch {}
+
+  return null;
+}

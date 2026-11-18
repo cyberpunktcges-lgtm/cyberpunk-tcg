@@ -3,12 +3,16 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { splitAndSortTournaments } from '../utils/dateUtils.js';
 import ProxyPrintModal from './ProxyPrintModal.jsx';
 import CyberAuthModal from './CyberAuthModal.jsx';
+import CyberProfileModal from './CyberProfileModal.jsx';
+import CyberMyDecksModal from './CyberMyDecksModal.jsx';
+import CyberUserDropdown from './CyberUserDropdown.jsx';
 import {
   subscribeToAuth,
   logoutUser,
   saveUserDeck,
   getUserDecks,
-  deleteUserDeck
+  deleteUserDeck,
+  getUserProfile
 } from '../utils/firebase.js';
 import {
   Terminal,
@@ -240,7 +244,10 @@ export default function CyberpunkPortal({
 
   // Estados de Autenticación con Firebase y Mazos en la Nube
   const [currentUser, setCurrentUser] = useState(null);
+  const [userProfile, setUserProfile] = useState(null);
   const [authModalOpen, setAuthModalOpen] = useState(false);
+  const [profileModalOpen, setProfileModalOpen] = useState(false);
+  const [myDecksModalOpen, setMyDecksModalOpen] = useState(false);
   const [userCloudDecks, setUserCloudDecks] = useState([]);
   const [isSavingDeck, setIsSavingDeck] = useState(false);
 
@@ -251,8 +258,12 @@ export default function CyberpunkPortal({
         getUserDecks(user.uid)
           .then((decks) => setUserCloudDecks(decks))
           .catch((e) => console.error('Error cargando mazos de la nube:', e));
+        getUserProfile(user.uid)
+          .then((prof) => setUserProfile(prof))
+          .catch((e) => console.error('Error cargando perfil:', e));
       } else {
         setUserCloudDecks([]);
+        setUserProfile(null);
       }
     });
     return () => unsubscribe();
@@ -2421,38 +2432,17 @@ export default function CyberpunkPortal({
                 )}
               </div>
 
-              {/* Botón de Autenticación / Perfil de Usuario en Navbar */}
+              {/* Menú de Usuario / Netrunner Dropdown en Navbar */}
               <div className="hidden sm:flex items-center">
-                {currentUser ? (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (window.confirm(`Sesión iniciada como: ${currentUser.email}\n¿Deseas cerrar sesión?`)) {
-                        logoutUser();
-                      }
-                    }}
-                    style={{ clipPath: CYBER_CLIP }}
-                    className="flex items-center gap-1.5 px-3 py-2 bg-[#000000] border border-[#00F0FF]/60 hover:border-[#FF003C] text-[#00F0FF] hover:text-[#FF003C] font-mono text-xs font-bold uppercase transition-all shadow-[0_0_12px_rgba(0,240,255,0.25)] cursor-pointer"
-                    title={`Conectado como ${currentUser.displayName || currentUser.email} (${userCloudDecks.length} mazos). Clic para cerrar sesión.`}
-                  >
-                    <span className="w-2 h-2 rounded-full bg-[#00F0FF] animate-pulse" />
-                    <span className="truncate max-w-[110px]">
-                      {currentUser.displayName || currentUser.email?.split('@')[0]}
-                    </span>
-                    <span className="text-[10px] text-[#FCEE0A] ml-0.5">({userCloudDecks.length})</span>
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => setAuthModalOpen(true)}
-                    style={{ clipPath: CYBER_CLIP }}
-                    className="flex items-center gap-1.5 px-3 py-2 bg-[#000000] border border-[#FCEE0A]/60 hover:border-[#00F0FF] text-[#FCEE0A] hover:text-[#00F0FF] font-mono text-xs font-bold uppercase transition-all shadow-[0_0_12px_rgba(252,238,10,0.25)] cursor-pointer"
-                    title="Inicia sesión o regístrate gratis para guardar tus mazos en la nube"
-                  >
-                    <User className="w-3.5 h-3.5 text-[#FCEE0A]" />
-                    <span>ENTRAR</span>
-                  </button>
-                )}
+                <CyberUserDropdown
+                  currentUser={currentUser}
+                  userProfile={userProfile}
+                  userDecksCount={userCloudDecks.length}
+                  onOpenAuthModal={() => setAuthModalOpen(true)}
+                  onOpenMyDecks={() => setMyDecksModalOpen(true)}
+                  onOpenProfile={() => setProfileModalOpen(true)}
+                  themeColor="#00F0FF"
+                />
               </div>
 
               {/* Botón Menú Móvil */}
@@ -2505,23 +2495,51 @@ export default function CyberpunkPortal({
                 })}
 
                 {/* Botón de cuenta en menú móvil */}
-                <div className="pt-2 border-t border-gray-800">
+                <div className="pt-2 border-t border-gray-800 space-y-2">
                   {currentUser ? (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (window.confirm(`¿Cerrar sesión de ${currentUser.email}?`)) {
-                          logoutUser();
-                        }
-                      }}
-                      className="w-full flex items-center justify-between px-4 py-2.5 bg-[#070a10] border border-[#00F0FF] text-[#00F0FF] font-mono text-xs font-bold uppercase"
-                    >
-                      <span className="flex items-center gap-2">
-                        <User className="w-4 h-4" />
-                        <span>{currentUser.displayName || currentUser.email?.split('@')[0]} ({userCloudDecks.length} mazos)</span>
-                      </span>
-                      <span className="text-[#FF003C] text-[10px]">CERRAR SESIÓN</span>
-                    </button>
+                    <>
+                      <div className="flex items-center justify-between px-3 py-2 bg-[#070a10] border border-[#00F0FF]/40 text-xs">
+                        <span className="font-bold uppercase text-[#00F0FF] truncate">
+                          {userProfile?.displayName || currentUser.displayName || currentUser.email?.split('@')[0]}
+                        </span>
+                        <span className="text-[10px] text-[#FCEE0A]">{userCloudDecks.length} mazos</span>
+                      </div>
+                      <div className="grid grid-cols-2 gap-1.5 text-xs">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setMobileMenuOpen(false);
+                            setMyDecksModalOpen(true);
+                          }}
+                          className="py-2 px-2 bg-black border border-[#FCEE0A] text-[#FCEE0A] font-bold uppercase text-[10px] flex items-center justify-center gap-1 cursor-pointer"
+                        >
+                          <Layers className="w-3.5 h-3.5" />
+                          <span>MIS MAZOS</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setMobileMenuOpen(false);
+                            setProfileModalOpen(true);
+                          }}
+                          className="py-2 px-2 bg-black border border-[#00F0FF] text-[#00F0FF] font-bold uppercase text-[10px] flex items-center justify-center gap-1 cursor-pointer"
+                        >
+                          <User className="w-3.5 h-3.5" />
+                          <span>MI PERFIL</span>
+                        </button>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (window.confirm(`¿Cerrar sesión de ${currentUser.email}?`)) {
+                            logoutUser();
+                          }
+                        }}
+                        className="w-full py-2 bg-black border border-[#FF003C]/40 hover:bg-[#FF003C] text-[#FF003C] hover:text-white text-[10px] font-bold uppercase text-center transition-colors cursor-pointer"
+                      >
+                        CERRAR SESIÓN
+                      </button>
+                    </>
                   ) : (
                     <button
                       type="button"
@@ -2529,9 +2547,9 @@ export default function CyberpunkPortal({
                         setMobileMenuOpen(false);
                         setAuthModalOpen(true);
                       }}
-                      className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-[#FCEE0A] text-[#070a10] font-mono font-black text-xs uppercase"
+                      className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-[#FCEE0A] text-[#070a10] font-mono font-black text-xs uppercase cursor-pointer"
                     >
-                      <User className="w-4 h-4" />
+                      <User className="w-3.5 h-3.5" />
                       <span>IDENTIFICARSE / REGISTRO</span>
                     </button>
                   )}
@@ -4719,7 +4737,44 @@ export default function CyberpunkPortal({
           setCurrentUser(user);
           if (user) {
             getUserDecks(user.uid).then((decks) => setUserCloudDecks(decks));
+            getUserProfile(user.uid).then((prof) => setUserProfile(prof));
           }
+        }}
+      />
+
+      {/* Cyberpunk Profile Modal (Editar Nombre, Apellidos, Melee.gg y Avatar) */}
+      <CyberProfileModal
+        isOpen={profileModalOpen}
+        onClose={() => setProfileModalOpen(false)}
+        currentUser={currentUser}
+        onProfileUpdated={(updated) => {
+          setUserProfile(updated);
+          if (updated.displayName && currentUser) {
+            setCurrentUser({ ...currentUser, displayName: updated.displayName });
+          }
+        }}
+      />
+
+      {/* Cyberpunk Mis Mazos Modal (Ver, Gestionar, Probar y Crear Mazos en la Nube) */}
+      <CyberMyDecksModal
+        isOpen={myDecksModalOpen}
+        onClose={() => setMyDecksModalOpen(false)}
+        currentUser={currentUser}
+        decks={userCloudDecks}
+        onDecksChanged={() => {
+          if (currentUser?.uid) {
+            getUserDecks(currentUser.uid).then((decks) => setUserCloudDecks(decks));
+          }
+        }}
+        onLoadDeckToBuilder={(deck) => handleLoadCloudDeck(deck)}
+        onPrintDeckProxies={(deck) => {
+          const cat = getCategorizedDeck(deck.cards || [], deck.sideboard || []);
+          handleOpenProxyPrint(
+            deck.name,
+            cat.units.concat(cat.programs, cat.gears, cat.others),
+            cat.legends,
+            deck.sideboard || []
+          );
         }}
       />
 
