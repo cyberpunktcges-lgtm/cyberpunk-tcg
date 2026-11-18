@@ -30,7 +30,8 @@ import {
   Layers
 } from 'lucide-react';
 import CyberAuthModal from './CyberAuthModal.jsx';
-import CyberDeckSelectorModal from './CyberDeckSelectorModal.jsx';
+import CyberDeckSelectorModal, { AvatarDisplay } from './CyberDeckSelectorModal.jsx';
+import { DEFAULT_PLAYER_AVATAR, DEFAULT_BOT_AVATAR } from '../data/avatars.js';
 import { subscribeToAuth, logoutUser } from '../utils/firebase.js';
 import {
   createInitialGameState,
@@ -896,6 +897,27 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
   const [showDeckSelectorModal, setShowDeckSelectorModal] = useState(false);
   const [activePlayerDeck, setActivePlayerDeck] = useState(null);
   const [activeBotDeck, setActiveBotDeck] = useState(null);
+
+  // Avatares de Combate (Jugador y Bot IA, persistentes en localStorage)
+  const [playerAvatar, setPlayerAvatar] = useState(() => {
+    try {
+      if (typeof window !== 'undefined') {
+        const saved = localStorage.getItem('cyber_sim_player_avatar');
+        if (saved) return JSON.parse(saved);
+      }
+    } catch {}
+    return DEFAULT_PLAYER_AVATAR;
+  });
+
+  const [botAvatar, setBotAvatar] = useState(() => {
+    try {
+      if (typeof window !== 'undefined') {
+        const saved = localStorage.getItem('cyber_sim_bot_avatar');
+        if (saved) return JSON.parse(saved);
+      }
+    } catch {}
+    return DEFAULT_BOT_AVATAR;
+  });
 
   useEffect(() => {
     const unsubscribe = subscribeToAuth((user) => {
@@ -1859,13 +1881,31 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
     };
   };
 
-  // Iniciar partida con dos mazos específicos seleccionados por el jugador
-  const handleStartWithDecks = (chosenPlayerDeck, chosenBotDeck) => {
+  // Iniciar partida con mazos y avatares específicos seleccionados por el jugador
+  const handleStartWithDecks = (
+    chosenPlayerDeck,
+    chosenBotDeck,
+    chosenPlayerAvatar = null,
+    chosenBotAvatar = null
+  ) => {
     const normPlayer = normalizeDeckInput(chosenPlayerDeck);
     const normBot = normalizeDeckInput(chosenBotDeck);
 
     setActivePlayerDeck(normPlayer);
     setActiveBotDeck(normBot);
+
+    if (chosenPlayerAvatar) {
+      setPlayerAvatar(chosenPlayerAvatar);
+      try {
+        localStorage.setItem('cyber_sim_player_avatar', JSON.stringify(chosenPlayerAvatar));
+      } catch {}
+    }
+    if (chosenBotAvatar) {
+      setBotAvatar(chosenBotAvatar);
+      try {
+        localStorage.setItem('cyber_sim_bot_avatar', JSON.stringify(chosenBotAvatar));
+      } catch {}
+    }
 
     const initial = createInitialGameState(normPlayer, normBot, initialCards, {
       startingPlayer: null,
@@ -1879,6 +1919,8 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
     setLegendMenuId(null);
     setHoveredCard(null);
     setPreviewCard(null);
+    setHolocall(null);
+    setRematchModal(null);
 
     if (typeof window !== 'undefined') {
       try {
@@ -1908,6 +1950,8 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
       const saved = loadSavedGame();
       if (saved && saved.gameState) {
         setGameState(saved.gameState);
+        if (saved.activePlayerDeck) setActivePlayerDeck(saved.activePlayerDeck);
+        if (saved.activeBotDeck) setActiveBotDeck(saved.activeBotDeck);
         if (typeof saved.selectedPlayerDeckIdx === 'number') {
           setSelectedPlayerDeckIdx(saved.selectedPlayerDeckIdx);
         }
@@ -1923,8 +1967,10 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
       }
     }
 
-    const pDeck = availableDecks[pDeckIdx] || availableDecks[0] || { deckList: [], legends: [] };
+    const pDeck =
+      activePlayerDeck || availableDecks[pDeckIdx] || availableDecks[0] || { deckList: [], legends: [] };
     const bDeck =
+      activeBotDeck ||
       availableDecks[bDeckIdx] || availableDecks[1] || availableDecks[0] || { deckList: [], legends: [] };
 
     const initial = createInitialGameState(pDeck, bDeck, initialCards, {
@@ -2009,28 +2055,9 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
     });
   };
 
-  // Reiniciar partida con aviso de confirmación
+  // Iniciar nueva partida: abre la sala de preparación de combate para elegir mazos y avatares
   const handleResetGame = () => {
-    if (
-      window.confirm(
-        '¿Deseas iniciar una nueva partida?\nSe reiniciará la mesa de combate, se realizará una nueva tirada de D20 para decidir quién empieza y volverás a la fase inicial de Keep/Mulligan.'
-      )
-    ) {
-      try {
-        if (typeof window !== 'undefined') {
-          localStorage.removeItem(CP_SIM_STORAGE_KEY);
-        }
-      } catch {}
-      setSelectedHandCard(null);
-      setSelectedFieldUnit(null);
-      setLegendMenuId(null);
-      setHoveredCard(null);
-      setPreviewCard(null);
-      setHistory([]);
-      setHolocall(null);
-      setRematchModal(null);
-      handleStartGame(selectedPlayerDeckIdx, selectedBotDeckIdx, true);
-    }
+    setShowDeckSelectorModal(true);
   };
 
   // Acción directa para llamar a una Leyenda boca arriba gastando 1 €$
@@ -2581,18 +2608,18 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
               style={{ clipPath: CYBER_AVATAR_CLIP }}
               className="flex items-center gap-2.5 bg-[#000000] border border-[#FF003C]/60 p-2 shadow-[0_0_15px_rgba(255,0,60,0.2)]"
             >
-              <div className="w-10 h-10 bg-[#FF003C]/20 border border-[#FF003C] flex items-center justify-center shrink-0">
-                <Bot className="w-6 h-6 text-[#FF003C]" />
+              <div className="w-10 h-10 bg-[#FF003C]/20 border border-[#FF003C] flex items-center justify-center shrink-0 overflow-hidden">
+                <AvatarDisplay avatar={botAvatar} fallbackType="bot" />
               </div>
               <div className="min-w-0 flex-1">
                 <div className="flex items-center justify-between">
                   <span className="font-black text-xs uppercase text-white truncate">
-                    RAY // CORPO BOT
+                    {botAvatar?.name || 'RAY // CORPO BOT'}
                   </span>
                   <span className="w-2 h-2 rounded-full bg-[#FF003C] animate-pulse" />
                 </div>
-                <span className="text-[9px] text-gray-400 block truncate">
-                  OPONENTE IA • NIGHT CITY
+                <span className="text-[9px] text-gray-400 block truncate font-mono">
+                  {botAvatar?.title || 'OPONENTE IA • NIGHT CITY'}
                 </span>
               </div>
             </div>
@@ -2863,18 +2890,18 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
               style={{ clipPath: CYBER_AVATAR_CLIP }}
               className="flex items-center gap-2.5 bg-[#000000] border border-[#0dfceb]/60 p-2 shadow-[0_0_15px_rgba(13,252,235,0.25)]"
             >
-              <div className="w-10 h-10 bg-[#0dfceb]/20 border border-[#0dfceb] flex items-center justify-center shrink-0">
-                <User className="w-6 h-6 text-[#0dfceb]" />
+              <div className="w-10 h-10 bg-[#0dfceb]/20 border border-[#0dfceb] flex items-center justify-center shrink-0 overflow-hidden">
+                <AvatarDisplay avatar={playerAvatar} fallbackType="player" />
               </div>
               <div className="min-w-0 flex-1">
                 <div className="flex items-center justify-between">
                   <span className="font-black text-xs uppercase text-white truncate">
-                    V // NETRUNNER
+                    {playerAvatar?.name || 'V // NETRUNNER'}
                   </span>
                   <span className="w-2 h-2 rounded-full bg-[#0dfceb] animate-pulse" />
                 </div>
-                <span className="text-[9px] text-gray-400 block truncate">
-                  SOLO // MERCENARIO NIGHT CITY
+                <span className="text-[9px] text-gray-400 block truncate font-mono">
+                  {playerAvatar?.title || 'SOLO // MERCENARIO NIGHT CITY'}
                 </span>
               </div>
             </div>
@@ -5338,12 +5365,12 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                     }
                   } catch {}
                   setRematchModal(null);
-                  handleStartGame(selectedPlayerDeckIdx, selectedBotDeckIdx, true);
+                  setShowDeckSelectorModal(true);
                 }}
                 style={{ clipPath: CYBER_BUTTON }}
                 className="w-full py-2.5 bg-black/80 border border-gray-700 hover:border-[#FCEE0A] text-gray-400 hover:text-[#FCEE0A] font-black text-xs uppercase tracking-widest cursor-pointer transition-all"
               >
-                🔄 NUEVA PARTIDA (REINICIAR MESA Y D20)
+                🔄 NUEVA PARTIDA (ELEGIR MAZO Y AVATAR)
               </button>
             </div>
           </div>
@@ -6745,7 +6772,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
         onSuccess={(user) => setCurrentUser(user)}
       />
 
-      {/* Modal de Selección de Mazos (Jugador y Bot IA) */}
+      {/* Modal de Selección de Mazos y Avatares (Sala de Preparación de Partida) */}
       <CyberDeckSelectorModal
         isOpen={showDeckSelectorModal}
         onClose={() => setShowDeckSelectorModal(false)}
@@ -6753,12 +6780,14 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
         metaDecks={availableDecks}
         currentSelectedPlayerDeck={activePlayerDeck || availableDecks[selectedPlayerDeckIdx]}
         currentSelectedBotDeck={activeBotDeck || availableDecks[selectedBotDeckIdx]}
+        currentSelectedPlayerAvatar={playerAvatar}
+        currentSelectedBotAvatar={botAvatar}
         onOpenAuthModal={() => {
           setShowDeckSelectorModal(false);
           setShowAuthModal(true);
         }}
-        onSelectDecks={({ playerDeck, botDeck }) => {
-          handleStartWithDecks(playerDeck, botDeck);
+        onSelectDecks={({ playerDeck, botDeck, playerAvatar: pAv, botAvatar: bAv }) => {
+          handleStartWithDecks(playerDeck, botDeck, pAv, bAv);
         }}
       />
     </div>
