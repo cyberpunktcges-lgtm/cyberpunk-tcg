@@ -26,8 +26,12 @@ import {
   Bot,
   User,
   Radio,
-  Save
+  Save,
+  Layers
 } from 'lucide-react';
+import CyberAuthModal from './CyberAuthModal.jsx';
+import CyberDeckSelectorModal from './CyberDeckSelectorModal.jsx';
+import { subscribeToAuth, logoutUser } from '../utils/firebase.js';
 import {
   createInitialGameState,
   applyStartingPlayer,
@@ -885,6 +889,20 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
     if (zoomMode === '0.75') return 0.75;
     return autoScale;
   }, [zoomMode, autoScale]);
+
+  // Autenticación con Firebase y gestión de mazos en la nube / local
+  const [currentUser, setCurrentUser] = useState(null);
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [showDeckSelectorModal, setShowDeckSelectorModal] = useState(false);
+  const [activePlayerDeck, setActivePlayerDeck] = useState(null);
+  const [activeBotDeck, setActiveBotDeck] = useState(null);
+
+  useEffect(() => {
+    const unsubscribe = subscribeToAuth((user) => {
+      setCurrentUser(user);
+    });
+    return () => unsubscribe();
+  }, []);
 
   // Menú contextual flotante sobre una Leyenda (elección entre HACER CALL y SACAR EDDIE)
   const [legendMenuId, setLegendMenuId] = useState(null);
@@ -1780,6 +1798,12 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
       if (typeof saved.selectedBotDeckIdx === 'number') {
         setSelectedBotDeckIdx(saved.selectedBotDeckIdx);
       }
+      if (saved.activePlayerDeck) {
+        setActivePlayerDeck(saved.activePlayerDeck);
+      }
+      if (saved.activeBotDeck) {
+        setActiveBotDeck(saved.activeBotDeck);
+      }
       if (Array.isArray(saved.history)) {
         setHistory(saved.history);
       }
@@ -1788,8 +1812,89 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
       const bDeck = availableDecks[1] || availableDecks[0] || { deckList: [], legends: [] };
       const initial = createInitialGameState(pDeck, bDeck, initialCards);
       setGameState(initial);
+      setActivePlayerDeck(pDeck);
+      setActiveBotDeck(bDeck);
+    }
+
+    // Comprobar parámetros de URL (?deck=custom o ?metaDeckId=...)
+    if (typeof window !== 'undefined') {
+      try {
+        const params = new URLSearchParams(window.location.search);
+        if (params.get('deck') === 'custom') {
+          const rawCustom = localStorage.getItem('cp_tcg_custom_deck');
+          if (rawCustom) {
+            const parsed = JSON.parse(rawCustom);
+            if (parsed.cards && parsed.cards.length > 0) {
+              handleStartWithDecks(parsed, availableDecks[1] || availableDecks[0]);
+            }
+          }
+        } else if (params.get('metaDeckId')) {
+          const mId = params.get('metaDeckId');
+          const found = availableDecks.find((d) => d.id === mId || String(d.id) === mId);
+          if (found) {
+            handleStartWithDecks(found, availableDecks[1] || availableDecks[0]);
+          }
+        }
+      } catch (err) {
+        console.warn('Error leyendo parámetros de mazo:', err);
+      }
     }
   }, []);
+
+  // Normalizar y clasificar cualquier mazo (sea de CMS o de usuario/Deckbuilder)
+  const normalizeDeckInput = (deck) => {
+    if (!deck) return { name: 'Mazo', legends: [], deckList: [] };
+    let legends = deck.legends || [];
+    let cards = deck.deckList || deck.cards || [];
+    if (legends.length === 0) {
+      legends = cards.filter((c) => isLegendCard(c));
+      cards = cards.filter((c) => !isLegendCard(c));
+    }
+    return {
+      id: deck.id,
+      name: deck.name || 'Mazo',
+      faction: deck.faction || 'Neutral',
+      legends: legends.slice(0, 3),
+      deckList: cards
+    };
+  };
+
+  // Iniciar partida con dos mazos específicos seleccionados por el jugador
+  const handleStartWithDecks = (chosenPlayerDeck, chosenBotDeck) => {
+    const normPlayer = normalizeDeckInput(chosenPlayerDeck);
+    const normBot = normalizeDeckInput(chosenBotDeck);
+
+    setActivePlayerDeck(normPlayer);
+    setActiveBotDeck(normBot);
+
+    const initial = createInitialGameState(normPlayer, normBot, initialCards, {
+      startingPlayer: null,
+      isRematch: false
+    });
+
+    setGameState(initial);
+    setHistory([]);
+    setSelectedHandCard(null);
+    setSelectedFieldUnit(null);
+    setLegendMenuId(null);
+    setHoveredCard(null);
+    setPreviewCard(null);
+
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem(
+          CP_SIM_STORAGE_KEY,
+          JSON.stringify({
+            gameState: initial,
+            activePlayerDeck: normPlayer,
+            activeBotDeck: normBot,
+            history: [],
+            savedAt: Date.now()
+          })
+        );
+      } catch {}
+    }
+  };
 
   // Inicializar o reiniciar partida (preserva guardado si forceNew es false)
   const handleStartGame = (
@@ -2371,6 +2476,49 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
             <span>📊</span>
             <span>{isHudOpen ? 'TABLERO' : 'HUD / DADOS'}</span>
           </button>
+
+          {/* Botón Elegir Mazo (Selector de Duelo) */}
+          <button
+            type="button"
+            onClick={() => setShowDeckSelectorModal(true)}
+            style={{ clipPath: CYBER_BUTTON }}
+            className="px-2.5 sm:px-3 py-1.5 bg-[#000000] border border-[#0dfceb]/50 hover:border-[#FCEE0A] text-[#0dfceb] hover:text-[#FCEE0A] font-mono font-black uppercase flex items-center gap-1.5 cursor-pointer text-xs transition-all hover:shadow-[0_0_15px_rgba(252,238,10,0.4)]"
+            title="Elegir tu mazo (de tu cuenta o del meta) y el mazo de la IA"
+          >
+            <Layers className="w-3.5 h-3.5 text-[#FCEE0A]" />
+            <span className="hidden sm:inline">ELEGIR MAZO</span>
+          </button>
+
+          {/* Chip de Identidad / Usuario (Firebase Auth) */}
+          {currentUser ? (
+            <button
+              type="button"
+              onClick={() => {
+                if (window.confirm(`Sesión activa: ${currentUser.email}\n¿Deseas cerrar sesión?`)) {
+                  logoutUser();
+                }
+              }}
+              style={{ clipPath: CYBER_BUTTON }}
+              className="hidden md:flex items-center gap-1.5 px-2.5 py-1.5 bg-[#000000] border border-[#39FF14]/50 hover:border-[#FF003C] text-[#39FF14] hover:text-[#FF003C] font-mono text-[10px] font-black uppercase transition-all cursor-pointer"
+              title={`Sesión iniciada como ${currentUser.displayName || currentUser.email}. Haz clic para cerrar sesión.`}
+            >
+              <span className="w-2 h-2 rounded-full bg-[#39FF14] animate-pulse" />
+              <span className="truncate max-w-[90px]">
+                {currentUser.displayName || currentUser.email?.split('@')[0]}
+              </span>
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setShowAuthModal(true)}
+              style={{ clipPath: CYBER_BUTTON }}
+              className="hidden md:flex items-center gap-1.5 px-2.5 py-1.5 bg-[#000000] border border-[#0dfceb]/40 hover:border-[#0dfceb] text-[#0dfceb] hover:text-white font-mono text-[10px] font-black uppercase transition-all cursor-pointer shadow-[0_0_8px_rgba(13,252,235,0.15)]"
+              title="Inicia sesión o regístrate para guardar y usar tus mazos en la nube"
+            >
+              <User className="w-3.5 h-3.5 text-[#0dfceb]" />
+              <span>ENTRAR</span>
+            </button>
+          )}
 
           {/* Botón Nueva Partida */}
           <button
@@ -6588,6 +6736,31 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Modal de Autenticación Cyberpunk (Firebase Auth) */}
+      <CyberAuthModal
+        isOpen={showAuthModal}
+        onClose={() => setShowAuthModal(false)}
+        currentUser={currentUser}
+        onSuccess={(user) => setCurrentUser(user)}
+      />
+
+      {/* Modal de Selección de Mazos (Jugador y Bot IA) */}
+      <CyberDeckSelectorModal
+        isOpen={showDeckSelectorModal}
+        onClose={() => setShowDeckSelectorModal(false)}
+        currentUser={currentUser}
+        metaDecks={availableDecks}
+        currentSelectedPlayerDeck={activePlayerDeck || availableDecks[selectedPlayerDeckIdx]}
+        currentSelectedBotDeck={activeBotDeck || availableDecks[selectedBotDeckIdx]}
+        onOpenAuthModal={() => {
+          setShowDeckSelectorModal(false);
+          setShowAuthModal(true);
+        }}
+        onSelectDecks={({ playerDeck, botDeck }) => {
+          handleStartWithDecks(playerDeck, botDeck);
+        }}
+      />
     </div>
   );
 }

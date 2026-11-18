@@ -2,6 +2,14 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { splitAndSortTournaments } from '../utils/dateUtils.js';
 import ProxyPrintModal from './ProxyPrintModal.jsx';
+import CyberAuthModal from './CyberAuthModal.jsx';
+import {
+  subscribeToAuth,
+  logoutUser,
+  saveUserDeck,
+  getUserDecks,
+  deleteUserDeck
+} from '../utils/firebase.js';
 import {
   Terminal,
   Layers,
@@ -47,7 +55,12 @@ import {
   Crown,
   Camera,
   Smartphone,
-  RotateCw
+  RotateCw,
+  Play,
+  Cloud,
+  Save,
+  User,
+  LogIn
 } from 'lucide-react';
 
 const CYBER_CLIP =
@@ -224,6 +237,86 @@ export default function CyberpunkPortal({
   const [cardColorFilter, setCardColorFilter] = useState('TODOS');
   const [visibleCardsCount, setVisibleCardsCount] = useState(24);
   const [modalCard, setModalCard] = useState(null);
+
+  // Estados de Autenticación con Firebase y Mazos en la Nube
+  const [currentUser, setCurrentUser] = useState(null);
+  const [authModalOpen, setAuthModalOpen] = useState(false);
+  const [userCloudDecks, setUserCloudDecks] = useState([]);
+  const [isSavingDeck, setIsSavingDeck] = useState(false);
+
+  useEffect(() => {
+    const unsubscribe = subscribeToAuth((user) => {
+      setCurrentUser(user);
+      if (user?.uid) {
+        getUserDecks(user.uid)
+          .then((decks) => setUserCloudDecks(decks))
+          .catch((e) => console.error('Error cargando mazos de la nube:', e));
+      } else {
+        setUserCloudDecks([]);
+      }
+    });
+    return () => unsubscribe();
+  }, []);
+
+  // Guardar mazo actual en la cuenta de Firebase Firestore
+  const handleSaveDeckToCloud = async () => {
+    if (!currentUser) {
+      setAuthModalOpen(true);
+      return;
+    }
+    if (customDeckList.length === 0) {
+      alert('Tu mazo está vacío. Añade cartas antes de guardarlo.');
+      return;
+    }
+    setIsSavingDeck(true);
+    try {
+      await saveUserDeck(currentUser.uid, {
+        name: customDeckName,
+        faction: customDeckFaction,
+        cards: customDeckList,
+        sideboard: customSideboardList
+      });
+      setDeckToast({ type: 'success', text: `¡Mazo "${customDeckName}" guardado en la nube!` });
+      setTimeout(() => setDeckToast(null), 3500);
+      const updated = await getUserDecks(currentUser.uid);
+      setUserCloudDecks(updated);
+    } catch (err) {
+      alert('Error guardando mazo en la nube: ' + err.message);
+    } finally {
+      setIsSavingDeck(false);
+    }
+  };
+
+  // Cargar un mazo de la nube al constructor
+  const handleLoadCloudDeck = (cloudDeck) => {
+    if (!cloudDeck) return;
+    setCustomDeckName(cloudDeck.name || 'Mazo Cargado');
+    setCustomDeckFaction(cloudDeck.faction || 'Arasaka');
+    setCustomDeckList(cloudDeck.cards || []);
+    setCustomSideboardList(cloudDeck.sideboard || []);
+    setDeckToast({ type: 'success', text: `Mazo "${cloudDeck.name}" cargado en el constructor` });
+    setTimeout(() => setDeckToast(null), 3000);
+  };
+
+  // Probar mazo actual en el simulador
+  const handleTestDeckInSimulator = () => {
+    if (customDeckList.length === 0) {
+      alert('Tu mazo está vacío. Añade cartas antes de probar en el simulador.');
+      return;
+    }
+    try {
+      localStorage.setItem(
+        'cp_tcg_custom_deck',
+        JSON.stringify({
+          name: customDeckName,
+          faction: customDeckFaction,
+          cards: customDeckList,
+          sideboard: customSideboardList
+        })
+      );
+    } catch {}
+    window.location.href = '/simulador?deck=custom';
+  };
 
   // Estados del Constructor de Mazos (Deckbuilder en /cartas)
   const [deckbuilderOpen, setDeckbuilderOpen] = useState(true);
@@ -1578,6 +1671,16 @@ export default function CyberpunkPortal({
                     <Printer className="w-4 h-4" />
                     <span>IMPRIMIR PROXYS (PDF)</span>
                   </button>
+
+                  <a
+                    href={`/simulador?metaDeckId=${activeDeck.id || activeDeck.name}`}
+                    style={{ clipPath: CYBER_CLIP }}
+                    className="px-4 py-2 bg-gradient-to-r from-[#00F0FF] to-[#FCEE0A] hover:from-[#FCEE0A] hover:to-[#00F0FF] text-[#070a10] font-black uppercase tracking-wider flex items-center gap-1.5 cursor-pointer shadow-[0_0_15px_rgba(0,240,255,0.4)] transition-all"
+                    title="Carga este mazo del meta directamente en el simulador para jugar una partida"
+                  >
+                    <Play className="w-4 h-4 fill-[#070a10]" />
+                    <span>PROBAR EN SIMULADOR</span>
+                  </a>
                 </div>
               </div>
 
@@ -2318,6 +2421,40 @@ export default function CyberpunkPortal({
                 )}
               </div>
 
+              {/* Botón de Autenticación / Perfil de Usuario en Navbar */}
+              <div className="hidden sm:flex items-center">
+                {currentUser ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (window.confirm(`Sesión iniciada como: ${currentUser.email}\n¿Deseas cerrar sesión?`)) {
+                        logoutUser();
+                      }
+                    }}
+                    style={{ clipPath: CYBER_CLIP }}
+                    className="flex items-center gap-1.5 px-3 py-2 bg-[#000000] border border-[#00F0FF]/60 hover:border-[#FF003C] text-[#00F0FF] hover:text-[#FF003C] font-mono text-xs font-bold uppercase transition-all shadow-[0_0_12px_rgba(0,240,255,0.25)] cursor-pointer"
+                    title={`Conectado como ${currentUser.displayName || currentUser.email} (${userCloudDecks.length} mazos). Clic para cerrar sesión.`}
+                  >
+                    <span className="w-2 h-2 rounded-full bg-[#00F0FF] animate-pulse" />
+                    <span className="truncate max-w-[110px]">
+                      {currentUser.displayName || currentUser.email?.split('@')[0]}
+                    </span>
+                    <span className="text-[10px] text-[#FCEE0A] ml-0.5">({userCloudDecks.length})</span>
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setAuthModalOpen(true)}
+                    style={{ clipPath: CYBER_CLIP }}
+                    className="flex items-center gap-1.5 px-3 py-2 bg-[#000000] border border-[#FCEE0A]/60 hover:border-[#00F0FF] text-[#FCEE0A] hover:text-[#00F0FF] font-mono text-xs font-bold uppercase transition-all shadow-[0_0_12px_rgba(252,238,10,0.25)] cursor-pointer"
+                    title="Inicia sesión o regístrate gratis para guardar tus mazos en la nube"
+                  >
+                    <User className="w-3.5 h-3.5 text-[#FCEE0A]" />
+                    <span>ENTRAR</span>
+                  </button>
+                )}
+              </div>
+
               {/* Botón Menú Móvil */}
               <div className="flex lg:hidden">
                 <button
@@ -2366,6 +2503,39 @@ export default function CyberpunkPortal({
                     </a>
                   );
                 })}
+
+                {/* Botón de cuenta en menú móvil */}
+                <div className="pt-2 border-t border-gray-800">
+                  {currentUser ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (window.confirm(`¿Cerrar sesión de ${currentUser.email}?`)) {
+                          logoutUser();
+                        }
+                      }}
+                      className="w-full flex items-center justify-between px-4 py-2.5 bg-[#070a10] border border-[#00F0FF] text-[#00F0FF] font-mono text-xs font-bold uppercase"
+                    >
+                      <span className="flex items-center gap-2">
+                        <User className="w-4 h-4" />
+                        <span>{currentUser.displayName || currentUser.email?.split('@')[0]} ({userCloudDecks.length} mazos)</span>
+                      </span>
+                      <span className="text-[#FF003C] text-[10px]">CERRAR SESIÓN</span>
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMobileMenuOpen(false);
+                        setAuthModalOpen(true);
+                      }}
+                      className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-[#FCEE0A] text-[#070a10] font-mono font-black text-xs uppercase"
+                    >
+                      <User className="w-4 h-4" />
+                      <span>IDENTIFICARSE / REGISTRO</span>
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
           )}
@@ -4024,6 +4194,58 @@ export default function CyberpunkPortal({
                   </div>
 
                   <div className="space-y-3 text-xs font-mono">
+                    {/* Sincronización en la Nube / Estado de Usuario */}
+                    {currentUser ? (
+                      <div className="p-2.5 bg-[#070a10] border border-[#00F0FF]/40 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px] text-[#00F0FF] font-bold flex items-center gap-1 uppercase tracking-wider">
+                            <Cloud className="w-3.5 h-3.5 text-[#00F0FF]" />
+                            Tus Mazos en la Nube ({userCloudDecks.length})
+                          </span>
+                          <span className="text-[10px] text-[#FCEE0A] font-bold truncate max-w-[120px]">
+                            {currentUser.displayName || currentUser.email?.split('@')[0]}
+                          </span>
+                        </div>
+                        {userCloudDecks.length > 0 ? (
+                          <select
+                            onChange={(e) => {
+                              const found = userCloudDecks.find((d) => d.id === e.target.value);
+                              if (found) handleLoadCloudDeck(found);
+                            }}
+                            className="w-full bg-[#03060c] border border-gray-700 text-white text-[11px] px-2 py-1.5 focus:border-[#00F0FF] cursor-pointer"
+                            defaultValue=""
+                          >
+                            <option value="" disabled>-- Cargar mazo guardado ({userCloudDecks.length}) --</option>
+                            {userCloudDecks.map((d) => (
+                              <option key={d.id} value={d.id}>
+                                📁 {d.name} ({d.faction} • {d.cards?.reduce((acc, c) => acc + (c.qty || 1), 0) || 0} cartas)
+                              </option>
+                            ))}
+                          </select>
+                        ) : (
+                          <p className="text-[10px] text-gray-500 italic">
+                            No tienes mazos guardados aún. Guarda tu mazo para acceder desde cualquier dispositivo.
+                          </p>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="p-2.5 bg-[#070a10] border border-[#FCEE0A]/40 flex items-center justify-between gap-2">
+                        <div className="text-[10px] text-gray-300">
+                          <span className="text-[#FCEE0A] font-bold block flex items-center gap-1">
+                            <User className="w-3 h-3 text-[#FCEE0A]" /> MODO INVITADO
+                          </span>
+                          Inicia sesión para sincronizar tus mazos.
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setAuthModalOpen(true)}
+                          className="px-2.5 py-1 bg-[#FCEE0A] text-[#070a10] font-mono font-black text-[10px] uppercase hover:bg-white transition-colors cursor-pointer shrink-0"
+                        >
+                          ENTRAR
+                        </button>
+                      </div>
+                    )}
+
                     <div>
                       <label className="text-gray-400 block mb-1">NOMBRE DEL MAZO</label>
                       <input
@@ -4365,6 +4587,37 @@ export default function CyberpunkPortal({
                     </div>
                   </div>
 
+                  {/* Probar en Simulador + Guardar en Nube */}
+                  <div className="space-y-2 pt-2 border-t border-gray-800">
+                    <button
+                      type="button"
+                      onClick={handleTestDeckInSimulator}
+                      disabled={customDeckList.length === 0}
+                      style={{ clipPath: CYBER_CLIP }}
+                      className="w-full py-3 bg-[#00F0FF] hover:bg-[#FCEE0A] text-[#070a10] font-mono font-black text-xs uppercase flex items-center justify-center gap-2 cursor-pointer shadow-[0_0_20px_rgba(0,240,255,0.4)] hover:shadow-[0_0_25px_rgba(252,238,10,0.6)] transition-all rounded-none disabled:opacity-40"
+                    >
+                      <Play className="w-4 h-4 fill-current" />
+                      <span>PROBAR EN SIMULADOR CONTRA BOT</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={handleSaveDeckToCloud}
+                      disabled={customDeckList.length === 0 || isSavingDeck}
+                      style={{ clipPath: CYBER_CLIP }}
+                      className="w-full py-2.5 bg-[#070a10] border border-[#FCEE0A] text-[#FCEE0A] hover:bg-[#FCEE0A] hover:text-[#070a10] font-mono font-black text-xs uppercase flex items-center justify-center gap-2 cursor-pointer transition-all disabled:opacity-40"
+                    >
+                      <Save className="w-4 h-4" />
+                      <span>{isSavingDeck ? 'GUARDANDO EN CUENTA...' : (currentUser ? 'GUARDAR EN MI CUENTA' : 'GUARDAR EN MI CUENTA (CONECTAR)')}</span>
+                    </button>
+
+                    {deckToast && (
+                      <div className="p-2 bg-[#00F0FF]/10 border border-[#00F0FF] text-[#00F0FF] text-center font-mono text-[11px] font-bold">
+                        {deckToast.text}
+                      </div>
+                    )}
+                  </div>
+
                   {/* Acciones del Constructor */}
                   <div className="grid grid-cols-2 gap-2">
                     <button
@@ -4455,6 +4708,19 @@ export default function CyberpunkPortal({
         cards={proxyModalData.cards}
         legends={proxyModalData.legends}
         sideboard={proxyModalData.sideboard}
+      />
+
+      {/* Cyberpunk Auth Modal (Firebase Login / Registro / Invitado) */}
+      <CyberAuthModal
+        isOpen={authModalOpen}
+        onClose={() => setAuthModalOpen(false)}
+        currentUser={currentUser}
+        onSuccess={(user) => {
+          setCurrentUser(user);
+          if (user) {
+            getUserDecks(user.uid).then((decks) => setUserCloudDecks(decks));
+          }
+        }}
       />
 
       {/* Footer Geométrico Cyberpulse + Cyberpunk 2077 */}
