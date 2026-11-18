@@ -2921,7 +2921,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
           className={`
             ${isHudOpen ? 'fixed inset-y-0 left-0 z-40 w-80 sm:w-88 shadow-2xl bg-[#070a10] flex' : 'hidden'}
             ${isKiroshiCollapsed ? 'lg:hidden' : 'lg:flex lg:static lg:w-72 xl:w-80 2xl:w-88 lg:shadow-none'}
-            bg-[#070a10]/95 border-r border-[#0dfceb]/30 p-2 sm:p-2.5 flex-col justify-between font-mono shrink-0 overflow-y-auto space-y-2.5 pb-3 sm:pb-4 cyber-scrollbar
+            h-full bg-[#070a10]/95 border-r border-[#0dfceb]/30 p-2 sm:p-2.5 flex-col justify-between font-mono shrink-0 overflow-y-auto space-y-2.5 pb-3 sm:pb-4 cyber-scrollbar
           `}
         >
           {/* Botón de cierre en pantalla móvil */}
@@ -3333,12 +3333,14 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
         )}
 
         {/* ===============================================================
-            CAMPO DE BATALLA CENTRAL:
-            - Dos zonas principales: CAMPO DE BATALLA (Unidades) y ZONA DE EDDIES (Cartas vendibles boca abajo)
-            - Tanto las unidades como los eddies gastados se giran 90 grados
-            - Ambas zonas cuentan con soporte Drag & Drop
+            ÁREA DE JUEGO PRINCIPAL: CAMPO DE BATALLA Y DOCK DE MANO INFERIOR
+            - Agrupa verticalmente el tapete central y el dock de la mano del jugador
+            - Permite que el panel lateral izquierdo (HUD + Escáner Kiroshi + Jugador)
+              se extienda completamente de arriba a abajo de la pantalla
            =============================================================== */}
-        <main
+        <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden">
+          {/* CAMPO DE BATALLA CENTRAL */}
+          <main
           style={effectiveScale < 1 ? { zoom: effectiveScale } : undefined}
           className="flex-1 min-h-0 flex flex-col justify-between overflow-y-auto relative p-1.5 sm:p-2.5 pb-2 gap-1.5 font-mono cyber-scrollbar"
         >
@@ -5015,15 +5017,14 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
             </div>
           </div>
         </main>
-      </div>
 
-      {/* =====================================================================
-          ZONA INFERIOR (MANO Y ACCIONES):
-          - Contenedor flexible en la parte inferior para la mano del jugador
-          - Dock horizontal responsivo que se adapta a cualquier resolución
-         ===================================================================== */}
-      <footer className="relative z-30 shrink-0 bg-[#070a10]/95 backdrop-blur-md border-t-2 border-[#0dfceb]/40 shadow-[0_-10px_35px_rgba(0,0,0,0.85)] font-mono overflow-visible">
-        <div className="max-w-7xl mx-auto px-3 sm:px-5 py-2">
+        {/* =====================================================================
+            ZONA INFERIOR (MANO Y ACCIONES):
+            - Contenedor flexible en la parte inferior para la mano del jugador
+            - Dock horizontal responsivo que se adapta a cualquier resolución
+           ===================================================================== */}
+        <footer className="relative z-30 shrink-0 bg-[#070a10]/95 backdrop-blur-md border-t border-[#0dfceb]/40 shadow-[0_-10px_35px_rgba(0,0,0,0.85)] font-mono overflow-visible">
+          <div className="w-full px-3 sm:px-5 py-2">
           {/* Barra Superior del Dock: Estado o Acciones de la Carta Seleccionada */}
           <div className="flex flex-wrap items-center justify-between text-xs border-b border-[#0dfceb]/20 pb-1.5 mb-1.5">
             <span className="text-gray-400 font-bold uppercase tracking-wider text-[11px]">
@@ -5264,6 +5265,8 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
           </div>
         </div>
       </footer>
+    </div>
+  </div>
 
       {/* =====================================================================
           MENÚS DESPLEGABLES / FLOTANTES (Fondo Translúcido y font-mono)
