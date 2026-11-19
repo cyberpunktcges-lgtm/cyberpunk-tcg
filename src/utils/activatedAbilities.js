@@ -16,7 +16,11 @@ import {
 
 import {
   executeProgramEffect,
-  sendDefeatedUnitToGraveyardOrExile
+  sendDefeatedUnitToGraveyardOrExile,
+  queueTargetSelection,
+  executeCardSpentTriggers,
+  triggerMeredithStoutOnRivalGigModify,
+  getGigMaxFace
 } from './cardEffects.js';
 
 /**
@@ -150,17 +154,18 @@ export const ACTIVATED_ABILITIES_CONFIG = {
         card.isSpent = true;
         const p = state[playerKey];
         if (playerKey === 'player') {
-          state.pendingTargetSelection = {
+          queueTargetSelection(state, {
             actionType: 'ADJUST_GIG',
             sourceCardId: 'CP-026',
             sourceCardName: 'Dexter DeShawn // Off the Grid',
             sourceCardImage: card.image,
             title: '💼 DEXTER DESHAWN // ↷ AUMENTAR GIG',
-            prompt: 'Selecciona cualquier Gig en juego (tuyo o del rival) para aumentar su valor en +1 o +2:',
+            prompt: 'Selecciona cualquier Gig en juego (tuyo o del rival) para aumentar su valor en +1, +2 o dejarlo igual:',
             canIncrease: true,
             canDecrease: false,
-            maxDelta: 2
-          };
+            maxDelta: 2,
+            allowZero: true
+          });
           state.actionLog.unshift(
             `💼 [Dexter DeShawn] Gira a Dexter (↷) para aumentar un Gig en hasta +2.`
           );
@@ -170,7 +175,7 @@ export const ACTIVATED_ABILITIES_CONFIG = {
         const targetGig = (p.gigs || [])[0] || (state.player?.gigs || [])[0];
         if (targetGig) {
           const dieStr = String(targetGig.die || targetGig.dieType || 'd20');
-          const maxFace = parseInt(dieStr.replace(/\D/g, ''), 10) || 20;
+          const maxFace = getGigMaxFace(targetGig);
           const oldVal = targetGig.value;
           targetGig.value = Math.min(maxFace, (targetGig.value || 1) + 2);
           state.actionLog.unshift(
@@ -391,10 +396,27 @@ export const ACTIVATED_ABILITIES_CONFIG = {
       },
       execute: (state, playerKey, card) => {
         const p = state[playerKey];
-        const opp = state[playerKey === 'player' ? 'bot' : 'player'];
+        const oppKey = playerKey === 'player' ? 'bot' : 'player';
+        const opp = state[oppKey];
         card.isSpent = true;
 
-        // Intercambiar el Gig de menor valor aliado por el de mayor valor rival
+        if (playerKey === 'player') {
+          queueTargetSelection(state, {
+            actionType: 'SWAP_GIGS',
+            sourceCardId: 'CP-045',
+            sourceCardName: 'Hanako Arasaka // Daughter of the Emperor',
+            sourceCardImage: card.image,
+            title: '🏯 HANAKO ARASAKA // ↷ INTERCAMBIAR GIG',
+            prompt: 'PASO 1 DE 2: Selecciona TU Gig que deseas intercambiar con un Gig del rival:',
+            step: 1
+          });
+          state.actionLog.unshift(
+            `🏯 [Hanako Arasaka] Gira a Hanako (↷) para intercambiar un Gig aliado por un Gig del rival.`
+          );
+          return { success: true, requiresModal: true, message: 'Selecciona tu Gig y el Gig del rival a intercambiar.' };
+        }
+
+        // Bot AI: intercambia su Gig de menor valor por el de mayor valor del jugador
         const myMinGigIdx = p.gigs.reduce((minIdx, g, idx, arr) => (g.value < arr[minIdx].value ? idx : minIdx), 0);
         const oppMaxGigIdx = opp.gigs.reduce((maxIdx, g, idx, arr) => (g.value > arr[maxIdx].value ? idx : maxIdx), 0);
 
@@ -404,12 +426,15 @@ export const ACTIVATED_ABILITIES_CONFIG = {
         p.gigs.push(oppGig);
         opp.gigs.push(myGig);
 
+        const myDieLabel = String(myGig.die || myGig.dieType || 'GIG').toUpperCase();
+        const oppDieLabel = String(oppGig.die || oppGig.dieType || 'GIG').toUpperCase();
         state.actionLog.unshift(
-          `🏯 [Hanako Arasaka] Activa (↷): Intercambió tu Gig ${myGig.dieType.toUpperCase()} (valor ${myGig.value}) por el Gig ${oppGig.dieType.toUpperCase()} del rival (valor ${oppGig.value}).`
+          `🏯 [Hanako Arasaka Rival] Activa (↷): Intercambió su Gig ${myDieLabel} (valor ${myGig.value}) por tu Gig ${oppDieLabel} (valor ${oppGig.value}).`
         );
+        triggerMeredithStoutOnRivalGigModify(state, oppKey);
         return {
           success: true,
-          message: `¡Intercambio completado! Has obtenido el Gig ${oppGig.dieType.toUpperCase()} (valor ${oppGig.value}).`
+          message: `Hanako Rival intercambió ${myDieLabel} (${myGig.value}) por ${oppDieLabel} (${oppGig.value}).`
         };
       }
     }
@@ -599,13 +624,37 @@ export const ACTIVATED_ABILITIES_CONFIG = {
       execute: (state, playerKey, card) => {
         const p = state[playerKey];
         card.isSpent = true;
-        const targetGig = (p.gigs && p.gigs.length > 0) ? p.gigs[0] : state.bot.gigs[0];
-        if (targetGig) {
-          targetGig.value = Math.min(20, (targetGig.value || 0) + 1);
+        if (playerKey === 'player') {
+          queueTargetSelection(state, {
+            actionType: 'ADJUST_GIG',
+            sourceCardId: 'CP-082',
+            sourceCardName: 'Muamar Reyes // El Capitán',
+            sourceCardImage: card.image,
+            title: '🚗 MUAMAR REYES // ↷ AJUSTAR GIG EN ±1',
+            prompt: 'Selecciona cualquier Gig en juego (tuyo o del rival) para ajustarlo en +1 o -1:',
+            canIncrease: true,
+            canDecrease: true,
+            maxDelta: 1,
+            allowZero: false
+          });
           state.actionLog.unshift(
-            `🚗 [Muamar Reyes] Activa (↷): Ajustó el Gig ${targetGig.dieType.toUpperCase()} en +1 (Nuevo valor: ${targetGig.value}).`
+            `🚗 [Muamar Reyes] Gira a El Capitán (↷) para ajustar un Gig en +1 o -1.`
           );
-          return { success: true, message: `Gig ${targetGig.dieType.toUpperCase()} ajustado a ${targetGig.value}.` };
+          return { success: true, requiresModal: true, message: 'Selecciona el Gig a ajustar en +1 o -1.' };
+        }
+        const targetGig = (p.gigs && p.gigs.length > 0) ? p.gigs[0] : (state.player?.gigs || [])[0];
+        if (targetGig) {
+          const isOwn = (p.gigs || []).includes(targetGig);
+          const dieLabel = String(targetGig.die || targetGig.dieType || 'GIG').toUpperCase();
+          const oldVal = targetGig.value;
+          targetGig.value = isOwn
+            ? Math.min(getGigMaxFace(targetGig), (targetGig.value || 1) + 1)
+            : Math.max(1, (targetGig.value || 1) - 1);
+          state.actionLog.unshift(
+            `🚗 [Muamar Reyes Rival] Activa (↷): Ajustó el Gig ${dieLabel} de ${oldVal} a ${targetGig.value}.`
+          );
+          if (!isOwn) triggerMeredithStoutOnRivalGigModify(state, 'player');
+          return { success: true, message: `Gig ${dieLabel} ajustado a ${targetGig.value}.` };
         }
         return { success: false, reason: 'No se encontró un Gig válido.' };
       }
@@ -679,22 +728,53 @@ export const ACTIVATED_ABILITIES_CONFIG = {
       canActivate: (state, playerKey, card) => {
         if (!card.isFaceUp) return { can: false, reason: 'Padre debe estar boca arriba.' };
         if (card.isSpent) return { can: false, reason: 'Padre ya está girado este turno.' };
-        const allGigs = [...(state.player?.gigs || []), ...(state.bot?.gigs || [])];
-        if (allGigs.length < 2) return { can: false, reason: 'Se necesitan al menos 2 Gigs en juego para replicar valores.' };
+        const pGigs = state.player?.gigs || [];
+        const bGigs = state.bot?.gigs || [];
+        if (pGigs.length === 0 || bGigs.length === 0) {
+          return { can: false, reason: 'Ambos jugadores deben controlar al menos 1 Gig para igualar un Gig al del otro jugador.' };
+        }
         return { can: true };
       },
       execute: (state, playerKey, card) => {
         const p = state[playerKey];
+        const oppKey = playerKey === 'player' ? 'bot' : 'player';
+        const opp = state[oppKey];
         card.isSpent = true;
-        const allGigs = [...(state.player?.gigs || []), ...(state.bot?.gigs || [])];
-        const maxGig = allGigs.reduce((max, g) => (g.value > max.value ? g : max), allGigs[0]);
-        const minGig = allGigs.reduce((min, g) => (g.value < min.value ? g : min), allGigs[0]);
-        minGig.value = maxGig.value;
 
-        state.actionLog.unshift(
-          `✝️ [Padre] Activa (↷): Establece el valor del Gig ${minGig.dieType.toUpperCase()} en ${maxGig.value} (igualando al Gig ${maxGig.dieType.toUpperCase()}).`
-        );
-        return { success: true, message: `Gig ${minGig.dieType.toUpperCase()} igualado a ${maxGig.value}.` };
+        if (playerKey === 'player') {
+          queueTargetSelection(state, {
+            actionType: 'PEACE_OFFERING',
+            sourceCardId: 'CP-091',
+            sourceCardName: 'Padre // Man of the Cross',
+            sourceCardImage: card.image,
+            title: '✝️ PADRE // ↷ IGUALAR GIG AL DE OTRO JUGADOR',
+            prompt: 'PASO 1 DE 2: Haz clic en el Gig (tuyo o del rival) cuyo valor deseas MODIFICAR (luego elegirás un Gig del OTRO jugador para copiar su valor):',
+            step: 1,
+            targetScope: 'ALL_GIGS',
+            requireOtherPlayerSource: true,
+            noDrawBonus: true,
+            selectedTargetGig: null
+          });
+          state.actionLog.unshift(
+            `✝️ [Padre] Gira a Padre (↷) para igualar el valor de un Gig al de un Gig del otro jugador.`
+          );
+          return { success: true, requiresModal: true, message: 'Selecciona el Gig a modificar y luego el Gig del otro jugador.' };
+        }
+
+        // Bot AI: copia el mayor Gig del jugador a un Gig propio con espacio, respetando maxFace
+        const highestOpp = [...(opp.gigs || [])].sort((a, b) => b.value - a.value)[0];
+        const ownTarget = [...(p.gigs || [])].sort((a, b) => a.value - b.value)[0];
+        if (highestOpp && ownTarget) {
+          const oldVal = ownTarget.value;
+          ownTarget.value = Math.max(1, Math.min(getGigMaxFace(ownTarget), highestOpp.value));
+          const tLabel = String(ownTarget.die || ownTarget.dieType || 'GIG').toUpperCase();
+          const sLabel = String(highestOpp.die || highestOpp.dieType || 'GIG').toUpperCase();
+          state.actionLog.unshift(
+            `✝️ [Padre Rival] Activa (↷): Establece su Gig ${tLabel} de ${oldVal} a ${ownTarget.value} (igualando a tu Gig ${sLabel}).`
+          );
+          return { success: true, message: `Gig ${tLabel} igualado a ${ownTarget.value}.` };
+        }
+        return { success: false, reason: 'No se encontraron Gigs válidos.' };
       }
     }
   ],
@@ -831,15 +911,42 @@ export const ACTIVATED_ABILITIES_CONFIG = {
       },
       execute: (state, playerKey, card) => {
         const p = state[playerKey];
+        const oppKey = playerKey === 'player' ? 'bot' : 'player';
+        const opp = state[oppKey];
         card.isSpent = true;
-        const targetGig = (p.gigs && p.gigs.length > 0) ? p.gigs[0] : state.bot.gigs[0];
-        if (targetGig) {
-          const oldVal = targetGig.value;
-          targetGig.value = Math.max(1, (targetGig.value || 0) - 2);
+
+        if (playerKey === 'player') {
+          queueTargetSelection(state, {
+            actionType: 'ADJUST_GIG',
+            sourceCardId: 'CP-143',
+            sourceCardName: 'Wakako Okada // Peace and Harmony',
+            sourceCardImage: card.image,
+            title: '🌸 WAKAKO OKADA // ↷ REDUCIR GIG (-HASTA 2)',
+            prompt: 'Selecciona cualquier Gig en juego (tuyo o del rival) para reducir su valor en -1, -2 o dejarlo igual:',
+            canIncrease: false,
+            canDecrease: true,
+            maxDelta: 2,
+            allowZero: true
+          });
           state.actionLog.unshift(
-            `🌸 [Wakako Okada] Activa (↷): Redujo el Gig ${targetGig.dieType.toUpperCase()} de ${oldVal} a ${targetGig.value} (-2).`
+            `🌸 [Wakako Okada] Gira a Wakako (↷) para reducir un Gig en hasta -2.`
           );
-          return { success: true, message: `Gig ${targetGig.dieType.toUpperCase()} reducido a ${targetGig.value}.` };
+          return { success: true, requiresModal: true, message: 'Selecciona el Gig a reducir (-1 o -2).' };
+        }
+
+        const targetGig =
+          (opp.gigs && opp.gigs.length > 0 ? [...opp.gigs].sort((a, b) => b.value - a.value)[0] : null) ||
+          (p.gigs || [])[0];
+        if (targetGig) {
+          const isOpp = (opp.gigs || []).includes(targetGig);
+          const dieLabel = String(targetGig.die || targetGig.dieType || 'GIG').toUpperCase();
+          const oldVal = targetGig.value;
+          targetGig.value = Math.max(1, (targetGig.value || 1) - 2);
+          state.actionLog.unshift(
+            `🌸 [Wakako Okada Rival] Activa (↷): Redujo el Gig ${dieLabel} de ${oldVal} a ${targetGig.value}.`
+          );
+          if (isOpp) triggerMeredithStoutOnRivalGigModify(state, oppKey);
+          return { success: true, message: `Gig ${dieLabel} reducido a ${targetGig.value}.` };
         }
         return { success: false, reason: 'No se encontró un Gig válido.' };
       }
@@ -908,5 +1015,13 @@ export function executeCardActivatedAbility(state, playerKey, cardInstanceId, ab
     return { success: false, reason: check.reason };
   }
 
-  return chosenAbility.execute(state, playerKey, card);
+  const wasSpentBefore = Boolean(card.isSpent);
+  const res = chosenAbility.execute(state, playerKey, card);
+  if (res && res.success && !wasSpentBefore && card.isSpent) {
+    executeCardSpentTriggers(state, playerKey, card);
+    if (state.pendingTargetSelection || state.pendingCardChoice) {
+      res.requiresModal = true;
+    }
+  }
+  return res;
 }

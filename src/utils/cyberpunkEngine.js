@@ -14,7 +14,11 @@ import {
   executeCallLegendTrigger,
   executeStartOfTurnTriggers,
   executeEndOfTurnTriggers,
-  executeBlockerUsedTrigger
+  executeBlockerUsedTrigger,
+  executeOnGigsStolenTriggers,
+  executeJackiePourOneOutTrigger,
+  executeKerryGigRollTrigger,
+  executeCardSpentTriggers
 } from './cardEffects.js';
 
 // Dados poliédricos de Gigs y sus valores máximos
@@ -871,6 +875,7 @@ export function toggleLegendSpent(state, playerKey, legendInstanceId) {
     (state.actionLog = state.actionLog || []).unshift(
       `👑 ${p.name} gira a su Leyenda "${leg.name}" (+1 €$). Total listos: ${p.floatingEddies} €$.`
     );
+    executeCardSpentTriggers(state, playerKey, leg);
     return { success: true, isSpent: true, floatingEddies: p.floatingEddies };
   } else {
     // REGLA: Las Leyendas no se pueden enderezar manualmente. Si el jugador se equivoca, debe usar DESHACER.
@@ -1051,6 +1056,9 @@ export function playGearCard(state, playerKey, cardInstanceId, targetInstanceId 
     `🔧 ${p.name} paga ${cost} €$ y equipa el Gear "${card.name}"${bonusText} a "${target.name}".`
   );
 
+  // Trigger pasivo CP-051 Jackie Welles // Pour One Out for Me (primer Gear o Unidad Azul del turno)
+  executeJackiePourOneOutTrigger(state, playerKey, card);
+
   return { success: true, type: 'GEAR', gear: card, target, targetType };
 }
 
@@ -1125,6 +1133,9 @@ export function playUnitCard(state, playerKey, cardInstanceId) {
 
   // Ejecutar habilidades al entrar al campo (On-Play triggers)
   executeUnitPlayTrigger(state, playerKey, unitInstance);
+
+  // Trigger pasivo CP-051 Jackie Welles // Pour One Out for Me (primera Unidad o Gear Azul del turno)
+  executeJackiePourOneOutTrigger(state, playerKey, unitInstance);
 
   return { success: true, type: 'UNIT', unit: unitInstance };
 }
@@ -1333,8 +1344,12 @@ export function attackRivalGigs(
   if (defender.gigs.length === 0) return { success: false, reason: 'El rival no tiene Gigs para robar.' };
 
   // Girar la unidad atacante y cumplir obligación de ataque si existía
+  const wasAttackerSpent = Boolean(unit.isSpent);
   unit.isSpent = true;
   delete unit.mustAttackNextTurn;
+  if (!isMidAttack && !wasAttackerSpent) {
+    executeCardSpentTriggers(state, attackerPlayerKey, unit);
+  }
 
   // FASE 1: Disparar habilidades de ataque (ej: Sketchy Ripper, El Sombrerón) antes de la reacción del rival
   if (!unit.hasTriggeredAttackThisDeclaration) {
@@ -1350,7 +1365,8 @@ export function attackRivalGigs(
       state.actionLog.unshift(
         `🛡️ [FASE 2: REACCIÓN] ¡BLOCKER! ${defender.name} gira a "${blocker.name}" para interceptar el asalto a sus Gigs. ¡El combate se convierte en lucha contra el bloqueador y NO se roba ningún Gig!`
       );
-      // Disparar triggers de BLOCKER (ej: Goro Takemura CP-042, Augmented Negotiators CP-012)
+      executeCardSpentTriggers(state, defenderKey, blocker);
+      // Disparar triggers de BLOCKER (ej: Goro Takemura CP-042, Augmented Negotiators CP-012, La Llorona CP-061)
       executeBlockerUsedTrigger(state, defenderKey, blocker);
       // FASE 3: Resolver pelea contra el Blocker
       const fightRes = resolveFight(state, attackerPlayerKey, unit, defenderKey, blocker);
@@ -1394,12 +1410,25 @@ export function attackRivalGigs(
   for (let i = 0; i < countToSteal; i++) {
     let chosenIdx = -1;
 
-    // Si el usuario eligió un dado específico (ej: 'd20'), buscarlo entre los gigs elegibles del defensor
+    // Si el usuario eligió un dado específico (por id exacto o por tipo de dado ej: 'd20'), buscarlo entre los gigs elegibles del defensor
     if (prefs.length > 0) {
-      const targetDie = String(prefs.shift()).toLowerCase();
-      chosenIdx = defender.gigs.findIndex(
-        (g) => g.die.toLowerCase() === targetDie && isGigStealable(g)
-      );
+      const pref = prefs.shift();
+      if (pref && typeof pref === 'object') {
+        if (pref.id) {
+          chosenIdx = defender.gigs.findIndex((g) => g.id === pref.id && isGigStealable(g));
+        }
+        if (chosenIdx === -1 && pref.die) {
+          const targetDie = String(pref.die).toLowerCase();
+          chosenIdx = defender.gigs.findIndex(
+            (g) => g.die.toLowerCase() === targetDie && (pref.value === undefined || g.value === pref.value) && isGigStealable(g)
+          );
+        }
+      } else {
+        const targetDie = String(pref).toLowerCase();
+        chosenIdx = defender.gigs.findIndex(
+          (g) => g.die.toLowerCase() === targetDie && isGigStealable(g)
+        );
+      }
     }
 
     // Si no se encontró el preferido o no quedan preferencias, escoger el elegible de mayor valor
@@ -1450,6 +1479,11 @@ export function attackRivalGigs(
     state.isGameOver = true;
     state.winner = attackerPlayerKey;
     state.actionLog.unshift(`🏆 ¡OVERTIME WIN! ${attacker.name} alcanza 7 Gigs y gana la partida.`);
+  }
+
+  // Disparadores al robar Gigs (CP-001 6th Street Recruits, CP-136 V // Roamer, CP-039 Gorilla Arms)
+  if (stolenDice.length > 0 && !state.isGameOver) {
+    executeOnGigsStolenTriggers(state, attackerPlayerKey, unit, stolenDice);
   }
 
   return { success: true, stolenCount: countToSteal, stolenDice };
@@ -1699,8 +1733,12 @@ export function fightRivalUnit(state, attackerPlayerKey, attackerUnitId, targetU
     return { success: false, reason: 'Solo puedes atacar a unidades rivales giradas (Spent). Las unidades enderezadas no pueden ser atacadas.' };
   }
 
-  attUnit.isSpent = true;
+  const wasAttSpent = Boolean(attUnit.isSpent);
+  attUnit.isSpent = true;
   delete attUnit.mustAttackNextTurn;
+  if (!isMidAttack && !wasAttSpent) {
+    executeCardSpentTriggers(state, attackerPlayerKey, attUnit);
+  }
 
   // FASE 1: Disparar habilidad ATTACK antes de la reacción del rival
   if (!attUnit.hasTriggeredAttackThisDeclaration) {
@@ -1716,6 +1754,7 @@ export function fightRivalUnit(state, attackerPlayerKey, attackerUnitId, targetU
       state.actionLog.unshift(
         `🛡️ [FASE 2: REACCIÓN] ¡BLOCKER! "${blocker.name}" se interpone para proteger a "${defUnit.name}".`
       );
+      executeCardSpentTriggers(state, defenderKey, blocker);
       executeBlockerUsedTrigger(state, defenderKey, blocker);
       const fightRes = resolveFight(state, attackerPlayerKey, attUnit, defenderKey, blocker);
       delete attUnit.hasTriggeredAttackThisDeclaration;
@@ -1762,7 +1801,7 @@ export function rollInGig(state, playerKey, dieType, specificRollValue = null) {
     die: normDie,
     value: rollValue,
     stolenFrom: null,
-    id: `${playerKey}-gig-${p.gigs.length}`
+    id: `${playerKey}-gig-${normDie}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`
   };
   p.gigs.push(gigEntry);
 
@@ -1772,6 +1811,9 @@ export function rollInGig(state, playerKey, dieType, specificRollValue = null) {
   state.actionLog.unshift(
     `🎲 ${p.name} lanza su dado ${normDie.toUpperCase()} del Fixer y obtiene un ${rollValue} (Credibilidad en la Calle: ⭐ ${calculateStreetCred(p.gigs)}).`
   );
+
+  // Trigger pasivo CP-058 Kerry Eurodyne // Axe, Attitude, Audience (repetir tirada 1 vez + robar en mín/máx)
+  executeKerryGigRollTrigger(state, playerKey, p.gigs.length - 1, false);
 
   // Si ambos han vaciado el Fixer, empieza el OVERTIME
   const otherKey = playerKey === 'player' ? 'bot' : 'player';
@@ -1841,6 +1883,7 @@ export function executeStartPhase(state, playerKey) {
     }
     u.isLagging = false;
     delete u.canAttackSpentUnitsTurnPlayed;
+    delete u.usedGorillaArmsThisTurn;
     // Si la congelación expiró en este turno
     if (u.cannotAttackUntilNextTurn && u.frozenAtTurn && state.turnNumber > u.frozenAtTurn) {
       delete u.cannotAttackUntilNextTurn;
@@ -1855,6 +1898,7 @@ export function executeStartPhase(state, playerKey) {
   delete p.chromeFangProtectionActive;
   delete p.westbrookProtectionActive;
   delete p.usedViktorCyberwareDiscountThisTurn;
+  delete p.usedJackiePourOneOutThisTurn;
 
   // 3. ROBO DE CARTA (DRAW 1 CARD)
   if (p.deck.length > 0) {

@@ -152,6 +152,382 @@ function trashFromDeck(player, count, state, sourceName) {
   return trashed;
 }
 
+/**
+ * Devuelve el valor máximo de caras de un dado de Gig (d4 -> 4, d6 -> 6, ..., d20 -> 20).
+ */
+export function getGigMaxFace(gig) {
+  const dieStr = String(gig?.die || gig?.dieType || 'd20');
+  return parseInt(dieStr.replace(/\D/g, ''), 10) || 20;
+}
+
+/**
+ * Encola una selección interactiva de objetivos (Kiroshi Targeting System) para que múltiples
+ * disparos de dados (ej: Dexter + Dying Night + Zetatech Faceplate) nunca se sobrescriban.
+ */
+export function queueTargetSelection(state, selection) {
+  if (!state || !selection) return;
+  if (!state.pendingTargetSelection) {
+    state.pendingTargetSelection = selection;
+  } else {
+    if (!Array.isArray(state.pendingTargetSelectionQueue)) {
+      state.pendingTargetSelectionQueue = [];
+    }
+    state.pendingTargetSelectionQueue.push(selection);
+  }
+}
+
+/**
+ * CP-075 Meredith Stout // Stone-Cold Corpo:
+ * "When a Rival adjusts or swaps 1 or more friendly Gigs, you may add a card from your trash to your hand."
+ */
+export function triggerMeredithStoutOnRivalGigModify(state, affectedOwnerKey) {
+  if (!state || !affectedOwnerKey) return;
+  const owner = state[affectedOwnerKey];
+  if (!owner || !owner.trash || owner.trash.length === 0) return;
+  const merediths = (owner.field || []).filter((u) => resolveCardId(u) === 'CP-075');
+  if (merediths.length === 0) return;
+
+  if (affectedOwnerKey === 'player') {
+    if (!state.pendingCardChoice) {
+      state.pendingCardChoice = {
+        type: 'MEREDITH_TRASH_TO_HAND',
+        playerKey: 'player',
+        sourceCardId: 'CP-075',
+        sourceCardName: 'Meredith Stout // Stone-Cold Corpo',
+        sourceCardImage: merediths[0].image,
+        title: '💼 MEREDITH STOUT // REACCIÓN A GIG MODIFICADO',
+        prompt: '¡El rival ajustó o intercambió uno de tus Gigs! Puedes añadir 1 carta de tu Basura (Trash) a tu mano (o omitir):',
+        cards: [...owner.trash],
+        eligibleIds: owner.trash.map((c) => c.instanceId),
+        maxChoices: 1,
+        minChoices: 0,
+        selectedIds: [],
+        filterDescription: 'Cualquier carta de tu Basura (opcional)'
+      };
+    }
+  } else {
+    const recovered = owner.trash.pop();
+    if (recovered) {
+      if (!owner.hand) owner.hand = [];
+      owner.hand.push(recovered);
+      state.actionLog.unshift(
+        `💼 [Meredith Stout Rival] ¡Reacción! Al modificar su Gig, recupera "${recovered.name}" de su Basura a su mano.`
+      );
+    }
+  }
+}
+
+/**
+ * Disparadores cuando una Unidad o Leyenda aliada es girada (spent):
+ * - CP-151 Zetatech Faceplate: "When this Unit or Legend is spent, adjust a Gig by up to 1. Then, if you control 3 or more Gigs with different values, draw 1."
+ * - CP-007 Alt Cunningham // Mother of Daemons: "When a friendly equipped Unit or Legend is spent, draw 1."
+ */
+export function executeCardSpentTriggers(state, playerKey, spentCard) {
+  if (!state || !spentCard) return;
+  const p = state[playerKey];
+  const opp = state[playerKey === 'player' ? 'bot' : 'player'];
+  if (!p) return;
+
+  const equippedGears = spentCard.gear || [];
+  // CP-007 Alt Cunningham // Mother of Daemons (en campo)
+  if (equippedGears.length > 0) {
+    const alts = (p.field || []).filter((u) => resolveCardId(u) === 'CP-007');
+    alts.forEach(() => {
+      drawCards(p, 1, state, 'Alt Cunningham // Mother of Daemons');
+    });
+  }
+
+  // CP-151 Zetatech Faceplate (en los gears equipados a la carta girada)
+  const faceplates = equippedGears.filter((g) => resolveCardId(g) === 'CP-151');
+  if (faceplates.length === 0) return;
+
+  const totalGigs = (p.gigs || []).length + (opp?.gigs || []).length;
+  faceplates.forEach((gearCard) => {
+    if (totalGigs === 0) {
+      state.actionLog.unshift(
+        `🎭 [Zetatech Faceplate] "${spentCard.name}" fue girada, pero no hay Gigs en juego para ajustar.`
+      );
+      return;
+    }
+    if (playerKey === 'player') {
+      queueTargetSelection(state, {
+        actionType: 'ADJUST_GIG',
+        sourceCardId: 'CP-151',
+        sourceCardName: 'Zetatech Faceplate',
+        sourceCardImage: gearCard.image || spentCard.image,
+        title: '🎭 ZETATECH FACEPLATE // AL GIRAR PORTADOR',
+        prompt: `"${spentCard.name}" ha sido girada. Elige cualquier Gig en juego para ajustarlo en +1, -1 o dejarlo igual (si controlas 3+ Gigs con valores distintos, robas 1 carta):`,
+        canIncrease: true,
+        canDecrease: true,
+        maxDelta: 1,
+        allowZero: true,
+        secondaryEffect: 'ZETATECH_3_DIFF_DRAW'
+      });
+    } else {
+      const targetGig = (p.gigs || [])[0];
+      if (targetGig) {
+        const maxFace = getGigMaxFace(targetGig);
+        const oldVal = targetGig.value;
+        targetGig.value = Math.min(maxFace, (targetGig.value || 1) + 1);
+        state.actionLog.unshift(
+          `🎭 [Zetatech Faceplate Rival] "${spentCard.name}" girada: ajusta su Gig ${String(targetGig.die || targetGig.dieType || 'GIG').toUpperCase()} de ${oldVal} a ${targetGig.value}.`
+        );
+      }
+      const distinct = new Set((p.gigs || []).map((g) => Number(g.value))).size;
+      if (distinct >= 3) {
+        drawCards(p, 1, state, 'Zetatech Faceplate Rival');
+      }
+    }
+  });
+}
+
+/**
+ * Disparadores cuando una Unidad roba 1 o más Gigs del rival:
+ * - CP-001 6th Street Recruits: "When a friendly Unit steals a d6, increase a Gig by up to 6."
+ * - CP-136 V // Roamer of the Badlands: "When this Unit steals a Gig, increase it by up to 5."
+ * - CP-039 Gorilla Arms: "The first time this Unit steals 1 or more Gigs each turn, steal a rival Gig with a value not shared by a friendly Gig."
+ */
+export function executeOnGigsStolenTriggers(state, attackerPlayerKey, attackerUnit, stolenDice = [], options = {}) {
+  if (!state || !attackerUnit || !Array.isArray(stolenDice) || stolenDice.length === 0) return;
+  const attacker = state[attackerPlayerKey];
+  const defenderKey = attackerPlayerKey === 'player' ? 'bot' : 'player';
+  const defender = state[defenderKey];
+  if (!attacker || !defender) return;
+
+  const attackerId = resolveCardId(attackerUnit);
+
+  // 1. CP-136 V // Roamer of the Badlands: "When this Unit steals a Gig, increase it by up to 5."
+  if (attackerId === 'CP-136') {
+    stolenDice.forEach((stolenDie) => {
+      const gigIdx = (attacker.gigs || []).indexOf(stolenDie);
+      if (gigIdx === -1) return;
+      const maxFace = getGigMaxFace(stolenDie);
+      if (attackerPlayerKey === 'player') {
+        queueTargetSelection(state, {
+          actionType: 'ADJUST_GIG',
+          sourceCardId: 'CP-136',
+          sourceCardName: 'V // Roamer of the Badlands',
+          sourceCardImage: attackerUnit.image,
+          title: '🏜️ V // ROAMER OF THE BADLANDS — AUMENTAR GIG ROBADO',
+          prompt: `¡V ha robado el dado ${String(stolenDie.die).toUpperCase()} (Valor actual: ${stolenDie.value}/${maxFace})! Elige cuánto aumentarlo (hasta +5, o déjalo igual):`,
+          canIncrease: true,
+          canDecrease: false,
+          maxDelta: 5,
+          allowZero: true,
+          targetScope: 'SPECIFIC_GIG',
+          onlyGig: { owner: 'player', gigIndex: gigIdx, die: String(stolenDie.die).toLowerCase() }
+        });
+      } else {
+        const oldVal = stolenDie.value;
+        stolenDie.value = Math.min(maxFace, (stolenDie.value || 1) + 5);
+        state.actionLog.unshift(
+          `🏜️ [V // Roamer Rival] Aumenta su Gig robado ${String(stolenDie.die).toUpperCase()} de ${oldVal} a ${stolenDie.value}.`
+        );
+      }
+    });
+  }
+
+  // 2. CP-001 6th Street Recruits: "When a friendly Unit steals a d6, increase a Gig by up to 6."
+  const stolenD6Count = stolenDice.filter((d) => String(d.die || d.dieType || '').toLowerCase() === 'd6').length;
+  if (stolenD6Count > 0) {
+    const recruits = (attacker.field || []).filter((u) => resolveCardId(u) === 'CP-001');
+    recruits.forEach((recruit) => {
+      for (let k = 0; k < stolenD6Count; k++) {
+        const totalGigs = (attacker.gigs || []).length + (defender.gigs || []).length;
+        if (totalGigs === 0) break;
+        if (attackerPlayerKey === 'player') {
+          queueTargetSelection(state, {
+            actionType: 'ADJUST_GIG',
+            sourceCardId: 'CP-001',
+            sourceCardName: '6th Street Recruits',
+            sourceCardImage: recruit.image,
+            title: '🔫 6TH STREET RECRUITS // ROBO DE D6 (+HASTA 6)',
+            prompt: '¡Una Unidad aliada robó un D6! Elige cualquier Gig en juego (tuyo o del rival) para aumentar su valor en hasta +6 (o déjalo igual):',
+            canIncrease: true,
+            canDecrease: false,
+            maxDelta: 6,
+            allowZero: true
+          });
+        } else {
+          const targetGig = [...(attacker.gigs || [])]
+            .sort((a, b) => (getGigMaxFace(b) - b.value) - (getGigMaxFace(a) - a.value))[0];
+          if (targetGig) {
+            const oldVal = targetGig.value;
+            targetGig.value = Math.min(getGigMaxFace(targetGig), (targetGig.value || 1) + 6);
+            state.actionLog.unshift(
+              `🔫 [6th Street Recruits Rival] ¡Robo de D6! Aumenta su Gig ${String(targetGig.die).toUpperCase()} de ${oldVal} a ${targetGig.value}.`
+            );
+          }
+        }
+      }
+    });
+  }
+
+  // 3. CP-039 Gorilla Arms: "The first time this Unit steals 1 or more Gigs each turn, steal a rival Gig with a value not shared by a friendly Gig."
+  if (!options.isGorillaBonus && !attackerUnit.usedGorillaArmsThisTurn) {
+    const gorillaGear = (attackerUnit.gear || []).find((g) => resolveCardId(g) === 'CP-039');
+    if (gorillaGear) {
+      attackerUnit.usedGorillaArmsThisTurn = true;
+      const friendlyVals = new Set((attacker.gigs || []).map((g) => Number(g.value)));
+      const eligibleIndices = [];
+      (defender.gigs || []).forEach((g, idx) => {
+        if (!friendlyVals.has(Number(g.value))) eligibleIndices.push(idx);
+      });
+
+      if (eligibleIndices.length === 0) {
+        state.actionLog.unshift(
+          `🦾 [Gorilla Arms] "${attackerUnit.name}" robó Gig(s), pero el rival no tiene ningún Gig adicional cuyo valor no compartas ya.`
+        );
+      } else if (attackerPlayerKey === 'player') {
+        queueTargetSelection(state, {
+          actionType: 'STEAL_RIVAL_GIG',
+          sourceCardId: 'CP-039',
+          sourceCardName: 'Gorilla Arms',
+          sourceCardImage: gorillaGear.image || attackerUnit.image,
+          title: '🦾 GORILLA ARMS // ROBO EXTRA DE GIG',
+          prompt: `¡Primera vez este turno que "${attackerUnit.name}" roba un Gig! Elige 1 Gig del rival con un valor que NO compartas con tus Gigs para robarlo:`,
+          eligibleGigIndices: eligibleIndices,
+          attackerUnitId: attackerUnit.instanceId
+        });
+      } else {
+        // Bot AI: roba el Gig elegible del jugador con mayor valor
+        let bestIdx = eligibleIndices[0];
+        eligibleIndices.forEach((idx) => {
+          if ((defender.gigs[idx]?.value || 0) > (defender.gigs[bestIdx]?.value || 0)) bestIdx = idx;
+        });
+        const [bonusDie] = defender.gigs.splice(bestIdx, 1);
+        if (bonusDie) {
+          bonusDie.stolenFrom = defenderKey;
+          attacker.gigs.push(bonusDie);
+          state.actionLog.unshift(
+            `🦾 [Gorilla Arms Rival] ¡Robo extra! "${attackerUnit.name}" roba además tu Gig ${String(bonusDie.die).toUpperCase()} (Valor ${bonusDie.value}).`
+          );
+          if (state.overtime && attacker.gigs.length >= 7) {
+            state.isGameOver = true;
+            state.winner = attackerPlayerKey;
+            state.actionLog.unshift(`🏆 ¡OVERTIME WIN! ${attacker.name} alcanza 7 Gigs y gana la partida.`);
+          }
+          executeOnGigsStolenTriggers(state, attackerPlayerKey, attackerUnit, [bonusDie], { isGorillaBonus: true });
+        }
+      }
+    }
+  }
+}
+
+/**
+ * CP-051 Jackie Welles // Pour One Out for Me:
+ * "The first time you play a Blue Unit or Blue Gear each turn, you may decrease a friendly Gig by up to 2. If it becomes a min Gig, draw 1."
+ */
+export function executeJackiePourOneOutTrigger(state, playerKey, playedCard) {
+  if (!state || !playedCard) return;
+  const p = state[playerKey];
+  if (!p || p.usedJackiePourOneOutThisTurn) return;
+
+  const isBlue = String(playedCard.aspect || '').toLowerCase() === 'blue';
+  const cType = String(playedCard.officialType || playedCard.type || '').toUpperCase();
+  const isUnitOrGear = cType.includes('UNIT') || cType.includes('GEAR');
+  if (!isBlue || !isUnitOrGear) return;
+
+  const jackie =
+    (p.legends || []).find((l) => l.isFaceUp && !l.isRemovedFromGame && resolveCardId(l) === 'CP-051') ||
+    (p.field || []).find((u) => resolveCardId(u) === 'CP-051');
+  if (!jackie) return;
+
+  p.usedJackiePourOneOutThisTurn = true;
+  if (!p.gigs || p.gigs.length === 0) {
+    state.actionLog.unshift(
+      `🥃 [Jackie Welles] Jugaste tu primera carta Azul del turno ("${playedCard.name}"), pero no controlas Gigs para reducir.`
+    );
+    return;
+  }
+
+  if (playerKey === 'player') {
+    queueTargetSelection(state, {
+      actionType: 'ADJUST_GIG',
+      sourceCardId: 'CP-051',
+      sourceCardName: 'Jackie Welles // Pour One Out for Me',
+      sourceCardImage: jackie.image,
+      title: '🥃 JACKIE WELLES // POUR ONE OUT FOR ME',
+      prompt: `¡Primera Unidad o Gear Azul del turno ("${playedCard.name}")! Puedes reducir 1 de TUS Gigs en -1 o -2 (si pasa a ser Gig mínimo [valor 1], robas 1 carta):`,
+      targetScope: 'FRIENDLY_GIGS',
+      canIncrease: false,
+      canDecrease: true,
+      maxDelta: 2,
+      allowZero: true,
+      secondaryEffect: 'JACKIE_MIN_GIG_DRAW'
+    });
+  } else {
+    // Bot AI: prioriza un Gig aliado con valor 2 o 3 para convertirlo en 1 y robar carta
+    const idealGig = (p.gigs || []).find((g) => g.value === 2 || g.value === 3);
+    if (idealGig) {
+      const oldVal = idealGig.value;
+      idealGig.value = 1;
+      state.actionLog.unshift(
+        `🥃 [Jackie Welles Rival] Reduce su Gig ${String(idealGig.die).toUpperCase()} de ${oldVal} a 1 (Gig mínimo) y roba 1 carta.`
+      );
+      drawCards(p, 1, state, 'Jackie Welles Rival');
+    }
+  }
+}
+
+/**
+ * CP-058 Kerry Eurodyne // Axe, Attitude, Audience:
+ * "When you roll in a Gig from your fixer area, you may ignore the result and reroll it once.
+ *  When you roll a min or max value on a Gig, draw 1. If it's a d20, draw 3 instead."
+ */
+export function executeKerryGigRollTrigger(state, playerKey, gigIndex, isAfterReroll = false) {
+  if (!state) return;
+  const p = state[playerKey];
+  if (!p || !p.gigs || !p.gigs[gigIndex]) return;
+
+  const kerry =
+    (p.legends || []).find((l) => l.isFaceUp && !l.isRemovedFromGame && resolveCardId(l) === 'CP-058') ||
+    (p.field || []).find((u) => resolveCardId(u) === 'CP-058');
+  if (!kerry) return;
+
+  const gig = p.gigs[gigIndex];
+  const dieStr = String(gig.die || 'd20').toLowerCase();
+  const maxFace = getGigMaxFace(gig);
+
+  // Paso 1 (antes de repetir tirada): ofrecer al jugador decidir si mantiene o repite tirada 1 vez
+  if (!isAfterReroll) {
+    if (playerKey === 'player') {
+      queueTargetSelection(state, {
+        actionType: 'KERRY_REROLL',
+        sourceCardId: 'CP-058',
+        sourceCardName: 'Kerry Eurodyne // Axe, Attitude, Audience',
+        sourceCardImage: kerry.image,
+        title: '🎸 KERRY EURODYNE // REPETIR TIRADA DE GIG',
+        prompt: `Has sacado un ${gig.value} en tu dado ${dieStr.toUpperCase()} (Mín: 1 / Máx: ${maxFace}). ¿Quieres mantener este resultado o ignorarlo y volver a tirarlo 1 vez? (Si sacas Mín o Máx robas ${dieStr === 'd20' ? '3 cartas' : '1 carta'}).`,
+        gigIndex,
+        die: dieStr,
+        rolledValue: gig.value,
+        maxFace
+      });
+      return;
+    } else {
+      // Bot AI: si no es mín ni máx y está por debajo de la mitad, repite 1 vez
+      if (gig.value !== 1 && gig.value !== maxFace && gig.value < Math.ceil(maxFace / 2)) {
+        const oldVal = gig.value;
+        const newVal = Math.floor(Math.random() * maxFace) + 1;
+        gig.value = newVal;
+        state.actionLog.unshift(
+          `🎸 [Kerry Eurodyne Rival] Ignora el ${oldVal} en su ${dieStr.toUpperCase()} y vuelve a tirar: ¡obtiene un ${newVal}!`
+        );
+      }
+    }
+  }
+
+  // Paso 2 (resultado final): si es valor mínimo (1) o máximo (maxFace), robar 1 (o 3 si es d20)
+  if (gig.value === 1 || gig.value === maxFace) {
+    const drawCount = dieStr === 'd20' ? 3 : 1;
+    state.actionLog.unshift(
+      `🎸 [Kerry Eurodyne] ¡Resultado ${gig.value === 1 ? 'MÍNIMO (1)' : `MÁXIMO (${maxFace})`} en ${dieStr.toUpperCase()}! ${p.name} roba ${drawCount} carta(s).`
+    );
+    drawCards(p, drawCount, state, 'Kerry Eurodyne // Axe, Attitude, Audience');
+  }
+}
+
 // =========================================================================
 // 1. MOTOR DE PROGRAMAS (34 CARTAS)
 // =========================================================================
@@ -173,22 +549,24 @@ export function executeProgramEffect(state, playerKey, card) {
       return { executed: true };
     }
     if (playerKey === 'player') {
-      state.pendingTargetSelection = {
+      queueTargetSelection(state, {
         actionType: 'ADJUST_GIG',
         sourceCardId: 'CP-005',
         sourceCardName: "Afterparty at Lizzie's",
         sourceCardImage: card.image,
         title: "🎉 AFTERPARTY AT LIZZIE'S // AJUSTAR GIG",
-        prompt: 'Selecciona cualquier Gig (tuyo o del rival) y elige ajustarlo en +1 o -1:',
+        prompt: 'Selecciona cualquier Gig (tuyo o del rival) y elige ajustarlo en +1, -1 o dejarlo igual:',
         maxDelta: 1,
         canIncrease: true,
         canDecrease: true,
+        allowZero: true,
         secondaryEffect: 'AFTERPARTY_DRAW'
-      };
+      });
     } else {
       if (p.gigs && p.gigs.length > 0) {
-        p.gigs[0].value = (p.gigs[0].value || 1) + 1;
-        state.actionLog.unshift(`🎉 [Afterparty at Lizzie's Rival] Ajusta su Gig ${p.gigs[0].die.toUpperCase()} a ${p.gigs[0].value}.`);
+        const g = p.gigs[0];
+        g.value = Math.min(getGigMaxFace(g), (g.value || 1) + 1);
+        state.actionLog.unshift(`🎉 [Afterparty at Lizzie's Rival] Ajusta su Gig ${String(g.die).toUpperCase()} a ${g.value}.`);
       }
       const values = (p.gigs || []).map((g) => g.value);
       if (new Set(values).size >= 2) {
@@ -444,29 +822,32 @@ export function executeProgramEffect(state, playerKey, card) {
 
   // CP-048: Industrial Assembly
   // "Increase a Gig by up to 4. If you control a Gig with 8+ value, draw 1."
-  if (cardId === 'CP-048' || cardId === 'CP-071') {
+  if (cardId === 'CP-048') {
     const totalGigs = (p.gigs || []).length + (opp.gigs || []).length;
     if (totalGigs === 0) {
       state.actionLog.unshift(`🏭 [Industrial Assembly] No hay Gigs en juego.`);
       return { executed: true };
     }
     if (playerKey === 'player') {
-      state.pendingTargetSelection = {
+      queueTargetSelection(state, {
         actionType: 'ADJUST_GIG',
-        sourceCardId: card.id,
+        sourceCardId: 'CP-048',
         sourceCardName: 'Industrial Assembly',
         sourceCardImage: card.image,
         title: '🏭 INDUSTRIAL ASSEMBLY // AUMENTAR GIG',
-        prompt: 'Selecciona un Gig (tuyo o del rival) para aumentar su valor en hasta +4:',
+        prompt: 'Selecciona cualquier Gig (tuyo o del rival) para aumentar su valor en hasta +4 (o déjalo igual):',
         maxDelta: 4,
         canIncrease: true,
         canDecrease: false,
+        allowZero: true,
         secondaryEffect: 'INDUSTRIAL_DRAW'
-      };
+      });
     } else {
       if (p.gigs && p.gigs.length > 0) {
-        p.gigs[0].value = (p.gigs[0].value || 1) + 4;
-        state.actionLog.unshift(`🏭 [Industrial Assembly Rival] Aumenta el Gig ${p.gigs[0].die.toUpperCase()} en +4.`);
+        const bestGig = [...p.gigs].sort((a, b) => (getGigMaxFace(b) - b.value) - (getGigMaxFace(a) - a.value))[0];
+        const oldVal = bestGig.value;
+        bestGig.value = Math.min(getGigMaxFace(bestGig), (bestGig.value || 1) + 4);
+        state.actionLog.unshift(`🏭 [Industrial Assembly Rival] Aumenta el Gig ${String(bestGig.die).toUpperCase()} de ${oldVal} a ${bestGig.value}.`);
       }
       if ((p.gigs || []).some((g) => g.value >= 8)) {
         drawCards(p, 1, state, cardName);
@@ -619,7 +1000,7 @@ export function executeProgramEffect(state, playerKey, card) {
   }
 
   // CP-094: Peace Offering
-  // "Set a Gig's value to the value of another Gig. Then, if you control a value-pair, draw 1."
+  // "You may set a Gig's value to the value of another Gig. Then, if you control a value-pair, draw 1."
   if (cardId === 'CP-094') {
     const totalGigs = (p.gigs || []).length + (opp.gigs || []).length;
     if (totalGigs < 2) {
@@ -628,7 +1009,7 @@ export function executeProgramEffect(state, playerKey, card) {
     }
 
     if (playerKey === 'player') {
-      state.pendingTargetSelection = {
+      queueTargetSelection(state, {
         actionType: 'PEACE_OFFERING',
         sourceCardId: 'CP-094',
         sourceCardName: 'Peace Offering',
@@ -638,7 +1019,7 @@ export function executeProgramEffect(state, playerKey, card) {
         step: 1,
         targetScope: 'ALL_GIGS',
         selectedTargetGig: null
-      };
+      });
     } else {
       // Lógica de IA para el rival
       const allFriendly = p.gigs || [];
@@ -904,12 +1285,46 @@ export function executeProgramEffect(state, playerKey, card) {
   // CP-132: Trust No One
   // "Decrease a Gig by up to 3. Then, if you control a min Gig, draw 1."
   if (cardId === 'CP-132') {
-    if (p.gigs && p.gigs.length > 0) {
-      p.gigs[0].value = Math.max(1, (p.gigs[0].value || 1) - 3);
-      state.actionLog.unshift(`🗡️ [Trust No One] Reduce el Gig ${p.gigs[0].die.toUpperCase()} a ${p.gigs[0].value}.`);
+    const totalGigs = (p.gigs || []).length + (opp.gigs || []).length;
+    if (totalGigs === 0) {
+      state.actionLog.unshift(`🗡️ [Trust No One] No hay Gigs en juego para reducir.`);
+      return { executed: true };
     }
-    if ((p.gigs || []).some((g) => g.value === 1)) {
-      drawCards(p, 1, state, cardName);
+    if (playerKey === 'player') {
+      queueTargetSelection(state, {
+        actionType: 'ADJUST_GIG',
+        sourceCardId: 'CP-132',
+        sourceCardName: 'Trust No One',
+        sourceCardImage: card.image,
+        title: '🗡️ TRUST NO ONE // REDUCIR GIG (-HASTA 3)',
+        prompt: 'Selecciona cualquier Gig en juego (tuyo o del rival) para reducir su valor en -1, -2 o -3 (si controlas un Gig mínimo tras esto, robas 1):',
+        canIncrease: false,
+        canDecrease: true,
+        maxDelta: 3,
+        allowZero: true,
+        secondaryEffect: 'TRUST_NO_ONE_DRAW'
+      });
+    } else {
+      // Bot AI: prioriza llevar un Gig aliado de valor 2..4 a 1 para robar carta; si no, baja el mayor Gig rival
+      const ownNearMin = (p.gigs || []).find((g) => g.value >= 2 && g.value <= 4);
+      if (ownNearMin) {
+        const oldVal = ownNearMin.value;
+        ownNearMin.value = 1;
+        state.actionLog.unshift(`🗡️ [Trust No One Rival] Reduce su Gig ${String(ownNearMin.die).toUpperCase()} de ${oldVal} a 1.`);
+      } else if (opp.gigs && opp.gigs.length > 0) {
+        const highestOpp = [...opp.gigs].sort((a, b) => b.value - a.value)[0];
+        const oldVal = highestOpp.value;
+        highestOpp.value = Math.max(1, (highestOpp.value || 1) - 3);
+        state.actionLog.unshift(`🗡️ [Trust No One Rival] Reduce tu Gig ${String(highestOpp.die).toUpperCase()} de ${oldVal} a ${highestOpp.value}.`);
+        triggerMeredithStoutOnRivalGigModify(state, oppKey);
+      } else if (p.gigs && p.gigs.length > 0) {
+        const g = p.gigs[0];
+        g.value = Math.max(1, (g.value || 1) - 3);
+        state.actionLog.unshift(`🗡️ [Trust No One Rival] Reduce su Gig ${String(g.die).toUpperCase()} a ${g.value}.`);
+      }
+      if ((p.gigs || []).some((g) => g.value === 1)) {
+        drawCards(p, 1, state, cardName);
+      }
     }
     return { executed: true };
   }
@@ -1241,22 +1656,23 @@ export function executeUnitPlayTrigger(state, playerKey, unitInstance) {
       state.actionLog.unshift(`🎲 [Dexter DeShawn] ¡PLAY activado! No hay Gigs en juego para ajustar.`);
       notifyTrigger('🎲 DEXTER DESHAWN // PLAY', 'No hay dados de Gig en juego para ajustar.', 'info');
     } else if (playerKey === 'player') {
-      state.pendingTargetSelection = {
+      queueTargetSelection(state, {
         actionType: 'ADJUST_GIG',
         sourceCardId: 'CP-027',
         sourceCardName: 'Dexter DeShawn // One Last Chance',
         sourceCardImage: unitInstance.image,
         title: '🎲 DEXTER DESHAWN // HABILIDAD PLAY',
-        prompt: 'Elige cualquier Gig en juego (tuyo o del rival) para ajustarlo en +1 o -1:',
+        prompt: 'Elige cualquier Gig en juego (tuyo o del rival) para ajustarlo en +1, -1 o dejarlo igual:',
         canIncrease: true,
         canDecrease: true,
-        maxDelta: 1
-      };
+        maxDelta: 1,
+        allowZero: true
+      });
     } else {
       const targetGig = (p.gigs || [])[0];
       if (targetGig) {
         const dieLabel = (targetGig.die || targetGig.dieType || 'GIG').toUpperCase();
-        targetGig.value = Math.min(targetGig.max || 20, (targetGig.value || 1) + 1);
+        targetGig.value = Math.min(getGigMaxFace(targetGig), (targetGig.value || 1) + 1);
         state.actionLog.unshift(`🎲 [Dexter DeShawn Rival] ¡PLAY! Ajusta su Gig ${dieLabel} a ${targetGig.value}.`);
       }
     }
@@ -1575,23 +1991,33 @@ export function executeUnitPlayTrigger(state, playerKey, unitInstance) {
       state.actionLog.unshift(`🚁 [MaxTac AV] ¡PLAY activado! Se requieren al menos 1 Gig aliado y 1 Gig rival para intercambiar.`);
       notifyTrigger('🚁 MAXTAC AV // PLAY', 'Se necesita al menos 1 Gig tuyo y 1 del rival para poder intercambiar.', 'info');
     } else if (playerKey === 'player') {
-      state.pendingTargetSelection = {
+      queueTargetSelection(state, {
         actionType: 'SWAP_GIGS',
         sourceCardId: 'CP-070',
         sourceCardName: 'MaxTac AV',
         sourceCardImage: unitInstance.image,
         title: '🚁 MAXTAC AV // HABILIDAD PLAY',
-        prompt: 'PASO 1 DE 2: Selecciona TU Gig que deseas intercambiar con el rival:',
+        prompt: 'PASO 1 DE 2: Selecciona TU Gig que deseas intercambiar por completo con un Gig del rival (o ESC para omitir):',
         step: 1
-      };
+      });
     } else {
-      const lowestFriendly = [...friendlyGigs].sort((a, b) => a.value - b.value)[0];
-      const highestRival = [...rivalGigs].sort((a, b) => b.value - a.value)[0];
-      if (lowestFriendly && highestRival && highestRival.value > lowestFriendly.value) {
-        const temp = lowestFriendly.value;
-        lowestFriendly.value = highestRival.value;
-        highestRival.value = temp;
-        state.actionLog.unshift(`🚁 [MaxTac AV Rival] ¡PLAY! Intercambió los valores de sus Gigs.`);
+      let minIdx = 0;
+      friendlyGigs.forEach((g, idx) => {
+        if (g.value < friendlyGigs[minIdx].value) minIdx = idx;
+      });
+      let maxIdx = 0;
+      rivalGigs.forEach((g, idx) => {
+        if (g.value > rivalGigs[maxIdx].value) maxIdx = idx;
+      });
+      if (rivalGigs[maxIdx].value > friendlyGigs[minIdx].value) {
+        const [myDie] = p.gigs.splice(minIdx, 1);
+        const [oppDie] = opp.gigs.splice(maxIdx, 1);
+        p.gigs.push(oppDie);
+        opp.gigs.push(myDie);
+        state.actionLog.unshift(
+          `🚁 [MaxTac AV Rival] ¡PLAY! Intercambió su ${String(myDie.die).toUpperCase()} (${myDie.value}) por tu ${String(oppDie.die).toUpperCase()} (${oppDie.value}).`
+        );
+        triggerMeredithStoutOnRivalGigModify(state, oppKey);
       }
     }
     return;
@@ -2238,6 +2664,77 @@ export function executeUnitAttackTrigger(state, playerKey, attackerUnit) {
       drawCards(p, 1, state, cardName);
     }
   }
+
+  // CP-027: Dexter DeShawn // One Last Chance ("PLAY ATTACK Adjust a Gig by up to 1.")
+  if (cardId === 'CP-027') {
+    const allGigs = [...(p.gigs || []), ...(opp.gigs || [])];
+    if (allGigs.length > 0) {
+      if (playerKey === 'player') {
+        queueTargetSelection(state, {
+          actionType: 'ADJUST_GIG',
+          sourceCardId: 'CP-027',
+          sourceCardName: 'Dexter DeShawn // One Last Chance',
+          sourceCardImage: attackerUnit.image,
+          title: '🎲 DEXTER DESHAWN // HABILIDAD ATTACK',
+          prompt: '¡Dexter ataca! Elige cualquier Gig en juego (tuyo o del rival) para ajustarlo en +1, -1 o dejarlo igual:',
+          canIncrease: true,
+          canDecrease: true,
+          maxDelta: 1,
+          allowZero: true
+        });
+      } else {
+        const targetGig = (p.gigs || [])[0] || (opp.gigs || [])[0];
+        if (targetGig) {
+          const oldVal = targetGig.value;
+          const isOwn = (p.gigs || []).includes(targetGig);
+          targetGig.value = isOwn
+            ? Math.min(getGigMaxFace(targetGig), (targetGig.value || 1) + 1)
+            : Math.max(1, (targetGig.value || 1) - 1);
+          state.actionLog.unshift(
+            `🎲 [Dexter DeShawn Rival] ¡ATTACK! Ajusta el Gig ${String(targetGig.die).toUpperCase()} de ${oldVal} a ${targetGig.value}.`
+          );
+          if (!isOwn) triggerMeredithStoutOnRivalGigModify(state, oppKey);
+        }
+      }
+    }
+  }
+
+  // GEARS EQUIPADOS CON TRIGGER ATTACK:
+  // CP-030: Dying Night // V's Pistol ("ATTACK Decrease a Gig by up to 2.")
+  const dyingNights = (attackerUnit.gear || []).filter((g) => resolveCardId(g) === 'CP-030');
+  if (dyingNights.length > 0) {
+    const allGigs = [...(p.gigs || []), ...(opp.gigs || [])];
+    dyingNights.forEach((pistol) => {
+      if (allGigs.length === 0) return;
+      if (playerKey === 'player') {
+        queueTargetSelection(state, {
+          actionType: 'ADJUST_GIG',
+          sourceCardId: 'CP-030',
+          sourceCardName: "Dying Night // V's Pistol",
+          sourceCardImage: pistol.image || attackerUnit.image,
+          title: "🔫 DYING NIGHT // HABILIDAD ATTACK (-HASTA 2)",
+          prompt: `"${attackerUnit.name}" ataca con Dying Night. Elige cualquier Gig en juego (tuyo o del rival) para reducirlo en -1, -2 o dejarlo igual:`,
+          canIncrease: false,
+          canDecrease: true,
+          maxDelta: 2,
+          allowZero: true
+        });
+      } else {
+        const targetGig =
+          (opp.gigs && opp.gigs.length > 0 ? [...opp.gigs].sort((a, b) => b.value - a.value)[0] : null) ||
+          (p.gigs || [])[0];
+        if (targetGig) {
+          const isOpp = (opp.gigs || []).includes(targetGig);
+          const oldVal = targetGig.value;
+          targetGig.value = Math.max(1, (targetGig.value || 1) - 2);
+          state.actionLog.unshift(
+            `🔫 [Dying Night Rival] ¡ATTACK! Reduce el Gig ${String(targetGig.die).toUpperCase()} de ${oldVal} a ${targetGig.value}.`
+          );
+          if (isOpp) triggerMeredithStoutOnRivalGigModify(state, oppKey);
+        }
+      }
+    });
+  }
 }
 
 // =========================================================================
@@ -2711,12 +3208,14 @@ export function executeStartOfTurnTriggers(state, playerKey) {
   const p = state[playerKey];
 
   // CP-045: Hanako Arasaka // Daughter of the Emperor
-  const hasHanako = (p.legends || []).some((l) => l.isFaceUp && l.id === 'CP-045');
-  if (hasHanako) {
-    const values = (p.gigs || []).map((g) => g.value);
-    const hasPair = values.some((val, idx) => values.indexOf(val) !== idx);
-    if (hasPair) {
-      drawCards(p, 1, state, 'Hanako Arasaka');
+  // "At the start of your turn, draw 1 for each friendly value-pair of Gigs."
+  const hanakos = (p.legends || []).filter(
+    (l) => l.isFaceUp && !l.isRemovedFromGame && resolveCardId(l) === 'CP-045'
+  );
+  if (hanakos.length > 0) {
+    const pairCount = countGigValuePairs(p.gigs || []);
+    if (pairCount > 0) {
+      drawCards(p, pairCount * hanakos.length, state, 'Hanako Arasaka // Daughter of the Emperor');
     }
   }
 }
@@ -2733,16 +3232,33 @@ export function executeEndOfTurnTriggers(state, playerKey) {
     state.actionLog.unshift(`🏍️ [Modded Kusanagi] Vuelve a la mano de ${p.name} al final del turno.`);
   }
 
-  // CP-114: Sandevistan (endereza al portador)
+  // CP-114: Sandevistan (endereza al portador) y CP-030: Dying Night (si el portador se llama "V", endereza 2 Eddies)
   for (const unit of p.field || []) {
-    if ((unit.gear || []).some((g) => g.id === 'CP-114')) {
+    if ((unit.gear || []).some((g) => resolveCardId(g) === 'CP-114')) {
       unit.isSpent = false;
       state.actionLog.unshift(`⚡ [Sandevistan] Endereza a "${unit.name}" al final del turno.`);
+    }
+    const dyingNights = (unit.gear || []).filter((g) => resolveCardId(g) === 'CP-030');
+    const isNamedV = /^V(\s|$|\/\/)/i.test(String(unit.name || '').trim());
+    if (dyingNights.length > 0 && isNamedV) {
+      let readied = 0;
+      const toReady = 2 * dyingNights.length;
+      for (const ed of p.eddies || []) {
+        if (ed.isSpent && readied < toReady) {
+          ed.isSpent = false;
+          readied++;
+        }
+      }
+      if (readied > 0) {
+        state.actionLog.unshift(
+          `🔫 [Dying Night] Fin de turno: "${unit.name}" es V, se enderezan ${readied} Eddie(s).`
+        );
+      }
     }
   }
 
   // CP-136: V // Roamer of the Badlands (si 2+ Gigs con 8+ valor, roba 1)
-  const hasBadlandsV = (p.field || []).some((u) => u.id === 'CP-136');
+  const hasBadlandsV = (p.field || []).some((u) => resolveCardId(u) === 'CP-136');
   if (hasBadlandsV) {
     const highGigs = (p.gigs || []).filter((g) => (g.value || 0) >= 8).length;
     if (highGigs >= 2) {
@@ -2776,6 +3292,36 @@ export function executeBlockerUsedTrigger(state, defenderKey, blockerUnit) {
       state.actionLog.unshift(
         `🛡️ [Augmented Negotiators] ¡Al bloquear! El rival descarta "${disc.name}".`
       );
+    }
+  }
+
+  // CP-061 La Llorona // Ghost of the Past: "When this Unit uses BLOCKER, increase a Gig by up to 3."
+  if (blockerId === 'CP-061') {
+    const totalGigs = (def.gigs || []).length + (opp.gigs || []).length;
+    if (totalGigs > 0) {
+      if (defenderKey === 'player') {
+        queueTargetSelection(state, {
+          actionType: 'ADJUST_GIG',
+          sourceCardId: 'CP-061',
+          sourceCardName: 'La Llorona // Ghost of the Past',
+          sourceCardImage: blockerUnit.image,
+          title: '👻 LA LLORONA // BLOCKER (+HASTA 3 A UN GIG)',
+          prompt: '¡La Llorona usó BLOCKER! Elige cualquier Gig en juego (tuyo o del rival) para aumentar su valor en hasta +3 (o déjalo igual):',
+          canIncrease: true,
+          canDecrease: false,
+          maxDelta: 3,
+          allowZero: true
+        });
+      } else {
+        const bestGig = [...(def.gigs || [])].sort((a, b) => (getGigMaxFace(b) - b.value) - (getGigMaxFace(a) - a.value))[0];
+        if (bestGig) {
+          const oldVal = bestGig.value;
+          bestGig.value = Math.min(getGigMaxFace(bestGig), (bestGig.value || 1) + 3);
+          state.actionLog.unshift(
+            `👻 [La Llorona Rival] ¡Al bloquear! Aumenta su Gig ${String(bestGig.die).toUpperCase()} de ${oldVal} a ${bestGig.value}.`
+          );
+        }
+      }
     }
   }
 

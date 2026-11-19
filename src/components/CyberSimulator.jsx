@@ -90,7 +90,7 @@ import {
   executeBotReaction,
   resolvePendingAttackAndContinueBot
 } from '../utils/botAi.js';
-import { getCardRulesText, executeUnitAttackTrigger, executeLegendAbility, executeProgramEffect, executeUnitPlayTrigger, getNumericCost } from '../utils/cardEffects.js';
+import { getCardRulesText, executeUnitAttackTrigger, executeLegendAbility, executeProgramEffect, executeUnitPlayTrigger, getNumericCost, executeCardSpentTriggers, executeOnGigsStolenTriggers, executeKerryGigRollTrigger, triggerMeredithStoutOnRivalGigModify, getGigMaxFace } from '../utils/cardEffects.js';
 import { getCardActivatedAbilities, executeCardActivatedAbility } from '../utils/activatedAbilities.js';
 
 // =========================================================================
@@ -1244,6 +1244,10 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
       return;
     }
     pushHistory();
+    if (res.requiresModal || gameState.pendingTargetSelection || gameState.pendingCardChoice) {
+      setGameState({ ...gameState });
+      return;
+    }
     setGameState({ ...gameState });
     setHolocall({
       title: 'HABILIDAD ACTIVADA (↷)',
@@ -1527,6 +1531,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
     selectedFieldUnit.isSpent = true;
     delete selectedFieldUnit.mustAttackNextTurn;
     selectedFieldUnit.hasTriggeredAttackThisDeclaration = true;
+    executeCardSpentTriggers(gameState, 'player', selectedFieldUnit);
     executeUnitAttackTrigger(gameState, 'player', selectedFieldUnit);
 
     gameState.actionLog.unshift(
@@ -1557,6 +1562,26 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
   const handleResolveCardChoice = (selectedCardIds = []) => {
     if (!gameState?.pendingCardChoice) return;
     const choice = gameState.pendingCardChoice;
+
+    if (choice.type === 'MEREDITH_TRASH_TO_HAND') {
+      const p = gameState[choice.playerKey || 'player'];
+      const selected = (choice.cards || []).find((c) => selectedCardIds.includes(c.instanceId));
+      delete gameState.pendingCardChoice;
+      if (selected) {
+        const tIdx = (p.trash || []).findIndex((c) => c.instanceId === selected.instanceId);
+        if (tIdx !== -1) p.trash.splice(tIdx, 1);
+        selected.isJustDrawn = true;
+        if (!p.hand) p.hand = [];
+        p.hand.push(selected);
+        gameState.actionLog.unshift(
+          `💼 [Meredith Stout] ¡Reacción! Añades "${selected.name}" de tu Basura a tu mano.`
+        );
+      } else {
+        gameState.actionLog.unshift('💼 [Meredith Stout] Decidiste no recuperar ninguna carta de tu Basura.');
+      }
+      setGameState({ ...gameState });
+      return;
+    }
 
     if (choice.type === 'ALT_CUNNINGHAM_PLAY_TRASH_PROGRAM') {
       const p = gameState[choice.playerKey || 'player'];
@@ -2228,6 +2253,77 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
     }
   };
 
+  // Helper interno: avanza al siguiente objetivo en cola (si existen múltiples triggers) o reanuda el combate
+  const finishTargetSelection = () => {
+    if (gameState.pendingTargetSelectionQueue && gameState.pendingTargetSelectionQueue.length > 0) {
+      gameState.pendingTargetSelection = gameState.pendingTargetSelectionQueue.shift();
+      setGameState({ ...gameState });
+      return;
+    }
+    delete gameState.pendingTargetSelection;
+    const pendingAttack = gameState.pendingAttackContinuation;
+    delete gameState.pendingAttackContinuation;
+    if (pendingAttack) {
+      continueAttackAfterTrigger(pendingAttack);
+    } else {
+      setGameState({ ...gameState });
+    }
+  };
+
+  // Helper interno: resuelve efectos secundarios de cartas de ajuste de Gig (incluso si delta = 0)
+  const applyAdjustGigSecondaryEffect = (sel, adjustedGig = null, oldVal = null) => {
+    const p = gameState.player;
+    if (!sel?.secondaryEffect) return;
+    if (sel.secondaryEffect === 'AFTERPARTY_DRAW') {
+      const values = (p.gigs || []).map((g) => Number(g.value));
+      if (new Set(values).size >= 2 && p.deck && p.deck.length > 0) {
+        const drawn = p.deck.shift();
+        drawn.isJustDrawn = true;
+        p.hand.push(drawn);
+        gameState.actionLog.unshift(`🎉 [Afterparty at Lizzie's] ¡Tienes 2+ Gigs con valores distintos! Robas "${drawn.name}".`);
+      }
+    } else if (sel.secondaryEffect === 'INDUSTRIAL_DRAW') {
+      if ((p.gigs || []).some((g) => (g.value || 0) >= 8) && p.deck && p.deck.length > 0) {
+        const drawn = p.deck.shift();
+        drawn.isJustDrawn = true;
+        p.hand.push(drawn);
+        gameState.actionLog.unshift(`🏭 [Industrial Assembly] ¡Controlas un Gig con valor 8+! Robas "${drawn.name}".`);
+      }
+    } else if (sel.secondaryEffect === 'TRUST_NO_ONE_DRAW') {
+      if ((p.gigs || []).some((g) => Number(g.value) === 1) && p.deck && p.deck.length > 0) {
+        const drawn = p.deck.shift();
+        drawn.isJustDrawn = true;
+        p.hand.push(drawn);
+        gameState.actionLog.unshift(`🗡️ [Trust No One] ¡Controlas un Gig mínimo (valor 1)! Robas "${drawn.name}".`);
+      }
+    } else if (sel.secondaryEffect === 'JACKIE_MIN_GIG_DRAW') {
+      if (adjustedGig && oldVal !== null && oldVal > 1 && Number(adjustedGig.value) === 1 && p.deck && p.deck.length > 0) {
+        const drawn = p.deck.shift();
+        drawn.isJustDrawn = true;
+        p.hand.push(drawn);
+        gameState.actionLog.unshift(`🥃 [Jackie Welles] ¡Tu Gig se convirtió en Gig mínimo (valor 1)! Robas "${drawn.name}".`);
+      }
+    } else if (sel.secondaryEffect === 'ZETATECH_3_DIFF_DRAW') {
+      const values = (p.gigs || []).map((g) => Number(g.value));
+      if (new Set(values).size >= 3 && p.deck && p.deck.length > 0) {
+        const drawn = p.deck.shift();
+        drawn.isJustDrawn = true;
+        p.hand.push(drawn);
+        gameState.actionLog.unshift(`🎭 [Zetatech Faceplate] ¡Controlas 3+ Gigs con valores distintos! Robas "${drawn.name}".`);
+      }
+    }
+  };
+
+  // Helper interno: busca un Gig exacto por índice (o por tipo de dado como respaldo)
+  const findGigByInfo = (ownerObj, info) => {
+    const gigs = ownerObj?.gigs || [];
+    if (typeof info?.gigIndex === 'number' && gigs[info.gigIndex]) {
+      return { gig: gigs[info.gigIndex], index: info.gigIndex };
+    }
+    const idx = gigs.findIndex((g) => String(g.die || '').toLowerCase() === String(info?.die || '').toLowerCase());
+    return idx !== -1 ? { gig: gigs[idx], index: idx } : { gig: null, index: -1 };
+  };
+
   // Manejador del Sistema Universal de Selección de Objetivos (Kiroshi Targeting System)
   const handleResolveTargetSelection = (targetData) => {
     if (!gameState?.pendingTargetSelection) return;
@@ -2237,10 +2333,13 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
 
     if (sel.actionType === 'PEACE_OFFERING') {
       if (sel.step === 1) {
+        const otherLabel = sel.requireOtherPlayerSource
+          ? (targetData.owner === 'player' ? 'un Gig DEL RIVAL' : 'uno de TUS Gigs')
+          : 'otro Gig';
         gameState.pendingTargetSelection = {
           ...sel,
           step: 2,
-          prompt: `PASO 2 DE 2: El Gig seleccionado para MODIFICAR es ${targetData.die.toUpperCase()} (${targetData.owner === 'player' ? 'Tuyo' : 'Del Rival'}, valor actual ${targetData.value}). Ahora haz clic en el Gig cuyo valor deseas COPIAR:`,
+          prompt: `PASO 2 DE 2: El Gig seleccionado para MODIFICAR es ${targetData.die.toUpperCase()} (${targetData.owner === 'player' ? 'Tuyo' : 'Del Rival'}, valor actual ${targetData.value}). Ahora haz clic en ${otherLabel} cuyo valor deseas COPIAR:`,
           selectedTargetGig: targetData
         };
         setGameState({ ...gameState });
@@ -2249,21 +2348,41 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
         const targetGigInfo = sel.selectedTargetGig;
         const sourceGigInfo = targetData;
 
+        // No se puede elegir exactamente el mismo dado como origen y destino
+        if (
+          targetGigInfo.owner === sourceGigInfo.owner &&
+          ((typeof targetGigInfo.gigIndex === 'number' && targetGigInfo.gigIndex === sourceGigInfo.gigIndex) ||
+            (typeof targetGigInfo.gigIndex !== 'number' && targetGigInfo.die === sourceGigInfo.die))
+        ) {
+          return;
+        }
+        // Para Padre (CP-091): el Gig origen debe pertenecer al OTRO jugador
+        if (sel.requireOtherPlayerSource && targetGigInfo.owner === sourceGigInfo.owner) {
+          return;
+        }
+
         const targetOwner = targetGigInfo.owner === 'player' ? p : opp;
-        const targetGig = (targetOwner.gigs || []).find((g) => g.die.toLowerCase() === targetGigInfo.die.toLowerCase());
+        const { gig: targetGig } = findGigByInfo(targetOwner, targetGigInfo);
 
         if (targetGig) {
           const oldVal = targetGig.value;
-          targetGig.value = sourceGigInfo.value;
+          const maxFace = getGigMaxFace(targetGig);
+          const newVal = Math.max(1, Math.min(maxFace, Number(sourceGigInfo.value) || 1));
+          targetGig.value = newVal;
+          const icon = sel.sourceCardId === 'CP-091' ? '✝️' : '🕊️';
+          const capNote = newVal !== Number(sourceGigInfo.value) ? ` (tope máximo de ${targetGig.die.toUpperCase()})` : '';
           gameState.actionLog.unshift(
-            `🕊️ [Peace Offering] Modificó el Gig ${targetGig.die.toUpperCase()} (${targetGigInfo.owner === 'player' ? 'tuyo' : 'del rival'}) de ${oldVal} a ${sourceGigInfo.value} (copiado del ${sourceGigInfo.die.toUpperCase()} ${sourceGigInfo.owner === 'player' ? 'tuyo' : 'del rival'}).`
+            `${icon} [${sel.sourceCardName}] Modificó el Gig ${targetGig.die.toUpperCase()} (${targetGigInfo.owner === 'player' ? 'tuyo' : 'del rival'}) de ${oldVal} a ${newVal}${capNote} (copiado del ${sourceGigInfo.die.toUpperCase()} ${sourceGigInfo.owner === 'player' ? 'tuyo' : 'del rival'}).`,
           );
+          if (targetGigInfo.owner === 'bot' && newVal !== oldVal) {
+            triggerMeredithStoutOnRivalGigModify(gameState, 'bot');
+          }
         }
 
-        const playerVals = (p.gigs || []).map((g) => g.value);
-        const hasValuePair = new Set(playerVals).size < playerVals.length;
-        if (hasValuePair) {
-          if (p.deck && p.deck.length > 0) {
+        if (!sel.noDrawBonus) {
+          const playerVals = (p.gigs || []).map((g) => Number(g.value));
+          const hasValuePair = new Set(playerVals).size < playerVals.length;
+          if (hasValuePair && p.deck && p.deck.length > 0) {
             const drawn = p.deck.shift();
             drawn.isJustDrawn = true;
             p.hand.push(drawn);
@@ -2273,89 +2392,97 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
           }
         }
 
-        delete gameState.pendingTargetSelection;
-        const pendingAttack = gameState.pendingAttackContinuation;
-        delete gameState.pendingAttackContinuation;
-        if (pendingAttack) {
-          continueAttackAfterTrigger(pendingAttack);
-        } else {
-          setGameState({ ...gameState });
-        }
+        finishTargetSelection();
       }
     } else if (sel.actionType === 'ADJUST_GIG') {
       const { gigInfo, delta } = targetData;
+      if (delta === 0) {
+        gameState.actionLog.unshift(`🎲 [${sel.sourceCardName}] Decide no alterar ningún Gig (ajuste 0).`);
+        applyAdjustGigSecondaryEffect(sel, null, null);
+        finishTargetSelection();
+        return;
+      }
       const owner = gigInfo.owner === 'player' ? p : opp;
-      const gig = (owner.gigs || []).find((g) => g.die.toLowerCase() === gigInfo.die.toLowerCase());
+      const { gig } = findGigByInfo(owner, gigInfo);
       if (gig) {
         const oldVal = gig.value;
-        const maxFace = parseInt(gig.die.replace(/\D/g, ''), 10) || 20;
+        const maxFace = getGigMaxFace(gig);
         gig.value = Math.max(1, Math.min(maxFace, (gig.value || 1) + delta));
         gameState.actionLog.unshift(
           `🎲 [${sel.sourceCardName}] Ajustó el Gig ${gig.die.toUpperCase()} (${gigInfo.owner === 'player' ? 'tuyo' : 'del rival'}) de ${oldVal} a ${gig.value} (${delta > 0 ? '+' + delta : delta}).`
         );
-
-        if (sel.secondaryEffect === 'AFTERPARTY_DRAW') {
-          const values = (p.gigs || []).map((g) => g.value);
-          if (new Set(values).size >= 2 && p.deck && p.deck.length > 0) {
-            const drawn = p.deck.shift();
-            drawn.isJustDrawn = true;
-            p.hand.push(drawn);
-            gameState.actionLog.unshift(`🎉 [Afterparty at Lizzie's] ¡Tienes 2+ Gigs con valores distintos! Robas "${drawn.name}".`);
-          }
-        } else if (sel.secondaryEffect === 'INDUSTRIAL_DRAW') {
-          if ((p.gigs || []).some((g) => (g.value || 0) >= 8) && p.deck && p.deck.length > 0) {
-            const drawn = p.deck.shift();
-            drawn.isJustDrawn = true;
-            p.hand.push(drawn);
-            gameState.actionLog.unshift(`🏭 [Industrial Assembly] ¡Controlas un Gig con valor 8+! Robas "${drawn.name}".`);
-          }
-        } else if (sel.secondaryEffect === 'TRUST_NO_ONE_DRAW') {
-          if ((p.gigs || []).some((g) => g.value === 1) && p.deck && p.deck.length > 0) {
-            const drawn = p.deck.shift();
-            drawn.isJustDrawn = true;
-            p.hand.push(drawn);
-            gameState.actionLog.unshift(`🗡️ [Trust No One] ¡Controlas un Gig mínimo (valor 1)! Robas "${drawn.name}".`);
-          }
+        if (gigInfo.owner === 'bot' && gig.value !== oldVal) {
+          triggerMeredithStoutOnRivalGigModify(gameState, 'bot');
         }
+        applyAdjustGigSecondaryEffect(sel, gig, oldVal);
       }
-      delete gameState.pendingTargetSelection;
-      const pendingAttack = gameState.pendingAttackContinuation;
-      delete gameState.pendingAttackContinuation;
-      if (pendingAttack) {
-        continueAttackAfterTrigger(pendingAttack);
-      } else {
-        setGameState({ ...gameState });
-      }
+      finishTargetSelection();
     } else if (sel.actionType === 'SWAP_GIGS') {
       if (sel.step === 1) {
         gameState.pendingTargetSelection = {
           ...sel,
           step: 2,
-          prompt: `PASO 2 DE 2: Has seleccionado tu Gig ${targetData.die.toUpperCase()} (Valor ${targetData.value}). Ahora haz clic en el Gig del RIVAL para intercambiar:`,
+          prompt: `PASO 2 DE 2: Has seleccionado tu Gig ${targetData.die.toUpperCase()} (Valor ${targetData.value}). Ahora haz clic en el Gig del RIVAL con el que deseas intercambiarlo:`,
           selectedFriendlyGig: targetData
         };
         setGameState({ ...gameState });
         return;
       } else if (sel.step === 2) {
-        const friendlyGig = (p.gigs || []).find((g) => g.die.toLowerCase() === sel.selectedFriendlyGig.die.toLowerCase());
-        const rivalGig = (opp.gigs || []).find((g) => g.die.toLowerCase() === targetData.die.toLowerCase());
-        if (friendlyGig && rivalGig) {
-          const temp = friendlyGig.value;
-          friendlyGig.value = rivalGig.value;
-          rivalGig.value = temp;
+        const { gig: friendlyGig, index: fIdx } = findGigByInfo(p, sel.selectedFriendlyGig);
+        const { gig: rivalGig, index: rIdx } = findGigByInfo(opp, targetData);
+        if (friendlyGig && rivalGig && fIdx !== -1 && rIdx !== -1) {
+          // REGLA OFICIAL: Intercambia los DADOS DE GIG completos entre ambos jugadores
+          p.gigs[fIdx] = rivalGig;
+          opp.gigs[rIdx] = friendlyGig;
+          rivalGig.stolenFrom = 'bot';
+          friendlyGig.stolenFrom = 'player';
+          const icon = sel.sourceCardId === 'CP-045' ? '🏯' : '🚁';
           gameState.actionLog.unshift(
-            `🚁 [${sel.sourceCardName}] Intercambió los valores del Gig ${friendlyGig.die.toUpperCase()} tuyo (${friendlyGig.value}) y el Gig ${rivalGig.die.toUpperCase()} rival (${rivalGig.value}).`
+            `${icon} [${sel.sourceCardName}] Intercambió tu Gig ${friendlyGig.die.toUpperCase()} (valor ${friendlyGig.value}) por el Gig ${rivalGig.die.toUpperCase()} del rival (valor ${rivalGig.value}).`
           );
+          triggerMeredithStoutOnRivalGigModify(gameState, 'bot');
         }
-        delete gameState.pendingTargetSelection;
-        const pendingAttack = gameState.pendingAttackContinuation;
-        delete gameState.pendingAttackContinuation;
-        if (pendingAttack) {
-          continueAttackAfterTrigger(pendingAttack);
+        finishTargetSelection();
+      }
+    } else if (sel.actionType === 'STEAL_RIVAL_GIG') {
+      const { index: rIdx } = findGigByInfo(opp, targetData);
+      if (rIdx !== -1) {
+        const [stolenDie] = opp.gigs.splice(rIdx, 1);
+        stolenDie.stolenFrom = 'bot';
+        p.gigs.push(stolenDie);
+        gameState.actionLog.unshift(
+          `🦾 [${sel.sourceCardName}] ¡Robo extra! Arrebatas el Gig ${String(stolenDie.die).toUpperCase()} (Valor ${stolenDie.value}) al rival.`
+        );
+        if (gameState.overtime && p.gigs.length >= 7) {
+          gameState.isGameOver = true;
+          gameState.winner = 'player';
+          gameState.actionLog.unshift(`🏆 ¡OVERTIME WIN! ${p.name} alcanza 7 Gigs y gana la partida.`);
         } else {
-          setGameState({ ...gameState });
+          const attUnit = (p.field || []).find((u) => u.instanceId === sel.attackerUnitId);
+          if (attUnit) {
+            executeOnGigsStolenTriggers(gameState, 'player', attUnit, [stolenDie], { isGorillaBonus: true });
+          }
         }
       }
+      finishTargetSelection();
+    } else if (sel.actionType === 'KERRY_REROLL') {
+      const gig = (p.gigs || [])[sel.gigIndex];
+      if (gig) {
+        if (targetData.reroll) {
+          const oldVal = gig.value;
+          const newVal = rollDie(sel.die);
+          gig.value = newVal;
+          gameState.actionLog.unshift(
+            `🎸 [Kerry Eurodyne] Ignoras el ${oldVal} en tu ${String(sel.die).toUpperCase()} y vuelves a tirar: ¡obtienes un ${newVal}!`
+          );
+        } else {
+          gameState.actionLog.unshift(
+            `🎸 [Kerry Eurodyne] Mantienes el resultado ${gig.value} en tu ${String(sel.die).toUpperCase()}.`
+          );
+        }
+        executeKerryGigRollTrigger(gameState, 'player', sel.gigIndex, true);
+      }
+      finishTargetSelection();
     } else if (sel.actionType === 'TARGET_UNIT') {
       const { unitInstanceId, ownerKey } = targetData;
       const targetOwner = ownerKey === 'player' ? p : opp;
@@ -2505,24 +2632,40 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
         gameState.pendingTargetSelection = chainedSelection;
         setGameState({ ...gameState });
       } else {
-        delete gameState.pendingTargetSelection;
-        const pendingAttack = gameState.pendingAttackContinuation;
-        delete gameState.pendingAttackContinuation;
-        if (pendingAttack) {
-          continueAttackAfterTrigger(pendingAttack);
-        } else {
-          setGameState({ ...gameState });
-        }
+        finishTargetSelection();
       }
     }
   };
 
   const handleCancelTargetSelection = () => {
     if (!gameState?.pendingTargetSelection) return;
-    const name = gameState.pendingTargetSelection.sourceCardName || 'Habilidad';
-    delete gameState.pendingTargetSelection;
-    gameState.actionLog.unshift(`ℹ️ [${name}] Selección de objetivo cancelada.`);
-    setGameState({ ...gameState });
+    const sel = gameState.pendingTargetSelection;
+    const p = gameState.player;
+    const name = sel.sourceCardName || 'Habilidad';
+    if (sel.actionType === 'KERRY_REROLL') {
+      const gig = (p.gigs || [])[sel.gigIndex];
+      if (gig) {
+        gameState.actionLog.unshift(`🎸 [Kerry Eurodyne] Mantienes el resultado ${gig.value} en tu ${String(sel.die).toUpperCase()}.`);
+        executeKerryGigRollTrigger(gameState, 'player', sel.gigIndex, true);
+      }
+    } else if (sel.actionType === 'PEACE_OFFERING' && !sel.noDrawBonus) {
+      gameState.actionLog.unshift(`ℹ️ [${name}] Omitiste copiar valor de Gig.`);
+      const playerVals = (p.gigs || []).map((g) => Number(g.value));
+      if (new Set(playerVals).size < playerVals.length && p.deck && p.deck.length > 0) {
+        const drawn = p.deck.shift();
+        drawn.isJustDrawn = true;
+        p.hand.push(drawn);
+        gameState.actionLog.unshift(`🕊️ [Peace Offering] ¡Controlas un par de Gigs con el mismo valor! Robas 1 carta: "${drawn.name}".`);
+      }
+    } else if (sel.actionType === 'ADJUST_GIG') {
+      gameState.actionLog.unshift(`ℹ️ [${name}] Ajuste de Gig omitido (0).`);
+      if (sel.secondaryEffect && sel.secondaryEffect !== 'JACKIE_MIN_GIG_DRAW') {
+        applyAdjustGigSecondaryEffect(sel, null, null);
+      }
+    } else {
+      gameState.actionLog.unshift(`ℹ️ [${name}] Selección de objetivo cancelada.`);
+    }
+    finishTargetSelection();
   };
 
   // Robar un dado de Gig específico del rival (al hacer clic sobre él en su barra de Gigs)
@@ -4293,10 +4436,11 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                       onClick={() => {
                         if (gameState.pendingTargetSelection) {
                           const sel = gameState.pendingTargetSelection;
+                          const activeIdx = activeGig ? (p.gigs || []).indexOf(activeGig) : -1;
                           if (sel.actionType === 'PEACE_OFFERING' && activeGig) {
-                            handleResolveTargetSelection({ owner: 'player', die: d, value: activeGig.value });
+                            handleResolveTargetSelection({ owner: 'player', die: d, value: activeGig.value, gigIndex: activeIdx });
                           } else if (sel.actionType === 'SWAP_GIGS' && sel.step === 1 && activeGig) {
-                            handleResolveTargetSelection({ owner: 'player', die: d, value: activeGig.value });
+                            handleResolveTargetSelection({ owner: 'player', die: d, value: activeGig.value, gigIndex: activeIdx });
                           }
                         }
                       }}
@@ -5020,10 +5164,11 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                           handleStealSpecificDie(d);
                         } else if (gameState.pendingTargetSelection) {
                           const sel = gameState.pendingTargetSelection;
+                          const activeIdx = activeGig ? (bot.gigs || []).indexOf(activeGig) : -1;
                           if (sel.actionType === 'PEACE_OFFERING' && activeGig) {
-                            handleResolveTargetSelection({ owner: 'bot', die: d, value: activeGig.value });
+                            handleResolveTargetSelection({ owner: 'bot', die: d, value: activeGig.value, gigIndex: activeIdx });
                           } else if (sel.actionType === 'SWAP_GIGS' && sel.step === 2 && activeGig) {
-                            handleResolveTargetSelection({ owner: 'bot', die: d, value: activeGig.value });
+                            handleResolveTargetSelection({ owner: 'bot', die: d, value: activeGig.value, gigIndex: activeIdx });
                           }
                         }
                       }}
@@ -7423,20 +7568,25 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 py-3 justify-items-center">
                 {availableGigs.map((gig, idx) => {
                   const dieKey = gig.die.toLowerCase();
-                  const isSelected = selectedDice.includes(dieKey);
+                  const dieSpec = { id: gig.id || `bot-idx-${idx}`, die: dieKey, value: gig.value };
+                  const isSelected = selectedDice.some((d) =>
+                    typeof d === 'object' ? d.id === dieSpec.id : d === dieKey
+                  );
 
                   return (
                     <div
-                      key={idx}
+                      key={gig.id || idx}
                       onClick={() => {
                         let next;
                         if (isSelected) {
-                          next = selectedDice.filter((d) => d !== dieKey);
+                          next = selectedDice.filter((d) =>
+                            typeof d === 'object' ? d.id !== dieSpec.id : d !== dieKey
+                          );
                         } else {
                           if (selectedDice.length >= countToSteal) {
-                            next = countToSteal === 1 ? [dieKey] : selectedDice;
+                            next = countToSteal === 1 ? [dieSpec] : selectedDice;
                           } else {
-                            next = [...selectedDice, dieKey];
+                            next = [...selectedDice, dieSpec];
                           }
                         }
                         setPendingGigTheft((prev) => ({
@@ -7800,200 +7950,353 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                 </div>
               </div>
 
-              {/* SECCIÓN 1: SELECCIÓN DE GIGS / DADOS (PEACE OFFERING, ADJUST GIG, SWAP GIGS) */}
+              {/* SECCIÓN 1A: KERRY EURODYNE — REPETIR TIRADA DE GIG (CP-058) */}
+              {sel.actionType === 'KERRY_REROLL' && (
+                <div className="bg-[#000000]/90 border border-[#FCEE0A]/50 rounded-xl p-5 flex flex-col items-center gap-4">
+                  <div className="flex items-center gap-4">
+                    <PolyhedralDie
+                      type={String(sel.die || 'd20').toLowerCase()}
+                      value={sel.rolledValue}
+                      isWaiting={false}
+                      size={56}
+                    />
+                    <div>
+                      <span className="text-sm font-black text-[#FCEE0A] uppercase block">
+                        {String(sel.die || 'D20').toUpperCase()} — RESULTADO: {sel.rolledValue} / {sel.maxFace}
+                      </span>
+                      <span className="text-[11px] text-gray-300 block mt-1">
+                        {sel.rolledValue === 1 || sel.rolledValue === sel.maxFace
+                          ? `✨ ¡Es un valor ${sel.rolledValue === 1 ? 'MÍNIMO' : 'MÁXIMO'}! Al mantenerlo robarás ${sel.die === 'd20' ? '3 cartas' : '1 carta'}.`
+                          : `Si repites y obtienes 1 o ${sel.maxFace}, robarás ${sel.die === 'd20' ? '3 cartas' : '1 carta'}.`}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap items-center justify-center gap-3 w-full">
+                    <button
+                      type="button"
+                      onClick={() => handleResolveTargetSelection({ reroll: false })}
+                      style={{ clipPath: CYBER_BUTTON }}
+                      className="px-5 py-2.5 bg-[#0dfceb] hover:bg-white text-black font-black text-xs uppercase cursor-pointer shadow-[0_0_20px_rgba(13,252,235,0.5)] transition-all"
+                    >
+                      ✓ MANTENER RESULTADO ({sel.rolledValue})
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleResolveTargetSelection({ reroll: true })}
+                      style={{ clipPath: CYBER_BUTTON }}
+                      className="px-5 py-2.5 bg-[#FCEE0A] hover:bg-white text-black font-black text-xs uppercase cursor-pointer shadow-[0_0_20px_rgba(252,238,10,0.6)] transition-all"
+                    >
+                      🎲 VOLVER A TIRAR {String(sel.die || 'D20').toUpperCase()} (1 VEZ)
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* SECCIÓN 1B: ROBO EXTRA DE GIG RIVAL (CP-039 GORILLA ARMS) */}
+              {sel.actionType === 'STEAL_RIVAL_GIG' && (
+                <div className="bg-[#000000]/80 border border-[#FF003C]/50 rounded-xl p-3 space-y-2">
+                  <div className="flex items-center justify-between pb-1 border-b border-[#FF003C]/20">
+                    <span className="text-[11px] font-black uppercase text-[#FF003C] flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-[#FF003C]" />
+                      <span>GIGS DEL RIVAL ({botGigs.length}) — ELIGE 1 CON VALOR NO COMPARTIDO:</span>
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5">
+                    {botGigs.map((gig, gIdx) => {
+                      const dieKey = gig.die.toLowerCase();
+                      const isEligible = (sel.eligibleGigIndices || []).includes(gIdx);
+                      return (
+                        <div
+                          key={`steal-b-gig-${gIdx}`}
+                          onClick={() => {
+                            if (isEligible) {
+                              handleResolveTargetSelection({ owner: 'bot', die: dieKey, value: gig.value, gigIndex: gIdx });
+                            }
+                          }}
+                          className={`p-3 rounded-lg border-2 transition-all flex flex-col items-center gap-2 bg-[#050912] ${
+                            isEligible
+                              ? 'border-[#FCEE0A] hover:bg-[#FCEE0A]/15 cursor-pointer hover:scale-105 shadow-[0_0_16px_rgba(252,238,10,0.4)]'
+                              : 'border-gray-800 opacity-35 cursor-not-allowed'
+                          }`}
+                        >
+                          <PolyhedralDie type={dieKey} value={gig.value} isWaiting={false} isStolen={Boolean(gig.stolenFrom)} size={40} />
+                          <div className="text-center">
+                            <span className="text-xs font-black text-white uppercase block">{gig.die.toUpperCase()}</span>
+                            <span className="text-[11px] text-[#FF003C] font-black block">VALOR: {gig.value}</span>
+                          </div>
+                          <span className={`text-[8px] font-black px-2 py-0.5 rounded uppercase mt-0.5 ${
+                            isEligible ? 'bg-[#FCEE0A] text-black' : 'bg-gray-800 text-gray-400'
+                          }`}>
+                            {isEligible ? '🦾 ROBAR ESTE GIG' : 'VALOR COMPARTIDO'}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* SECCIÓN 1C: SELECCIÓN DE GIGS / DADOS (PEACE OFFERING, PADRE, ADJUST GIG, SWAP GIGS) */}
               {(sel.actionType === 'PEACE_OFFERING' || sel.actionType === 'ADJUST_GIG' || sel.actionType === 'SWAP_GIGS') && (
                 <div className="space-y-4 py-1">
                   {/* TUS GIGS */}
-                  <div className="bg-[#000000]/80 border border-[#0dfceb]/40 rounded-xl p-3 space-y-2">
-                    <div className="flex items-center justify-between pb-1 border-b border-[#0dfceb]/20">
-                      <span className="text-[11px] font-black uppercase text-[#0dfceb] flex items-center gap-1.5">
-                        <span className="w-2 h-2 rounded-full bg-[#0dfceb]" />
-                        <span>TUS GIGS EN JUEGO ({playerGigs.length}):</span>
-                      </span>
-                      <span className="text-[9px] text-gray-400">Aliados</span>
-                    </div>
-
-                    {playerGigs.length === 0 ? (
-                      <span className="text-xs text-gray-500 italic block py-2">No tienes Gigs en juego actualmente.</span>
-                    ) : (
-                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5">
-                        {playerGigs.map((gig, gIdx) => {
-                          const dieKey = gig.die.toLowerCase();
-                          const isSelectedTarget = sel.selectedTargetGig?.owner === 'player' && sel.selectedTargetGig?.die.toLowerCase() === dieKey;
-
-                          return (
-                            <div
-                              key={`p-gig-${gIdx}`}
-                              className={`p-3 rounded-lg border-2 transition-all flex flex-col items-center gap-2 bg-[#050912] ${
-                                isSelectedTarget
-                                  ? 'border-[#0dfceb] bg-[#0dfceb]/20 shadow-[0_0_20px_rgba(13,252,235,0.7)] scale-105'
-                                  : 'border-gray-800 hover:border-[#FCEE0A] hover:bg-[#FCEE0A]/10 cursor-pointer hover:scale-105 shadow-md'
-                              }`}
-                              onClick={() => {
-                                if (sel.actionType === 'PEACE_OFFERING') {
-                                  handleResolveTargetSelection({ owner: 'player', die: dieKey, value: gig.value });
-                                } else if (sel.actionType === 'SWAP_GIGS') {
-                                  if (sel.step === 1) {
-                                    handleResolveTargetSelection({ owner: 'player', die: dieKey, value: gig.value });
-                                  }
-                                }
-                              }}
-                            >
-                              <PolyhedralDie
-                                type={dieKey}
-                                value={gig.value}
-                                isWaiting={false}
-                                isStolen={Boolean(gig.stolenFrom)}
-                                size={40}
-                              />
-                              <div className="text-center">
-                                <span className="text-xs font-black text-white uppercase block">
-                                  {gig.die.toUpperCase()}
-                                </span>
-                                <span className="text-[11px] text-[#FCEE0A] font-black block">
-                                  VALOR: {gig.value}
-                                </span>
-                              </div>
-
-                              {/* Si es acción de ajuste (+1/-1, etc.) */}
-                              {sel.actionType === 'ADJUST_GIG' ? (
-                                <div className="flex items-center gap-1.5 pt-1 w-full justify-center">
-                                  {sel.canDecrease && Array.from({ length: sel.maxDelta || 1 }).map((_, di) => (
-                                    <button
-                                      key={`dec-${di}`}
-                                      type="button"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleResolveTargetSelection({ gigInfo: { owner: 'player', die: dieKey, value: gig.value }, delta: -(di + 1) });
-                                      }}
-                                      className="px-2 py-1 bg-[#FF003C] hover:bg-white text-white hover:text-black font-black text-[10px] rounded transition-all cursor-pointer shadow"
-                                    >
-                                      -{di + 1}
-                                    </button>
-                                  ))}
-                                  {sel.canIncrease && Array.from({ length: sel.maxDelta || 1 }).map((_, di) => (
-                                    <button
-                                      key={`inc-${di}`}
-                                      type="button"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleResolveTargetSelection({ gigInfo: { owner: 'player', die: dieKey, value: gig.value }, delta: di + 1 });
-                                      }}
-                                      className="px-2 py-1 bg-[#0dfceb] hover:bg-white text-black font-black text-[10px] rounded transition-all cursor-pointer shadow"
-                                    >
-                                      +{di + 1}
-                                    </button>
-                                  ))}
-                                </div>
-                              ) : (
-                                <span className={`text-[8px] font-black px-2 py-0.5 rounded uppercase mt-0.5 ${
-                                  isSelectedTarget ? 'bg-[#0dfceb] text-black' : 'bg-gray-800 text-gray-300'
-                                }`}>
-                                  {isSelectedTarget ? '✓ MODIFICANDO' : '🎯 FIJAR OBJETIVO'}
-                                </span>
-                              )}
-                            </div>
-                          );
-                        })}
+                  {!(sel.targetScope === 'SPECIFIC_GIG' && sel.onlyGig?.owner !== 'player') && (
+                    <div className="bg-[#000000]/80 border border-[#0dfceb]/40 rounded-xl p-3 space-y-2">
+                      <div className="flex items-center justify-between pb-1 border-b border-[#0dfceb]/20">
+                        <span className="text-[11px] font-black uppercase text-[#0dfceb] flex items-center gap-1.5">
+                          <span className="w-2 h-2 rounded-full bg-[#0dfceb]" />
+                          <span>TUS GIGS EN JUEGO ({playerGigs.length}):</span>
+                        </span>
+                        <span className="text-[9px] text-gray-400">Aliados</span>
                       </div>
-                    )}
-                  </div>
+
+                      {playerGigs.length === 0 ? (
+                        <span className="text-xs text-gray-500 italic block py-2">No tienes Gigs en juego actualmente.</span>
+                      ) : (
+                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5">
+                          {playerGigs.map((gig, gIdx) => {
+                            if (sel.targetScope === 'SPECIFIC_GIG' && sel.onlyGig?.gigIndex !== gIdx) return null;
+                            const dieKey = gig.die.toLowerCase();
+                            const maxFace = getGigMaxFace(gig);
+                            const isSelectedTarget =
+                              (sel.selectedTargetGig?.owner === 'player' && sel.selectedTargetGig?.gigIndex === gIdx) ||
+                              (sel.selectedFriendlyGig?.owner === 'player' && sel.selectedFriendlyGig?.gigIndex === gIdx);
+                            const isDisabledInStep2 =
+                              (sel.actionType === 'PEACE_OFFERING' && sel.step === 2 && (isSelectedTarget || (sel.requireOtherPlayerSource && sel.selectedTargetGig?.owner === 'player'))) ||
+                              (sel.actionType === 'SWAP_GIGS' && sel.step === 2);
+
+                            return (
+                              <div
+                                key={`p-gig-${gIdx}`}
+                                className={`p-3 rounded-lg border-2 transition-all flex flex-col items-center gap-2 bg-[#050912] ${
+                                  isSelectedTarget
+                                    ? 'border-[#0dfceb] bg-[#0dfceb]/20 shadow-[0_0_20px_rgba(13,252,235,0.7)] scale-105'
+                                    : isDisabledInStep2
+                                    ? 'border-gray-800 opacity-35 cursor-not-allowed'
+                                    : 'border-gray-800 hover:border-[#FCEE0A] hover:bg-[#FCEE0A]/10 cursor-pointer hover:scale-105 shadow-md'
+                                }`}
+                                onClick={() => {
+                                  if (isDisabledInStep2) return;
+                                  if (sel.actionType === 'PEACE_OFFERING') {
+                                    handleResolveTargetSelection({ owner: 'player', die: dieKey, value: gig.value, gigIndex: gIdx });
+                                  } else if (sel.actionType === 'SWAP_GIGS' && sel.step === 1) {
+                                    handleResolveTargetSelection({ owner: 'player', die: dieKey, value: gig.value, gigIndex: gIdx });
+                                  }
+                                }}
+                              >
+                                <PolyhedralDie
+                                  type={dieKey}
+                                  value={gig.value}
+                                  isWaiting={false}
+                                  isStolen={Boolean(gig.stolenFrom)}
+                                  size={40}
+                                />
+                                <div className="text-center">
+                                  <span className="text-xs font-black text-white uppercase block">
+                                    {gig.die.toUpperCase()}
+                                  </span>
+                                  <span className="text-[11px] text-[#FCEE0A] font-black block">
+                                    VALOR: {gig.value}/{maxFace}
+                                  </span>
+                                </div>
+
+                                {sel.actionType === 'ADJUST_GIG' ? (
+                                  <div className="flex flex-wrap items-center gap-1 pt-1 w-full justify-center">
+                                    {sel.canDecrease && Array.from({ length: sel.maxDelta || 1 }).map((_, di) => {
+                                      const step = di + 1;
+                                      const canDo = gig.value > 1 && (gig.value - step >= 1 || step === 1);
+                                      const nextVal = Math.max(1, gig.value - step);
+                                      return (
+                                        <button
+                                          key={`dec-${di}`}
+                                          type="button"
+                                          disabled={!canDo || nextVal === gig.value}
+                                          title={`Bajar a ${nextVal}`}
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleResolveTargetSelection({ gigInfo: { owner: 'player', die: dieKey, value: gig.value, gigIndex: gIdx }, delta: -step });
+                                          }}
+                                          className="px-2 py-1 bg-[#FF003C] hover:bg-white text-white hover:text-black font-black text-[10px] rounded transition-all cursor-pointer shadow disabled:opacity-25 disabled:cursor-not-allowed"
+                                        >
+                                          -{step}
+                                        </button>
+                                      );
+                                    })}
+                                    {sel.canIncrease && Array.from({ length: sel.maxDelta || 1 }).map((_, di) => {
+                                      const step = di + 1;
+                                      const nextVal = Math.min(maxFace, gig.value + step);
+                                      const redundant = step > 1 && Math.min(maxFace, gig.value + step - 1) === nextVal;
+                                      const canDo = gig.value < maxFace && !redundant;
+                                      return (
+                                        <button
+                                          key={`inc-${di}`}
+                                          type="button"
+                                          disabled={!canDo}
+                                          title={`Subir a ${nextVal}`}
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleResolveTargetSelection({ gigInfo: { owner: 'player', die: dieKey, value: gig.value, gigIndex: gIdx }, delta: step });
+                                          }}
+                                          className="px-2 py-1 bg-[#0dfceb] hover:bg-white text-black font-black text-[10px] rounded transition-all cursor-pointer shadow disabled:opacity-25 disabled:cursor-not-allowed"
+                                        >
+                                          +{step}
+                                        </button>
+                                      );
+                                    })}
+                                  </div>
+                                ) : (
+                                  <span className={`text-[8px] font-black px-2 py-0.5 rounded uppercase mt-0.5 ${
+                                    isSelectedTarget ? 'bg-[#0dfceb] text-black' : 'bg-gray-800 text-gray-300'
+                                  }`}>
+                                    {isSelectedTarget
+                                      ? (sel.actionType === 'SWAP_GIGS' ? '✓ TU GIG ELEGIDO' : '✓ MODIFICANDO')
+                                      : isDisabledInStep2
+                                      ? (sel.requireOtherPlayerSource ? 'ELIGE DEL RIVAL' : 'PASO 2: RIVAL')
+                                      : (sel.actionType === 'PEACE_OFFERING' && sel.step === 2 ? '📋 COPIAR VALOR' : '🎯 ELEGIR ESTE GIG')}
+                                  </span>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  )}
 
                   {/* GIGS DEL RIVAL */}
-                  <div className="bg-[#000000]/80 border border-[#FF003C]/40 rounded-xl p-3 space-y-2">
-                    <div className="flex items-center justify-between pb-1 border-b border-[#FF003C]/20">
-                      <span className="text-[11px] font-black uppercase text-[#FF003C] flex items-center gap-1.5">
-                        <span className="w-2 h-2 rounded-full bg-[#FF003C]" />
-                        <span>GIGS DEL RIVAL ({botGigs.length}):</span>
-                      </span>
-                      <span className="text-[9px] text-gray-400">Oponente</span>
-                    </div>
-
-                    {botGigs.length === 0 ? (
-                      <span className="text-xs text-gray-500 italic block py-2">El rival no tiene Gigs en juego actualmente.</span>
-                    ) : (
-                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5">
-                        {botGigs.map((gig, gIdx) => {
-                          const dieKey = gig.die.toLowerCase();
-                          const isSelectedTarget = sel.selectedTargetGig?.owner === 'bot' && sel.selectedTargetGig?.die.toLowerCase() === dieKey;
-
-                          return (
-                            <div
-                              key={`b-gig-${gIdx}`}
-                              className={`p-3 rounded-lg border-2 transition-all flex flex-col items-center gap-2 bg-[#050912] ${
-                                isSelectedTarget
-                                  ? 'border-[#0dfceb] bg-[#0dfceb]/20 shadow-[0_0_20px_rgba(13,252,235,0.7)] scale-105'
-                                  : 'border-gray-800 hover:border-[#FF003C] hover:bg-[#FF003C]/10 cursor-pointer hover:scale-105 shadow-md'
-                              }`}
-                              onClick={() => {
-                                if (sel.actionType === 'PEACE_OFFERING') {
-                                  handleResolveTargetSelection({ owner: 'bot', die: dieKey, value: gig.value });
-                                } else if (sel.actionType === 'SWAP_GIGS') {
-                                  if (sel.step === 2) {
-                                    handleResolveTargetSelection({ owner: 'bot', die: dieKey, value: gig.value });
-                                  }
-                                }
-                              }}
-                            >
-                              <PolyhedralDie
-                                type={dieKey}
-                                value={gig.value}
-                                isWaiting={false}
-                                isStolen={Boolean(gig.stolenFrom)}
-                                size={40}
-                              />
-                              <div className="text-center">
-                                <span className="text-xs font-black text-white uppercase block">
-                                  {gig.die.toUpperCase()}
-                                </span>
-                                <span className="text-[11px] text-[#FF003C] font-black block">
-                                  VALOR: {gig.value}
-                                </span>
-                              </div>
-
-                              {/* Si es acción de ajuste (+1/-1) */}
-                              {sel.actionType === 'ADJUST_GIG' ? (
-                                <div className="flex items-center gap-1.5 pt-1 w-full justify-center">
-                                  {sel.canDecrease && Array.from({ length: sel.maxDelta || 1 }).map((_, di) => (
-                                    <button
-                                      key={`dec-${di}`}
-                                      type="button"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleResolveTargetSelection({ gigInfo: { owner: 'bot', die: dieKey, value: gig.value }, delta: -(di + 1) });
-                                      }}
-                                      className="px-2 py-1 bg-[#FF003C] hover:bg-white text-white hover:text-black font-black text-[10px] rounded transition-all cursor-pointer shadow"
-                                    >
-                                      -{di + 1}
-                                    </button>
-                                  ))}
-                                  {sel.canIncrease && Array.from({ length: sel.maxDelta || 1 }).map((_, di) => (
-                                    <button
-                                      key={`inc-${di}`}
-                                      type="button"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleResolveTargetSelection({ gigInfo: { owner: 'bot', die: dieKey, value: gig.value }, delta: di + 1 });
-                                      }}
-                                      className="px-2 py-1 bg-[#0dfceb] hover:bg-white text-black font-black text-[10px] rounded transition-all cursor-pointer shadow"
-                                    >
-                                      +{di + 1}
-                                    </button>
-                                  ))}
-                                </div>
-                              ) : (
-                                <span className={`text-[8px] font-black px-2 py-0.5 rounded uppercase mt-0.5 ${
-                                  isSelectedTarget ? 'bg-[#0dfceb] text-black' : 'bg-gray-800 text-gray-300'
-                                }`}>
-                                  {isSelectedTarget ? '✓ MODIFICANDO' : '🎯 FIJAR OBJETIVO'}
-                                </span>
-                              )}
-                            </div>
-                          );
-                        })}
+                  {sel.targetScope !== 'FRIENDLY_GIGS' && !(sel.targetScope === 'SPECIFIC_GIG' && sel.onlyGig?.owner !== 'bot') && (
+                    <div className="bg-[#000000]/80 border border-[#FF003C]/40 rounded-xl p-3 space-y-2">
+                      <div className="flex items-center justify-between pb-1 border-b border-[#FF003C]/20">
+                        <span className="text-[11px] font-black uppercase text-[#FF003C] flex items-center gap-1.5">
+                          <span className="w-2 h-2 rounded-full bg-[#FF003C]" />
+                          <span>GIGS DEL RIVAL ({botGigs.length}):</span>
+                        </span>
+                        <span className="text-[9px] text-gray-400">Oponente</span>
                       </div>
-                    )}
-                  </div>
+
+                      {botGigs.length === 0 ? (
+                        <span className="text-xs text-gray-500 italic block py-2">El rival no tiene Gigs en juego actualmente.</span>
+                      ) : (
+                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5">
+                          {botGigs.map((gig, gIdx) => {
+                            if (sel.targetScope === 'SPECIFIC_GIG' && sel.onlyGig?.gigIndex !== gIdx) return null;
+                            const dieKey = gig.die.toLowerCase();
+                            const maxFace = getGigMaxFace(gig);
+                            const isSelectedTarget = sel.selectedTargetGig?.owner === 'bot' && sel.selectedTargetGig?.gigIndex === gIdx;
+                            const isDisabledInStep =
+                              (sel.actionType === 'SWAP_GIGS' && sel.step === 1) ||
+                              (sel.actionType === 'PEACE_OFFERING' && sel.step === 2 && (isSelectedTarget || (sel.requireOtherPlayerSource && sel.selectedTargetGig?.owner === 'bot')));
+
+                            return (
+                              <div
+                                key={`b-gig-${gIdx}`}
+                                className={`p-3 rounded-lg border-2 transition-all flex flex-col items-center gap-2 bg-[#050912] ${
+                                  isSelectedTarget
+                                    ? 'border-[#0dfceb] bg-[#0dfceb]/20 shadow-[0_0_20px_rgba(13,252,235,0.7)] scale-105'
+                                    : isDisabledInStep
+                                    ? 'border-gray-800 opacity-35 cursor-not-allowed'
+                                    : 'border-gray-800 hover:border-[#FF003C] hover:bg-[#FF003C]/10 cursor-pointer hover:scale-105 shadow-md'
+                                }`}
+                                onClick={() => {
+                                  if (isDisabledInStep) return;
+                                  if (sel.actionType === 'PEACE_OFFERING') {
+                                    handleResolveTargetSelection({ owner: 'bot', die: dieKey, value: gig.value, gigIndex: gIdx });
+                                  } else if (sel.actionType === 'SWAP_GIGS' && sel.step === 2) {
+                                    handleResolveTargetSelection({ owner: 'bot', die: dieKey, value: gig.value, gigIndex: gIdx });
+                                  }
+                                }}
+                              >
+                                <PolyhedralDie
+                                  type={dieKey}
+                                  value={gig.value}
+                                  isWaiting={false}
+                                  isStolen={Boolean(gig.stolenFrom)}
+                                  size={40}
+                                />
+                                <div className="text-center">
+                                  <span className="text-xs font-black text-white uppercase block">
+                                    {gig.die.toUpperCase()}
+                                  </span>
+                                  <span className="text-[11px] text-[#FF003C] font-black block">
+                                    VALOR: {gig.value}/{maxFace}
+                                  </span>
+                                </div>
+
+                                {sel.actionType === 'ADJUST_GIG' ? (
+                                  <div className="flex flex-wrap items-center gap-1 pt-1 w-full justify-center">
+                                    {sel.canDecrease && Array.from({ length: sel.maxDelta || 1 }).map((_, di) => {
+                                      const step = di + 1;
+                                      const canDo = gig.value > 1 && (gig.value - step >= 1 || step === 1);
+                                      const nextVal = Math.max(1, gig.value - step);
+                                      return (
+                                        <button
+                                          key={`dec-${di}`}
+                                          type="button"
+                                          disabled={!canDo || nextVal === gig.value}
+                                          title={`Bajar a ${nextVal}`}
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleResolveTargetSelection({ gigInfo: { owner: 'bot', die: dieKey, value: gig.value, gigIndex: gIdx }, delta: -step });
+                                          }}
+                                          className="px-2 py-1 bg-[#FF003C] hover:bg-white text-white hover:text-black font-black text-[10px] rounded transition-all cursor-pointer shadow disabled:opacity-25 disabled:cursor-not-allowed"
+                                        >
+                                          -{step}
+                                        </button>
+                                      );
+                                    })}
+                                    {sel.canIncrease && Array.from({ length: sel.maxDelta || 1 }).map((_, di) => {
+                                      const step = di + 1;
+                                      const nextVal = Math.min(maxFace, gig.value + step);
+                                      const redundant = step > 1 && Math.min(maxFace, gig.value + step - 1) === nextVal;
+                                      const canDo = gig.value < maxFace && !redundant;
+                                      return (
+                                        <button
+                                          key={`inc-${di}`}
+                                          type="button"
+                                          disabled={!canDo}
+                                          title={`Subir a ${nextVal}`}
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleResolveTargetSelection({ gigInfo: { owner: 'bot', die: dieKey, value: gig.value, gigIndex: gIdx }, delta: step });
+                                          }}
+                                          className="px-2 py-1 bg-[#0dfceb] hover:bg-white text-black font-black text-[10px] rounded transition-all cursor-pointer shadow disabled:opacity-25 disabled:cursor-not-allowed"
+                                        >
+                                          +{step}
+                                        </button>
+                                      );
+                                    })}
+                                  </div>
+                                ) : (
+                                  <span className={`text-[8px] font-black px-2 py-0.5 rounded uppercase mt-0.5 ${
+                                    isSelectedTarget ? 'bg-[#0dfceb] text-black' : 'bg-gray-800 text-gray-300'
+                                  }`}>
+                                    {isSelectedTarget
+                                      ? '✓ MODIFICANDO'
+                                      : isDisabledInStep
+                                      ? (sel.actionType === 'SWAP_GIGS' ? 'PRIMERO TU GIG' : 'ELIGE UNO TUYO')
+                                      : (sel.actionType === 'PEACE_OFFERING' && sel.step === 2 ? '📋 COPIAR VALOR' : '🎯 ELEGIR ESTE GIG')}
+                                  </span>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Botón opcional de ajuste 0 ("por hasta X") */}
+                  {sel.actionType === 'ADJUST_GIG' && sel.allowZero && (
+                    <div className="flex justify-end pt-1">
+                      <button
+                        type="button"
+                        onClick={() => handleResolveTargetSelection({ gigInfo: null, delta: 0 })}
+                        className="px-3.5 py-1.5 bg-gray-900 hover:bg-gray-800 border border-gray-600 text-gray-300 hover:text-white font-mono font-bold text-[10px] uppercase rounded cursor-pointer transition-colors"
+                      >
+                        ⏭️ DEJAR IGUAL (AJUSTE 0)
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
 
