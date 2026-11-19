@@ -4328,8 +4328,16 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                 const lastTrashCard = bot.trash && bot.trash.length > 0 ? bot.trash[bot.trash.length - 1] : null;
                 return (
                   <div
+                    onMouseEnter={() => {
+                      if (lastTrashCard) {
+                        setHoveredCard(lastTrashCard);
+                        setPreviewCard(lastTrashCard);
+                      }
+                    }}
+                    onMouseLeave={() => setHoveredCard(null)}
                     onClick={() => {
                       if (bot.trash.length > 0) {
+                        if (lastTrashCard) setPreviewCard(lastTrashCard);
                         setViewingTrashModal({ playerKey: 'bot', title: 'DESCARTE DEL RIVAL (TRASH)' });
                       }
                     }}
@@ -5808,8 +5816,16 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                 const lastTrashCard = p.trash && p.trash.length > 0 ? p.trash[p.trash.length - 1] : null;
                 return (
                   <div
+                    onMouseEnter={() => {
+                      if (lastTrashCard) {
+                        setHoveredCard(lastTrashCard);
+                        setPreviewCard(lastTrashCard);
+                      }
+                    }}
+                    onMouseLeave={() => setHoveredCard(null)}
                     onClick={() => {
                       if (p.trash.length > 0) {
+                        if (lastTrashCard) setPreviewCard(lastTrashCard);
                         setViewingTrashModal({ playerKey: 'player', title: 'TUS DESCARTES (TRASH)' });
                       }
                     }}
@@ -7657,7 +7673,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
         );
       })()}
 
-      {/* 5.8. MODAL DE INSPECCIÓN COMPLETA DE TRASH / CEMENTERIO */}
+      {/* 5.8. PANEL COMPACTO DE INSPECCIÓN DE TRASH (SIN TAPAR EL ESCÁNER KIROSHI) */}
       {viewingTrashModal && (() => {
         const targetPlayer = gameState[viewingTrashModal.playerKey || 'bot'];
         const trashList = targetPlayer?.trash || [];
@@ -7665,71 +7681,87 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
 
         return (
           <div
-            className="fixed inset-0 z-50 bg-[#000000]/90 backdrop-blur-md flex items-center justify-center p-3 sm:p-5 font-mono select-none"
-            onClick={() => setViewingTrashModal(null)}
+            className={`fixed inset-y-0 right-0 z-40 ${
+              isKiroshiCollapsed ? 'left-0' : 'left-0 lg:left-72 xl:left-80 2xl:left-88'
+            } bg-[#000000]/55 backdrop-blur-[2px] flex items-center justify-end p-2.5 sm:p-4 font-mono select-none`}
+            onClick={() => {
+              setHoveredCard(null);
+              setViewingTrashModal(null);
+            }}
           >
             <motion.div
-              initial={{ scale: 0.94, opacity: 0, y: 15 }}
-              animate={{ scale: 1, opacity: 1, y: 0 }}
+              initial={{ x: 40, opacity: 0 }}
+              animate={{ x: 0, opacity: 1 }}
               onClick={(e) => e.stopPropagation()}
               style={{ clipPath: CYBER_CLIP }}
-              className={`max-w-4xl w-full bg-[#070a10]/98 border-2 ${
-                isBot ? 'border-[#FF003C] shadow-[0_0_60px_rgba(255,0,60,0.45)]' : 'border-[#0dfceb] shadow-[0_0_60px_rgba(13,252,235,0.45)]'
-              } p-4 sm:p-6 space-y-4 relative max-h-[88vh] flex flex-col`}
+              className={`w-full max-w-md lg:max-w-lg bg-[#070a10]/96 border-2 ${
+                isBot ? 'border-[#FF003C] shadow-[0_0_40px_rgba(255,0,60,0.4)]' : 'border-[#0dfceb] shadow-[0_0_40px_rgba(13,252,235,0.4)]'
+              } p-3 sm:p-4 space-y-3 relative max-h-[82vh] flex flex-col`}
             >
               {/* Cabecera */}
-              <div className="flex items-center justify-between border-b border-gray-800 pb-3">
-                <div className="flex items-center gap-2.5">
-                  <span className={`w-3 h-3 rounded-full ${isBot ? 'bg-[#FF003C]' : 'bg-[#0dfceb]'} animate-pulse`} />
-                  <div>
-                    <h3 className={`text-sm sm:text-base font-black uppercase ${isBot ? 'text-[#FF003C]' : 'text-[#0dfceb]'}`}>
-                      {viewingTrashModal.title}
+              <div className="flex items-center justify-between border-b border-gray-800 pb-2">
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${isBot ? 'bg-[#FF003C]' : 'bg-[#0dfceb]'} animate-pulse`} />
+                  <div className="min-w-0">
+                    <h3 className={`text-xs sm:text-sm font-black uppercase truncate ${isBot ? 'text-[#FF003C]' : 'text-[#0dfceb]'}`}>
+                      {viewingTrashModal.title} ({trashList.length})
                     </h3>
-                    <span className="text-[10px] text-gray-400 block font-mono">
-                      {trashList.length} cartas en el cementerio (clic o botón derecho para pantalla completa)
+                    <span className="text-[9px] text-gray-400 block font-mono truncate">
+                      Pasa el ratón para ver en Escáner Kiroshi • Clic para ampliar
                     </span>
                   </div>
                 </div>
 
                 <button
                   type="button"
-                  onClick={() => setViewingTrashModal(null)}
-                  className="p-1.5 px-3 bg-[#000000] border border-gray-700 hover:border-white text-gray-300 hover:text-white cursor-pointer font-bold text-xs"
+                  onClick={() => {
+                    setHoveredCard(null);
+                    setViewingTrashModal(null);
+                  }}
+                  className="p-1 px-2.5 bg-[#000000] border border-gray-700 hover:border-white text-gray-300 hover:text-white cursor-pointer font-bold text-[10px] shrink-0"
                 >
-                  ✕ ESC
+                  ✕ CERRAR
                 </button>
               </div>
 
-              {/* Grid de cartas del Trash */}
-              <div className="flex-1 overflow-y-auto pr-2 cyber-scrollbar">
+              {/* Grid compacto de miniaturas del Trash (última carta primero) */}
+              <div className="flex-1 overflow-y-auto pr-1 cyber-scrollbar">
                 {trashList.length === 0 ? (
-                  <div className="py-12 text-center text-gray-500 font-mono text-sm">
+                  <div className="py-8 text-center text-gray-500 font-mono text-xs">
                     El cementerio está vacío. No hay cartas jugadas ni destruidas todavía.
                   </div>
                 ) : (
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
-                    {trashList.map((card, idx) => (
-                      <div
-                        key={card.instanceId || idx}
-                        onClick={() => setInspectedCard(card)}
-                        onContextMenu={(e) => handleCardRightClick(e, card)}
-                        className={`relative aspect-[7/10] rounded overflow-hidden border transition-all duration-150 cursor-pointer group bg-black hover:scale-105 shadow-md ${
-                          isBot ? 'border-[#FF003C]/40 hover:border-[#FF003C]' : 'border-[#0dfceb]/40 hover:border-[#0dfceb]'
-                        }`}
-                        title="Clic izq o derecho para ver en PANTALLA COMPLETA"
-                      >
-                        <img src={card.image} alt={card.name} className="w-full h-full object-cover" />
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-transparent to-black/60 pointer-events-none" />
-                        <div className="absolute top-1 left-1 px-1 bg-black/80 text-[7px] text-gray-300 rounded font-bold uppercase z-10">
-                          #{idx + 1} • {card.officialType || 'CARD'}
+                  <div className="grid grid-cols-4 sm:grid-cols-5 gap-2">
+                    {[...trashList].reverse().map((card, revIdx) => {
+                      const originalNum = trashList.length - revIdx;
+                      return (
+                        <div
+                          key={card.instanceId || `trash-${originalNum}`}
+                          onMouseEnter={() => {
+                            setHoveredCard(card);
+                            setPreviewCard(card);
+                          }}
+                          onMouseLeave={() => setHoveredCard(null)}
+                          onClick={() => setInspectedCard(card)}
+                          onContextMenu={(e) => handleCardRightClick(e, card)}
+                          className={`relative aspect-[7/10] rounded overflow-hidden border transition-all duration-150 cursor-pointer group bg-black hover:scale-105 hover:z-10 shadow ${
+                            isBot ? 'border-[#FF003C]/45 hover:border-[#FCEE0A]' : 'border-[#0dfceb]/45 hover:border-[#FCEE0A]'
+                          }`}
+                          title={`#${originalNum} ${card.name} — Hover: Escáner Kiroshi | Clic: Pantalla completa`}
+                        >
+                          <img src={card.image} alt={card.name} className="w-full h-full object-cover" />
+                          <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-transparent to-black/50 pointer-events-none" />
+                          <div className="absolute top-0.5 left-0.5 px-1 bg-black/85 text-[7px] text-[#FCEE0A] rounded font-black z-10">
+                            #{originalNum}
+                          </div>
+                          <div className="absolute bottom-0.5 inset-x-0.5 text-center z-10">
+                            <span className="text-[7px] font-black text-white uppercase truncate block leading-tight">
+                              {card.name}
+                            </span>
+                          </div>
                         </div>
-                        <div className="absolute bottom-1 inset-x-1 text-center z-10">
-                          <span className="text-[8px] font-black text-white uppercase truncate block">
-                            {card.name}
-                          </span>
-                        </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </div>
