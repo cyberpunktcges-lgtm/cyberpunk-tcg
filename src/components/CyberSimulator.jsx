@@ -825,6 +825,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
   const [isInspectedFlipped, setIsInspectedFlipped] = useState(false);
   const [showLogModal, setShowLogModal] = useState(false);
   const [showRulesModal, setShowRulesModal] = useState(false);
+  const [helpModalTab, setHelpModalTab] = useState('turn');
   const [showTurnGuideModal, setShowTurnGuideModal] = useState(false);
 
   // Estados para Drag & Drop y Animación de Dados
@@ -3144,13 +3145,12 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                   : 'bg-[#FF003C] text-white animate-pulse'
               }`}
             >
-              {isMyTurn ? 'TU TURNO' : 'IA...'}
+              {isMyTurn ? 'FASE PRINCIPAL' : 'TURNO RIVAL'}
             </span>
           </div>
 
-          {/* Derecha: Botones esenciales que caben sin solaparse en cualquier móvil */}
+          {/* Derecha: Botones esenciales sin solapamiento */}
           <div className="flex items-center gap-1.5 shrink-0">
-            {/* Deshacer rápido */}
             <button
               type="button"
               disabled={history.length === 0 || !isMyTurn}
@@ -3162,7 +3162,6 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
               <Undo2 className="w-4 h-4" />
             </button>
 
-            {/* Botón HUD / Escáner */}
             <button
               type="button"
               onClick={() => setIsHudOpen((prev) => !prev)}
@@ -3172,24 +3171,22 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                   ? 'bg-[#0dfceb] text-black shadow-[0_0_12px_rgba(13,252,235,0.6)]'
                   : 'bg-[#000000] border border-[#0dfceb]/50 text-[#0dfceb]'
               }`}
-              title="Ver Escáner Kiroshi y estadísticas"
+              title="Ver Escáner Kiroshi, Logs y estadísticas"
             >
               <Eye className="w-3.5 h-3.5" />
               <span>{isHudOpen ? 'MESA' : 'HUD'}</span>
             </button>
 
-            {/* Botón Elegir Mazo rápido */}
             <button
               type="button"
-              onClick={() => setShowDeckSelectorModal(true)}
+              onClick={() => { setHelpModalTab('turn'); setShowRulesModal(true); }}
               style={{ clipPath: CYBER_BUTTON }}
-              className="p-1.5 bg-[#000000] border border-[#FCEE0A]/50 text-[#FCEE0A] cursor-pointer"
-              title="Elegir Mazo"
+              className="p-1.5 bg-[#000000] border border-gray-700 text-gray-200 cursor-pointer"
+              title="Ayuda y Cómo Funciona un Turno"
             >
-              <Layers className="w-4 h-4" />
+              <HelpCircle className="w-4 h-4" />
             </button>
 
-            {/* Botón Menú Hamburguesa (Abre panel completo de opciones) */}
             <button
               type="button"
               onClick={() => setIsMobileMenuOpen(true)}
@@ -3205,256 +3202,148 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
 
         {/* ================= BARRA SUPERIOR DESKTOP (>= lg) ================= */}
         <div className="hidden lg:flex items-center justify-between gap-2 w-full">
-        <div className="flex items-center gap-2 sm:gap-2.5 min-w-0">
-          <div className="flex items-center gap-1.5 shrink-0">
-            <span className="w-2 h-2 rounded-full bg-[#0dfceb] animate-pulse shrink-0" />
-            <span className="font-black text-white uppercase tracking-wider text-xs whitespace-nowrap">
-              CYBERPUNK TCG // <span className="text-[#FCEE0A]">SIMULADOR</span>
-            </span>
+          <div className="flex items-center gap-2 sm:gap-2.5 min-w-0">
+            <div className="flex items-center gap-1.5 shrink-0">
+              <span className="w-2 h-2 rounded-full bg-[#0dfceb] animate-pulse shrink-0" />
+              <span className="font-black text-white uppercase tracking-wider text-xs whitespace-nowrap">
+                CYBERPUNK TCG // <span className="text-[#FCEE0A]">SIMULADOR</span>
+              </span>
+            </div>
+
+            <div className="flex items-center gap-1.5 text-gray-400 pl-2 border-l border-[#0dfceb]/30 shrink-0">
+              <span className="text-[#0dfceb] font-bold whitespace-nowrap">TURNO {gameState.turnNumber}</span>
+              <span className="text-gray-700">•</span>
+              <span
+                className={`font-black uppercase px-2 py-0.5 text-[10px] sm:text-[11px] whitespace-nowrap ${
+                  isMyTurn
+                    ? 'bg-[#0dfceb] text-[#070a10]'
+                    : 'bg-[#FF003C] text-white animate-pulse'
+                }`}
+              >
+                {isMyTurn ? 'FASE PRINCIPAL' : 'TURNO RIVAL'}
+              </span>
+            </div>
           </div>
 
-          <div className="hidden md:flex items-center gap-1.5 text-gray-400 pl-2 border-l border-[#0dfceb]/30 shrink-0">
-            <span className="text-[#0dfceb] font-bold whitespace-nowrap">TURNO {gameState.turnNumber}</span>
-            <span className="text-gray-700">•</span>
-            <span
-              className={`font-black uppercase px-2 py-0.5 text-[10px] sm:text-[11px] whitespace-nowrap ${
-                isMyTurn
-                  ? 'bg-[#0dfceb] text-[#070a10]'
-                  : 'bg-[#FF003C] text-white animate-pulse'
-              }`}
-            >
-              {isMyTurn ? 'TU TURNO // FASE PRINCIPAL' : 'IA PENSANDO ACCIONES...'}
-            </span>
-
-            {/* Botón Guía de Fases oficial */}
+          {/* Botones de Utilidad limpios */}
+          <div className="flex items-center gap-2">
+            {/* Botón Deshacer */}
             <button
               type="button"
-              onClick={() => setShowTurnGuideModal(true)}
+              disabled={history.length === 0 || !isMyTurn}
+              onClick={handleUndo}
               style={{ clipPath: CYBER_BUTTON }}
-              className="px-2 py-1 bg-[#0dfceb]/10 hover:bg-[#0dfceb] text-[#0dfceb] hover:text-black border border-[#0dfceb]/50 text-[10px] font-black uppercase transition-all flex items-center gap-1 cursor-pointer whitespace-nowrap shrink-0"
-              title="Ver infografía oficial de cómo funciona un turno (Rules 8.1–8.18)"
+              className="px-2.5 sm:px-3 py-1.5 bg-[#000000] border border-[#0dfceb]/40 hover:border-[#0dfceb] text-[#0dfceb] font-bold uppercase flex items-center gap-1.5 cursor-pointer text-xs transition-all hover:shadow-[0_0_15px_rgba(13,252,235,0.4)] disabled:opacity-30 disabled:pointer-events-none"
+              title="Deshacer la última acción de tu turno"
             >
-              <HelpCircle className="w-3 h-3 shrink-0" />
-              <span className="hidden xl:inline">CÓMO FUNCIONA UN TURNO</span>
-              <span className="inline xl:hidden">GUÍA TURNO</span>
+              <Undo2 className="w-3.5 h-3.5" />
+              <span>DESHACER</span>
+            </button>
+
+            {/* Selector de Zoom / Escala de Resolución */}
+            <div
+              style={{ clipPath: CYBER_BUTTON }}
+              className="flex items-center gap-1 px-2 py-1 bg-[#000000] border border-[#0dfceb]/40 text-xs font-mono text-[#0dfceb] shadow-[0_0_8px_rgba(13,252,235,0.15)]"
+              title="Ajusta el zoom para que todo el tablero encaje en tu pantalla sin scroll vertical"
+            >
+              <span className="hidden xl:inline text-[9px] font-bold text-gray-400 uppercase">ZOOM:</span>
+              <select
+                value={zoomMode}
+                onChange={(e) => {
+                  setZoomMode(e.target.value);
+                  try {
+                    localStorage.setItem('cyber_sim_zoom', e.target.value);
+                  } catch (err) {}
+                }}
+                className="bg-transparent text-[#FCEE0A] font-black text-[11px] focus:outline-none cursor-pointer border-none py-0.5"
+              >
+                <option value="auto" className="bg-[#070a10] text-[#0dfceb]">
+                  AUTO ({Math.round(autoScale * 100)}%)
+                </option>
+                <option value="1" className="bg-[#070a10] text-white">100%</option>
+                <option value="0.9" className="bg-[#070a10] text-white">90%</option>
+                <option value="0.8" className="bg-[#070a10] text-white">80%</option>
+                <option value="0.75" className="bg-[#070a10] text-white">75%</option>
+                <option value="0.7" className="bg-[#070a10] text-white">70% (Portátil)</option>
+                <option value="0.65" className="bg-[#070a10] text-white">65%</option>
+              </select>
+            </div>
+
+            {/* Pantalla Completa */}
+            <button
+              type="button"
+              onClick={toggleFullscreen}
+              style={{ clipPath: CYBER_BUTTON }}
+              className={`p-1.5 bg-[#000000] border cursor-pointer transition-all hover:shadow-[0_0_15px_rgba(13,252,235,0.4)] ${
+                isFullscreen
+                  ? 'border-[#FCEE0A] text-[#FCEE0A]'
+                  : 'border-[#0dfceb]/40 hover:border-[#0dfceb] text-[#0dfceb] hover:text-white'
+              }`}
+              title={isFullscreen ? 'Salir de Pantalla Completa' : 'Pantalla Completa'}
+            >
+              {isFullscreen ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
+            </button>
+
+            {/* Colapsar/Expandir HUD lateral */}
+            <button
+              type="button"
+              onClick={() => {
+                setIsKiroshiCollapsed((prev) => {
+                  const next = !prev;
+                  try {
+                    localStorage.setItem('cyber_sim_kiroshi_collapsed', String(next));
+                  } catch (err) {}
+                  return next;
+                });
+              }}
+              style={{ clipPath: CYBER_BUTTON }}
+              className={`flex px-2 sm:px-2.5 py-1.5 font-bold uppercase items-center gap-1.5 cursor-pointer text-xs transition-all ${
+                !isKiroshiCollapsed
+                  ? 'bg-[#0dfceb]/15 border border-[#0dfceb] text-[#0dfceb] shadow-[0_0_10px_rgba(13,252,235,0.3)]'
+                  : 'bg-[#000000] border border-gray-700 text-gray-400 hover:border-[#0dfceb] hover:text-[#0dfceb]'
+              }`}
+              title={isKiroshiCollapsed ? 'Mostrar Escáner Kiroshi y Logs' : 'Ocultar panel lateral'}
+            >
+              <Eye className="w-3.5 h-3.5" />
+              <span className="hidden xl:inline">{isKiroshiCollapsed ? 'VER HUD' : 'HUD'}</span>
+            </button>
+
+            {/* Único Icono de Ayuda (Fusiona Cómo funciona un turno + Reglas oficiales) */}
+            <button
+              type="button"
+              onClick={() => { setHelpModalTab('turn'); setShowRulesModal(true); }}
+              style={{ clipPath: CYBER_BUTTON }}
+              className="p-1.5 bg-[#000000] border border-gray-700 hover:border-[#0dfceb] text-gray-300 hover:text-white cursor-pointer transition-all hover:shadow-[0_0_15px_rgba(13,252,235,0.4)]"
+              title="Ayuda: Cómo funciona un turno y Reglas oficiales"
+            >
+              <HelpCircle className="w-4 h-4" />
+            </button>
+
+            {/* Menú Desplegable de Usuario Netrunner */}
+            <div className="flex items-center">
+              <CyberUserDropdown
+                currentUser={currentUser}
+                userProfile={userProfile}
+                userDecksCount={userCloudDecks.length}
+                onOpenAuthModal={() => setShowAuthModal(true)}
+                onOpenMyDecks={() => setShowMyDecksModal(true)}
+                onOpenProfile={() => setShowProfileModal(true)}
+                themeColor="#0dfceb"
+              />
+            </div>
+
+            {/* Botón Nueva Partida (permite elegir mazos al iniciar) */}
+            <button
+              type="button"
+              onClick={handleResetGame}
+              style={{ clipPath: CYBER_BUTTON }}
+              className="px-2.5 sm:px-3 py-1.5 bg-[#FF003C]/20 hover:bg-[#FF003C] text-[#FF003C] hover:text-white border border-[#FF003C]/60 hover:border-[#FF003C] font-mono font-black uppercase flex items-center gap-1.5 cursor-pointer text-xs transition-all shadow-[0_0_15px_rgba(255,0,60,0.3)] hover:shadow-[0_0_20px_rgba(255,0,60,0.7)] whitespace-nowrap"
+              title="Iniciar Nueva Partida y elegir mazos"
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+              <span>NUEVA PARTIDA</span>
             </button>
           </div>
-        </div>
-
-        {/* Botones de Utilidad con Bordes Afilados */}
-        <div className="flex items-center gap-2">
-          {/* Botón Deshacer */}
-          <button
-            type="button"
-            disabled={history.length === 0 || !isMyTurn}
-            onClick={handleUndo}
-            style={{ clipPath: CYBER_BUTTON }}
-            className="px-2.5 sm:px-3 py-1.5 bg-[#000000] border border-[#0dfceb]/40 hover:border-[#0dfceb] text-[#0dfceb] font-bold uppercase flex items-center gap-1.5 cursor-pointer text-xs transition-all hover:shadow-[0_0_15px_rgba(13,252,235,0.4)] disabled:opacity-30 disabled:pointer-events-none"
-            title="Deshacer la última acción de tu turno"
-          >
-            <Undo2 className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">DESHACER</span>
-          </button>
-
-          {/* Botón Terminar Turno */}
-          <button
-            type="button"
-            disabled={!isMyTurn}
-            onClick={() => {
-              const forcedAttacker = (gameState.player?.field || []).find((u) => {
-                if (!u.mustAttackNextTurn) return false;
-                const canHitGigs = canUnitAttack(u, gameState.player, gameState, 'GIGS') && (gameState.bot?.gigs || []).length > 0;
-                const canHitUnit = canUnitAttack(u, gameState.player, gameState, 'UNIT') && (gameState.bot?.field || []).some((bu) => bu.isSpent || u.canAttackReadyUnits);
-                return canHitGigs || canHitUnit;
-              });
-              if (forcedAttacker) {
-                setHolocall({
-                  title: '💢 ATAQUE OBLIGATORIO PENDIENTE',
-                  characterName: 'KIROSHI OS // PROTOCOLO DE COMBATE',
-                  message: `"${forcedAttacker.name}" está provocada (Evelyn Parker / Mox Inciters) y DEBE atacar este turno antes de que puedas pasar turno.`,
-                  type: 'warning'
-                });
-                return;
-              }
-              setSelectedHandCard(null);
-              setSelectedFieldUnit(null);
-              setHistory([]);
-              passTurn(gameState);
-              setGameState({ ...gameState });
-            }}
-            style={{ clipPath: CYBER_BUTTON }}
-            className="px-3 sm:px-4 py-1.5 bg-[#FCEE0A] hover:bg-[#0dfceb] text-[#070a10] font-black uppercase flex items-center gap-1.5 cursor-pointer text-xs transition-all shadow-[0_0_15px_rgba(252,238,10,0.4)] hover:shadow-[0_0_15px_rgba(13,252,235,0.4)] disabled:opacity-30 disabled:pointer-events-none"
-          >
-            <Play className="w-3.5 h-3.5" />
-            <span>TERMINAR TURNO</span>
-          </button>
-
-          {/* Botón Registro (Log Terminal Flotante) */}
-          <button
-            type="button"
-            onClick={() => setShowLogModal(true)}
-            style={{ clipPath: CYBER_BUTTON }}
-            className="px-2.5 sm:px-3 py-1.5 bg-[#000000] border border-[#0dfceb]/40 hover:border-[#0dfceb] text-[#0dfceb] font-bold uppercase flex items-center gap-1.5 cursor-pointer text-xs transition-all hover:shadow-[0_0_15px_rgba(13,252,235,0.4)]"
-            title="Abrir Terminal de Registro de Combate"
-          >
-            <Terminal className="w-3.5 h-3.5 text-[#FCEE0A]" />
-            <span className="hidden sm:inline">LOGS ({gameState.actionLog.length})</span>
-          </button>
-
-          {/* Indicador de Autoguardado Activo (Persiste en F5 o al cerrar pestaña) */}
-          <div
-            style={{ clipPath: CYBER_BUTTON }}
-            className="hidden lg:flex items-center gap-1.5 px-2.5 py-1.5 bg-[#000000] border border-[#0dfceb]/30 text-[#0dfceb] font-mono text-[10px] font-bold select-none shadow-[0_0_8px_rgba(13,252,235,0.15)]"
-            title="Tu partida se guarda automáticamente en este navegador. Si pulsas F5 o cierras la pestaña, se conservará todo tu progreso exactamente donde lo dejaste."
-          >
-            <Save className="w-3.5 h-3.5 text-[#0dfceb] animate-pulse" />
-            <span className="tracking-wider text-[9px] uppercase">AUTOGUARDADO</span>
-          </div>
-
-          {/* Selector de Zoom / Escala de Resolución */}
-          <div
-            style={{ clipPath: CYBER_BUTTON }}
-            className="flex items-center gap-1 px-2 py-1 bg-[#000000] border border-[#0dfceb]/40 text-xs font-mono text-[#0dfceb] shadow-[0_0_8px_rgba(13,252,235,0.15)]"
-            title="Ajusta el zoom para que todo el tablero encaje en tu pantalla sin scroll vertical"
-          >
-            <span className="hidden xl:inline text-[9px] font-bold text-gray-400 uppercase">ZOOM:</span>
-            <select
-              value={zoomMode}
-              onChange={(e) => {
-                setZoomMode(e.target.value);
-                try {
-                  localStorage.setItem('cyber_sim_zoom', e.target.value);
-                } catch (err) {}
-              }}
-              className="bg-transparent text-[#FCEE0A] font-black text-[11px] focus:outline-none cursor-pointer border-none py-0.5"
-            >
-              <option value="auto" className="bg-[#070a10] text-[#0dfceb]">
-                AUTO ({Math.round(autoScale * 100)}%)
-              </option>
-              <option value="1" className="bg-[#070a10] text-white">
-                100%
-              </option>
-              <option value="0.9" className="bg-[#070a10] text-white">
-                90%
-              </option>
-              <option value="0.8" className="bg-[#070a10] text-white">
-                80%
-              </option>
-              <option value="0.75" className="bg-[#070a10] text-white">
-                75%
-              </option>
-              <option value="0.7" className="bg-[#070a10] text-white">
-                70% (Portátil)
-              </option>
-              <option value="0.65" className="bg-[#070a10] text-white">
-                65%
-              </option>
-            </select>
-          </div>
-
-          {/* Botón Alternar Pantalla Completa (Fullscreen) */}
-          <button
-            type="button"
-            onClick={toggleFullscreen}
-            style={{ clipPath: CYBER_BUTTON }}
-            className={`p-1.5 bg-[#000000] border cursor-pointer transition-all hover:shadow-[0_0_15px_rgba(13,252,235,0.4)] ${
-              isFullscreen
-                ? 'border-[#FCEE0A] text-[#FCEE0A]'
-                : 'border-[#0dfceb]/40 hover:border-[#0dfceb] text-[#0dfceb] hover:text-white'
-            }`}
-            title={isFullscreen ? 'Salir de Pantalla Completa' : 'Pantalla Completa (Ocultar barras del navegador)'}
-          >
-            {isFullscreen ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
-          </button>
-
-          {/* Botón Desktop para Colapsar/Expandir Escáner Kiroshi y HUD lateral */}
-          <button
-            type="button"
-            onClick={() => {
-              setIsKiroshiCollapsed((prev) => {
-                const next = !prev;
-                try {
-                  localStorage.setItem('cyber_sim_kiroshi_collapsed', String(next));
-                } catch (err) {}
-                return next;
-              });
-            }}
-            style={{ clipPath: CYBER_BUTTON }}
-            className={`hidden lg:flex px-2 sm:px-2.5 py-1.5 font-bold uppercase items-center gap-1.5 cursor-pointer text-xs transition-all ${
-              !isKiroshiCollapsed
-                ? 'bg-[#0dfceb]/15 border border-[#0dfceb] text-[#0dfceb] shadow-[0_0_10px_rgba(13,252,235,0.3)]'
-                : 'bg-[#000000] border border-gray-700 text-gray-400 hover:border-[#0dfceb] hover:text-[#0dfceb]'
-            }`}
-            title={isKiroshiCollapsed ? 'Mostrar Escáner Kiroshi y HUD lateral' : 'Colapsar panel lateral para dar máximo espacio al tablero'}
-          >
-            <Eye className="w-3.5 h-3.5" />
-            <span className="hidden xl:inline">{isKiroshiCollapsed ? 'VER HUD' : 'HUD'}</span>
-          </button>
-
-          {/* Botón Reglas Rápidas */}
-          <button
-            type="button"
-            onClick={() => setShowRulesModal(true)}
-            style={{ clipPath: CYBER_BUTTON }}
-            className="p-1.5 bg-[#000000] border border-gray-700 hover:border-[#0dfceb] text-gray-300 hover:text-white cursor-pointer transition-all hover:shadow-[0_0_15px_rgba(13,252,235,0.4)]"
-            title="Guía de Reglas Rápidas"
-          >
-            <HelpCircle className="w-4 h-4" />
-          </button>
-
-          {/* Botón responsive para alternar HUD / Dados en pantallas medianas y móviles */}
-          <button
-            type="button"
-            onClick={() => setIsHudOpen((prev) => !prev)}
-            style={{ clipPath: CYBER_BUTTON }}
-            className={`lg:hidden px-2.5 sm:px-3 py-1.5 font-bold uppercase flex items-center gap-1.5 cursor-pointer text-xs transition-all ${
-              isHudOpen
-                ? 'bg-[#0dfceb] text-black shadow-[0_0_15px_rgba(13,252,235,0.7)]'
-                : 'bg-[#000000] border border-[#0dfceb]/50 text-[#0dfceb] hover:border-[#0dfceb]'
-            }`}
-            title="Ver estadísticas y dados del Netrunner y Corpo"
-          >
-            <span>📊</span>
-            <span>{isHudOpen ? 'TABLERO' : 'HUD / DADOS'}</span>
-          </button>
-
-          {/* Botón Elegir Mazo (Selector de Duelo) */}
-          <button
-            type="button"
-            onClick={() => setShowDeckSelectorModal(true)}
-            style={{ clipPath: CYBER_BUTTON }}
-            className="px-2.5 sm:px-3 py-1.5 bg-[#000000] border border-[#0dfceb]/50 hover:border-[#FCEE0A] text-[#0dfceb] hover:text-[#FCEE0A] font-mono font-black uppercase flex items-center gap-1.5 cursor-pointer text-xs transition-all hover:shadow-[0_0_15px_rgba(252,238,10,0.4)]"
-            title="Elegir tu mazo (de tu cuenta o del meta) y el mazo de la IA"
-          >
-            <Layers className="w-3.5 h-3.5 text-[#FCEE0A]" />
-            <span className="hidden sm:inline">ELEGIR MAZO</span>
-          </button>
-
-          {/* Menú Desplegable de Usuario Netrunner */}
-          <div className="flex items-center">
-            <CyberUserDropdown
-              currentUser={currentUser}
-              userProfile={userProfile}
-              userDecksCount={userCloudDecks.length}
-              onOpenAuthModal={() => setShowAuthModal(true)}
-              onOpenMyDecks={() => setShowMyDecksModal(true)}
-              onOpenProfile={() => setShowProfileModal(true)}
-              themeColor="#0dfceb"
-            />
-          </div>
-
-          {/* Botón Nueva Partida */}
-          <button
-            type="button"
-            onClick={handleResetGame}
-            style={{ clipPath: CYBER_BUTTON }}
-            className="px-2.5 sm:px-3 py-1.5 bg-[#FF003C]/20 hover:bg-[#FF003C] text-[#FF003C] hover:text-white border border-[#FF003C]/60 hover:border-[#FF003C] font-mono font-black uppercase flex items-center gap-1.5 cursor-pointer text-xs transition-all shadow-[0_0_15px_rgba(255,0,60,0.3)] hover:shadow-[0_0_20px_rgba(255,0,60,0.7)]"
-            title="Iniciar una Nueva Partida limpia desde el Turno 1"
-          >
-            <RotateCcw className="w-3.5 h-3.5" />
-            <span>NUEVA PARTIDA</span>
-          </button>
-        </div>
         </div>
       </header>
 
@@ -3477,7 +3366,6 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
               className="w-[86vw] max-w-xs h-full bg-[#070a10] border-l-2 border-[#0dfceb] p-4 flex flex-col justify-between overflow-y-auto cyber-scrollbar shadow-[-10px_0_40px_rgba(13,252,235,0.25)]"
             >
               <div className="space-y-4">
-                {/* Cabecera del Menú Móvil */}
                 <div className="flex items-center justify-between pb-3 border-b border-[#0dfceb]/30">
                   <div className="flex items-center gap-2">
                     <span className="w-2.5 h-2.5 rounded-full bg-[#0dfceb] animate-pulse" />
@@ -3550,49 +3438,18 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                   )}
                 </div>
 
-                {/* Acciones de Partida */}
+                {/* Acciones esenciales */}
                 <div className="space-y-2">
                   <button
                     type="button"
-                    onClick={() => { setIsMobileMenuOpen(false); setShowDeckSelectorModal(true); }}
-                    style={{ clipPath: CYBER_BUTTON }}
-                    className="w-full py-2.5 px-3 bg-black border border-[#FCEE0A]/60 text-[#FCEE0A] font-black text-xs uppercase flex items-center justify-between cursor-pointer"
-                  >
-                    <span className="flex items-center gap-2"><Layers className="w-4 h-4" /> ELEGIR MAZO</span>
-                    <ChevronRight className="w-4 h-4" />
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => { setIsMobileMenuOpen(false); setShowLogModal(true); }}
-                    style={{ clipPath: CYBER_BUTTON }}
-                    className="w-full py-2.5 px-3 bg-black border border-[#0dfceb]/40 text-[#0dfceb] font-black text-xs uppercase flex items-center justify-between cursor-pointer"
-                  >
-                    <span className="flex items-center gap-2"><Terminal className="w-4 h-4 text-[#FCEE0A]" /> REGISTRO (LOGS)</span>
-                    <span className="px-1.5 py-0.5 bg-[#0dfceb]/20 rounded text-[10px]">{gameState.actionLog.length}</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => { setIsMobileMenuOpen(false); setShowTurnGuideModal(true); }}
+                    onClick={() => { setIsMobileMenuOpen(false); setHelpModalTab('turn'); setShowRulesModal(true); }}
                     style={{ clipPath: CYBER_BUTTON }}
                     className="w-full py-2.5 px-3 bg-black border border-[#0dfceb]/40 text-white font-black text-xs uppercase flex items-center justify-between cursor-pointer"
                   >
-                    <span className="flex items-center gap-2"><HelpCircle className="w-4 h-4 text-[#0dfceb]" /> CÓMO FUNCIONA UN TURNO</span>
+                    <span className="flex items-center gap-2"><HelpCircle className="w-4 h-4 text-[#0dfceb]" /> AYUDA Y TURNO</span>
                     <ChevronRight className="w-4 h-4 text-gray-500" />
                   </button>
 
-                  <button
-                    type="button"
-                    onClick={() => { setIsMobileMenuOpen(false); setShowRulesModal(true); }}
-                    style={{ clipPath: CYBER_BUTTON }}
-                    className="w-full py-2.5 px-3 bg-black border border-gray-700 text-gray-200 font-black text-xs uppercase flex items-center justify-between cursor-pointer"
-                  >
-                    <span className="flex items-center gap-2"><FileText className="w-4 h-4 text-[#FCEE0A]" /> REGLAS RÁPIDAS</span>
-                    <ChevronRight className="w-4 h-4 text-gray-500" />
-                  </button>
-
-                  {/* Zoom en Móvil */}
                   <div className="p-2.5 bg-black border border-[#0dfceb]/30 rounded flex items-center justify-between">
                     <span className="text-[10px] font-bold text-gray-400 uppercase">ZOOM TABLERO</span>
                     <select
@@ -3627,7 +3484,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                 </div>
               </div>
 
-              {/* Pie del Menú Móvil: Nueva Partida */}
+              {/* Pie del Menú Móvil: Nueva Partida (permite elegir mazo) */}
               <div className="pt-4 border-t border-gray-800 space-y-2">
                 <button
                   type="button"
@@ -3668,7 +3525,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
           className={`
             ${isHudOpen ? 'fixed inset-y-0 left-0 z-40 w-80 sm:w-88 shadow-2xl bg-[#070a10] flex' : 'hidden'}
             ${isKiroshiCollapsed ? 'lg:hidden' : 'lg:flex lg:static lg:w-72 xl:w-80 2xl:w-88 lg:shadow-none'}
-            h-full bg-[#070a10]/95 border-r border-[#0dfceb]/30 p-2 sm:p-2.5 flex-col justify-between font-mono shrink-0 overflow-y-auto space-y-1.5 sm:space-y-2 pb-2 sm:pb-3 cyber-scrollbar
+            h-full bg-[#070a10]/95 border-r border-[#0dfceb]/30 p-2 sm:p-2.5 flex-col font-mono shrink-0 overflow-y-auto lg:overflow-hidden space-y-1.5 sm:space-y-2 pb-2 cyber-scrollbar
           `}
         >
           {/* Botón de cierre en pantalla móvil */}
@@ -3744,7 +3601,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
               (Entre el Rival arriba y el Jugador abajo)
              =============================================================== */}
           <div
-            className="my-auto p-2 bg-[#000000]/95 border border-[#0dfceb]/50 shadow-[0_0_20px_rgba(13,252,235,0.15)] flex flex-col items-center relative transition-all rounded-xl shrink-0"
+            className="p-2 bg-[#000000]/95 border border-[#0dfceb]/50 shadow-[0_0_20px_rgba(13,252,235,0.15)] flex flex-col items-center relative transition-all rounded-xl shrink-0"
           >
             {/* Cabecera del Escáner */}
             <div className="w-full flex items-center justify-between pb-1 border-b border-[#0dfceb]/20 text-[9px] text-gray-400 font-bold uppercase tracking-widest mb-1.5">
@@ -3763,7 +3620,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                 <div
                   onClick={() => setInspectedCard(displayCard)}
                   onContextMenu={(e) => handleCardRightClick(e, displayCard)}
-                  className="relative w-full max-w-[280px] aspect-[7/10] h-auto max-h-[46vh] sm:max-h-[50vh] mx-auto rounded-lg overflow-hidden border-2 border-[#FCEE0A] shadow-[0_0_25px_rgba(252,238,10,0.45)] bg-black cursor-pointer group transition-all duration-200 hover:border-[#0dfceb] hover:shadow-[0_0_35px_rgba(13,252,235,0.6)] shrink-0"
+                  className="relative w-full max-w-[280px] aspect-[7/10] h-auto max-h-[34vh] sm:max-h-[37vh] mx-auto rounded-lg overflow-hidden border-2 border-[#FCEE0A] shadow-[0_0_25px_rgba(252,238,10,0.45)] bg-black cursor-pointer group transition-all duration-200 hover:border-[#0dfceb] hover:shadow-[0_0_35px_rgba(13,252,235,0.6)] shrink-0"
                   title="Clic para ampliar a pantalla completa // Clic derecho para opciones"
                 >
                   <img
@@ -3874,7 +3731,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                 </details>
               </div>
             ) : (
-              <div className="w-full max-w-[280px] aspect-[7/10] h-auto max-h-[46vh] sm:max-h-[50vh] mx-auto rounded-lg border border-dashed border-[#0dfceb]/30 bg-[#070a10]/50 flex flex-col items-center justify-center p-3 text-center select-none">
+              <div className="w-full max-w-[280px] aspect-[7/10] h-auto max-h-[34vh] sm:max-h-[37vh] mx-auto rounded-lg border border-dashed border-[#0dfceb]/30 bg-[#070a10]/50 flex flex-col items-center justify-center p-3 text-center select-none">
                 <div className="w-9 h-9 rounded-full border border-dashed border-[#0dfceb]/50 flex items-center justify-center mb-2 animate-pulse">
                   <span className="text-[#0dfceb] text-lg font-black">⊕</span>
                 </div>
@@ -3888,8 +3745,44 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
             )}
           </div>
 
+          {/* ===============================================================
+              LOGS DE COMBATE SIEMPRE VISIBLES Y SCROLLEABLES (DEBAJO DEL KIROSHI)
+             =============================================================== */}
+          <div className="flex-1 min-h-[110px] bg-[#000000]/95 border border-[#0dfceb]/40 rounded-xl p-2 flex flex-col overflow-hidden shadow-[0_0_15px_rgba(13,252,235,0.1)]">
+            <div className="flex items-center justify-between pb-1 mb-1 border-b border-[#0dfceb]/25 shrink-0">
+              <span className="text-[9px] font-black uppercase tracking-widest text-[#0dfceb] flex items-center gap-1.5">
+                <Terminal className="w-3 h-3 text-[#FCEE0A]" />
+                <span>LOGS ({gameState.actionLog.length})</span>
+              </span>
+              <span className="text-[8px] text-gray-500 uppercase">EN VIVO</span>
+            </div>
+            <div className="flex-1 overflow-y-auto cyber-scrollbar space-y-1 pr-1 text-[9px] sm:text-[10px] leading-snug font-mono">
+              {(gameState.actionLog || []).map((entry, idx) => {
+                const isHeader = entry.startsWith('//');
+                const isCombat = entry.includes('⚔️') || entry.includes('💥') || entry.includes('💀') || entry.includes('🥊');
+                const isTrigger = entry.includes('⚡') || entry.includes('🎤') || entry.includes('🌐') || entry.includes('👑') || entry.includes('🛡️');
+                return (
+                  <div
+                    key={idx}
+                    className={`py-0.5 px-1 rounded border-l-2 ${
+                      isHeader
+                        ? 'border-[#FCEE0A] bg-[#FCEE0A]/10 text-[#FCEE0A] font-black text-[8px]'
+                        : isCombat
+                        ? 'border-[#FF003C] bg-[#FF003C]/10 text-gray-100'
+                        : isTrigger
+                        ? 'border-[#0dfceb] bg-[#0dfceb]/5 text-gray-200'
+                        : 'border-gray-800 text-gray-300'
+                    }`}
+                  >
+                    {entry}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
           {/* SECCIÓN JUGADOR (TÚ) — SITUADA EN LA PARTE INFERIOR */}
-          <div className="space-y-1.5 pt-1 mt-auto">
+          <div className="space-y-1.5 pt-1 shrink-0">
             {/* Avatar del Jugador */}
             <div
               style={{ clipPath: CYBER_AVATAR_CLIP }}
@@ -6459,18 +6352,114 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
             <div className="flex items-center justify-between border-b border-[#FCEE0A]/30 pb-3">
               <span className="font-bold text-[#FCEE0A] uppercase flex items-center gap-2">
                 <HelpCircle className="w-4 h-4 text-[#0dfceb]" />
-                <span>REGLAS OFICIALES NIGHT CITY // CYBERPUNK TCG</span>
+                <span>AYUDA // CYBERPUNK TCG</span>
               </span>
               <button
                 type="button"
                 onClick={() => setShowRulesModal(false)}
-                className="text-gray-400 hover:text-white"
+                className="text-gray-400 hover:text-white cursor-pointer px-1"
               >
                 ✕
               </button>
             </div>
 
-            <div className="flex-1 overflow-y-auto space-y-3 pr-2 text-gray-300 leading-relaxed text-[11px]">
+            {/* Pestañas fusionadas: Cómo funciona un turno + Reglas oficiales */}
+            <div className="grid grid-cols-2 gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={() => setHelpModalTab('turn')}
+                style={{ clipPath: CYBER_BUTTON }}
+                className={`py-2 px-3 text-xs font-black uppercase transition-all cursor-pointer border ${
+                  helpModalTab === 'turn'
+                    ? 'bg-[#0dfceb] text-[#070a10] border-[#0dfceb] shadow-[0_0_15px_rgba(13,252,235,0.5)]'
+                    : 'bg-black text-gray-400 border-gray-800 hover:text-white hover:border-[#0dfceb]/50'
+                }`}
+              >
+                ⚡ CÓMO FUNCIONA UN TURNO
+              </button>
+              <button
+                type="button"
+                onClick={() => setHelpModalTab('rules')}
+                style={{ clipPath: CYBER_BUTTON }}
+                className={`py-2 px-3 text-xs font-black uppercase transition-all cursor-pointer border ${
+                  helpModalTab === 'rules'
+                    ? 'bg-[#FCEE0A] text-[#070a10] border-[#FCEE0A] shadow-[0_0_15px_rgba(252,238,10,0.5)]'
+                    : 'bg-black text-gray-400 border-gray-800 hover:text-white hover:border-[#FCEE0A]/50'
+                }`}
+              >
+                📖 REGLAS OFICIALES
+              </button>
+            </div>
+
+            {helpModalTab === 'turn' ? (
+              <div className="flex-1 overflow-y-auto space-y-4 pr-1 cyber-scrollbar">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {/* COLUMNA 1: 1. START PHASE */}
+                  <div className="bg-[#05070e] border border-[#FCEE0A]/60 rounded-lg p-3.5 space-y-2.5">
+                    <div className="flex items-center justify-between border-b border-[#FCEE0A]/30 pb-1.5">
+                      <span className="text-xs font-black text-[#FCEE0A] uppercase">1. START PHASE</span>
+                      <span className="text-[9px] text-black font-black uppercase bg-[#FCEE0A] px-1.5 py-0.5 rounded">EN ORDEN (1-5)</span>
+                    </div>
+                    <ol className="space-y-2 text-[11px] text-gray-200">
+                      <li className="flex items-start gap-2 bg-black/40 p-1.5 rounded border border-gray-900">
+                        <span className="w-4 h-4 rounded-full bg-[#FCEE0A] text-black font-black text-[10px] flex items-center justify-center shrink-0 mt-0.5">1</span>
+                        <div><strong className="text-white block">Comprobar victoria (7+ Gigs)</strong><span className="text-[10px] text-gray-400 font-sans">Ganas automáticamente si empiezas el turno con 7+ dados de Gig.</span></div>
+                      </li>
+                      <li className="flex items-start gap-2 bg-black/40 p-1.5 rounded border border-gray-900">
+                        <span className="w-4 h-4 rounded-full bg-[#FCEE0A] text-black font-black text-[10px] flex items-center justify-center shrink-0 mt-0.5">2</span>
+                        <div><strong className="text-white block">Efectos de Inicio de Turno</strong><span className="text-[10px] text-gray-400 font-sans">Se disparan habilidades automáticas de inicio (ej. Hanako Arasaka).</span></div>
+                      </li>
+                      <li className="flex items-start gap-2 bg-black/40 p-1.5 rounded border border-gray-900">
+                        <span className="w-4 h-4 rounded-full bg-[#FCEE0A] text-black font-black text-[10px] flex items-center justify-center shrink-0 mt-0.5">3</span>
+                        <div><strong className="text-white block">Enderezar todas tus cartas</strong><span className="text-[10px] text-gray-400 font-sans">Se enderezan Eddies, Leyendas y Unidades y pierden el Lag.</span></div>
+                      </li>
+                      <li className="flex items-start gap-2 bg-black/40 p-1.5 rounded border border-gray-900">
+                        <span className="w-4 h-4 rounded-full bg-[#FCEE0A] text-black font-black text-[10px] flex items-center justify-center shrink-0 mt-0.5">4</span>
+                        <div><strong className="text-white block">Robar 1 carta del mazo</strong><span className="text-[10px] text-gray-400 font-sans">Si no te quedan cartas para robar, pierdes la partida (Deck Out).</span></div>
+                      </li>
+                      <li className="flex items-start gap-2 bg-black/40 p-1.5 rounded border border-gray-900">
+                        <span className="w-4 h-4 rounded-full bg-[#FCEE0A] text-black font-black text-[10px] flex items-center justify-center shrink-0 mt-0.5">5</span>
+                        <div><strong className="text-white block">Rodar 1 Gig del Fixer</strong><span className="text-[10px] text-gray-400 font-sans">Elige un dado de tu Fixer y ruédalo (el D20 siempre es el último).</span></div>
+                      </li>
+                    </ol>
+                  </div>
+
+                  {/* COLUMNA 2: 2. MAIN PHASE */}
+                  <div className="bg-[#05070e] border border-[#0dfceb]/60 rounded-lg p-3.5 space-y-2.5">
+                    <div className="flex items-center justify-between border-b border-[#0dfceb]/30 pb-1.5">
+                      <span className="text-xs font-black text-[#0dfceb] uppercase">2. FASE PRINCIPAL</span>
+                      <span className="text-[9px] text-black font-black uppercase bg-[#0dfceb] px-1.5 py-0.5 rounded">CUALQUIER ORDEN</span>
+                    </div>
+                    <div className="space-y-2 text-[11px]">
+                      <div className="flex items-center justify-between bg-black/50 p-1.5 rounded border border-gray-800">
+                        <div><strong className="text-[#FCEE0A] block">VENDER CARTA (SELL)</strong><span className="text-[10px] text-gray-400 font-sans">Coloca 1 carta con Sell Tag boca abajo en Eddies.</span></div>
+                        <span className="text-[9px] font-black text-[#FCEE0A] bg-[#FCEE0A]/10 px-1.5 py-0.5 rounded shrink-0">1/turno</span>
+                      </div>
+                      <div className="flex items-center justify-between bg-black/50 p-1.5 rounded border border-gray-800">
+                        <div><strong className="text-[#0dfceb] block">LLAMAR LEYENDA (CALL)</strong><span className="text-[10px] text-gray-400 font-sans">Paga 1 €$ para revelar una Leyenda boca abajo.</span></div>
+                        <span className="text-[9px] font-black text-[#0dfceb] bg-[#0dfceb]/10 px-1.5 py-0.5 rounded shrink-0">1/turno</span>
+                      </div>
+                      <div className="flex items-center justify-between bg-black/50 p-1.5 rounded border border-gray-800">
+                        <div><strong className="text-white block">JUGAR CARTAS / GO SOLO</strong><span className="text-[10px] text-gray-400 font-sans">Unidades, Programas, Gears o Leyendas con Go Solo.</span></div>
+                        <span className="text-[9px] font-black text-gray-300 bg-gray-900 px-1.5 py-0.5 rounded shrink-0">∞</span>
+                      </div>
+                      <div className="flex items-center justify-between bg-black/50 p-1.5 rounded border border-gray-800">
+                        <div><strong className="text-white block">ACTIVAR HABILIDADES (↷)</strong><span className="text-[10px] text-gray-400 font-sans">Habilidades de giro de Leyendas, Unidades o Gears.</span></div>
+                        <span className="text-[9px] font-black text-gray-300 bg-gray-900 px-1.5 py-0.5 rounded shrink-0">∞</span>
+                      </div>
+                      <div className="flex items-center justify-between bg-black/50 p-1.5 rounded border border-gray-800">
+                        <div><strong className="text-[#FF003C] block">ATACAR (1 A LA VEZ)</strong><span className="text-[10px] text-gray-400 font-sans">Gira una unidad lista sin Lag para asaltar Gigs o pelear con una unidad rival gastada.</span></div>
+                        <span className="text-[9px] font-black text-[#FF003C] bg-[#FF003C]/10 px-1.5 py-0.5 rounded shrink-0">1 a 1</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div className="p-2.5 bg-black/80 border border-gray-800 rounded text-center text-[10px] text-gray-300 font-sans">
+                  <strong className="text-white">Fin de turno:</strong> Terminan los efectos de este turno, se limpia el Lag y comienza el turno del Rival.
+                </div>
+              </div>
+            ) : (
+            <div className="flex-1 overflow-y-auto space-y-3 pr-2 text-gray-300 leading-relaxed text-[11px] cyber-scrollbar">
               <div>
                 <strong className="text-[#0dfceb] block uppercase">1. Preparación de Partida:</strong>
                 Ambos jugadores tiran un D20; quien saque más alto decide si va primero o segundo. Se baraja el mazo (40-50 cartas) y las 3 Leyendas van boca abajo.
@@ -6536,6 +6525,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                 La suma de los valores de tus dados de Gig activos es tu Credibilidad en la Calle. Si ambos jugadores vacían sus Fixers, entra el Overtime: el primero que llegue a 7 Gigs gana la partida inmediatamente.
               </div>
             </div>
+            )}
           </div>
         </div>
       )}
