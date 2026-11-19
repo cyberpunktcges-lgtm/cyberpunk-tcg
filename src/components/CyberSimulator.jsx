@@ -3025,48 +3025,14 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                 </span>
               </div>
             </div>
-
-            {/* SELECCIÓN DE DADOS GEOMÉTRICOS (D4 a D20) APILADOS RIVAL */}
-            <div
-              style={{ clipPath: CYBER_CLIP }}
-              className="bg-[#000000] border border-[#FF003C]/40 p-1.5 space-y-1"
-            >
-              <div className="flex items-center justify-between">
-                <span className="text-[9px] text-[#FF003C] font-bold uppercase tracking-wider">
-                  DADOS GIG RIVAL (D4 A D20):
-                </span>
-                <span className="text-[8px] text-gray-500">
-                  {bot.gigs.length} ACTIVOS
-                </span>
-              </div>
-
-              {/* Columna apilada de dados del rival */}
-              <div className="grid grid-cols-6 gap-1 justify-items-center py-1 bg-[#070a10] border border-gray-900 rounded-sm">
-                {['d4', 'd6', 'd8', 'd10', 'd12', 'd20'].map((d) => {
-                  const activeGig = bot.gigs.find((g) => g.die.toLowerCase() === d);
-                  const isWaiting = bot.fixerDice.includes(d);
-
-                  return (
-                    <PolyhedralDie
-                      key={d}
-                      type={d}
-                      value={activeGig ? activeGig.value : null}
-                      isWaiting={isWaiting}
-                      isStolen={Boolean(activeGig?.stolenFrom)}
-                      size={26}
-                    />
-                  );
-                })}
-              </div>
-            </div>
           </div>
 
           {/* ===============================================================
               ZONA CENTRAL IZQUIERDA: PREVISUALIZACIÓN DE CARTA EN EL HUD
-              (Encima de V // NETRUNNER y debajo de los dados del rival)
+              (Entre el Rival arriba y el Jugador abajo)
              =============================================================== */}
           <div
-            className="my-1.5 p-2 bg-[#000000]/95 border border-[#0dfceb]/50 shadow-[0_0_20px_rgba(13,252,235,0.15)] flex flex-col items-center relative transition-all rounded-xl shrink-0"
+            className="my-auto p-2 bg-[#000000]/95 border border-[#0dfceb]/50 shadow-[0_0_20px_rgba(13,252,235,0.15)] flex flex-col items-center relative transition-all rounded-xl shrink-0"
           >
             {/* Cabecera del Escáner */}
             <div className="w-full flex items-center justify-between pb-1 border-b border-[#0dfceb]/20 text-[9px] text-gray-400 font-bold uppercase tracking-widest mb-1.5">
@@ -3081,11 +3047,11 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
 
             {displayCard ? (
               <div className="w-full flex flex-col items-center">
-                {/* Carta a Máximo Tamaño en el Escáner Kiroshi (con límite de altura adaptativo para portátiles) */}
+                {/* Carta a Gran Tamaño en el Escáner Kiroshi */}
                 <div
                   onClick={() => setInspectedCard(displayCard)}
                   onContextMenu={(e) => handleCardRightClick(e, displayCard)}
-                  className="relative w-auto max-w-full aspect-[7/10] h-32 sm:h-36 md:h-40 xl:h-44 max-h-[20vh] sm:max-h-[22vh] mx-auto rounded-lg overflow-hidden border-2 border-[#FCEE0A] shadow-[0_0_25px_rgba(252,238,10,0.45)] bg-black cursor-pointer group transition-all duration-200 hover:border-[#0dfceb] hover:shadow-[0_0_35px_rgba(13,252,235,0.6)] shrink-0"
+                  className="relative w-full max-w-[280px] aspect-[7/10] h-auto max-h-[46vh] sm:max-h-[50vh] mx-auto rounded-lg overflow-hidden border-2 border-[#FCEE0A] shadow-[0_0_25px_rgba(252,238,10,0.45)] bg-black cursor-pointer group transition-all duration-200 hover:border-[#0dfceb] hover:shadow-[0_0_35px_rgba(13,252,235,0.6)] shrink-0"
                   title="Clic para ampliar a pantalla completa // Clic derecho para opciones"
                 >
                   <img
@@ -3202,9 +3168,9 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                 </details>
               </div>
             ) : (
-              <div className="w-auto max-w-full aspect-[7/10] h-32 sm:h-36 md:h-40 xl:h-44 max-h-[20vh] sm:max-h-[22vh] mx-auto rounded-lg border border-dashed border-[#0dfceb]/30 bg-[#070a10]/50 flex flex-col items-center justify-center p-2 text-center select-none">
-                <div className="w-8 h-8 rounded-full border border-dashed border-[#0dfceb]/50 flex items-center justify-center mb-1.5 animate-pulse">
-                  <span className="text-[#0dfceb] text-base font-black">⊕</span>
+              <div className="w-full max-w-[280px] aspect-[7/10] h-auto max-h-[46vh] sm:max-h-[50vh] mx-auto rounded-lg border border-dashed border-[#0dfceb]/30 bg-[#070a10]/50 flex flex-col items-center justify-center p-3 text-center select-none">
+                <div className="w-9 h-9 rounded-full border border-dashed border-[#0dfceb]/50 flex items-center justify-center mb-2 animate-pulse">
+                  <span className="text-[#0dfceb] text-lg font-black">⊕</span>
                 </div>
                 <span className="text-[10px] text-[#0dfceb] uppercase font-black tracking-widest block mb-1">
                   ESCÁNER ACTIVO
@@ -3280,40 +3246,6 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                 <span className="text-[8px] text-[#0dfceb] block font-bold">
                   GIGS: {p.gigs.length} / 7
                 </span>
-              </div>
-            </div>
-
-            {/* SELECCIÓN DE DADOS GEOMÉTRICOS (D4 a D20) APILADOS JUGADOR */}
-            <div
-              style={{ clipPath: CYBER_CLIP }}
-              className="bg-[#000000] border border-[#0dfceb]/50 p-1.5 space-y-1 shadow-[0_0_15px_rgba(13,252,235,0.15)]"
-            >
-              <div className="flex items-center justify-between">
-                <span className="text-[9px] text-[#0dfceb] font-bold uppercase tracking-wider">
-                  TUS DADOS GIG (D4 A D20):
-                </span>
-                <span className="text-[8px] text-[#FCEE0A] font-bold">
-                  {p.gigs.length} / 7 PARA GANAR
-                </span>
-              </div>
-
-              {/* Columna apilada de dados del jugador */}
-              <div className="grid grid-cols-6 gap-1 justify-items-center py-1 bg-[#070a10] border border-gray-900 rounded-sm">
-                {['d4', 'd6', 'd8', 'd10', 'd12', 'd20'].map((d) => {
-                  const activeGig = p.gigs.find((g) => g.die.toLowerCase() === d);
-                  const isWaiting = p.fixerDice.includes(d);
-
-                  return (
-                    <PolyhedralDie
-                      key={d}
-                      type={d}
-                      value={activeGig ? activeGig.value : null}
-                      isWaiting={isWaiting}
-                      isStolen={Boolean(activeGig?.stolenFrom)}
-                      size={26}
-                    />
-                  );
-                })}
               </div>
             </div>
           </div>
@@ -3618,8 +3550,157 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                     ⭐ {botStreetCred}
                   </span>
                 </div>
+                            </div>
+            </div>
+
+            {/* 1.B COLUMNA DERECHA: TRASH DEL RIVAL */}
+            <div className="flex flex-col justify-end shrink-0 w-13 sm:w-16 md:w-18">
+              {/* TRASH RIVAL (ÚLTIMA CARTA JUGADA EN MINIATURA) */}
+              {(() => {
+                const lastTrashCard = bot.trash && bot.trash.length > 0 ? bot.trash[bot.trash.length - 1] : null;
+                return (
+                  <div
+                    onClick={() => {
+                      if (bot.trash.length > 0) {
+                        setViewingTrashModal({ playerKey: 'bot', title: 'DESCARTE DEL RIVAL (TRASH)' });
+                      }
+                    }}
+                    onContextMenu={(e) => {
+                      if (lastTrashCard) {
+                        handleCardRightClick(e, lastTrashCard);
+                      }
+                    }}
+                    style={{ clipPath: CYBER_CLIP }}
+                    className={`relative w-full aspect-[5/7] rounded-xl overflow-hidden border-2 transition-all select-none ${
+                      lastTrashCard
+                        ? 'border-[#FF003C] bg-[#070a10] shadow-[0_0_15px_rgba(255,0,60,0.45)] cursor-pointer hover:scale-105 hover:shadow-[0_0_25px_rgba(255,0,60,0.8)] hover:border-[#FCEE0A] group'
+                        : 'border-dashed border-[#FF003C]/35 bg-[#060b14]/90 flex flex-col items-center justify-center p-1'
+                    }`}
+                    title={
+                      lastTrashCard
+                        ? `Última carta en Descarte Rival: "${lastTrashCard.name}" • Total: ${bot.trash.length} cartas (Clic izq: ver todas // Clic DERECHO: pantalla completa)`
+                        : 'Descarte del Rival (Trash vacío - 0 cartas)'
+                    }
+                  >
+                    {lastTrashCard ? (
+                      <>
+                        {/* Miniatura nítida de la última carta jugada / enviada al descarte */}
+                        <img
+                          src={lastTrashCard.image}
+                          alt={lastTrashCard.name}
+                          className="w-full h-full object-cover object-center transition-transform duration-200 group-hover:scale-105"
+                        />
+                        {/* Viñeta sutil en esquinas para legibilidad de badges */}
+                        <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-transparent to-black/75 pointer-events-none" />
+
+                        {/* Badge superior izquierdo: DESCARTE */}
+                        <div className="absolute top-1 left-1 px-1 py-0.2 bg-black/90 text-[#FF003C] font-mono font-black text-[6px] sm:text-[7px] uppercase tracking-wider rounded border border-[#FF003C]/60 z-10">
+                          DESCARTE
+                        </div>
+
+                        {/* Nombre de la carta en la parte inferior */}
+                        <div className="absolute bottom-5 inset-x-1 px-1 py-0.5 bg-black/90 rounded text-[6px] sm:text-[7px] font-mono text-white font-bold truncate text-center z-10 border border-[#FF003C]/40">
+                          {lastTrashCard.name}
+                        </div>
+
+                        {/* Contador de cartas en Trash */}
+                        <div className="absolute bottom-1 right-1 px-1.5 py-0.5 bg-black/95 text-[#FF003C] border border-[#FF003C] font-mono font-black text-[8px] sm:text-[10px] rounded shadow-[0_0_8px_rgba(255,0,60,0.6)] z-10 flex items-center gap-0.5">
+                          <span>🗑️</span>
+                          <span>{bot.trash.length}</span>
+                        </div>
+
+                        {/* Overlay hover para avisar de clic */}
+                        <div className="absolute top-1 right-1 px-1 bg-black/90 text-[#FCEE0A] font-mono text-[6px] uppercase font-bold rounded opacity-0 group-hover:opacity-100 transition-opacity z-10 border border-[#FCEE0A]/40">
+                          VER
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <div className="absolute top-1 left-1 px-1 py-0.2 bg-black/80 text-gray-400 font-mono font-black text-[6px] sm:text-[7px] uppercase tracking-wider rounded border border-gray-700">
+                          DESCARTE
+                        </div>
+                        <div className="text-center font-mono text-[8px] sm:text-[9px] font-bold text-gray-500 leading-tight">
+                          TRASH
+                          <br />
+                          VACÍO
+                        </div>
+                        <div className="absolute bottom-1 right-1 px-1.5 py-0.5 bg-black/90 text-gray-500 border border-gray-700 font-mono font-black text-[8px] sm:text-[9px] rounded">
+                          0
+                        </div>
+                      </>
+                    )}
+                  </div>
+                );
+              })()}
+            </div>
+          </div>
+
+          {/* ===============================================================
+              2. ZONA CENTRAL DE COMBATE (FLANQUEADA POR LOS DADOS DE JUGADOR Y RIVAL)
+              - Flanco Izquierdo: Tus Dados GIG (D4 a D20 apilados del Jugador)
+              - Zona Central: Frontline Rival -> Selector e Indicador de Fases -> Frontline Jugador
+              - Flanco Derecho: Dados GIG Rival (D4 a D20 apilados del Rival)
+              - Columna Derecha Extrema: Mazos (Deck Rival arriba y Tu Mazo abajo)
+             =============================================================== */}
+          <div className="flex gap-1.5 sm:gap-2.5 w-full items-stretch my-0.5">
+            {/* 2.A COLUMNA FLANCO IZQUIERDO: TUS DADOS GIG (JUGADOR) */}
+            <div
+              style={{ clipPath: CYBER_CLIP }}
+              className="bg-[#070a10]/95 border border-[#0dfceb]/40 rounded-xl p-1 sm:p-1.5 flex items-center gap-1 shadow-[0_0_15px_rgba(13,252,235,0.2)] select-none shrink-0"
+            >
+              {/* Texto vertical rotado */}
+              <div
+                className="text-[7.5px] sm:text-[8.5px] font-mono font-bold text-[#0dfceb] uppercase tracking-wider select-none py-1 flex items-center justify-center shrink-0"
+                style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}
+              >
+                <span>• TUS DADOS GIG (D4 A D20) • {p.gigs.length}/7 PARA GANAR</span>
               </div>
 
+              {/* Pila vertical de los 6 dados: D20, D12, D10, D8, D6, D4 */}
+              <div className="flex flex-col items-center justify-between h-full gap-1 py-0.5">
+                {['d20', 'd12', 'd10', 'd8', 'd6', 'd4'].map((d) => {
+                  const activeGig = p.gigs.find((g) => g.die.toLowerCase() === d);
+                  const isWaiting = p.fixerDice.includes(d);
+
+                  return (
+                    <div
+                      key={d}
+                      onClick={() => {
+                        if (gameState.pendingTargetSelection) {
+                          const sel = gameState.pendingTargetSelection;
+                          if (sel.actionType === 'PEACE_OFFERING' && activeGig) {
+                            handleResolveTargetSelection({ owner: 'player', die: d, value: activeGig.value });
+                          } else if (sel.actionType === 'SWAP_GIGS' && sel.step === 1 && activeGig) {
+                            handleResolveTargetSelection({ owner: 'player', die: d, value: activeGig.value });
+                          }
+                        }
+                      }}
+                      className={`transition-all duration-150 rounded ${
+                        activeGig ? 'cursor-pointer hover:scale-115 drop-shadow-[0_0_8px_rgba(13,252,235,0.6)]' : ''
+                      }`}
+                      title={
+                        activeGig
+                          ? `Dado ${d.toUpperCase()} (Valor: ${activeGig.value}) - ${activeGig.stolenFrom ? 'Robado del rival' : 'Gig activo'}`
+                          : isWaiting
+                          ? `Dado ${d.toUpperCase()} en espera en la reserva del Fixer`
+                          : `Dado ${d.toUpperCase()}`
+                      }
+                    >
+                      <PolyhedralDie
+                        type={d}
+                        value={activeGig ? activeGig.value : null}
+                        isWaiting={isWaiting}
+                        isStolen={Boolean(activeGig?.stolenFrom)}
+                        size={22}
+                      />
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* 2.B ZONA CENTRAL: CAMPO RIVAL -> LÍNEA CENTRAL -> CAMPO JUGADOR */}
+            <div className="flex-1 flex flex-col gap-1.5 min-w-0 justify-between">
               {/* FRONTLINE: CAMPO DE BATALLA DEL RIVAL (FIELD) — CARTAS MÁS PEQUEÑAS CON HOVER PREVIEW */}
               <div className="flex-1 rounded-2xl border border-[#FF003C]/30 bg-[#060b14]/80 p-1.5 sm:p-2 pt-5 pb-1.5 min-h-[110px] sm:min-h-[125px] md:min-h-[140px] flex items-center relative overflow-x-auto overflow-y-hidden">
                 <div className="flex items-center gap-2 sm:gap-2.5 w-full justify-start">
@@ -3831,120 +3912,8 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                   ))}
                 </div>
               </div>
-            </div>
 
-            {/* 1.B COLUMNA DERECHA: TRASH (ARRIBA) Y DECK (ABAJO) DEL RIVAL */}
-            <div className="flex flex-col justify-between gap-1.5 sm:gap-2 shrink-0 w-13 sm:w-16 md:w-18">
-              {/* TRASH RIVAL (ÚLTIMA CARTA JUGADA EN MINIATURA) */}
-              {(() => {
-                const lastTrashCard = bot.trash && bot.trash.length > 0 ? bot.trash[bot.trash.length - 1] : null;
-                return (
-                  <div
-                    onClick={() => {
-                      if (bot.trash.length > 0) {
-                        setViewingTrashModal({ playerKey: 'bot', title: 'DESCARTE DEL RIVAL (TRASH)' });
-                      }
-                    }}
-                    onContextMenu={(e) => {
-                      if (lastTrashCard) {
-                        handleCardRightClick(e, lastTrashCard);
-                      }
-                    }}
-                    style={{ clipPath: CYBER_CLIP }}
-                    className={`relative w-full aspect-[5/7] rounded-xl overflow-hidden border-2 transition-all select-none ${
-                      lastTrashCard
-                        ? 'border-[#FF003C] bg-[#070a10] shadow-[0_0_15px_rgba(255,0,60,0.45)] cursor-pointer hover:scale-105 hover:shadow-[0_0_25px_rgba(255,0,60,0.8)] hover:border-[#FCEE0A] group'
-                        : 'border-dashed border-[#FF003C]/35 bg-[#060b14]/90 flex flex-col items-center justify-center p-1'
-                    }`}
-                    title={
-                      lastTrashCard
-                        ? `Última carta en Descarte Rival: "${lastTrashCard.name}" • Total: ${bot.trash.length} cartas (Clic izq: ver todas // Clic DERECHO: pantalla completa)`
-                        : 'Descarte del Rival (Trash vacío - 0 cartas)'
-                    }
-                  >
-                    {lastTrashCard ? (
-                      <>
-                        {/* Miniatura nítida de la última carta jugada / enviada al descarte */}
-                        <img
-                          src={lastTrashCard.image}
-                          alt={lastTrashCard.name}
-                          className="w-full h-full object-cover object-center transition-transform duration-200 group-hover:scale-105"
-                        />
-                        {/* Viñeta sutil en esquinas para legibilidad de badges */}
-                        <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-transparent to-black/75 pointer-events-none" />
-
-                        {/* Badge superior izquierdo: DESCARTE */}
-                        <div className="absolute top-1 left-1 px-1 py-0.2 bg-black/90 text-[#FF003C] font-mono font-black text-[6px] sm:text-[7px] uppercase tracking-wider rounded border border-[#FF003C]/60 z-10">
-                          DESCARTE
-                        </div>
-
-                        {/* Nombre de la carta en la parte inferior */}
-                        <div className="absolute bottom-5 inset-x-1 px-1 py-0.5 bg-black/90 rounded text-[6px] sm:text-[7px] font-mono text-white font-bold truncate text-center z-10 border border-[#FF003C]/40">
-                          {lastTrashCard.name}
-                        </div>
-
-                        {/* Contador de cartas en Trash */}
-                        <div className="absolute bottom-1 right-1 px-1.5 py-0.5 bg-black/95 text-[#FF003C] border border-[#FF003C] font-mono font-black text-[8px] sm:text-[10px] rounded shadow-[0_0_8px_rgba(255,0,60,0.6)] z-10 flex items-center gap-0.5">
-                          <span>🗑️</span>
-                          <span>{bot.trash.length}</span>
-                        </div>
-
-                        {/* Overlay hover para avisar de clic */}
-                        <div className="absolute top-1 right-1 px-1 bg-black/90 text-[#FCEE0A] font-mono text-[6px] uppercase font-bold rounded opacity-0 group-hover:opacity-100 transition-opacity z-10 border border-[#FCEE0A]/40">
-                          VER
-                        </div>
-                      </>
-                    ) : (
-                      <>
-                        <div className="absolute top-1 left-1 px-1 py-0.2 bg-black/80 text-gray-400 font-mono font-black text-[6px] sm:text-[7px] uppercase tracking-wider rounded border border-gray-700">
-                          DESCARTE
-                        </div>
-                        <div className="text-center font-mono text-[8px] sm:text-[9px] font-bold text-gray-500 leading-tight">
-                          TRASH
-                          <br />
-                          VACÍO
-                        </div>
-                        <div className="absolute bottom-1 right-1 px-1.5 py-0.5 bg-black/90 text-gray-500 border border-gray-700 font-mono font-black text-[8px] sm:text-[9px] rounded">
-                          0
-                        </div>
-                      </>
-                    )}
-                  </div>
-                );
-              })()}
-
-              {/* DECK RIVAL (MAZO CON REVERSO AMARILLO OFICIAL Y CONTADOR NEÓN) */}
-              <div
-                style={{ clipPath: CYBER_CLIP }}
-                className="relative w-full aspect-[5/7] rounded-xl overflow-hidden border-2 border-[#FF003C]/50 bg-[#070a10] shadow-md select-none group transition-transform hover:scale-105"
-                title={`Mazo del Rival (Deck): ${bot.deck.length} cartas restantes`}
-              >
-                <img
-                  src="/images/back_normal.png"
-                  alt="Mazo Rival"
-                  className="w-full h-full object-cover pointer-events-none opacity-90"
-                  onError={(e) => {
-                    e.currentTarget.style.display = 'none';
-                  }}
-                />
-                <div
-                  className="absolute inset-0 opacity-20 pointer-events-none"
-                  style={{
-                    backgroundImage:
-                      'repeating-linear-gradient(45deg, #000 0, #000 2px, transparent 0, transparent 6px)'
-                  }}
-                />
-                <div className="absolute top-1 left-1 px-1 py-0.2 bg-black/90 text-[#FF003C] font-mono font-black text-[6px] sm:text-[7px] uppercase tracking-wider rounded border border-[#FF003C]/40">
-                  DECK RIVAL
-                </div>
-                <div className="absolute bottom-1 right-1 px-1.5 py-0.5 bg-black/90 text-[#39FF14] border border-[#39FF14]/50 font-mono font-black text-[10px] sm:text-xs rounded shadow-[0_0_8px_rgba(57,255,20,0.6)]">
-                  {bot.deck.length}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* ===============================================================
+              {/* ===============================================================
               2. SELECTOR E INDICADOR DE FASES EN TIEMPO REAL (HOW A TURN WORKS)
              =============================================================== */}
           <div className="my-1 relative flex items-center justify-center shrink-0 w-full px-2">
@@ -4107,16 +4076,6 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
             </div>
           </div>
 
-          {/* ===============================================================
-              3. SECCIÓN INFERIOR: TAPETE DEL JUGADOR (TÚ) — MODO ESPEJO
-              - Frontline: Campo de Batalla Jugador (cartas grandes con hover preview)
-              - Barra de Gigs del Jugador con dados activos y Street Cred
-              - Backline: Leyendas (3 slots a la izquierda) + Zona de Eddies (a la derecha)
-              - Columna Derecha: Deck (arriba) y Trash (abajo)
-             =============================================================== */}
-          <div className="flex gap-2 sm:gap-3 w-full items-stretch">
-            {/* 3.A ZONA CENTRAL DEL JUGADOR: FRONTLINE (CAMPO) -> GIGS -> BACKLINE (LEYENDAS + EDDIES) */}
-            <div className="flex-1 flex flex-col gap-1.5 min-w-0">
               {/* CAMPO DE BATALLA DEL JUGADOR (FIELD - DROP ZONE PARA DESPLEGAR) */}
               <div
                 onDragOver={(e) => {
@@ -4409,7 +4368,141 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                   ))}
                 </div>
               </div>
+            </div>
 
+            {/* 2.C COLUMNA FLANCO DERECHO: DADOS GIG RIVAL (BOT) */}
+            <div
+              style={{ clipPath: CYBER_CLIP }}
+              className="bg-[#070a10]/95 border border-[#FF003C]/40 rounded-xl p-1 sm:p-1.5 flex items-center gap-1 shadow-[0_0_15px_rgba(255,0,60,0.2)] select-none shrink-0"
+            >
+              {/* Pila vertical de los 6 dados rivales: D20, D12, D10, D8, D6, D4 */}
+              <div className="flex flex-col items-center justify-between h-full gap-1 py-0.5">
+                {['d20', 'd12', 'd10', 'd8', 'd6', 'd4'].map((d) => {
+                  const activeGig = bot.gigs.find((g) => g.die.toLowerCase() === d);
+                  const isWaiting = bot.fixerDice.includes(d);
+
+                  return (
+                    <div
+                      key={d}
+                      onClick={() => {
+                        if (canAttackGigs && activeGig) {
+                          handleStealSpecificDie(d);
+                        } else if (gameState.pendingTargetSelection) {
+                          const sel = gameState.pendingTargetSelection;
+                          if (sel.actionType === 'PEACE_OFFERING' && activeGig) {
+                            handleResolveTargetSelection({ owner: 'bot', die: d, value: activeGig.value });
+                          } else if (sel.actionType === 'SWAP_GIGS' && sel.step === 2 && activeGig) {
+                            handleResolveTargetSelection({ owner: 'bot', die: d, value: activeGig.value });
+                          }
+                        }
+                      }}
+                      className={`transition-all duration-150 rounded ${
+                        canAttackGigs && activeGig
+                          ? 'cursor-pointer hover:scale-125 ring-2 ring-[#FF003C] hover:ring-[#FCEE0A] p-0.5 animate-pulse'
+                          : activeGig
+                          ? 'cursor-pointer hover:scale-115 drop-shadow-[0_0_8px_rgba(255,0,60,0.6)]'
+                          : ''
+                      }`}
+                      title={
+                        activeGig
+                          ? `Dado ${d.toUpperCase()} del Rival (Valor: ${activeGig.value}) - ${canAttackGigs ? '¡Clic para robar este dado!' : 'Activo'}`
+                          : isWaiting
+                          ? `Dado ${d.toUpperCase()} del rival en reserva`
+                          : `Dado ${d.toUpperCase()} del rival`
+                      }
+                    >
+                      <PolyhedralDie
+                        type={d}
+                        value={activeGig ? activeGig.value : null}
+                        isWaiting={isWaiting}
+                        isStolen={Boolean(activeGig?.stolenFrom)}
+                        colorScheme="red"
+                        size={22}
+                      />
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Texto vertical rotado en el lateral derecho */}
+              <div
+                className="text-[7.5px] sm:text-[8.5px] font-mono font-bold text-[#FF003C] uppercase tracking-wider select-none py-1 flex items-center justify-center shrink-0"
+                style={{ writingMode: 'vertical-rl' }}
+              >
+                <span>• DADOS GIG RIVAL (D4 A D20) • {bot.gigs.length} ACTIVOS</span>
+              </div>
+            </div>
+
+            {/* 2.D COLUMNA DERECHA EXTREMA: DECK RIVAL (ARRIBA) Y TU MAZO (ABAJO) */}
+            <div className="flex flex-col justify-between gap-1.5 sm:gap-2 shrink-0 w-13 sm:w-16 md:w-18">
+              {/* DECK RIVAL (MAZO CON REVERSO AMARILLO OFICIAL Y CONTADOR NEÓN) */}
+              <div
+                style={{ clipPath: CYBER_CLIP }}
+                className="relative w-full aspect-[5/7] rounded-xl overflow-hidden border-2 border-[#FF003C]/50 bg-[#070a10] shadow-md select-none group transition-transform hover:scale-105"
+                title={`Mazo del Rival (Deck): ${bot.deck.length} cartas restantes`}
+              >
+                <img
+                  src="/images/back_normal.png"
+                  alt="Mazo Rival"
+                  className="w-full h-full object-cover pointer-events-none opacity-90"
+                  onError={(e) => {
+                    e.currentTarget.style.display = 'none';
+                  }}
+                />
+                <div
+                  className="absolute inset-0 opacity-20 pointer-events-none"
+                  style={{
+                    backgroundImage:
+                      'repeating-linear-gradient(45deg, #000 0, #000 2px, transparent 0, transparent 6px)'
+                  }}
+                />
+                <div className="absolute top-1 left-1 px-1 py-0.2 bg-black/90 text-[#FF003C] font-mono font-black text-[6px] sm:text-[7px] uppercase tracking-wider rounded border border-[#FF003C]/40">
+                  DECK RIVAL
+                </div>
+                <div className="absolute bottom-1 right-1 px-1.5 py-0.5 bg-black/90 text-[#39FF14] border border-[#39FF14]/50 font-mono font-black text-[10px] sm:text-xs rounded shadow-[0_0_8px_rgba(57,255,20,0.6)]">
+                  {bot.deck.length}
+                </div>
+              </div>
+              {/* DECK JUGADOR (MAZO CON REVERSO AMARILLO OFICIAL Y CONTADOR NEÓN) */}
+              <div
+                style={{ clipPath: CYBER_CLIP }}
+                className="relative w-full aspect-[5/7] rounded-xl overflow-hidden border-2 border-[#0dfceb]/50 bg-[#070a10] shadow-md select-none group transition-transform hover:scale-105"
+                title={`Tu Mazo (Deck): ${p.deck.length} cartas restantes`}
+              >
+                <img
+                  src="/images/back_normal.png"
+                  alt="Tu Mazo"
+                  className="w-full h-full object-cover pointer-events-none opacity-90"
+                  onError={(e) => {
+                    e.currentTarget.style.display = 'none';
+                  }}
+                />
+                <div
+                  className="absolute inset-0 opacity-20 pointer-events-none"
+                  style={{
+                    backgroundImage:
+                      'repeating-linear-gradient(45deg, #000 0, #000 2px, transparent 0, transparent 6px)'
+                  }}
+                />
+                <div className="absolute top-1 left-1 px-1 py-0.2 bg-black/90 text-[#FCEE0A] font-mono font-black text-[6px] sm:text-[7px] uppercase tracking-wider rounded border border-[#FCEE0A]/40">
+                  TU MAZO
+                </div>
+                <div className="absolute bottom-1 right-1 px-1.5 py-0.5 bg-black/90 text-[#39FF14] border border-[#39FF14]/50 font-mono font-black text-[10px] sm:text-xs rounded shadow-[0_0_8px_rgba(57,255,20,0.6)]">
+                  {p.deck.length}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* ===============================================================
+              3. SECCIÓN INFERIOR: TAPETE DEL JUGADOR (TÚ)
+              - Barra de Gigs del Jugador con Street Cred
+              - Backline: Leyendas (3 slots a la izquierda) + Zona de Eddies (a la derecha)
+              - Columna Derecha: Trash del Jugador
+             =============================================================== */}
+          <div className="flex gap-2 sm:gap-3 w-full items-stretch">
+            {/* 3.A ZONA CENTRAL DEL JUGADOR: GIGS -> BACKLINE (LEYENDAS + EDDIES) */}
+            <div className="flex-1 flex flex-col gap-1.5 min-w-0">
               {/* BARRA DE GIGS DEL JUGADOR (DADOS ACTIVOS Y STREET CRED) */}
               <div className="px-3 py-1 rounded-xl bg-[#070a10] border border-[#0dfceb]/35 flex items-center justify-between">
                 <div className="flex items-center gap-2">
@@ -4912,37 +5005,8 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
               </div>
             </div>
 
-            {/* 3.B COLUMNA DERECHA DEL JUGADOR: DECK (ARRIBA) Y TRASH (ABAJO) */}
-            <div className="flex flex-col justify-between gap-1.5 sm:gap-2 shrink-0 w-13 sm:w-16 md:w-18">
-              {/* DECK JUGADOR (MAZO CON REVERSO AMARILLO OFICIAL Y CONTADOR NEÓN) */}
-              <div
-                style={{ clipPath: CYBER_CLIP }}
-                className="relative w-full aspect-[5/7] rounded-xl overflow-hidden border-2 border-[#0dfceb]/50 bg-[#070a10] shadow-md select-none group transition-transform hover:scale-105"
-                title={`Tu Mazo (Deck): ${p.deck.length} cartas restantes`}
-              >
-                <img
-                  src="/images/back_normal.png"
-                  alt="Tu Mazo"
-                  className="w-full h-full object-cover pointer-events-none opacity-90"
-                  onError={(e) => {
-                    e.currentTarget.style.display = 'none';
-                  }}
-                />
-                <div
-                  className="absolute inset-0 opacity-20 pointer-events-none"
-                  style={{
-                    backgroundImage:
-                      'repeating-linear-gradient(45deg, #000 0, #000 2px, transparent 0, transparent 6px)'
-                  }}
-                />
-                <div className="absolute top-1 left-1 px-1 py-0.2 bg-black/90 text-[#FCEE0A] font-mono font-black text-[6px] sm:text-[7px] uppercase tracking-wider rounded border border-[#FCEE0A]/40">
-                  TU MAZO
-                </div>
-                <div className="absolute bottom-1 right-1 px-1.5 py-0.5 bg-black/90 text-[#39FF14] border border-[#39FF14]/50 font-mono font-black text-[10px] sm:text-xs rounded shadow-[0_0_8px_rgba(57,255,20,0.6)]">
-                  {p.deck.length}
-                </div>
-              </div>
-
+            {/* 3.B COLUMNA DERECHA DEL JUGADOR: TRASH JUGADOR */}
+            <div className="flex flex-col justify-start shrink-0 w-13 sm:w-16 md:w-18">
               {/* TRASH JUGADOR (ÚLTIMA CARTA JUGADA EN MINIATURA) */}
               {(() => {
                 const lastTrashCard = p.trash && p.trash.length > 0 ? p.trash[p.trash.length - 1] : null;
@@ -5022,7 +5086,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
               })()}
             </div>
           </div>
-        </main>
+</main>
 
         {/* =====================================================================
             ZONA INFERIOR (MANO Y ACCIONES):
