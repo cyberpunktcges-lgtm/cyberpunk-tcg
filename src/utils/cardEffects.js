@@ -998,6 +998,9 @@ export function executeProgramEffect(state, playerKey, card) {
 export function sendDefeatedUnitToGraveyardOrExile(playerState, unit, state = null) {
   if (!unit || !playerState) return;
 
+  const equippedGears = Array.isArray(unit.gear) ? [...unit.gear] : [];
+  unit.gear = [];
+
   const isGoSoloOrLegend = Boolean(unit.hasGoSolo || unit.isLegendUnit);
 
   if (isGoSoloOrLegend) {
@@ -1007,6 +1010,7 @@ export function sendDefeatedUnitToGraveyardOrExile(playerState, unit, state = nu
       if (leg) {
         leg.isOnField = false;
         leg.isRemovedFromGame = true;
+        leg.gear = [];
       }
     }
 
@@ -1024,9 +1028,62 @@ export function sendDefeatedUnitToGraveyardOrExile(playerState, unit, state = nu
   }
 
   // Los Gears equipados a la unidad derrotada van al Trash normalmente
-  if (unit.gear && unit.gear.length > 0) {
+  if (equippedGears.length > 0) {
     if (!playerState.trash) playerState.trash = [];
-    unit.gear.forEach((g) => playerState.trash.push(g));
+    equippedGears.forEach((g) => playerState.trash.push(g));
+  }
+}
+
+/**
+ * Envía una unidad (o Leyenda en campo) al fondo del mazo según las reglas oficiales:
+ * - Si es Leyenda / Go Solo: la Leyenda se remueve del juego y sus Gears equipados van al fondo del mazo.
+ * - Si es Unidad normal: la Unidad y sus Gears equipados van al fondo del mazo.
+ */
+export function sendUnitToBottomDeck(playerState, unit, state = null) {
+  if (!unit || !playerState) return;
+  if (!playerState.deck) playerState.deck = [];
+
+  const equippedGears = Array.isArray(unit.gear) ? [...unit.gear] : [];
+  unit.gear = [];
+
+  const isGoSoloOrLegend = Boolean(unit.hasGoSolo || unit.isLegendUnit);
+
+  if (isGoSoloOrLegend) {
+    const legendId = unit.legendInstanceId || (unit.instanceId ? unit.instanceId.replace(/_unit$/, '') : null);
+    if (legendId && playerState.legends) {
+      const leg = playerState.legends.find((l) => l.instanceId === legendId);
+      if (leg) {
+        leg.isOnField = false;
+        leg.isRemovedFromGame = true;
+        leg.gear = [];
+      }
+    }
+    if (!playerState.removedFromGame) playerState.removedFromGame = [];
+    playerState.removedFromGame.push(unit);
+    equippedGears.forEach((g) => playerState.deck.push(g));
+
+    if (state && state.actionLog) {
+      state.actionLog.unshift(
+        `🚫 [GO SOLO / BOTTOM-DECK] "${unit.name}" queda ELIMINADA DE LA PARTIDA${
+          equippedGears.length > 0
+            ? ` y sus ${equippedGears.length} Gear(s) equipado(s) (${equippedGears.map((g) => g.name).join(', ')}) van al fondo del mazo.`
+            : '.'
+        }`
+      );
+    }
+  } else {
+    playerState.deck.push(unit);
+    equippedGears.forEach((g) => playerState.deck.push(g));
+
+    if (state && state.actionLog) {
+      state.actionLog.unshift(
+        `🌊 [BOTTOM-DECK] "${unit.name}" fue enviada al fondo del mazo${
+          equippedGears.length > 0
+            ? ` junto con sus ${equippedGears.length} Gear(s) equipado(s) (${equippedGears.map((g) => g.name).join(', ')})`
+            : ''
+        }.`
+      );
+    }
   }
 }
 
@@ -1190,7 +1247,9 @@ export function executeUnitPlayTrigger(state, playerKey, unitInstance) {
         sourceCardImage: unitInstance.image,
         title: '🎲 DEXTER DESHAWN // HABILIDAD PLAY',
         prompt: 'Elige cualquier Gig en juego (tuyo o del rival) para ajustarlo en +1 o -1:',
-        deltaRange: 1
+        canIncrease: true,
+        canDecrease: true,
+        maxDelta: 1
       };
     } else {
       const targetGig = (p.gigs || [])[0];
@@ -1497,8 +1556,7 @@ export function executeUnitPlayTrigger(state, playerKey, unitInstance) {
       const oIdx = opp.field.indexOf(target);
       if (oIdx !== -1) {
         const [removed] = opp.field.splice(oIdx, 1);
-        if (!opp.deck) opp.deck = [];
-        opp.deck.push(removed);
+        sendUnitToBottomDeck(opp, removed, state);
         state.actionLog.unshift(`🕯️ [Maman Brigitte Rival] ¡PLAY! Descarta 2 Programas y envía a "${removed.name}" al fondo de tu mazo.`);
       }
     }
@@ -1724,8 +1782,7 @@ export function executeUnitPlayTrigger(state, playerKey, unitInstance) {
       const oIdx = opp.field.indexOf(target);
       if (oIdx !== -1) {
         const [removed] = opp.field.splice(oIdx, 1);
-        if (!opp.deck) opp.deck = [];
-        opp.deck.push(removed);
+        sendUnitToBottomDeck(opp, removed, state);
         state.actionLog.unshift(`📡 [Placide Rival] ¡PLAY! Descarta 1 Programa y envía a "${removed.name}" al fondo de tu mazo.`);
       }
     }
@@ -2037,8 +2094,7 @@ export function executeUnitAttackTrigger(state, playerKey, attackerUnit) {
       const oIdx = opp.field.indexOf(target);
       if (oIdx !== -1) {
         const [removed] = opp.field.splice(oIdx, 1);
-        if (!opp.deck) opp.deck = [];
-        opp.deck.push(removed);
+        sendUnitToBottomDeck(opp, removed, state);
         state.actionLog.unshift(`📡 [Placide Rival] ¡ATTACK! Descarta 1 Programa y envía a "${removed.name}" al fondo de tu mazo.`);
       }
     }
@@ -2322,7 +2378,7 @@ export function executeCallLegendTrigger(state, playerKey, legendCard) {
   const p = state[playerKey];
   const oppKey = playerKey === 'player' ? 'bot' : 'player';
   const opp = state[oppKey];
-  const cardId = legendCard.id || '';
+  const cardId = resolveCardId(legendCard);
   const cardName = legendCard.name || 'Leyenda';
 
   // CP-026: Dexter DeShawn // Off the Grid
@@ -2366,7 +2422,9 @@ export function executeCallLegendTrigger(state, playerKey, legendCard) {
   // CP-029: Dum Dum // Maelstrom Triggerman
   // "CALL You may defeat a friendly Gear. If you do, draw 2. Otherwise, draw 1."
   if (cardId === 'CP-029' || legendCard.slug?.includes('dum-dum')) {
-    const hasGear = (p.field || []).some((u) => u.gear && u.gear.length > 0);
+    const hasUnitGear = (p.field || []).some((u) => u.gear && u.gear.length > 0);
+    const hasLegendGear = (p.legends || []).some((l) => l.isFaceUp && !l.isOnField && !l.isRemovedFromGame && l.gear && l.gear.length > 0);
+    const hasGear = hasUnitGear || hasLegendGear;
     if (playerKey === 'player') {
       state.pendingModalChoice = {
         sourceCardId: 'CP-029',
@@ -2646,6 +2704,62 @@ export function executeEndOfTurnTriggers(state, playerKey) {
 // =========================================================================
 // 9. MOTOR DE ACTIVACIÓN DE LEYENDAS (ACTIVATED ABILITIES: ↷ / QUICK)
 // =========================================================================
+
+/**
+ * Dispara habilidades pasivas cuando una unidad aliada usa BLOCKER para interceptar un ataque:
+ * - CP-042 Goro Takemura // Vengeful Bodyguard: "When a friendly Unit uses BLOCKER, you may discard 1. If you do, draw 1."
+ * - CP-012 Augmented Negotiators: "When this Unit uses BLOCKER, a Rival discards 1."
+ */
+export function executeBlockerUsedTrigger(state, defenderKey, blockerUnit) {
+  if (!state || !blockerUnit) return;
+  const def = state[defenderKey];
+  const oppKey = defenderKey === 'player' ? 'bot' : 'player';
+  const opp = state[oppKey];
+  const blockerId = resolveCardId(blockerUnit);
+
+  // CP-012 Augmented Negotiators: "When this Unit uses BLOCKER, a Rival discards 1."
+  if (blockerId === 'CP-012') {
+    if (opp.hand && opp.hand.length > 0) {
+      const [disc] = opp.hand.splice(0, 1);
+      if (!opp.trash) opp.trash = [];
+      opp.trash.push(disc);
+      state.actionLog.unshift(
+        `🛡️ [Augmented Negotiators] ¡Al bloquear! El rival descarta "${disc.name}".`
+      );
+    }
+  }
+
+  // CP-042 Goro Takemura // Vengeful Bodyguard (Leyenda boca arriba):
+  // "When a friendly Unit uses BLOCKER, you may discard 1. If you do, draw 1."
+  const takemura = (def.legends || []).find(
+    (l) => l.isFaceUp && !l.isRemovedFromGame && resolveCardId(l) === 'CP-042'
+  );
+  if (takemura && (def.hand || []).length > 0 && (def.deck || []).length > 0) {
+    if (defenderKey === 'player') {
+      state.pendingCardChoice = {
+        type: 'TAKEMURA_BLOCKER_LOOT',
+        playerKey: 'player',
+        sourceCardId: 'CP-042',
+        sourceCardName: 'Goro Takemura // Vengeful Bodyguard',
+        sourceCardImage: takemura.image,
+        title: '🛡️ GORO TAKEMURA // TRIGGER AL BLOQUEAR',
+        prompt: `Tu unidad "${blockerUnit.name}" ha usado BLOCKER. Puedes descartar 1 carta de tu mano para robar 1 carta (o omitir):`,
+        cards: [...def.hand],
+        eligibleIds: def.hand.map((c) => c.instanceId),
+        maxChoices: 1,
+        minChoices: 0,
+        selectedIds: [],
+        filterDescription: 'Elige 1 carta de tu mano para descartar y robar 1 (opcional)'
+      };
+    } else {
+      // Bot AI: descarta 1 carta de mano y roba 1
+      const [disc] = def.hand.splice(0, 1);
+      if (!def.trash) def.trash = [];
+      def.trash.push(disc);
+      drawCards(def, 1, state, 'Goro Takemura Rival');
+    }
+  }
+}
 
 export function executeLegendAbility(state, playerKey, legendCard, abilityId = null) {
   if (!state || !legendCard) return { success: false, reason: 'Leyenda no válida' };

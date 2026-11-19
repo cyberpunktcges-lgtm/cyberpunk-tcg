@@ -22,7 +22,7 @@ import {
   parseCardCost,
   canUnitAttack
 } from './cyberpunkEngine.js';
-import { executeUnitAttackTrigger } from './cardEffects.js';
+import { executeUnitAttackTrigger, executeBlockerUsedTrigger } from './cardEffects.js';
 
 /**
  * Decide si el bot desea interceptar un ataque del jugador usando una de sus unidades con Blocker.
@@ -239,7 +239,9 @@ export async function runBotTurn(gameState, updateCallback, delayMs = 700) {
   }
 
   // Paso 4: Fase de Ataques con Unidades Listas (Ready, sin Lag y sin restricciones de ataque)
-  const readyUnits = (bot.field || []).filter((u) => canUnitAttack(u, bot, gameState));
+  const readyUnits = (bot.field || [])
+    .filter((u) => canUnitAttack(u, bot, gameState))
+    .sort((a, b) => (b.mustAttackNextTurn ? 1 : 0) - (a.mustAttackNextTurn ? 1 : 0));
 
   for (const unit of readyUnits) {
     if (gameState.isGameOver) break;

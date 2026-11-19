@@ -7,6 +7,9 @@
 import {
   getAvailableEddies,
   getTotalAvailableEddies,
+  getSpendableEddiesExcludingCard,
+  payEddieCostWithAutoTap,
+  getEffectiveCardCost,
   spendEddies,
   hasKeyword
 } from './cyberpunkEngine.js';
@@ -39,14 +42,14 @@ export const ACTIVATED_ABILITIES_CONFIG = {
       execute: (state, playerKey, card) => {
         const p = state[playerKey];
         card.isSpent = true;
-        const minGigs = (p.gigs || []).filter((g) => g.value === 1).length;
-        p.altCunninghamProgramDiscount = minGigs;
+        p.altCunninghamDiscountStacks = (p.altCunninghamDiscountStacks || 0) + 1;
+        const minGigs = (p.gigs || []).filter((g) => Number(g.value) === 1).length;
         state.actionLog.unshift(
-          `🌐 [Alt Cunningham] Activa (↷): Tu próximo Programa este turno cuesta -${minGigs} €$ (por ${minGigs} Gig(s) mínimo(s) de valor 1, coste mínimo final 1 €$).`
+          `🌐 [Alt Cunningham] Activa (↷): Tu próximo Programa este turno cuesta -1 €$ por cada Gig mínimo aliado (actualmente ${minGigs} Gig(s) mínimo(s) = -${minGigs * p.altCunninghamDiscountStacks} €$, mínimo 1 €$).`
         );
         return {
           success: true,
-          message: `Descuento activado: Tu próximo Programa este turno costará -${minGigs} €$ (mínimo 1 €$).`
+          message: `Descuento activado: Tu próximo Programa este turno costará -1 €$ por cada Gig mínimo que controles (actualmente -${minGigs * p.altCunninghamDiscountStacks} €$, mínimo 1 €$).`
         };
       }
     },
@@ -63,25 +66,43 @@ export const ACTIVATED_ABILITIES_CONFIG = {
         if (!card.isFaceUp) return { can: false, reason: 'Alt Cunningham debe estar boca arriba.' };
         if (card.isSpent) return { can: false, reason: 'Alt Cunningham ya está girada en este turno.' };
         const p = state[playerKey];
-        const totalCap = getTotalAvailableEddies(p);
-        if (totalCap < 1) return { can: false, reason: 'Necesitas al menos 1 €$ para activar esta habilidad.' };
+        // Excluir a Alt de los Eddies disponibles ya que Alt se gira para pagar (↷)
+        const otherEddies = getSpendableEddiesExcludingCard(p, card.instanceId);
+        if (otherEddies < 1) {
+          return { can: false, reason: 'Necesitas al menos 1 €$ adicional (sin contar a Alt) para activar esta habilidad.' };
+        }
         const trashProgs = (p.trash || []).filter(
           (c) => c.officialType === 'PROGRAM' || (c.type || '').toUpperCase().includes('PROGRAM')
         );
         if (trashProgs.length === 0) {
           return { can: false, reason: 'No tienes cartas de tipo Programa en tu Basura (Trash).' };
         }
+        const remainingAfterActivation = otherEddies - 1;
+        const affordableProgs = trashProgs.filter(
+          (prog) => getEffectiveCardCost(prog, p, state) <= remainingAfterActivation
+        );
+        if (affordableProgs.length === 0) {
+          return {
+            can: false,
+            reason: `Tienes Programas en Basura, pero tras pagar 1 €$ de activación solo te quedarían ${remainingAfterActivation} €$ (insuficiente para pagar su coste).`
+          };
+        }
         return { can: true };
       },
       execute: (state, playerKey, card) => {
         const p = state[playerKey];
-        // Cobrar 1 Eddie de activación
-        spendEddies(p, 1);
+        // Pagar 1 Eddie de activación sin girar a Alt, luego girar a Alt
+        const paid = payEddieCostWithAutoTap(p, 1, card.instanceId);
+        if (!paid) return { success: false, reason: 'No tienes 1 €$ adicional para activar a Alt Cunningham.' };
         card.isSpent = true;
 
+        const remainingCap = getSpendableEddiesExcludingCard(p, null);
         const trashProgs = (p.trash || []).filter(
           (c) => c.officialType === 'PROGRAM' || (c.type || '').toUpperCase().includes('PROGRAM')
         );
+        const affordableIds = trashProgs
+          .filter((prog) => getEffectiveCardCost(prog, p, state) <= remainingCap)
+          .map((c) => c.instanceId);
 
         state.pendingCardChoice = {
           type: 'ALT_CUNNINGHAM_PLAY_TRASH_PROGRAM',
@@ -90,16 +111,17 @@ export const ACTIVATED_ABILITIES_CONFIG = {
           sourceCardName: 'Alt Cunningham // Soulkiller Architect',
           sourceCardImage: card.image,
           title: '🌐 ALT CUNNINGHAM // RECUPERAR PROGRAMA DE BASURA',
-          prompt: 'Selecciona 1 Programa de tu Basura para jugarlo (pagarás su coste y al resolverse irá al fondo de tu mazo):',
+          prompt: `Selecciona 1 Programa de tu Basura para jugarlo (pagarás su coste con tus ${remainingCap} €$ disponibles y al resolverse irá al fondo de tu mazo):`,
           cards: trashProgs,
-          eligibleIds: trashProgs.map((c) => c.instanceId),
+          eligibleIds: affordableIds,
           maxChoices: 1,
+          minChoices: affordableIds.length > 0 ? 1 : 0,
           selectedIds: [],
-          filterDescription: 'Solo Programas de tu Basura'
+          filterDescription: `Programas en Basura con coste ≤ ${remainingCap} €$`
         };
 
         state.actionLog.unshift(
-          `🌐 [Alt Cunningham] Paga 1 €$, gira a Alt y abre su interfaz de Basura para jugar un Programa.`
+          `🌐 [Alt Cunningham] Paga 1 €$, gira a Alt y abre la Basura para jugar un Programa (Eddies restantes: ${remainingCap} €$).`
         );
         return { success: true, requiresModal: true, message: 'Selecciona el Programa de tu Basura.' };
       }
@@ -112,9 +134,9 @@ export const ACTIVATED_ABILITIES_CONFIG = {
       id: 'CP-026-TAP',
       abilityIndex: 0,
       title: '↷ Aumentar Gig hasta +2',
-      shortTitle: '↷ Gig +2',
+      shortTitle: '↷ Gig +1/+2',
       badgeText: '↷ GIG +2',
-      description: 'Gira a Dexter: Aumenta el valor de un Gig (propio o rival) en hasta 2.',
+      description: 'Gira a Dexter: Elige cualquier Gig en juego (tuyo o del rival) y aumenta su valor en +1 o +2 (sin superar el máximo de ese dado).',
       costEddie: 0,
       requiresTap: true,
       canActivate: (state, playerKey, card) => {
@@ -127,15 +149,34 @@ export const ACTIVATED_ABILITIES_CONFIG = {
       execute: (state, playerKey, card) => {
         card.isSpent = true;
         const p = state[playerKey];
-        // Si el jugador tiene al menos un gig, aumentar su primer gig (o abrir selección)
-        const targetGig = (p.gigs && p.gigs.length > 0) ? p.gigs[0] : (state.bot.gigs[0]);
-        if (targetGig) {
-          const oldVal = targetGig.value;
-          targetGig.value = Math.min(20, (targetGig.value || 0) + 2);
+        if (playerKey === 'player') {
+          state.pendingTargetSelection = {
+            actionType: 'ADJUST_GIG',
+            sourceCardId: 'CP-026',
+            sourceCardName: 'Dexter DeShawn // Off the Grid',
+            sourceCardImage: card.image,
+            title: '💼 DEXTER DESHAWN // ↷ AUMENTAR GIG',
+            prompt: 'Selecciona cualquier Gig en juego (tuyo o del rival) para aumentar su valor en +1 o +2:',
+            canIncrease: true,
+            canDecrease: false,
+            maxDelta: 2
+          };
           state.actionLog.unshift(
-            `💼 [Dexter DeShawn] Activa (↷): Aumenta el Gig ${targetGig.dieType?.toUpperCase()} de ${oldVal} a ${targetGig.value} (+2).`
+            `💼 [Dexter DeShawn] Gira a Dexter (↷) para aumentar un Gig en hasta +2.`
           );
-          return { success: true, message: `Gig ${targetGig.dieType?.toUpperCase()} aumentado a ${targetGig.value}.` };
+          return { success: true, requiresModal: true, message: 'Selecciona el Gig a aumentar (+1 o +2).' };
+        }
+        // Bot AI: aumenta su propio Gig con más margen (respetando el máximo de caras del dado)
+        const targetGig = (p.gigs || [])[0] || (state.player?.gigs || [])[0];
+        if (targetGig) {
+          const dieStr = String(targetGig.die || targetGig.dieType || 'd20');
+          const maxFace = parseInt(dieStr.replace(/\D/g, ''), 10) || 20;
+          const oldVal = targetGig.value;
+          targetGig.value = Math.min(maxFace, (targetGig.value || 1) + 2);
+          state.actionLog.unshift(
+            `💼 [Dexter DeShawn Rival] Activa (↷): Aumenta el Gig ${dieStr.toUpperCase()} de ${oldVal} a ${targetGig.value}.`
+          );
+          return { success: true, message: `Gig ${dieStr.toUpperCase()} aumentado a ${targetGig.value}.` };
         }
         return { success: false, reason: 'No se encontró un Gig válido.' };
       }
@@ -147,35 +188,57 @@ export const ACTIVATED_ABILITIES_CONFIG = {
     {
       id: 'CP-029-TAP',
       abilityIndex: 0,
+      isQuick: true,
       title: 'QUICK 1 €$, ↷ Bono por Gear (+1 por cada Gear equipado)',
       shortTitle: '1 €$, ↷ +Fuerza Gear',
-      badgeText: '1 €$, ↷ +GEAR',
-      description: 'Paga 1 €$ y gira a Dum Dum: Otorga a una Unidad aliada +1 de Fuerza este turno por cada Gear que tenga equipado.',
+      badgeText: 'QUICK 1€$, ↷',
+      description: 'QUICK (también en Fase de Reacción): Paga 1 €$ y gira a Dum Dum para dar a una Unidad aliada +1 de Fuerza este turno por cada Gear que tenga equipado.',
       costEddie: 1,
       requiresTap: true,
       canActivate: (state, playerKey, card) => {
         if (!card.isFaceUp) return { can: false, reason: 'Dum Dum debe estar boca arriba.' };
         if (card.isSpent) return { can: false, reason: 'Dum Dum ya está girado en este turno.' };
         const p = state[playerKey];
-        if (getTotalAvailableEddies(p) < 1) return { can: false, reason: 'Necesitas 1 €$ para activar a Dum Dum.' };
-        if ((p.field || []).length === 0) return { can: false, reason: 'No tienes unidades en el campo.' };
+        if (getSpendableEddiesExcludingCard(p, card.instanceId) < 1) {
+          return { can: false, reason: 'Necesitas al menos 1 €$ adicional (sin contar a Dum Dum) para activar esta habilidad.' };
+        }
+        if ((p.field || []).length === 0) return { can: false, reason: 'No tienes unidades en el campo de batalla.' };
         return { can: true };
       },
       execute: (state, playerKey, card) => {
         const p = state[playerKey];
-        spendEddies(p, 1);
+        const paid = payEddieCostWithAutoTap(p, 1, card.instanceId);
+        if (!paid) {
+          return { success: false, reason: 'Gira primero 1 Eddie o Leyenda para tener 1 €$ en reserva antes de activar a Dum Dum.' };
+        }
         card.isSpent = true;
 
-        // Buscar unidades con gear o la primera unidad
-        const equippedUnit = (p.field || []).find((u) => u.gear && u.gear.length > 0) || p.field[0];
-        const gearCount = equippedUnit.gear ? equippedUnit.gear.length : 0;
-        const bonus = Math.max(1, gearCount);
-        equippedUnit.currentPower = (equippedUnit.currentPower || equippedUnit.power || 0) + bonus;
+        if (playerKey === 'player' && (p.field || []).length > 1) {
+          state.pendingTargetSelection = {
+            actionType: 'TARGET_UNIT',
+            sourceCardId: 'CP-029',
+            sourceCardName: 'Dum Dum // Maelstrom Triggerman',
+            sourceCardImage: card.image,
+            title: '💉 DUM DUM // QUICK 1 €$, ↷ BONO POR GEAR',
+            prompt: 'Selecciona una Unidad aliada: ganará +1 de Fuerza este turno por cada Gear que tenga equipado:',
+            effectType: 'BUFF_PER_GEAR',
+            targetScope: 'FRIENDLY_UNITS'
+          };
+          state.actionLog.unshift(`💉 [Dum Dum] Paga 1 €$ y gira a Dum Dum (QUICK ↷) para potenciar una unidad aliada según sus Gears.`);
+          return { success: true, requiresModal: true, message: 'Selecciona la unidad aliada a potenciar.' };
+        }
 
-        state.actionLog.unshift(
-          `💉 [Dum Dum] Paga 1 €$ y gira a Dum Dum: Otorga +${bonus} de Fuerza a "${equippedUnit.name}" (${gearCount} Gear(s) equipado(s)). Fuerza actual: ${equippedUnit.currentPower}.`
-        );
-        return { success: true, message: `+${bonus} de Fuerza otorgado a "${equippedUnit.name}".` };
+        // 1 unidad (o Bot AI: elige la que más Gears tiene)
+        const target = [...(p.field || [])].sort((a, b) => (b.gear?.length || 0) - (a.gear?.length || 0))[0];
+        const gearCount = target?.gear ? target.gear.length : 0;
+        if (target) {
+          target.currentPower = (target.currentPower || target.power || 0) + gearCount;
+          state.actionLog.unshift(
+            `💉 [Dum Dum] Paga 1 €$ y gira a Dum Dum: Otorga +${gearCount} de Fuerza este turno a "${target.name}" (${gearCount} Gear(s) equipado(s)). Fuerza actual: ${target.currentPower}.`
+          );
+          return { success: true, message: `+${gearCount} de Fuerza este turno otorgado a "${target.name}" (${gearCount} Gear(s)).` };
+        }
+        return { success: false, reason: 'No hay unidad válida.' };
       }
     }
   ],
@@ -188,7 +251,7 @@ export const ACTIVATED_ABILITIES_CONFIG = {
       title: '1 €$, ↷ Provocación Forzada (Rival debe atacar)',
       shortTitle: '1 €$, ↷ Provocar',
       badgeText: '1 €$, ↷ PROVOCA',
-      description: 'Paga 1 €$ y gira a Evelyn: Una Unidad rival debe atacar en su próximo turno si puede hacerlo.',
+      description: 'Paga 1 €$ y gira a Evelyn: Elige una Unidad rival; deberá atacar en su próximo turno si puede hacerlo.',
       costEddie: 1,
       requiresTap: true,
       canActivate: (state, playerKey, card) => {
@@ -196,22 +259,42 @@ export const ACTIVATED_ABILITIES_CONFIG = {
         if (card.isSpent) return { can: false, reason: 'Evelyn ya está girada en este turno.' };
         const p = state[playerKey];
         const opp = state[playerKey === 'player' ? 'bot' : 'player'];
-        if (getTotalAvailableEddies(p) < 1) return { can: false, reason: 'Necesitas 1 €$ para activar a Evelyn.' };
+        if (getSpendableEddiesExcludingCard(p, card.instanceId) < 1) {
+          return { can: false, reason: 'Necesitas al menos 1 €$ adicional (sin contar a Evelyn) para activar esta habilidad.' };
+        }
         if ((opp.field || []).length === 0) return { can: false, reason: 'El rival no tiene unidades en el campo.' };
         return { can: true };
       },
       execute: (state, playerKey, card) => {
         const p = state[playerKey];
         const opp = state[playerKey === 'player' ? 'bot' : 'player'];
-        spendEddies(p, 1);
+        const paid = payEddieCostWithAutoTap(p, 1, card.instanceId);
+        if (!paid) {
+          return { success: false, reason: 'Gira primero 1 Eddie o Leyenda para tener 1 €$ en reserva antes de activar a Evelyn.' };
+        }
         card.isSpent = true;
+
+        if (playerKey === 'player' && (opp.field || []).length > 1) {
+          state.pendingTargetSelection = {
+            actionType: 'TARGET_UNIT',
+            sourceCardId: 'CP-033',
+            sourceCardName: 'Evelyn Parker // Beautiful Enigma',
+            sourceCardImage: card.image,
+            title: '💋 EVELYN PARKER // 1 €$, ↷ PROVOCACIÓN',
+            prompt: 'Selecciona una Unidad rival: deberá atacar en su próximo turno si puede hacerlo:',
+            effectType: 'MUST_ATTACK',
+            targetScope: 'RIVAL_UNITS'
+          };
+          state.actionLog.unshift(`💋 [Evelyn Parker] Paga 1 €$ y gira a Evelyn para obligar a una unidad rival a atacar.`);
+          return { success: true, requiresModal: true, message: 'Selecciona la unidad rival objetivo.' };
+        }
 
         const target = opp.field[0];
         target.mustAttackNextTurn = true;
         state.actionLog.unshift(
           `💋 [Evelyn Parker] Paga 1 €$ y gira a Evelyn: "${target.name}" del rival está forzada a atacar en su próximo turno si puede.`
         );
-        return { success: true, message: `"${target.name}" obligada a atacar su próximo turno.` };
+        return { success: true, message: `"${target.name}" obligada a atacar en su próximo turno.` };
       }
     }
   ],
@@ -221,42 +304,67 @@ export const ACTIVATED_ABILITIES_CONFIG = {
     {
       id: 'CP-042-TAP',
       abilityIndex: 0,
+      isQuick: true,
       title: 'QUICK 1 €$, ↷ Conceder Blocker (Coste ≤ 4)',
       shortTitle: '1 €$, ↷ Blocker',
-      badgeText: '1 €$, ↷ BLOCKER',
-      description: 'Paga 1 €$ y gira a Takemura: Otorga BLOCKER a una Unidad aliada de coste ≤ 4 (+1 Fuerza si controlas pareja de Gigs).',
+      badgeText: 'QUICK 1€$, ↷',
+      description: 'QUICK (también en Fase de Reacción): Paga 1 €$ y gira a Takemura para dar BLOCKER este turno a una Unidad aliada de coste ≤ 4 (+1 Fuerza este turno si controlas pareja de Gigs).',
       costEddie: 1,
       requiresTap: true,
       canActivate: (state, playerKey, card) => {
         if (!card.isFaceUp) return { can: false, reason: 'Takemura debe estar boca arriba.' };
         if (card.isSpent) return { can: false, reason: 'Takemura ya está girado en este turno.' };
         const p = state[playerKey];
-        if (getTotalAvailableEddies(p) < 1) return { can: false, reason: 'Necesitas 1 €$ para activar a Takemura.' };
-        const eligibleUnits = (p.field || []).filter((u) => (u.costNum || u.parsedCost || 0) <= 4);
+        if (getSpendableEddiesExcludingCard(p, card.instanceId) < 1) {
+          return { can: false, reason: 'Necesitas al menos 1 €$ adicional (sin contar a Takemura) para activar esta habilidad.' };
+        }
+        const eligibleUnits = (p.field || []).filter((u) => {
+          const c = typeof u.parsedCost === 'number' ? u.parsedCost : (typeof u.costNum === 'number' ? u.costNum : parseInt(String(u.cost || '').replace(/\D/g, ''), 10) || 0);
+          return c <= 4;
+        });
         if (eligibleUnits.length === 0) return { can: false, reason: 'No tienes unidades aliadas con coste ≤ 4.' };
         return { can: true };
       },
       execute: (state, playerKey, card) => {
         const p = state[playerKey];
-        spendEddies(p, 1);
+        const paid = payEddieCostWithAutoTap(p, 1, card.instanceId);
+        if (!paid) {
+          return { success: false, reason: 'Gira primero 1 Eddie o Leyenda para tener 1 €$ en reserva antes de activar a Takemura.' };
+        }
         card.isSpent = true;
 
-        const target = (p.field || []).find((u) => (u.costNum || u.parsedCost || 0) <= 4) || p.field[0];
-        target.isTemporaryBlockerThisTurn = true;
-        if (!target.keywords) target.keywords = [];
-        if (!target.keywords.includes('Blocker')) target.keywords.push('Blocker');
+        const eligibleUnits = (p.field || []).filter((u) => {
+          const c = typeof u.parsedCost === 'number' ? u.parsedCost : (typeof u.costNum === 'number' ? u.costNum : parseInt(String(u.cost || '').replace(/\D/g, ''), 10) || 0);
+          return c <= 4;
+        });
 
-        // Comprobar si controla pareja de Gigs de igual valor
-        const values = (p.gigs || []).map((g) => g.value);
+        if (playerKey === 'player' && eligibleUnits.length > 1) {
+          state.pendingTargetSelection = {
+            actionType: 'TARGET_UNIT',
+            sourceCardId: 'CP-042',
+            sourceCardName: 'Goro Takemura // Vengeful Bodyguard',
+            sourceCardImage: card.image,
+            title: '🛡️ GORO TAKEMURA // QUICK 1 €$, ↷ BLOCKER',
+            prompt: 'Selecciona una Unidad aliada con coste ≤ 4 para otorgarle BLOCKER este turno (+1 Fuerza si controlas pareja de Gigs):',
+            effectType: 'GRANT_BLOCKER_TAKEMURA',
+            targetScope: 'FRIENDLY_UNITS',
+            maxCost: 4
+          };
+          state.actionLog.unshift(`🛡️ [Goro Takemura] Paga 1 €$ y gira a Takemura (QUICK ↷) para conceder BLOCKER a una unidad aliada.`);
+          return { success: true, requiresModal: true, message: 'Selecciona la unidad aliada (coste ≤ 4).' };
+        }
+
+        const target = eligibleUnits[0];
+        target.isTemporaryBlockerThisTurn = true;
+        const values = (p.gigs || []).map((g) => Number(g.value));
         const hasPair = new Set(values).size < values.length;
         if (hasPair) {
           target.currentPower = (target.currentPower || target.power || 0) + 1;
         }
-
         state.actionLog.unshift(
-          `🛡️ [Goro Takemura] Paga 1 €$ y gira a Takemura: Otorga BLOCKER a "${target.name}"${hasPair ? ' y +1 de Fuerza (por pareja de Gigs)' : ''}.`
+          `🛡️ [Goro Takemura] Paga 1 €$ y gira a Takemura: Otorga BLOCKER este turno a "${target.name}"${hasPair ? ' y +1 de Fuerza (por pareja de Gigs)' : ''}.`
         );
-        return { success: true, message: `BLOCKER concedido a "${target.name}".` };
+        return { success: true, message: `BLOCKER concedido este turno a "${target.name}"${hasPair ? ' (+1 Fuerza por pareja de Gigs)' : ''}.` };
       }
     }
   ],
@@ -509,6 +617,7 @@ export const ACTIVATED_ABILITIES_CONFIG = {
     {
       id: 'CP-089-TAP',
       abilityIndex: 0,
+      isQuick: true,
       title: 'QUICK 1 €$, ↷ Francotirador Overwatch (Descartar 1 para destruir)',
       shortTitle: '1 €$, ↷ Snipe',
       badgeText: '1 €$, ↷ SNIPE',
@@ -635,6 +744,7 @@ export const ACTIVATED_ABILITIES_CONFIG = {
     {
       id: 'CP-104-TAP',
       abilityIndex: 0,
+      isQuick: true,
       title: 'QUICK ↷ Equipar Gear Gratis (Coste ≤ 2 €$)',
       shortTitle: '↷ Equipar Gear',
       badgeText: '↷ GEAR GRATIS',
@@ -667,6 +777,7 @@ export const ACTIVATED_ABILITIES_CONFIG = {
     {
       id: 'CP-107-TAP',
       abilityIndex: 0,
+      isQuick: true,
       title: 'QUICK 2 €$, ↷ Debuff de Fuerza Rival',
       shortTitle: '2 €$, ↷ Debuff',
       badgeText: '2 €$, ↷ DEBUFF',

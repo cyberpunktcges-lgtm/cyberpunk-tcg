@@ -13,7 +13,8 @@ import {
   executeUnitDefeatedTrigger,
   executeCallLegendTrigger,
   executeStartOfTurnTriggers,
-  executeEndOfTurnTriggers
+  executeEndOfTurnTriggers,
+  executeBlockerUsedTrigger
 } from './cardEffects.js';
 
 // Dados poliédricos de Gigs y sus valores máximos
@@ -72,12 +73,18 @@ export function rollDie(dieType) {
 export function hasKeyword(card, keyword) {
   if (!card) return false;
   const target = keyword.toLowerCase();
-  const kw = (card.keywords || '').toLowerCase();
-  if (kw.includes(target)) return true;
-  const traits = (card.traits || '').toLowerCase();
-  if (traits.includes(target)) return true;
-  const text = (card.rulesText || card.rules || card.text || card.effect || card.ability || '').toLowerCase();
-  return text.includes(target);
+  if (target === 'blocker' && card.isTemporaryBlockerThisTurn) return true;
+  if (target === 'adrenaline' && card.hasAdrenaline) return true;
+
+  const rawKw = Array.isArray(card.keywords) ? card.keywords.join(', ') : String(card.keywords || '');
+  if (rawKw.toLowerCase().includes(target)) return true;
+
+  const rawTraits = Array.isArray(card.traits) ? card.traits.join(', ') : String(card.traits || '');
+  if (rawTraits.toLowerCase().includes(target)) return true;
+
+  const text = String(card.rulesText || card.rules || card.text || card.effect || card.ability || '');
+  const lineRegex = new RegExp('(^|\\n)\\s*' + target.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b', 'i');
+  return lineRegex.test(text);
 }
 
 /**
@@ -614,6 +621,123 @@ export function spendEddies(playerState, amount) {
 }
 
 /**
+ * Calcula el total de Eddies gastables (flotantes + Eddies sin girar + Leyendas sin girar)
+ * excluyendo opcionalmente la carta que se está girando para pagar su propio coste (↷).
+ */
+export function getSpendableEddiesExcludingCard(playerState, excludedCardInstanceId = null) {
+  if (!playerState) return 0;
+  const floating = playerState.floatingEddies || 0;
+  const readyEddies = (playerState.eddies || []).filter(
+    (e) => !e.isSpent && e.instanceId !== excludedCardInstanceId
+  ).length;
+  const readyLegends = (playerState.legends || []).filter(
+    (l) => !l.isSpent && !l.isOnField && !l.isRemovedFromGame && l.instanceId !== excludedCardInstanceId
+  ).length;
+  return floating + readyEddies + readyLegends;
+}
+
+/**
+ * Paga un coste en Eddies usando primero los flotantes (floatingEddies) y, si falta,
+ * girando Eddies de la Zona de Eddies (NUNCA gira automáticamente Leyendas).
+ */
+export function payEddieCostWithAutoTap(playerState, amount, excludedCardInstanceId = null) {
+  const cost = Math.max(0, Number(amount) || 0);
+  if (cost === 0) return true;
+  const floating = playerState.floatingEddies || 0;
+  const readyEddies = (playerState.eddies || []).filter(
+    (e) => !e.isSpent && e.instanceId !== excludedCardInstanceId
+  );
+  if (floating + readyEddies.length < cost) return false;
+
+  let needed = cost;
+  if (floating > 0) {
+    const usedFloat = Math.min(floating, needed);
+    playerState.floatingEddies = floating - usedFloat;
+    needed -= usedFloat;
+  }
+
+  for (const ed of readyEddies) {
+    if (needed <= 0) break;
+    ed.isSpent = true;
+    needed--;
+  }
+
+  return needed === 0;
+}
+
+/**
+ * Calcula el coste efectivo actual de una carta aplicando todos los descuentos oficiales activos
+ * (ej: Alt Cunningham CP-008, Carnage at the Colosseum CP-016, Nocturne Op55N1 CP-085,
+ *  MaxTac Heavy CP-071, Octant CP-086, Trauma Team CP-131, Zetatech Berserk CP-150, Viktor CP-140).
+ */
+export function getEffectiveCardCost(card, playerState = null, gameState = null) {
+  if (!card) return 0;
+  const baseCost =
+    typeof card.parsedCost === 'number' && !Number.isNaN(card.parsedCost)
+      ? card.parsedCost
+      : typeof card.costNum === 'number' && !Number.isNaN(card.costNum)
+      ? card.costNum
+      : parseCardCost(card.cost);
+
+  if (!playerState) return baseCost;
+
+  const cId = String(card.id || '').toUpperCase();
+  const slug = String(card.slug || '').toLowerCase();
+  const cardType = getCardType(card);
+  let cost = baseCost;
+
+  if (cardType === 'PROGRAM') {
+    // CP-085 Nocturne Op55N1: "If your fixer area is empty, play this Program for 1 €$"
+    if ((cId === 'CP-085' || slug.includes('nocturne')) && (playerState.fixerDice || []).length === 0) {
+      cost = Math.min(cost, 1);
+    }
+    // CP-016 Carnage at the Colosseum: -1 €$ for each friendly Gig with 8+ value, min 1
+    if (cId === 'CP-016' || slug.includes('carnage-at-the-colosseum')) {
+      const highGigs = (playerState.gigs || []).filter((g) => (g.value || 0) >= 8).length;
+      if (highGigs > 0) cost = Math.min(cost, Math.max(1, cost - highGigs));
+    }
+    // CP-008 Alt Cunningham // Soulkiller Architect (Habilidad 1):
+    // "Your next Program this turn plays for -1 €$ for each friendly min Gig, to a minimum of 1 €$"
+    const stacks = playerState.altCunninghamDiscountStacks || (playerState.altCunninghamProgramDiscount > 0 ? 1 : 0);
+    if (stacks > 0) {
+      const minGigsNow = (playerState.gigs || []).filter((g) => Number(g.value) === 1).length;
+      const totalDiscount = minGigsNow * stacks;
+      if (totalDiscount > 0) {
+        cost = Math.min(cost, Math.max(1, cost - totalDiscount));
+      }
+    }
+  } else if (cardType === 'UNIT') {
+    const opp = gameState ? gameState[playerState.id === 'player' ? 'bot' : 'player'] : null;
+    if (cId === 'CP-071' || slug.includes('maxtac-heavy')) {
+      const oppUnitsCount = (opp?.field || []).length;
+      if (oppUnitsCount > 0) cost = Math.min(cost, Math.max(1, cost - oppUnitsCount));
+    }
+    if (cId === 'CP-086' || slug.includes('octant')) {
+      const highGigs = (playerState.gigs || []).filter((g) => (g.value || 0) >= 8).length;
+      if (highGigs > 0) cost = Math.min(cost, Math.max(1, cost - highGigs));
+    }
+    if (cId === 'CP-131' || slug.includes('trauma-team-operatives')) {
+      const trashUnits = (playerState.trash || []).filter(
+        (c) => String(c.officialType || '').toUpperCase() === 'UNIT' || String(c.type || '').toUpperCase().includes('UNIT')
+      ).length;
+      if (trashUnits > 0) cost = Math.min(cost, Math.max(1, cost - trashUnits));
+    }
+  } else if (cardType === 'GEAR') {
+    if (cId === 'CP-150' || slug.includes('zetatech-berserk')) {
+      const faceUpLegends = (playerState.legends || []).filter((l) => l.isFaceUp).length;
+      if (faceUpLegends > 0) cost = Math.min(cost, Math.max(1, cost - faceUpLegends));
+    }
+    const hasViktor = (playerState.field || []).some((u) => String(u.id || '').toUpperCase() === 'CP-140');
+    const isCyberware = String(card.traits || card.cardType || '').toUpperCase().includes('CYBERWARE');
+    if (hasViktor && isCyberware && !playerState.usedViktorCyberwareDiscountThisTurn) {
+      cost = Math.min(cost, Math.max(1, cost - 3));
+    }
+  }
+
+  return cost;
+}
+
+/**
  * Comprueba las condiciones de victoria oficiales:
  * 1. Controlar 7 o más dados de Gig al inicio del turno (Start Phase) o en Overtime.
  * 2. Quedarse sin cartas en el mazo cuando es obligatorio robar (Deck out).
@@ -757,15 +881,8 @@ export function playProgramCard(state, playerKey, cardInstanceId) {
 
   const card = p.hand[cardIdx];
   const baseCost = card.parsedCost || parseCardCost(card.cost);
-  let discount = 0;
-  if (p.altCunninghamProgramDiscount && p.altCunninghamProgramDiscount > 0) {
-    discount = p.altCunninghamProgramDiscount;
-    delete p.altCunninghamProgramDiscount;
-    (state.actionLog = state.actionLog || []).unshift(
-      `🌐 [Alt Cunningham] Descuento de -${discount} €$ aplicado a "${card.name}" (por Gigs mínimos).`
-    );
-  }
-  const cost = Math.max(1, baseCost - discount);
+  const cost = getEffectiveCardCost(card, p, state);
+  const discount = Math.max(0, baseCost - cost);
   const available = getAvailableEddies(p);
 
   if (available < cost) {
@@ -775,12 +892,22 @@ export function playProgramCard(state, playerKey, cardInstanceId) {
       missingEddies: missing,
       cardName: card.name,
       cost,
-      reason: `Eddies insuficientes. "${card.name}" cuesta ${cost} €$${discount > 0 ? ` (reducido de ${baseCost} €$ por Alt Cunningham)` : ''} y solo has girado ${available} €$. Te faltan ${missing} €$ (gira más cartas de Eddies o Leyendas antes de jugar).`
+      reason: `Eddies insuficientes. "${card.name}" cuesta ${cost} €$${discount > 0 ? ` (reducido de ${baseCost} €$ por descuento activo)` : ''} y solo has girado ${available} €$. Te faltan ${missing} €$ (gira más cartas de Eddies o Leyendas antes de jugar).`
     };
   }
 
-  // Pagar coste de los Eddies girados
+  // Pagar coste de los Eddies girados y consumir descuento de Alt Cunningham si estaba activo
   spendEddies(p, cost);
+  if (p.altCunninghamDiscountStacks || p.altCunninghamProgramDiscount) {
+    delete p.altCunninghamDiscountStacks;
+    delete p.altCunninghamProgramDiscount;
+  delete p.altCunninghamDiscountStacks;
+    if (discount > 0) {
+      (state.actionLog = state.actionLog || []).unshift(
+        `🌐 [Alt Cunningham] Descuento de -${discount} €$ aplicado a "${card.name}" (coste final: ${cost} €$, por Gigs mínimos).`
+      );
+    }
+  }
   p.hand.splice(cardIdx, 1);
 
   // El programa va directo al descarte (Trash)
@@ -1096,6 +1223,13 @@ export function playLegendToField(state, playerKey, legendInstanceId, isGoSolo =
   const entersReady = isGoSolo ? true : !wasSpent;
   const entersLagging = isGoSolo ? false : true;
 
+  const baseLegendPower =
+    leg.parsedPower || parseCardPower(leg.power) || (leg.powerVal ? parseInt(leg.powerVal, 10) : 0);
+  const equippedGearBonus = (leg.gear || []).reduce(
+    (sum, g) => sum + (g.powerBonus || g.parsedPower || parseCardPower(g.power) || 0),
+    0
+  );
+
   const unitInstance = {
     ...leg,
     instanceId: `${leg.instanceId}_unit`,
@@ -1105,7 +1239,7 @@ export function playLegendToField(state, playerKey, legendInstanceId, isGoSolo =
     isSpent: !entersReady,
     isLagging: entersLagging,
     turnEntered: state.turnNumber,
-    currentPower: leg.parsedPower || parseCardPower(leg.power) || (leg.powerVal ? parseInt(leg.powerVal, 10) : 0),
+    currentPower: baseLegendPower + equippedGearBonus,
     gear: leg.gear || []
   };
 
@@ -1162,8 +1296,9 @@ export function attackRivalGigs(
   }
   if (defender.gigs.length === 0) return { success: false, reason: 'El rival no tiene Gigs para robar.' };
 
-  // Girar la unidad atacante
+  // Girar la unidad atacante y cumplir obligación de ataque si existía
   unit.isSpent = true;
+  delete unit.mustAttackNextTurn;
 
   // FASE 1: Disparar habilidades de ataque (ej: Sketchy Ripper, El Sombrerón) antes de la reacción del rival
   if (!unit.hasTriggeredAttackThisDeclaration) {
@@ -1179,6 +1314,8 @@ export function attackRivalGigs(
       state.actionLog.unshift(
         `🛡️ [FASE 2: REACCIÓN] ¡BLOCKER! ${defender.name} gira a "${blocker.name}" para interceptar el asalto a sus Gigs. ¡El combate se convierte en lucha contra el bloqueador y NO se roba ningún Gig!`
       );
+      // Disparar triggers de BLOCKER (ej: Goro Takemura CP-042, Augmented Negotiators CP-012)
+      executeBlockerUsedTrigger(state, defenderKey, blocker);
       // FASE 3: Resolver pelea contra el Blocker
       const fightRes = resolveFight(state, attackerPlayerKey, unit, defenderKey, blocker);
       delete unit.hasTriggeredAttackThisDeclaration;
@@ -1251,6 +1388,27 @@ export function attackRivalGigs(
     `💎 [FASE 4: ROBO DE GIGS] ¡ASALTO EXITOSO! "${unit.name}" [Fuerza: ${unit.currentPower}] asalta los Gigs de ${defender.name} y ROBA ${countToSteal} Gig(s): ${diceNames}.`
   );
 
+  // Trigger pasivo CP-033 Evelyn Parker // Beautiful Enigma:
+  // "When a friendly CORPO or GANGER Unit steals 1 or more Gigs, ready 1 Eddie."
+  if (stolenDice.length > 0) {
+    const unitMeta = (String(unit.traits || '') + ' ' + String(unit.cardType || '') + ' ' + String(unit.faction || '')).toUpperCase();
+    const isCorpoOrGanger = unitMeta.includes('CORPO') || unitMeta.includes('GANGER');
+    if (isCorpoOrGanger) {
+      const evelyns = (attacker.legends || []).filter(
+        (l) => l.isFaceUp && !l.isRemovedFromGame && (String(l.id || '').toUpperCase() === 'CP-033' || (l.slug || '').includes('evelyn-parker'))
+      );
+      evelyns.forEach(() => {
+        const spentEddie = (attacker.eddies || []).find((e) => e.isSpent);
+        if (spentEddie) {
+          spentEddie.isSpent = false;
+          state.actionLog.unshift(
+            `💋 [Evelyn Parker] ¡Habilidad Pasiva! "${unit.name}" (CORPO/GANGER) robó Gig(s): se endereza 1 Eddie.`
+          );
+        }
+      });
+    }
+  }
+
   // Comprobar victoria inmediata en Overtime
   if (state.overtime && attacker.gigs.length >= 7) {
     state.isGameOver = true;
@@ -1270,6 +1428,9 @@ export function attackRivalGigs(
 export function sendDefeatedUnitToGraveyardOrExile(playerState, unit, state = null) {
   if (!unit || !playerState) return;
 
+  const equippedGears = Array.isArray(unit.gear) ? [...unit.gear] : [];
+  unit.gear = [];
+
   const isGoSoloOrLegend = Boolean(unit.hasGoSolo || unit.isLegendUnit);
 
   if (isGoSoloOrLegend) {
@@ -1279,6 +1440,7 @@ export function sendDefeatedUnitToGraveyardOrExile(playerState, unit, state = nu
       if (leg) {
         leg.isOnField = false;
         leg.isRemovedFromGame = true;
+        leg.gear = [];
       }
     }
 
@@ -1296,9 +1458,67 @@ export function sendDefeatedUnitToGraveyardOrExile(playerState, unit, state = nu
   }
 
   // Los Gears equipados a la unidad derrotada van al Trash normalmente
-  if (unit.gear && unit.gear.length > 0) {
+  if (equippedGears.length > 0) {
     if (!playerState.trash) playerState.trash = [];
-    unit.gear.forEach((g) => playerState.trash.push(g));
+    equippedGears.forEach((g) => playerState.trash.push(g));
+  }
+}
+
+/**
+ * Envía una unidad (o Leyenda en campo) al fondo del mazo según las reglas oficiales:
+ * - Si es una Leyenda / Go Solo: la Leyenda queda ELIMINADA DE LA PARTIDA (Remove from the game),
+ *   y sus Gears equipados van al FONDO DEL MAZO (como cartas independientes).
+ * - Si es una Unidad normal: la Unidad va al FONDO DEL MAZO, y sus Gears equipados también van al FONDO DEL MAZO.
+ */
+export function sendUnitToBottomDeck(playerState, unit, state = null) {
+  if (!unit || !playerState) return;
+  if (!playerState.deck) playerState.deck = [];
+
+  const equippedGears = Array.isArray(unit.gear) ? [...unit.gear] : [];
+  unit.gear = [];
+
+  const isGoSoloOrLegend = Boolean(unit.hasGoSolo || unit.isLegendUnit);
+
+  if (isGoSoloOrLegend) {
+    const legendId = unit.legendInstanceId || (unit.instanceId ? unit.instanceId.replace(/_unit$/, '') : null);
+    if (legendId && playerState.legends) {
+      const leg = playerState.legends.find((l) => l.instanceId === legendId);
+      if (leg) {
+        leg.isOnField = false;
+        leg.isRemovedFromGame = true;
+        leg.gear = [];
+      }
+    }
+
+    if (!playerState.removedFromGame) playerState.removedFromGame = [];
+    playerState.removedFromGame.push(unit);
+
+    // Regla oficial: si la Leyenda equipada se envía al fondo del mazo, la Leyenda se remueve del juego y sus Gears van al fondo del mazo
+    equippedGears.forEach((g) => playerState.deck.push(g));
+
+    if (state && state.actionLog) {
+      state.actionLog.unshift(
+        `🚫 [GO SOLO / BOTTOM-DECK] "${unit.name}" queda ELIMINADA DE LA PARTIDA${
+          equippedGears.length > 0
+            ? ` y sus ${equippedGears.length} Gear(s) equipado(s) (${equippedGears.map((g) => g.name).join(', ')}) van al fondo del mazo.`
+            : '.'
+        }`
+      );
+    }
+  } else {
+    playerState.deck.push(unit);
+    // Regla oficial: si la Unidad equipada va al fondo del mazo, sus Gears equipados también van al fondo del mazo
+    equippedGears.forEach((g) => playerState.deck.push(g));
+
+    if (state && state.actionLog) {
+      state.actionLog.unshift(
+        `🌊 [BOTTOM-DECK] "${unit.name}" fue enviada al fondo del mazo${
+          equippedGears.length > 0
+            ? ` junto con sus ${equippedGears.length} Gear(s) equipado(s) (${equippedGears.map((g) => g.name).join(', ')})`
+            : ''
+        }.`
+      );
+    }
   }
 }
 
@@ -1437,7 +1657,8 @@ export function fightRivalUnit(state, attackerPlayerKey, attackerUnitId, targetU
     return { success: false, reason: 'Solo puedes atacar a unidades rivales giradas (Spent). Las unidades enderezadas no pueden ser atacadas.' };
   }
 
-  attUnit.isSpent = true;
+  attUnit.isSpent = true;
+  delete attUnit.mustAttackNextTurn;
 
   // FASE 1: Disparar habilidad ATTACK antes de la reacción del rival
   if (!attUnit.hasTriggeredAttackThisDeclaration) {
@@ -1453,6 +1674,7 @@ export function fightRivalUnit(state, attackerPlayerKey, attackerUnitId, targetU
       state.actionLog.unshift(
         `🛡️ [FASE 2: REACCIÓN] ¡BLOCKER! "${blocker.name}" se interpone para proteger a "${defUnit.name}".`
       );
+      executeBlockerUsedTrigger(state, defenderKey, blocker);
       const fightRes = resolveFight(state, attackerPlayerKey, attUnit, defenderKey, blocker);
       delete attUnit.hasTriggeredAttackThisDeclaration;
       return fightRes;
@@ -1655,6 +1877,35 @@ export function passTurn(state) {
 
   // Disparar habilidades de fin de turno (End of Turn Triggers)
   executeEndOfTurnTriggers(state, state.activePlayer);
+
+  // Limpiar mustAttackNextTurn de las unidades del jugador que acaba de terminar su turno
+  (state[state.activePlayer]?.field || []).forEach((u) => {
+    delete u.mustAttackNextTurn;
+  });
+
+  // Limpiar TODOS los efectos "hasta el final del turno" ("this turn") en ambos campos
+  [state.player, state.bot].forEach((side) => {
+    (side?.field || []).forEach((u) => {
+      // Restaurar fuerza base + bonos de Gear (elimina +X / -X power "this turn" sin deriva)
+      const basePower =
+        typeof u.parsedPower === 'number' && !Number.isNaN(u.parsedPower)
+          ? u.parsedPower
+          : parseCardPower(u.power || u.powerVal || 0);
+      const gearBonus = (u.gear || []).reduce(
+        (sum, g) => sum + (g.powerBonus || g.parsedPower || parseCardPower(g.power || g.powerVal || 0) || 0),
+        0
+      );
+      u.currentPower = Math.max(0, basePower + gearBonus);
+      delete u.tempPowerMod;
+      delete u.cannotBeDefeatedThisTurn;
+      if (u.isTemporaryBlockerThisTurn) {
+        delete u.isTemporaryBlockerThisTurn;
+        if (Array.isArray(u.keywords)) {
+          u.keywords = u.keywords.filter((k) => String(k).toLowerCase() !== 'blocker');
+        }
+      }
+    });
+  });
 
   const nextPlayerKey = state.activePlayer === 'player' ? 'bot' : 'player';
   state.activePlayer = nextPlayerKey;

@@ -48,6 +48,8 @@ import {
   getAvailableEddies,
   getTotalAvailableEddies,
   spendEddies,
+  payEddieCostWithAutoTap,
+  getEffectiveCardCost,
   sellCardForEddies,
   playCard,
   playUnitCard,
@@ -76,6 +78,7 @@ import {
   canUnitAttack,
   getUnitAttackRestriction,
   sendDefeatedUnitToGraveyardOrExile,
+  sendUnitToBottomDeck,
   resolveFight,
   DICE_CONFIG
 } from '../utils/cyberpunkEngine.js';
@@ -1180,8 +1183,9 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
   };
 
   // Activar habilidad de Leyenda boca arriba (↷ / Quick)
-  const handleActivateLegendAbility = (legendInstanceId, abilityId = null) => {
-    if (!gameState || gameState.activePlayer !== 'player' || gameState.isGameOver) return;
+  const handleActivateLegendAbility = (legendInstanceId, abilityId = null, isReactionQuick = false) => {
+    if (!gameState || gameState.isGameOver) return;
+    if (gameState.activePlayer !== 'player' && !isReactionQuick) return;
     const leg = (gameState.player.legends || []).find((l) => l.instanceId === legendInstanceId);
     if (!leg) return;
 
@@ -1222,8 +1226,9 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
   };
 
   // Activar habilidad de Unidad o Gear con giro (↷ / Quick)
-  const handleExecuteActivatedAbility = (cardInstanceId, abilityId = null) => {
-    if (!gameState || gameState.activePlayer !== 'player' || gameState.isGameOver) return;
+  const handleExecuteActivatedAbility = (cardInstanceId, abilityId = null, isReactionQuick = false) => {
+    if (!gameState || gameState.isGameOver) return;
+    if (gameState.activePlayer !== 'player' && !isReactionQuick) return;
     const res = executeCardActivatedAbility(gameState, 'player', cardInstanceId, abilityId);
     if (!res.success) {
       setHolocall({
@@ -1351,15 +1356,24 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
     const res = playLegendToField(gameState, 'player', legendInstanceId, isGoSolo);
     setLegendMenuId(null);
     if (res.success) {
+      const hasInteractiveModal = Boolean(
+        gameState.pendingTargetSelection || gameState.pendingCardChoice || gameState.pendingModalChoice
+      );
+      const triggerNotif = gameState.lastTriggerNotification;
+      delete gameState.lastTriggerNotification;
       setGameState({ ...gameState });
-      setHolocall({
-        title: isGoSolo ? '🔥 ¡GO SOLO ACTIVADO!' : '⚔️ LEYENDA DESPLEGADA',
-        message: isGoSolo
-          ? `"${leg.name}" ha entrado al campo de batalla lista y sin lag. ¡Puede atacar este mismo turno!`
-          : `"${leg.name}" ha sido desplegada al campo de batalla.`,
-        characterName: 'NETWATCH // OVERWATCH',
-        type: 'success'
-      });
+      if (!hasInteractiveModal) {
+        setHolocall({
+          title: triggerNotif ? triggerNotif.title : (isGoSolo ? '🔥 ¡GO SOLO ACTIVADO!' : '⚔️ LEYENDA DESPLEGADA'),
+          message: triggerNotif
+            ? `${isGoSolo ? '🔥 Go Solo activado (entra lista y sin Lag). ' : ''}${triggerNotif.message}`
+            : isGoSolo
+            ? `"${leg.name}" ha entrado al campo de batalla lista y sin lag. ¡Puede atacar este mismo turno!`
+            : `"${leg.name}" ha sido desplegada al campo de batalla.`,
+          characterName: 'NETWATCH // OVERWATCH',
+          type: triggerNotif?.type || 'success'
+        });
+      }
     } else {
       if (res.missingEddies) {
         setHolocall({
@@ -1507,6 +1521,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
 
     // 1. FASE 1: DECLARACIÓN DE ATAQUE Y DISPARO DE ATTACK
     selectedFieldUnit.isSpent = true;
+    delete selectedFieldUnit.mustAttackNextTurn;
     selectedFieldUnit.hasTriggeredAttackThisDeclaration = true;
     executeUnitAttackTrigger(gameState, 'player', selectedFieldUnit);
 
@@ -1544,11 +1559,26 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
       const selected = (choice.cards || []).find((c) => selectedCardIds.includes(c.instanceId));
       delete gameState.pendingCardChoice;
       if (selected) {
+        const finalCost = getEffectiveCardCost(selected, p, gameState);
+        const paid = payEddieCostWithAutoTap(p, finalCost, null);
+        if (!paid) {
+          setHolocall({
+            title: 'EDDIES INSUFICIENTES',
+            message: `No tienes suficientes Eddies (${finalCost} €$) para pagar el coste de "${selected.name}".`,
+            characterName: 'VIKTOR // RIPPERDOC',
+            type: 'warning'
+          });
+          setGameState({ ...gameState });
+          return;
+        }
         const tIdx = (p.trash || []).findIndex((tc) => tc.instanceId === selected.instanceId);
         if (tIdx !== -1) p.trash.splice(tIdx, 1);
 
-        const cost = getNumericCost(selected);
-        spendEddies(p, cost);
+        if (p.altCunninghamDiscountStacks || p.altCunninghamProgramDiscount) {
+          delete p.altCunninghamDiscountStacks;
+          delete p.altCunninghamProgramDiscount;
+        }
+
         p.programsPlayedThisTurn = (p.programsPlayedThisTurn || 0) + 1;
         executeProgramEffect(gameState, choice.playerKey || 'player', selected);
 
@@ -1556,8 +1586,33 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
         p.deck.push(selected);
 
         gameState.actionLog.unshift(
-          `🌐 [Alt Cunningham] Has jugado "${selected.name}" desde la Basura pagando ${cost} €$ y ha sido colocada en el FONDO de tu mazo.`
+          `🌐 [Alt Cunningham] Has jugado "${selected.name}" desde la Basura pagando ${finalCost} €$ y ha sido colocada en el FONDO de tu mazo.`
         );
+      }
+      setGameState({ ...gameState });
+      return;
+    }
+
+    if (choice.type === 'TAKEMURA_BLOCKER_LOOT') {
+      const p = gameState[choice.playerKey || 'player'];
+      const selected = (choice.cards || []).find((c) => selectedCardIds.includes(c.instanceId));
+      delete gameState.pendingCardChoice;
+      if (selected) {
+        const hIdx = (p.hand || []).findIndex((c) => c.instanceId === selected.instanceId);
+        if (hIdx !== -1) {
+          if (!p.trash) p.trash = [];
+          p.trash.push(p.hand.splice(hIdx, 1)[0]);
+        }
+        if (p.deck && p.deck.length > 0) {
+          const drawn = p.deck.shift();
+          drawn.isJustDrawn = true;
+          p.hand.push(drawn);
+          gameState.actionLog.unshift(
+            `🛡️ [Goro Takemura] ¡Al bloquear! Descartaste "${selected.name}" y robaste "${drawn.name}".`
+          );
+        }
+      } else {
+        gameState.actionLog.unshift(`🛡️ [Goro Takemura] Decidiste no descartar ninguna carta al bloquear.`);
       }
       setGameState({ ...gameState });
       return;
@@ -1609,8 +1664,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
         const rivalUnequipped = (opp.field || []).filter((u) => !u.gear || u.gear.length === 0);
         if (rivalUnequipped.length === 1) {
           const [removed] = opp.field.splice(opp.field.indexOf(rivalUnequipped[0]), 1);
-          if (!opp.deck) opp.deck = [];
-          opp.deck.push(removed);
+          sendUnitToBottomDeck(opp, removed, gameState);
           gameState.actionLog.unshift(
             `🕯️ [Maman Brigitte] Descartaste 2 Programas y enviaste a "${removed.name}" al fondo del mazo rival.`
           );
@@ -1648,8 +1702,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
         const oppUnits = opp.field || [];
         if (oppUnits.length === 1) {
           const [removed] = opp.field.splice(0, 1);
-          if (!opp.deck) opp.deck = [];
-          opp.deck.push(removed);
+          sendUnitToBottomDeck(opp, removed, gameState);
           gameState.actionLog.unshift(
             `📡 [Placide] Descartaste "${selected.name}" y enviaste a "${removed.name}" al fondo del mazo rival.`
           );
@@ -1877,8 +1930,15 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
       const allPlayerGears = [];
       (p.field || []).forEach((u) => {
         (u.gear || []).forEach((g) => {
-          allPlayerGears.push({ gear: g, unit: u });
+          allPlayerGears.push({ gear: g, unit: u, isLegend: false });
         });
+      });
+      (p.legends || []).forEach((l) => {
+        if (l.isFaceUp && !l.isOnField && !l.isRemovedFromGame) {
+          (l.gear || []).forEach((g) => {
+            allPlayerGears.push({ gear: g, unit: l, isLegend: true });
+          });
+        }
       });
 
       if (allPlayerGears.length > 1) {
@@ -1886,7 +1946,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
           actionType: 'TARGET_GEAR',
           gearAction: 'DUMDUM_REWARD',
           title: '💉 DUM DUM // SACRIFICAR GEAR',
-          prompt: 'Selecciona el Gear que deseas destruir para robar 2 cartas:',
+          prompt: 'Selecciona el Gear aliado (en Unidad o Leyenda) que deseas destruir para robar 2 cartas:',
           sourceCardName: 'Dum Dum',
           sourceCardImage: choice.sourceCardImage
         };
@@ -1896,12 +1956,17 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
       }
 
       let sacrificed = null;
-      for (const unit of p.field || []) {
-        if (unit.gear && unit.gear.length > 0) {
-          sacrificed = unit.gear.shift();
+      if (allPlayerGears.length === 1) {
+        const entry = allPlayerGears[0];
+        const gIdx = entry.unit.gear.indexOf(entry.gear);
+        if (gIdx !== -1) {
+          [sacrificed] = entry.unit.gear.splice(gIdx, 1);
+          if (!entry.isLegend) {
+            const lostBonus = sacrificed.powerBonus || sacrificed.parsedPower || parseCardPower(sacrificed.power) || 0;
+            if (lostBonus > 0) entry.unit.currentPower = Math.max(0, (entry.unit.currentPower || 0) - lostBonus);
+          }
           if (!p.trash) p.trash = [];
           p.trash.push(sacrificed);
-          break;
         }
       }
       const drawnCards = [];
@@ -2275,6 +2340,10 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
         } else if (sel.effectType === 'BUFF') {
           unit.currentPower = (unit.currentPower || unit.power || 0) + (sel.amount || 2);
           gameState.actionLog.unshift(`⚡ [${sel.sourceCardName}] Otorgó +${sel.amount || 2} de poder a "${unit.name}" (Poder actual: ${unit.currentPower}).`);
+        } else if (sel.effectType === 'BUFF_PER_GEAR') {
+          const gCount = unit.gear ? unit.gear.length : 0;
+          unit.currentPower = (unit.currentPower || unit.power || 0) + gCount;
+          gameState.actionLog.unshift(`💉 [${sel.sourceCardName}] Otorgó +${gCount} de Fuerza este turno a "${unit.name}" (${gCount} Gear(s) equipado(s)). Fuerza actual: ${unit.currentPower}.`);
         } else if (sel.effectType === 'DEBUFF') {
           unit.currentPower = Math.max(0, (unit.currentPower || unit.power || 0) - (sel.amount || 2));
           gameState.actionLog.unshift(`🔻 [${sel.sourceCardName}] Redujo el poder de "${unit.name}" en ${sel.amount || 2} (Poder actual: ${unit.currentPower}).`);
@@ -2291,6 +2360,16 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
           unit.isLagging = false;
           unit.hasAdrenaline = true;
           gameState.actionLog.unshift(`🏎️ [${sel.sourceCardName}] Otorgó ADRENALINE a "${unit.name}" este turno.`);
+        } else if (sel.effectType === 'GRANT_BLOCKER_TAKEMURA') {
+          unit.isTemporaryBlockerThisTurn = true;
+          const values = (p.gigs || []).map((g) => Number(g.value));
+          const hasPair = new Set(values).size < values.length;
+          if (hasPair) {
+            unit.currentPower = (unit.currentPower || unit.power || 0) + 1;
+          }
+          gameState.actionLog.unshift(
+            `🛡️ [${sel.sourceCardName}] Otorgó BLOCKER este turno a "${unit.name}"${hasPair ? ' y +1 de Fuerza (pareja de Gigs)' : ''}.`
+          );
         } else if (sel.effectType === 'EQUIP_GEAR' && sel.gearToEquip) {
           unit.gear = unit.gear || [];
           unit.gear.push(sel.gearToEquip);
@@ -2316,9 +2395,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
         } else if (sel.effectType === 'BOTTOM_DECK') {
           const idx = targetOwner.field.indexOf(unit);
           const [dead] = targetOwner.field.splice(idx, 1);
-          if (!targetOwner.deck) targetOwner.deck = [];
-          targetOwner.deck.push(dead);
-          gameState.actionLog.unshift(`🌊 [${sel.sourceCardName}] "${dead.name}" fue enviada al fondo del mazo.`);
+          sendUnitToBottomDeck(targetOwner, dead, gameState);
         }
       }
       if (!keepSelectionForMoreSpends) {
@@ -2334,9 +2411,11 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
         setGameState({ ...gameState });
       }
     } else if (sel.actionType === 'TARGET_GEAR') {
-      const { unitInstanceId, gearInstanceId, ownerKey } = targetData;
+      const { unitInstanceId, gearInstanceId, ownerKey, isLegend } = targetData;
       const targetOwner = ownerKey === 'player' ? p : opp;
-      const unit = (targetOwner.field || []).find((u) => u.instanceId === unitInstanceId);
+      const unit = isLegend
+        ? (targetOwner.legends || []).find((l) => l.instanceId === unitInstanceId)
+        : (targetOwner.field || []).find((u) => u.instanceId === unitInstanceId);
       let chainedSelection = null;
       if (unit && unit.gear) {
         const gIdx = unit.gear.findIndex((g) => g.instanceId === gearInstanceId);
@@ -3103,6 +3182,21 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
             type="button"
             disabled={!isMyTurn}
             onClick={() => {
+              const forcedAttacker = (gameState.player?.field || []).find((u) => {
+                if (!u.mustAttackNextTurn) return false;
+                const canHitGigs = canUnitAttack(u, gameState.player, gameState, 'GIGS') && (gameState.bot?.gigs || []).length > 0;
+                const canHitUnit = canUnitAttack(u, gameState.player, gameState, 'UNIT') && (gameState.bot?.field || []).some((bu) => bu.isSpent || u.canAttackReadyUnits);
+                return canHitGigs || canHitUnit;
+              });
+              if (forcedAttacker) {
+                setHolocall({
+                  title: '💢 ATAQUE OBLIGATORIO PENDIENTE',
+                  characterName: 'KIROSHI OS // PROTOCOLO DE COMBATE',
+                  message: `"${forcedAttacker.name}" está provocada (Evelyn Parker / Mox Inciters) y DEBE atacar este turno antes de que puedas pasar turno.`,
+                  type: 'warning'
+                });
+                return;
+              }
               setSelectedHandCard(null);
               setSelectedFieldUnit(null);
               setHistory([]);
@@ -3412,13 +3506,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                     className="w-full h-full object-contain bg-black"
                   />
 
-                  {/* Insignia de Poder Dinámico si está en juego y modificado */}
-                  {(displayCard.currentPower !== undefined || (displayCard.parsedPower !== undefined && displayCard.parsedPower > 0)) && (
-                    <div className="absolute bottom-1.5 right-1.5 px-2.5 py-0.5 bg-[#FCEE0A] text-[#070a10] font-mono font-black text-xs sm:text-sm shadow-xl rounded border border-black flex items-center gap-1">
-                      <span>⚡</span>
-                      <span>{displayCard.currentPower !== undefined ? displayCard.currentPower : displayCard.parsedPower}</span>
-                    </div>
-                  )}
+
 
                   {/* Insignia de Gear equipado si tiene */}
                   {displayCard.gear && displayCard.gear.length > 0 && (
@@ -4464,7 +4552,6 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                       gameState.pendingReaction &&
                       gameState.pendingReaction.attackerPlayerKey === 'bot' &&
                       !unit.isSpent &&
-                      !unit.isLagging &&
                       hasKeyword(unit, 'Blocker')
                     );
                     const isCurrentBlocker = Boolean(
@@ -4646,6 +4733,11 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                                 🔥 GO SOLO
                               </span>
                             )}
+                            {unit.mustAttackNextTurn && !unit.isSpent && (
+                              <span className="px-1 py-0.5 bg-amber-500 text-black font-mono font-black text-[7px] sm:text-[7.5px] uppercase shadow animate-pulse border border-yellow-200">
+                                💢 DEBE ATACAR
+                              </span>
+                            )}
                             {attackRestriction && !unit.isSpent && !unit.isLagging && (
                               <span className="px-1 py-0.5 bg-red-600/90 text-white font-mono font-bold text-[7px] sm:text-[7.5px] uppercase shadow tracking-wider border border-red-400">
                                 🚫 NO ATACA
@@ -4666,10 +4758,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                             </div>
                           )}
 
-                          {/* Insignia de Poder GIGANTE */}
-                          <div className="absolute bottom-1 right-1 px-2 py-0.5 bg-[#FCEE0A] text-[#070a10] font-mono font-black text-xs shadow-md">
-                            {unit.currentPower}
-                          </div>
+
 
                           {/* Estado: GASTADA */}
                           {unit.isSpent && (
@@ -5492,7 +5581,9 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                   const isProgram = cardType === 'PROGRAM';
                   const isGear = cardType === 'GEAR';
                   const gearTarget = selectedFieldUnit?.instanceId || (p.field.length > 0 ? p.field[0].instanceId : (p.legends[0]?.instanceId || null));
-                  const cardCost = selectedHandCard.parsedCost || 0;
+                  const baseCardCost = selectedHandCard.parsedCost || 0;
+                  const cardCost = getEffectiveCardCost(selectedHandCard, p, gameState);
+                  const hasDiscount = cardCost < baseCardCost;
                   const canAfford = availableEddies >= cardCost;
                   const missingEddies = Math.max(0, cardCost - availableEddies);
                   const canPlay = isMyTurn && canAfford && (!isGear || Boolean(gearTarget));
@@ -5501,7 +5592,9 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                   if (!canAfford) {
                     actionLabel = `FALTAN ${missingEddies} €$ (GIRAR MÁS)`;
                   } else if (isProgram) {
-                    actionLabel = `LANZAR PROGRAMA (${cardCost} €$)`;
+                    actionLabel = hasDiscount
+                      ? `LANZAR PROGRAMA (${cardCost} €$, antes ${baseCardCost})`
+                      : `LANZAR PROGRAMA (${cardCost} €$)`;
                   } else if (isGear) {
                     if (selectedFieldUnit) {
                       actionLabel = `EQUIPAR A ${selectedFieldUnit.name.split(' ')[0]} (${cardCost} €$)`;
@@ -5681,11 +5774,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                       </div>
                     )}
 
-                    {card.parsedPower > 0 && (
-                      <div className="absolute bottom-0.5 right-0.5 px-1.5 bg-[#FCEE0A] text-[#070a10] text-[9px] sm:text-[10px] font-black shadow-md z-10">
-                        {card.parsedPower}
-                      </div>
-                    )}
+
                   </motion.div>
                 );
               })}
@@ -5697,6 +5786,21 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                 type="button"
                 disabled={!isMyTurn}
                 onClick={() => {
+                  const forcedAttacker = (gameState.player?.field || []).find((u) => {
+                    if (!u.mustAttackNextTurn) return false;
+                    const canHitGigs = canUnitAttack(u, gameState.player, gameState, 'GIGS') && (gameState.bot?.gigs || []).length > 0;
+                    const canHitUnit = canUnitAttack(u, gameState.player, gameState, 'UNIT') && (gameState.bot?.field || []).some((bu) => bu.isSpent || u.canAttackReadyUnits);
+                    return canHitGigs || canHitUnit;
+                  });
+                  if (forcedAttacker) {
+                    setHolocall({
+                      title: '💢 ATAQUE OBLIGATORIO PENDIENTE',
+                      characterName: 'KIROSHI OS // PROTOCOLO DE COMBATE',
+                      message: `"${forcedAttacker.name}" está provocada (Evelyn Parker / Mox Inciters) y DEBE atacar este turno antes de que puedas pasar turno.`,
+                      type: 'warning'
+                    });
+                    return;
+                  }
                   setSelectedHandCard(null);
                   setSelectedFieldUnit(null);
                   setHistory([]);
@@ -6583,6 +6687,73 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                     </div>
                   )}
                 </div>
+
+                {/* Opción 4: Activar Habilidades QUICK (↷) de Leyendas, Unidades o Gears */}
+                {(() => {
+                  const quickAbilitiesList = [];
+                  (p.legends || []).forEach((l) => {
+                    if (l.isFaceUp && !l.isSpent && !l.isOnField && !l.isRemovedFromGame) {
+                      getCardActivatedAbilities(l, 'player', gameState)
+                        .filter((ab) => ab.isQuick)
+                        .forEach((ab) => quickAbilitiesList.push({ card: l, ab, kind: 'LEGEND' }));
+                    }
+                  });
+                  (p.field || []).forEach((u) => {
+                    if (!u.isSpent && !u.isLagging) {
+                      getCardActivatedAbilities(u, 'player', gameState)
+                        .filter((ab) => ab.isQuick)
+                        .forEach((ab) => quickAbilitiesList.push({ card: u, ab, kind: 'UNIT' }));
+                    }
+                    (u.gear || []).forEach((g) => {
+                      if (!g.isSpent) {
+                        getCardActivatedAbilities(g, 'player', gameState)
+                          .filter((ab) => ab.isQuick)
+                          .forEach((ab) => quickAbilitiesList.push({ card: g, ab, kind: 'GEAR' }));
+                      }
+                    });
+                  });
+
+                  if (quickAbilitiesList.length === 0) return null;
+
+                  return (
+                    <div className="bg-[#000000]/80 border border-[#FCEE0A]/40 p-2.5 rounded">
+                      <div className="flex items-center justify-between mb-1.5">
+                        <span className="text-[10px] font-black uppercase text-[#FCEE0A] flex items-center gap-1.5">
+                          <Zap className="w-3.5 h-3.5 text-[#FCEE0A]" />
+                          4. ACTIVAR HABILIDAD QUICK (↷)
+                        </span>
+                        <span className="text-[9px] text-gray-400">
+                          {quickAbilitiesList.length} DISPONIBLE(S)
+                        </span>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {quickAbilitiesList.map(({ card: qCard, ab, kind }) => (
+                          <button
+                            key={`${qCard.instanceId}-${ab.id}`}
+                            type="button"
+                            disabled={!ab.canActivateNow}
+                            onClick={() => {
+                              if (kind === 'LEGEND') {
+                                handleActivateLegendAbility(qCard.instanceId, ab.id, true);
+                              } else {
+                                handleExecuteActivatedAbility(qCard.instanceId, ab.id, true);
+                              }
+                            }}
+                            style={{ clipPath: CYBER_BUTTON }}
+                            title={ab.canActivateNow ? ab.description : ab.disabledReason}
+                            className={`px-3 py-1 text-xs font-black uppercase transition-all flex items-center gap-1.5 border ${
+                              ab.canActivateNow
+                                ? 'bg-[#FCEE0A]/20 hover:bg-[#FCEE0A] text-[#FCEE0A] hover:text-black border-[#FCEE0A]/60 cursor-pointer'
+                                : 'bg-gray-900 text-gray-500 border-gray-800 cursor-not-allowed opacity-50'
+                            }`}
+                          >
+                            <span>⚡ {qCard.name.split('//')[0].trim()}: {ab.shortTitle || ab.title}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })()}
               </div>
 
               {/* Botón de Resolver Combate / Pasar Respuesta */}
@@ -8102,13 +8273,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                 </div>
               )}
 
-              {/* Badge de Poder en esquina inferior derecha */}
-              {(displayCard.currentPower !== undefined || (displayCard.parsedPower !== undefined && displayCard.parsedPower > 0)) && (
-                <div className="absolute bottom-2 right-2 px-3 py-1 bg-[#FCEE0A] text-[#070a10] font-mono font-black text-sm shadow-xl rounded flex items-center gap-1">
-                  <span>⚡</span>
-                  <span>{displayCard.currentPower !== undefined ? displayCard.currentPower : displayCard.parsedPower} FUERZA</span>
-                </div>
-              )}
+
             </div>
 
             <div className="mt-2 px-3 py-1 bg-black/95 border border-[#0dfceb] text-[#0dfceb] font-mono text-[10px] font-bold uppercase tracking-wider rounded shadow flex items-center gap-1.5">
