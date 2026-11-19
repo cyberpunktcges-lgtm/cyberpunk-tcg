@@ -980,11 +980,23 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
     };
   }, [legendMenuId]);
 
+  // Helper para verificar si una carta es una Leyenda boca abajo (oculta)
+  const isCardFaceDownLegend = (card) => {
+    if (!card) return false;
+    const playerLeg = (gameState?.player?.legends || []).find((l) => l.instanceId === card.instanceId);
+    if (playerLeg) return !playerLeg.isFaceUp;
+    const botLeg = (gameState?.bot?.legends || []).find((l) => l.instanceId === card.instanceId);
+    if (botLeg) return !botLeg.isFaceUp;
+    if (card.isLegend) return !card.isFaceUp;
+    return false;
+  };
+
   // Estado para previsualización fija en la zona central izquierda del HUD (Kiroshi Scanner)
   const [hoveredCard, setHoveredCard] = useState(null);
   const [previewCard, setPreviewCard] = useState(null);
   const [isKiroshiHoverZoom, setIsKiroshiHoverZoom] = useState(false);
-  const displayCard = hoveredCard || previewCard || selectedFieldUnit || selectedHandCard;
+  const rawDisplayCard = hoveredCard || previewCard || selectedFieldUnit || selectedHandCard;
+  const displayCard = isCardFaceDownLegend(rawDisplayCard) ? null : rawDisplayCard;
 
   // Manejador global para inspección de cartas en pantalla completa al pulsar con botón derecho
   const handleCardRightClick = (e, card) => {
@@ -993,6 +1005,8 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
       e.preventDefault();
       e.stopPropagation();
     }
+    // No permitir inspección en pantalla completa de leyendas boca abajo
+    if (isCardFaceDownLegend(card)) return;
     setInspectedCard(card);
     setIsInspectedFlipped(false);
   };
@@ -3099,35 +3113,6 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                   </div>
                 </div>
 
-                {/* Si la carta mostrada es una Leyenda del jugador boca abajo, ofrecer botón directo de Call */}
-                {p.legends.some((l) => l.instanceId === displayCard.instanceId) && !displayCard.isFaceUp && (
-                  <div className="w-full pt-1.5 mt-1 border-t border-[#0dfceb]/30">
-                    <button
-                      type="button"
-                      disabled={p.hasCalledLegendThisTurn}
-                      onClick={() => handleCallLegendAction(displayCard.instanceId)}
-                      className={`w-full py-1.5 px-2.5 rounded font-mono font-black text-[10px] uppercase tracking-wider flex items-center justify-between transition-all ${
-                        p.hasCalledLegendThisTurn
-                          ? 'bg-gray-900 text-gray-500 border border-gray-800 cursor-not-allowed'
-                          : availableEddies > 0
-                          ? 'bg-[#0dfceb] hover:bg-white text-black shadow-[0_0_15px_rgba(13,252,235,0.7)] cursor-pointer'
-                          : 'bg-[#0dfceb]/20 hover:bg-[#0dfceb] text-[#0dfceb] hover:text-black border border-[#0dfceb] shadow-[0_0_10px_rgba(13,252,235,0.3)] cursor-pointer'
-                      }`}
-                    >
-                      <span className="flex items-center gap-1.5">
-                        <span>👑</span>
-                        <span>HACER CALL (DAR LA VUELTA)</span>
-                      </span>
-                      <span className="text-[9px] px-1.5 py-0.5 bg-black text-[#0dfceb] rounded">1 €$</span>
-                    </button>
-                    {p.hasCalledLegendThisTurn && (
-                      <span className="text-[8px] text-gray-500 block text-center mt-0.5">
-                        Límite alcanzado: 1 llamada por turno.
-                      </span>
-                    )}
-                  </div>
-                )}
-
                 {/* Información detallada opcional desplazada más abajo */}
                 <details className="w-full mt-1.5 group border-t border-[#0dfceb]/20 pt-1">
                   <summary className="text-[8px] font-mono font-bold text-gray-400 hover:text-[#0dfceb] cursor-pointer flex items-center justify-between uppercase tracking-wider select-none py-0.5">
@@ -4685,18 +4670,20 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                               </div>
                             )}
 
-                            {/* Opción 4: Inspeccionar carta en grande */}
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setLegendMenuId(null);
-                                setInspectedCard(leg);
-                              }}
-                              className="w-full mt-1.5 py-1 px-2 text-center text-[9px] font-bold text-gray-400 hover:text-white hover:bg-gray-800 rounded transition-colors cursor-pointer border border-gray-800 hover:border-gray-600"
-                            >
-                              🔍 Ver en grande
-                            </button>
+                            {/* Opción 4: Inspeccionar carta en grande (sólo si ya está boca arriba) */}
+                            {leg.isFaceUp && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setLegendMenuId(null);
+                                  setInspectedCard(leg);
+                                }}
+                                className="w-full mt-1.5 py-1 px-2 text-center text-[9px] font-bold text-gray-400 hover:text-white hover:bg-gray-800 rounded transition-colors cursor-pointer border border-gray-800 hover:border-gray-600"
+                              >
+                                🔍 Ver en grande
+                              </button>
+                            )}
 
                             {/* Flecha indicadora hacia la carta */}
                             <div className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-[#070a10] border-r-2 border-b-2 border-[#0dfceb] rotate-45 pointer-events-none" />
@@ -4710,11 +4697,21 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                             e.dataTransfer.setData('text/plain', `legend:${leg.instanceId}`);
                           }}
                           onMouseEnter={() => {
-                            setHoveredCard(leg);
-                            setPreviewCard(leg);
+                            if (leg.isFaceUp) {
+                              setHoveredCard(leg);
+                              setPreviewCard(leg);
+                            }
                           }}
-                          onMouseLeave={() => setHoveredCard(null)}
-                          onContextMenu={(e) => handleCardRightClick(e, leg)}
+                          onMouseLeave={() => {
+                            if (leg.isFaceUp) {
+                              setHoveredCard(null);
+                            }
+                          }}
+                          onContextMenu={(e) => {
+                            if (leg.isFaceUp) {
+                              handleCardRightClick(e, leg);
+                            }
+                          }}
                           onDragOver={(e) => {
                             e.preventDefault();
                             e.stopPropagation();
@@ -4729,10 +4726,14 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                           }}
                           onClick={(e) => {
                             e.stopPropagation();
-                            setHoveredCard(leg);
-                            setPreviewCard(leg);
+                            if (leg.isFaceUp) {
+                              setHoveredCard(leg);
+                              setPreviewCard(leg);
+                            }
                             if (!isMyTurn) {
-                              setInspectedCard(leg);
+                              if (leg.isFaceUp) {
+                                setInspectedCard(leg);
+                              }
                               return;
                             }
                             setLegendMenuId((prev) => (prev === leg.instanceId ? null : leg.instanceId));
