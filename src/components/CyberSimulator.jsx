@@ -72,6 +72,8 @@ import {
   toggleLegendSpent,
   playLegendToField,
   canLegendDeployToField,
+  canUnitAttack,
+  getUnitAttackRestriction,
   sendDefeatedUnitToGraveyardOrExile,
   resolveFight,
   DICE_CONFIG
@@ -1431,7 +1433,20 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
   // FASE 3: Combate (si el objetivo es una unidad o Blocker: compara poderes, derrota, basura).
   // FASE 4: Robar (si el objetivo son Gigs y no hubo Blocker: roba dados según tabla de poder).
   const handlePlayerAttack = (targetType, targetUnitId = null, preferredDice = []) => {
-    if (!selectedFieldUnit || selectedFieldUnit.isSpent || selectedFieldUnit.isLagging) return;
+    if (!selectedFieldUnit) return;
+    if (!canUnitAttack(selectedFieldUnit, gameState.player, gameState, targetType)) {
+      const reason = getUnitAttackRestriction(selectedFieldUnit, gameState.player, gameState, targetType);
+      if (reason) {
+        setHolocall({
+          title: 'NO PUEDE ATACAR',
+          characterName: 'KIROSHI OS // PROTOCOLO DE COMBATE',
+          message: reason,
+          type: 'warning'
+        });
+      }
+      return;
+    }
+    if (selectedFieldUnit.isSpent || selectedFieldUnit.isLagging) return;
 
     pushHistory();
 
@@ -2683,8 +2698,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
   const canAttackGigs =
     isMyTurn &&
     selectedFieldUnit &&
-    !selectedFieldUnit.isSpent &&
-    !selectedFieldUnit.isLagging &&
+    canUnitAttack(selectedFieldUnit, p, gameState, 'GIGS') &&
     bot.gigs &&
     bot.gigs.length > 0;
   const gigsToSteal = canAttackGigs ? calculateGigsToSteal(selectedFieldUnit.currentPower) : 0;
@@ -3707,9 +3721,8 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                   {bot.field.map((unit) => {
                     const canAttackThisUnit =
                       selectedFieldUnit &&
-                      !selectedFieldUnit.isSpent &&
-                      !selectedFieldUnit.isLagging &&
-                      unit.isSpent;
+                      canUnitAttack(selectedFieldUnit, p, gameState, 'UNIT') &&
+                      (unit.isSpent || selectedFieldUnit.canAttackReadyUnits);
 
                     return (
                       <div
@@ -4115,7 +4128,8 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                 <div className="flex items-center gap-2 sm:gap-3 w-full justify-start">
                   {p.field.map((unit) => {
                     const isSelected = selectedFieldUnit?.instanceId === unit.instanceId;
-                    const canAttack = isMyTurn && !unit.isSpent && !unit.isLagging;
+                    const canAttack = isMyTurn && canUnitAttack(unit, p, gameState);
+                    const attackRestriction = (!unit.isSpent && !unit.isLagging) ? getUnitAttackRestriction(unit, p, gameState) : null;
                     const isEligibleBlocker = Boolean(
                       gameState.pendingReaction &&
                       gameState.pendingReaction.attackerPlayerKey === 'bot' &&
@@ -4242,6 +4256,14 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                             if (canAttack) {
                               setSelectedFieldUnit(isSelected ? null : unit);
                             } else {
+                              if (attackRestriction) {
+                                setHolocall({
+                                  title: 'NO PUEDE ATACAR',
+                                  characterName: 'KIROSHI OS // PROTOCOLO DE COMBATE',
+                                  message: attackRestriction,
+                                  type: 'warning'
+                                });
+                              }
                               setInspectedCard(unit);
                             }
                           }}
@@ -4292,6 +4314,11 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                             {hasKeyword(unit, 'Go Solo') && (
                               <span className="px-1 py-0.5 bg-[#FF003C] text-white font-mono font-black text-[7px] sm:text-[8px] uppercase shadow">
                                 🔥 GO SOLO
+                              </span>
+                            )}
+                            {attackRestriction && !unit.isSpent && !unit.isLagging && (
+                              <span className="px-1 py-0.5 bg-red-600/90 text-white font-mono font-bold text-[7px] sm:text-[7.5px] uppercase shadow tracking-wider border border-red-400">
+                                🚫 NO ATACA
                               </span>
                             )}
                             {unit.isLagging && (

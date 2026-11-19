@@ -100,6 +100,156 @@ export function canLegendDeployToField(card) {
 }
 
 /**
+ * Comprueba si una Unidad en el campo puede atacar bajo las reglas oficiales de Cyberpunk TCG.
+ * @param {Object} unit - La unidad a evaluar
+ * @param {Object} playerState - El estado del jugador controlador (para verificar programas jugados, etc.)
+ * @param {Object} gameState - El estado global de la partida
+ * @param {'GIGS'|'UNIT'|null} targetType - Tipo de objetivo si está especificado
+ * @returns {boolean}
+ */
+export function canUnitAttack(unit, playerState = null, gameState = null, targetType = null) {
+  if (!unit) return false;
+
+  // 1. Estados básicos: Una unidad girada (Spent) o con Lag no puede atacar
+  if (unit.isSpent) return false;
+  if (unit.isLagging) return false;
+
+  // 2. Efectos temporales de congelación (Chrome Reverie, Nocturne Op55N1, etc.)
+  if (unit.cannotAttackUntilNextTurn) return false;
+  if (unit.cannotAttackUntilTurn && gameState && gameState.turnNumber < unit.cannotAttackUntilTurn) {
+    return false;
+  }
+
+  const cardId = String(unit.id || '').toUpperCase();
+  const cardName = String(unit.name || '').toLowerCase();
+  const rules = String(unit.rulesText || unit.ability || '').toLowerCase();
+
+  // 3. Jacked-In Voodoo Boy (CP-049):
+  // Regla oficial: "This Unit can't attack unless you played a Program this turn."
+  if (
+    cardId === 'CP-049' ||
+    cardName.includes('jacked-in voodoo boy') ||
+    rules.includes('unless you played a program this turn')
+  ) {
+    const programsPlayed = playerState ? (playerState.programsPlayedThisTurn || 0) : 0;
+    if (programsPlayed <= 0) {
+      return false;
+    }
+  }
+
+  // 4. Unidades que nunca pueden atacar (Corpo Security CP-019, Misty Olszewski CP-077, etc.)
+  // "This Unit can't attack." (excluyendo "unless")
+  if (
+    cardId === 'CP-019' ||
+    cardId === 'CP-077' ||
+    (rules.includes("this unit can't attack") && !rules.includes('unless'))
+  ) {
+    return false;
+  }
+
+  // 5. Ruthless Lowlife (CP-110): Solo puede atacar a Unidades rivales, no a zonas de Gigs
+  // "This Unit can only attack rival Units. (It can't attack Gig areas.)"
+  if (targetType === 'GIGS') {
+    if (
+      cardId === 'CP-110' ||
+      cardName.includes('ruthless lowlife') ||
+      rules.includes('only attack rival units') ||
+      rules.includes("can't attack gig areas")
+    ) {
+      return false;
+    }
+  }
+
+  // 6. MaxTac Suppression Team (CP-073): Las unidades rivales no pueden atacar el turno en que son jugadas
+  if (gameState && playerState) {
+    const oppKey = playerState.id === 'player' ? 'bot' : 'player';
+    const opp = gameState[oppKey];
+    if (
+      opp &&
+      (opp.field || []).some(
+        (u) =>
+          String(u.id || '').toUpperCase() === 'CP-073' ||
+          String(u.name || '').toLowerCase().includes('maxtac suppression team')
+      )
+    ) {
+      if (unit.turnEntered === gameState.turnNumber) {
+        return false;
+      }
+    }
+  }
+
+  return true;
+}
+
+/**
+ * Devuelve el motivo por el cual una Unidad no puede atacar (para mensajes UI / Holocall)
+ */
+export function getUnitAttackRestriction(unit, playerState = null, gameState = null, targetType = null) {
+  if (!unit) return 'Unidad no válida.';
+  if (unit.isSpent) return 'La unidad ya está girada (Spent).';
+  if (unit.isLagging) return 'La unidad tiene Lag (no puede atacar el turno en que entra en juego).';
+  if (unit.cannotAttackUntilNextTurn) {
+    return 'Esta unidad tiene el ataque bloqueado hasta tu próximo turno.';
+  }
+
+  const cardId = String(unit.id || '').toUpperCase();
+  const cardName = String(unit.name || '').toLowerCase();
+  const rules = String(unit.rulesText || unit.ability || '').toLowerCase();
+
+  if (
+    cardId === 'CP-049' ||
+    cardName.includes('jacked-in voodoo boy') ||
+    rules.includes('unless you played a program this turn')
+  ) {
+    const programsPlayed = playerState ? (playerState.programsPlayedThisTurn || 0) : 0;
+    if (programsPlayed <= 0) {
+      return 'Jacked-In Voodoo Boy no puede atacar a menos que hayas jugado un Programa este turno.';
+    }
+  }
+
+  if (cardId === 'CP-019') {
+    return 'Corpo Security no puede atacar (es un Blocker puramente defensivo).';
+  }
+
+  if (cardId === 'CP-077') {
+    return 'Misty Olszewski no puede atacar (es una unidad de apoyo).';
+  }
+
+  if (rules.includes("this unit can't attack") && !rules.includes('unless')) {
+    return `${unit.name} no puede atacar.`;
+  }
+
+  if (
+    targetType === 'GIGS' &&
+    (cardId === 'CP-110' ||
+      cardName.includes('ruthless lowlife') ||
+      rules.includes('only attack rival units') ||
+      rules.includes("can't attack gig areas"))
+  ) {
+    return 'Ruthless Lowlife solo puede atacar a Unidades rivales (no puede atacar al Área de Gigs).';
+  }
+
+  if (gameState && playerState) {
+    const oppKey = playerState.id === 'player' ? 'bot' : 'player';
+    const opp = gameState[oppKey];
+    if (
+      opp &&
+      (opp.field || []).some(
+        (u) =>
+          String(u.id || '').toUpperCase() === 'CP-073' ||
+          String(u.name || '').toLowerCase().includes('maxtac suppression team')
+      )
+    ) {
+      if (unit.turnEntered === gameState.turnNumber) {
+        return 'MaxTac Suppression Team en el rival impide que las unidades ataquen el turno que entran en juego.';
+      }
+    }
+  }
+
+  return null;
+}
+
+/**
  * Tabla oficial de robo de Gigs según el Poder de la Unidad atacante:
  * - Poder 0: 0 Gigs
  * - Poder 1–9: 1 Gig
@@ -356,7 +506,8 @@ export function createInitialGameState(playerDeckInput, botDeckInput, allCards =
       fixerDice: ['d4', 'd6', 'd8', 'd10', 'd12', 'd20'],
       gigs: [], // Empieza vacío hasta la fase de inicio
       hasSoldThisTurn: false,
-      hasCalledLegendThisTurn: false
+      hasCalledLegendThisTurn: false,
+      programsPlayedThisTurn: 0
     },
 
     bot: {
@@ -373,7 +524,8 @@ export function createInitialGameState(playerDeckInput, botDeckInput, allCards =
       fixerDice: ['d4', 'd6', 'd8', 'd10', 'd12', 'd20'],
       gigs: [],
       hasSoldThisTurn: false,
-      hasCalledLegendThisTurn: false
+      hasCalledLegendThisTurn: false,
+      programsPlayedThisTurn: 0
     }
   };
 
@@ -616,6 +768,10 @@ export function playProgramCard(state, playerKey, cardInstanceId) {
   // El programa va directo al descarte (Trash)
   if (!p.trash) p.trash = [];
   p.trash.push(card);
+
+  // Registrar programa jugado este turno para reglas oficiales (ej: Jacked-In Voodoo Boy)
+  p.programsPlayedThisTurn = (p.programsPlayedThisTurn || 0) + 1;
+  card.playedAtTurn = state.turnNumber;
 
   (state.actionLog = state.actionLog || []).unshift(
     `💾 ${p.name} usa ${cost} €$ girados, lanza el Programa "${card.name}" y va al Descarte (Trash).`
@@ -951,6 +1107,10 @@ export function attackRivalGigs(
     return { success: false, reason: 'La unidad ya está girada (Spent).' };
   }
   if (unit.isLagging) return { success: false, reason: 'La unidad tiene Lag (no puede atacar este turno).' };
+  if (!canUnitAttack(unit, attacker, state, 'GIGS')) {
+    const restriction = getUnitAttackRestriction(unit, attacker, state, 'GIGS') || 'Esta unidad no puede atacar a los Gigs.';
+    return { success: false, reason: restriction };
+  }
   if (defender.gigs.length === 0) return { success: false, reason: 'El rival no tiene Gigs para robar.' };
 
   // Girar la unidad atacante
@@ -1204,6 +1364,10 @@ export function fightRivalUnit(state, attackerPlayerKey, attackerUnitId, targetU
     return { success: false, reason: 'Tu unidad está girada.' };
   }
   if (attUnit.isLagging) return { success: false, reason: 'Tu unidad tiene Lag.' };
+  if (!canUnitAttack(attUnit, attacker, state, 'UNIT')) {
+    const restriction = getUnitAttackRestriction(attUnit, attacker, state, 'UNIT') || 'Esta unidad no puede atacar a unidades rivales.';
+    return { success: false, reason: restriction };
+  }
   if (!defUnit.isSpent && !blockerUnitId && !attUnit.canAttackReadyUnits) {
     return { success: false, reason: 'Solo puedes atacar a unidades rivales giradas (Spent). Las unidades enderezadas no pueden ser atacadas.' };
   }
@@ -1342,10 +1506,16 @@ export function executeStartPhase(state, playerKey) {
   p.field.forEach((u) => {
     u.isSpent = false;
     u.isLagging = false;
+    // Si la congelación expiró en este turno
+    if (u.cannotAttackUntilNextTurn && u.frozenAtTurn && state.turnNumber > u.frozenAtTurn) {
+      delete u.cannotAttackUntilNextTurn;
+      delete u.frozenAtTurn;
+    }
   });
 
   p.hasSoldThisTurn = false;
   p.hasCalledLegendThisTurn = false;
+  p.programsPlayedThisTurn = 0;
 
   // 3. ROBO DE CARTA (DRAW 1 CARD)
   if (p.deck.length > 0) {

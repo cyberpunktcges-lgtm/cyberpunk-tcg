@@ -19,7 +19,8 @@ import {
   hasKeyword,
   calculateGigsToSteal,
   isCardVendible,
-  parseCardCost
+  parseCardCost,
+  canUnitAttack
 } from './cyberpunkEngine.js';
 import { executeUnitAttackTrigger } from './cardEffects.js';
 
@@ -237,8 +238,8 @@ export async function runBotTurn(gameState, updateCallback, delayMs = 700) {
     }
   }
 
-  // Paso 4: Fase de Ataques con Unidades Listas (Ready y sin Lag)
-  const readyUnits = (bot.field || []).filter((u) => !u.isSpent && !u.isLagging);
+  // Paso 4: Fase de Ataques con Unidades Listas (Ready, sin Lag y sin restricciones de ataque)
+  const readyUnits = (bot.field || []).filter((u) => canUnitAttack(u, bot, gameState));
 
   for (const unit of readyUnits) {
     if (gameState.isGameOver) break;
@@ -248,7 +249,7 @@ export async function runBotTurn(gameState, updateCallback, delayMs = 700) {
       (pu) => pu.isSpent && (pu.currentPower || 0) < (unit.currentPower || 0)
     );
 
-    if (killableSpentEnemy) {
+    if (killableSpentEnemy && canUnitAttack(unit, bot, gameState, 'UNIT')) {
       unit.isSpent = true;
       unit.hasTriggeredAttackThisDeclaration = true;
       executeUnitAttackTrigger(gameState, 'bot', unit);
@@ -274,7 +275,7 @@ export async function runBotTurn(gameState, updateCallback, delayMs = 700) {
     }
 
     // Prioridad B: Atacar los Gigs del jugador para robar dados de Gig según la tabla de poder
-    if (player.gigs && player.gigs.length > 0) {
+    if (player.gigs && player.gigs.length > 0 && canUnitAttack(unit, bot, gameState, 'GIGS')) {
       unit.isSpent = true;
       unit.hasTriggeredAttackThisDeclaration = true;
       executeUnitAttackTrigger(gameState, 'bot', unit);
@@ -381,7 +382,7 @@ export async function resolvePendingAttackAndContinueBot(gameState, updateCallba
   await wait(delayMs);
 
   // Continuar con los siguientes ataques del bot si tiene más unidades listas
-  const remainingReadyUnits = (bot.field || []).filter((u) => !u.isSpent && !u.isLagging);
+  const remainingReadyUnits = (bot.field || []).filter((u) => canUnitAttack(u, bot, gameState));
   if (remainingReadyUnits.length > 0) {
     return runBotTurn(gameState, updateCallback, delayMs);
   } else {
