@@ -2016,8 +2016,8 @@ export function mulliganHand(state, playerKey = 'player') {
     `🔄 ${p.name} realiza MULLIGAN: baraja su mano y roba 6 cartas nuevas.`
   );
 
-  // Ejecutar Start Phase del Jugador 1
-  return executeStartPhase(state, playerKey);
+  // Ejecutar Start Phase del jugador inicial real (puede ser 'player' o 'bot' según el D20)
+  return executeStartPhase(state, state.activePlayer || playerKey);
 }
 
 /**
@@ -2032,6 +2032,6 @@ export function keepHand(state, playerKey = 'player') {
     `✅ ${p.name} decide MANTENER (Keep) su mano inicial de 6 cartas.`
   );
 
-  // Ejecutar Start Phase del Jugador 1
-  return executeStartPhase(state, playerKey);
+  // Ejecutar Start Phase del jugador inicial real (puede ser 'player' o 'bot' según el D20)
+  return executeStartPhase(state, state.activePlayer || playerKey);
 }

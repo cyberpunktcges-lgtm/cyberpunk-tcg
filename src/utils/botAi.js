@@ -20,7 +20,8 @@ import {
   calculateGigsToSteal,
   isCardVendible,
   parseCardCost,
-  canUnitAttack
+  canUnitAttack,
+  executeStartPhase
 } from './cyberpunkEngine.js';
 import { executeUnitAttackTrigger, executeBlockerUsedTrigger } from './cardEffects.js';
 
@@ -167,6 +168,12 @@ export async function runBotTurn(gameState, updateCallback, delayMs = 700) {
   const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
   const bot = gameState.bot;
   const player = gameState.player;
+
+  // Salvaguarda de Turno 1: si el bot empieza la partida y aún no se ejecutó su Fase de Inicio (0 dados lanzados), lanzarla ahora
+  if (gameState.turnNumber === 1 && (bot.gigs || []).length === 0 && (bot.fixerDice || []).length === 6) {
+    executeStartPhase(gameState, 'bot');
+    updateCallback({ ...gameState });
+  }
 
   // Paso 1: Si tiene cartas en mano y aún no ha vendido este turno, vender una carta vendible (Programas, Gears o Flathead)
   if (bot.hand.length > 0 && !bot.hasSoldThisTurn) {
