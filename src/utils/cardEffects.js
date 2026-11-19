@@ -88,6 +88,7 @@ function isGearCard(c) {
 
 function isUnitCard(c) {
   if (!c) return false;
+  if (c.isUnit || c.isLegendUnit) return true;
   const ot = String(c.officialType || '').toUpperCase();
   const ct = String(c.cardType || c.type || '').toUpperCase();
   return ot === 'UNIT' || (ct.includes('UNIT') && !ct.includes('LEGEND'));

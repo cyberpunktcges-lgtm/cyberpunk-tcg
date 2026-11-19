@@ -6054,7 +6054,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
                     <span className="text-[10px] text-gray-400 uppercase truncate">
-                      {isLeg ? '👑 LEYENDA' : inspectedCard.officialType || inspectedCard.cardType || 'UNIDAD / GEAR / PROGRAMA'}
+                      {inspectedCard.isLegendUnit ? '👑 LEYENDA • UNIDAD (EN CAMPO)' : isLeg ? '👑 LEYENDA' : inspectedCard.officialType || inspectedCard.cardType || 'UNIDAD / GEAR / PROGRAMA'}
                     </span>
                     <span className="text-[9px] px-1.5 py-0.2 bg-[#0dfceb]/20 border border-[#0dfceb]/50 text-[#0dfceb] font-black uppercase rounded">
                       PANTALLA COMPLETA

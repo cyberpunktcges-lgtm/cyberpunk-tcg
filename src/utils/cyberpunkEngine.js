@@ -94,6 +94,34 @@ export function hasKeyword(card, keyword) {
  * 2. Su coste NO puede ser '-' ni '(-)'.
  * 3. Debe tener un coste numérico en Eddies mayor que 0.
  */
+/**
+ * Comprueba si una carta es Leyenda (en Zona de Leyendas o desplegada en el campo de batalla).
+ * REGLA OFICIAL: Una Leyenda en el campo de batalla sigue siendo Leyenda y ADEMÁS es Unidad.
+ */
+export function isCardLegend(card) {
+  if (!card) return false;
+  return Boolean(
+    card.isLegend ||
+    card.isLegendUnit ||
+    String(card.officialType || '').toUpperCase() === 'LEGEND' ||
+    String(card.cardType || card.type || '').toUpperCase().includes('LEGEND')
+  );
+}
+
+/**
+ * Comprueba si una carta cuenta como Unidad.
+ * REGLA OFICIAL: Cualquier Leyenda en el campo de batalla (con Go Solo o sin Go Solo)
+ * cuenta simultáneamente como LEYENDA y como UNIDAD.
+ */
+export function isCardUnit(card, isOnField = false) {
+  if (!card) return false;
+  if (card.isUnit || card.isLegendUnit) return true;
+  if (isOnField && isCardLegend(card)) return true;
+  const ot = String(card.officialType || '').toUpperCase();
+  const ct = String(card.cardType || card.type || '').toUpperCase();
+  return ot === 'UNIT' || (ct.includes('UNIT') && !ct.includes('LEGEND'));
+}
+
 export function canLegendDeployToField(card) {
   if (!card) return false;
   const hasGoSolo = hasKeyword(card, 'Go Solo');
@@ -724,7 +752,7 @@ export function getEffectiveCardCost(card, playerState = null, gameState = null)
     }
   } else if (cardType === 'GEAR') {
     if (cId === 'CP-150' || slug.includes('zetatech-berserk')) {
-      const faceUpLegends = (playerState.legends || []).filter((l) => l.isFaceUp).length;
+      const faceUpLegends = (playerState.legends || []).filter((l) => l.isFaceUp && !l.isRemovedFromGame).length;
       if (faceUpLegends > 0) cost = Math.min(cost, Math.max(1, cost - faceUpLegends));
     }
     const hasViktor = (playerState.field || []).some((u) => String(u.id || '').toUpperCase() === 'CP-140');
@@ -945,7 +973,7 @@ export function playGearCard(state, playerKey, cardInstanceId, targetInstanceId 
   const cId = String(card.id || '').toUpperCase();
   // CP-150 Zetatech Berserk: -1 €$ por cada Leyenda aliada boca arriba (mín 1 €$)
   if (cId === 'CP-150' || (card.slug || '').includes('zetatech-berserk')) {
-    const faceUpLegends = (p.legends || []).filter((l) => l.isFaceUp).length;
+    const faceUpLegends = (p.legends || []).filter((l) => l.isFaceUp && !l.isRemovedFromGame).length;
     if (faceUpLegends > 0) cost = Math.max(1, cost - faceUpLegends);
   }
   // CP-140 Viktor Vektor // Drop Your Illusions: primer Gear CYBERWARE cada turno -3 €$ (mín 1 €$)
@@ -1234,6 +1262,8 @@ export function playLegendToField(state, playerKey, legendInstanceId, isGoSolo =
     ...leg,
     instanceId: `${leg.instanceId}_unit`,
     legendInstanceId: leg.instanceId,
+    isLegend: true,
+    isUnit: true,
     isLegendUnit: true,
     hasGoSolo: Boolean(isGoSolo),
     isSpent: !entersReady,
