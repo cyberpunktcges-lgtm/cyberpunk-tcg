@@ -747,7 +747,16 @@ export function playProgramCard(state, playerKey, cardInstanceId) {
   if (cardIdx === -1) return { success: false, reason: 'Programa no encontrado en mano.' };
 
   const card = p.hand[cardIdx];
-  const cost = card.parsedCost || parseCardCost(card.cost);
+  const baseCost = card.parsedCost || parseCardCost(card.cost);
+  let discount = 0;
+  if (p.altCunninghamProgramDiscount && p.altCunninghamProgramDiscount > 0) {
+    discount = p.altCunninghamProgramDiscount;
+    delete p.altCunninghamProgramDiscount;
+    (state.actionLog = state.actionLog || []).unshift(
+      `🌐 [Alt Cunningham] Descuento de -${discount} €$ aplicado a "${card.name}" (por Gigs mínimos).`
+    );
+  }
+  const cost = Math.max(1, baseCost - discount);
   const available = getAvailableEddies(p);
 
   if (available < cost) {
@@ -757,7 +766,7 @@ export function playProgramCard(state, playerKey, cardInstanceId) {
       missingEddies: missing,
       cardName: card.name,
       cost,
-      reason: `Eddies insuficientes. "${card.name}" cuesta ${cost} €$ y solo has girado ${available} €$. Te faltan ${missing} €$ (gira más cartas de Eddies o Leyendas antes de jugar).`
+      reason: `Eddies insuficientes. "${card.name}" cuesta ${cost} €$${discount > 0 ? ` (reducido de ${baseCost} €$ por Alt Cunningham)` : ''} y solo has girado ${available} €$. Te faltan ${missing} €$ (gira más cartas de Eddies o Leyendas antes de jugar).`
     };
   }
 
@@ -1516,6 +1525,7 @@ export function executeStartPhase(state, playerKey) {
   p.hasSoldThisTurn = false;
   p.hasCalledLegendThisTurn = false;
   p.programsPlayedThisTurn = 0;
+  delete p.altCunninghamProgramDiscount;
 
   // 3. ROBO DE CARTA (DRAW 1 CARD)
   if (p.deck.length > 0) {

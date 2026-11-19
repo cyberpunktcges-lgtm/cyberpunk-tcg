@@ -85,6 +85,7 @@ import {
   resolvePendingAttackAndContinueBot
 } from '../utils/botAi.js';
 import { getCardRulesText, executeUnitAttackTrigger, executeLegendAbility } from '../utils/cardEffects.js';
+import { getCardActivatedAbilities, executeCardActivatedAbility } from '../utils/activatedAbilities.js';
 
 // =========================================================================
 // CLIP-PATHS GEOMÉTRICOS CYBERPUNK (ESQUINAS RECORTADAS EN DIAGONAL)
@@ -1161,12 +1162,12 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
   };
 
   // Activar habilidad de Leyenda boca arriba (↷ / Quick)
-  const handleActivateLegendAbility = (legendInstanceId) => {
+  const handleActivateLegendAbility = (legendInstanceId, abilityId = null) => {
     if (!gameState || gameState.activePlayer !== 'player' || gameState.isGameOver) return;
     const leg = (gameState.player.legends || []).find((l) => l.instanceId === legendInstanceId);
     if (!leg) return;
 
-    const res = executeLegendAbility(gameState, 'player', leg);
+    const res = executeLegendAbility(gameState, 'player', leg, abilityId);
     if (!res.success) {
       setHolocall({
         title: 'HABILIDAD NO DISPONIBLE',
@@ -1187,11 +1188,39 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
       return;
     }
 
+    if (res.requiresModal) {
+      setGameState({ ...gameState });
+      return;
+    }
+
     pushHistory();
     setGameState({ ...gameState });
     setHolocall({
       title: 'HABILIDAD DE LEYENDA ACTIVADA',
       message: res.message || `Has activado la habilidad de "${leg.name}".`,
+      characterName: 'NETWATCH // INTEL',
+      type: 'success'
+    });
+  };
+
+  // Activar habilidad de Unidad o Gear con giro (↷ / Quick)
+  const handleExecuteActivatedAbility = (cardInstanceId, abilityId = null) => {
+    if (!gameState || gameState.activePlayer !== 'player' || gameState.isGameOver) return;
+    const res = executeCardActivatedAbility(gameState, 'player', cardInstanceId, abilityId);
+    if (!res.success) {
+      setHolocall({
+        title: 'HABILIDAD NO DISPONIBLE',
+        message: res.reason || 'No se puede activar esta habilidad en este momento.',
+        characterName: 'VIKTOR // RIPPERDOC',
+        type: 'warning'
+      });
+      return;
+    }
+    pushHistory();
+    setGameState({ ...gameState });
+    setHolocall({
+      title: 'HABILIDAD ACTIVADA (↷)',
+      message: res.message || 'Habilidad ejecutada con éxito.',
       characterName: 'NETWATCH // INTEL',
       type: 'success'
     });
@@ -1491,6 +1520,29 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
   const handleResolveCardChoice = (selectedCardIds = []) => {
     if (!gameState?.pendingCardChoice) return;
     const choice = gameState.pendingCardChoice;
+
+    if (choice.type === 'ALT_CUNNINGHAM_PLAY_TRASH_PROGRAM') {
+      const p = gameState[choice.playerKey || 'player'];
+      const selected = (choice.cards || []).find((c) => selectedCardIds.includes(c.instanceId));
+      if (selected) {
+        const tIdx = (p.trash || []).findIndex((tc) => tc.instanceId === selected.instanceId);
+        if (tIdx !== -1) p.trash.splice(tIdx, 1);
+
+        const cost = selected.parsedCost || parseCardCost(selected.cost);
+        spendEddies(p, cost);
+        executeProgramEffect(gameState, choice.playerKey || 'player', selected);
+
+        if (!p.deck) p.deck = [];
+        p.deck.push(selected); // Bottom-deck it after you play it
+
+        gameState.actionLog.unshift(
+          `🌐 [Alt Cunningham] Has jugado "${selected.name}" desde la Basura pagando ${cost} €$ y ha sido colocada en el FONDO de tu mazo.`
+        );
+      }
+      delete gameState.pendingCardChoice;
+      setGameState({ ...gameState });
+      return;
+    }
 
     if (choice.type === 'SELECT_RIVAL_UNIT_TO_DEFEAT') {
       const oppKey = (choice.playerKey || 'player') === 'player' ? 'bot' : 'player';
@@ -4028,6 +4080,26 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
 
               {/* Botón de Asaltar Gigs o Acciones Rápidas */}
               <div className="flex items-center gap-2">
+                {/* Habilidades activadas (↷) de la Unidad seleccionada */}
+                {selectedFieldUnit && (() => {
+                  const unitAbilities = getCardActivatedAbilities(selectedFieldUnit, 'player', gameState);
+                  if (unitAbilities.length === 0) return null;
+                  return unitAbilities.map((ab) => (
+                    <button
+                      key={ab.id}
+                      type="button"
+                      disabled={!ab.canActivateNow}
+                      onClick={() => handleExecuteActivatedAbility(selectedFieldUnit.instanceId, ab.id)}
+                      style={{ clipPath: CYBER_BUTTON }}
+                      className="px-2.5 py-1 bg-[#0dfceb] hover:bg-white text-black font-black text-xs uppercase cursor-pointer shadow-[0_0_15px_rgba(13,252,235,0.7)] transition-all disabled:opacity-40 flex items-center gap-1"
+                      title={ab.description}
+                    >
+                      <span>⚡</span>
+                      <span>{ab.shortTitle || ab.title}</span>
+                    </button>
+                  ));
+                })()}
+
                 {selectedFieldUnit && !selectedFieldUnit.isSpent && !selectedFieldUnit.isLagging && (() => {
                   const gigsToSteal = calculateGigsToSteal(selectedFieldUnit.currentPower);
                   const hasGigs = bot.gigs.length > 0;
@@ -4704,28 +4776,48 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                               </div>
                             )}
 
-                            {/* Opción Habilidad de Leyenda (si está boca arriba y lista) */}
-                            {leg.isFaceUp && !leg.isSpent && (
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setLegendMenuId(null);
-                                  handleActivateLegendAbility(leg.instanceId);
-                                }}
-                                className="w-full py-1.5 px-2 text-left flex items-center justify-between rounded text-[10px] font-black uppercase transition-all bg-[#0dfceb]/20 hover:bg-[#0dfceb] text-[#0dfceb] hover:text-black border border-[#0dfceb]/60 shadow-[0_0_12px_rgba(13,252,235,0.3)] cursor-pointer hover:scale-[1.02] mb-1"
-                              >
-                                <span className="flex items-center gap-1.5">
-                                  <span>⚡</span>
-                                  <span>
-                                    {leg.id === 'CP-104' || leg.slug?.includes('river-ward')
-                                      ? 'EQUIPAR GEAR GRATIS'
-                                      : 'ACTIVAR HABILIDAD (↷)'}
-                                  </span>
-                                </span>
-                                <span className="text-[9px] font-bold">↷</span>
-                              </button>
-                            )}
+                            {/* Habilidades de Leyenda activadas (↷) */}
+                            {leg.isFaceUp && !leg.isSpent && (() => {
+                              const legAbilities = getCardActivatedAbilities(leg, 'player', gameState);
+                              if (legAbilities.length === 0) return null;
+                              return (
+                                <div className="flex flex-col gap-1 mb-1.5">
+                                  {legAbilities.map((ab) => (
+                                    <button
+                                      key={ab.id}
+                                      type="button"
+                                      disabled={!ab.canActivateNow}
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setLegendMenuId(null);
+                                        handleActivateLegendAbility(leg.instanceId, ab.id);
+                                      }}
+                                      title={ab.description}
+                                      className={`w-full py-1.5 px-2 text-left flex flex-col rounded text-[10px] font-black uppercase transition-all border ${
+                                        !ab.canActivateNow
+                                          ? 'bg-gray-900/80 text-gray-500 border-gray-800 cursor-not-allowed opacity-60'
+                                          : 'bg-[#0dfceb]/20 hover:bg-[#0dfceb] text-[#0dfceb] hover:text-black border-[#0dfceb]/60 shadow-[0_0_12px_rgba(13,252,235,0.3)] cursor-pointer hover:scale-[1.02]'
+                                      }`}
+                                    >
+                                      <div className="flex items-center justify-between w-full">
+                                        <span className="flex items-center gap-1.5 truncate max-w-[80%]">
+                                          <span>⚡</span>
+                                          <span className="truncate">{ab.title}</span>
+                                        </span>
+                                        <span className="text-[9px] font-bold px-1 py-0.2 bg-black/60 rounded text-[#0dfceb]">
+                                          {ab.costEddie > 0 ? (ab.costEddie + ' €$') : '↷'}
+                                        </span>
+                                      </div>
+                                      {ab.disabledReason && !ab.canActivateNow && (
+                                        <span className="text-[8px] text-[#FF003C] font-normal normal-case tracking-tight mt-0.5">
+                                          {ab.disabledReason}
+                                        </span>
+                                      )}
+                                    </button>
+                                  ))}
+                                </div>
+                              );
+                            })()}
 
                             {/* Opción 2: SACAR EDDIE (si está enderezada) */}
                             {!leg.isSpent && (
