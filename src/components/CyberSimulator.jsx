@@ -47,6 +47,7 @@ import {
   calculateStreetCred,
   getAvailableEddies,
   getTotalAvailableEddies,
+  spendEddies,
   sellCardForEddies,
   playCard,
   playUnitCard,
@@ -84,7 +85,7 @@ import {
   executeBotReaction,
   resolvePendingAttackAndContinueBot
 } from '../utils/botAi.js';
-import { getCardRulesText, executeUnitAttackTrigger, executeLegendAbility } from '../utils/cardEffects.js';
+import { getCardRulesText, executeUnitAttackTrigger, executeLegendAbility, executeProgramEffect, executeUnitPlayTrigger, getNumericCost } from '../utils/cardEffects.js';
 import { getCardActivatedAbilities, executeCardActivatedAbility } from '../utils/activatedAbilities.js';
 
 // =========================================================================
@@ -1113,6 +1114,23 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
     const res = playCard(gameState, 'player', cardInstanceId, targetId);
     if (res.success) {
       setSelectedHandCard(null);
+      if (
+        !gameState.pendingCardChoice &&
+        !gameState.pendingModalChoice &&
+        !gameState.pendingTargetSelection &&
+        gameState.lastTriggerNotification
+      ) {
+        const notif = gameState.lastTriggerNotification;
+        delete gameState.lastTriggerNotification;
+        setHolocall({
+          title: notif.title,
+          message: notif.message,
+          characterName: 'KIROSHI OS // TRIGGER PLAY',
+          type: notif.type || 'success'
+        });
+      } else {
+        delete gameState.lastTriggerNotification;
+      }
       setGameState({ ...gameState });
     } else {
       if (res.missingEddies) {
@@ -1524,22 +1542,208 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
     if (choice.type === 'ALT_CUNNINGHAM_PLAY_TRASH_PROGRAM') {
       const p = gameState[choice.playerKey || 'player'];
       const selected = (choice.cards || []).find((c) => selectedCardIds.includes(c.instanceId));
+      delete gameState.pendingCardChoice;
       if (selected) {
         const tIdx = (p.trash || []).findIndex((tc) => tc.instanceId === selected.instanceId);
         if (tIdx !== -1) p.trash.splice(tIdx, 1);
 
-        const cost = selected.parsedCost || parseCardCost(selected.cost);
+        const cost = getNumericCost(selected);
         spendEddies(p, cost);
+        p.programsPlayedThisTurn = (p.programsPlayedThisTurn || 0) + 1;
         executeProgramEffect(gameState, choice.playerKey || 'player', selected);
 
         if (!p.deck) p.deck = [];
-        p.deck.push(selected); // Bottom-deck it after you play it
+        p.deck.push(selected);
 
         gameState.actionLog.unshift(
           `🌐 [Alt Cunningham] Has jugado "${selected.name}" desde la Basura pagando ${cost} €$ y ha sido colocada en el FONDO de tu mazo.`
         );
       }
+      setGameState({ ...gameState });
+      return;
+    }
+
+    if (choice.type === 'LIZZY_WIZZY_PLAY_FREE_PROGRAM') {
+      const p = gameState[choice.playerKey || 'player'];
+      const selected = (choice.cards || []).find((c) => selectedCardIds.includes(c.instanceId));
       delete gameState.pendingCardChoice;
+      if (selected) {
+        if (selected._lizzyZone === 'HAND') {
+          const hIdx = (p.hand || []).findIndex((c) => c.instanceId === selected.instanceId);
+          if (hIdx !== -1) p.hand.splice(hIdx, 1);
+        } else {
+          const tIdx = (p.trash || []).findIndex((c) => c.instanceId === selected.instanceId);
+          if (tIdx !== -1) p.trash.splice(tIdx, 1);
+        }
+        const cleanProg = { ...selected };
+        delete cleanProg._lizzyZone;
+        p.programsPlayedThisTurn = (p.programsPlayedThisTurn || 0) + 1;
+        executeProgramEffect(gameState, choice.playerKey || 'player', cleanProg);
+
+        if (!p.deck) p.deck = [];
+        p.deck.push(cleanProg);
+
+        gameState.actionLog.unshift(
+          `🎤 [Lizzy Wizzy] ¡PLAY! Has jugado GRATIS el Programa "${cleanProg.name}" desde ${selected._lizzyZone === 'HAND' ? 'tu Mano' : 'tu Basura'} y se ha enviado al FONDO de tu mazo.`
+        );
+      } else {
+        gameState.actionLog.unshift(`🎤 [Lizzy Wizzy] Decidiste no jugar ningún Programa gratuito.`);
+      }
+      setGameState({ ...gameState });
+      return;
+    }
+
+    if (choice.type === 'MAMAN_BRIGITTE_DISCARD_2') {
+      const p = gameState[choice.playerKey || 'player'];
+      const opp = gameState[(choice.playerKey || 'player') === 'player' ? 'bot' : 'player'];
+      const selected = (choice.cards || []).filter((c) => selectedCardIds.includes(c.instanceId));
+      delete gameState.pendingCardChoice;
+      if (selected.length === 2) {
+        selected.forEach((sc) => {
+          const hIdx = (p.hand || []).findIndex((c) => c.instanceId === sc.instanceId);
+          if (hIdx !== -1) {
+            if (!p.trash) p.trash = [];
+            p.trash.push(p.hand.splice(hIdx, 1)[0]);
+          }
+        });
+        const rivalUnequipped = (opp.field || []).filter((u) => !u.gear || u.gear.length === 0);
+        if (rivalUnequipped.length === 1) {
+          const [removed] = opp.field.splice(opp.field.indexOf(rivalUnequipped[0]), 1);
+          if (!opp.deck) opp.deck = [];
+          opp.deck.push(removed);
+          gameState.actionLog.unshift(
+            `🕯️ [Maman Brigitte] Descartaste 2 Programas y enviaste a "${removed.name}" al fondo del mazo rival.`
+          );
+        } else if (rivalUnequipped.length > 1) {
+          gameState.pendingTargetSelection = {
+            actionType: 'TARGET_UNIT',
+            sourceCardId: 'CP-067',
+            sourceCardName: 'Maman Brigitte',
+            sourceCardImage: choice.sourceCardImage,
+            title: '🕯️ MAMAN BRIGITTE // ENVIAR AL FONDO DEL MAZO',
+            prompt: 'Selecciona la Unidad rival sin Gear equipado para enviarla al fondo de su mazo:',
+            effectType: 'BOTTOM_DECK',
+            targetScope: 'RIVAL_UNITS',
+            onlyUnequipped: true
+          };
+        }
+      } else {
+        gameState.actionLog.unshift(`🕯️ [Maman Brigitte] Habilidad PLAY omitida (se requieren 2 Programas descartados).`);
+      }
+      setGameState({ ...gameState });
+      return;
+    }
+
+    if (choice.type === 'PLACIDE_DISCARD_1') {
+      const p = gameState[choice.playerKey || 'player'];
+      const opp = gameState[(choice.playerKey || 'player') === 'player' ? 'bot' : 'player'];
+      const selected = (choice.cards || []).find((c) => selectedCardIds.includes(c.instanceId));
+      delete gameState.pendingCardChoice;
+      if (selected) {
+        const hIdx = (p.hand || []).findIndex((c) => c.instanceId === selected.instanceId);
+        if (hIdx !== -1) {
+          if (!p.trash) p.trash = [];
+          p.trash.push(p.hand.splice(hIdx, 1)[0]);
+        }
+        const oppUnits = opp.field || [];
+        if (oppUnits.length === 1) {
+          const [removed] = opp.field.splice(0, 1);
+          if (!opp.deck) opp.deck = [];
+          opp.deck.push(removed);
+          gameState.actionLog.unshift(
+            `📡 [Placide] Descartaste "${selected.name}" y enviaste a "${removed.name}" al fondo del mazo rival.`
+          );
+        } else if (oppUnits.length > 1) {
+          gameState.pendingTargetSelection = {
+            actionType: 'TARGET_UNIT',
+            sourceCardId: 'CP-096',
+            sourceCardName: 'Placide',
+            sourceCardImage: choice.sourceCardImage,
+            title: '📡 PLACIDE // ENVIAR AL FONDO DEL MAZO',
+            prompt: 'Selecciona una Unidad rival para enviarla al fondo de su mazo:',
+            effectType: 'BOTTOM_DECK',
+            targetScope: 'RIVAL_UNITS'
+          };
+        }
+      } else {
+        gameState.actionLog.unshift(`📡 [Placide] Decidiste no descartar ningún Programa.`);
+      }
+      const pendingAttack = gameState.pendingAttackContinuation;
+      if (pendingAttack && !gameState.pendingTargetSelection) {
+        delete gameState.pendingAttackContinuation;
+        continueAttackAfterTrigger(pendingAttack);
+      } else {
+        setGameState({ ...gameState });
+      }
+      return;
+    }
+
+    if (choice.type === 'VIKTOR_PLAY_TRASH_GEAR') {
+      const p = gameState[choice.playerKey || 'player'];
+      const selected = (choice.cards || []).find((c) => selectedCardIds.includes(c.instanceId));
+      delete gameState.pendingCardChoice;
+      if (selected) {
+        const tIdx = (p.trash || []).findIndex((c) => c.instanceId === selected.instanceId);
+        if (tIdx !== -1) p.trash.splice(tIdx, 1);
+        const otherUnits = (p.field || []).filter((u) => u.instanceId !== choice.excludeUnitId);
+        if (otherUnits.length === 1) {
+          const targetUnit = otherUnits[0];
+          targetUnit.gear = targetUnit.gear || [];
+          targetUnit.gear.push(selected);
+          const bonus = selected.powerBonus || selected.parsedPower || parseCardPower(selected.power) || 1;
+          targetUnit.currentPower = (targetUnit.currentPower || 0) + bonus;
+          gameState.actionLog.unshift(
+            `💉 [Viktor Vektor] ¡PLAY! Equipó gratis "${selected.name}" desde tu Basura a "${targetUnit.name}" (+${bonus} Fuerza).`
+          );
+        } else if (otherUnits.length > 1) {
+          gameState.pendingTargetSelection = {
+            actionType: 'TARGET_UNIT',
+            sourceCardId: 'CP-142',
+            sourceCardName: 'Viktor Vektor',
+            sourceCardImage: choice.sourceCardImage,
+            title: '💉 VIKTOR VEKTOR // EQUIPAR GEAR DE BASURA',
+            prompt: `Selecciona OTRA Unidad aliada para equiparle gratis "${selected.name}":`,
+            effectType: 'EQUIP_GEAR',
+            gearToEquip: selected,
+            targetScope: 'FRIENDLY_UNITS',
+            excludeInstanceId: choice.excludeUnitId
+          };
+        }
+      }
+      setGameState({ ...gameState });
+      return;
+    }
+
+    if (choice.type === 'YORINOBU_PLAY_FREE_UNIT') {
+      const p = gameState[choice.playerKey || 'player'];
+      const selected = (choice.cards || []).find((c) => selectedCardIds.includes(c.instanceId));
+      delete gameState.pendingCardChoice;
+      if (selected) {
+        if (selected._yorinobuZone === 'HAND') {
+          const hIdx = (p.hand || []).findIndex((c) => c.instanceId === selected.instanceId);
+          if (hIdx !== -1) p.hand.splice(hIdx, 1);
+        } else {
+          const tIdx = (p.trash || []).findIndex((c) => c.instanceId === selected.instanceId);
+          if (tIdx !== -1) p.trash.splice(tIdx, 1);
+        }
+        const cleanUnit = { ...selected };
+        delete cleanUnit._yorinobuZone;
+        const deployed = {
+          ...cleanUnit,
+          isSpent: false,
+          isLagging: false,
+          canAttackSpentUnitsTurnPlayed: true,
+          turnEntered: gameState.turnNumber,
+          currentPower: cleanUnit.parsedPower || parseCardPower(cleanUnit.power) || 1,
+          gear: []
+        };
+        if (!p.field) p.field = [];
+        p.field.push(deployed);
+        gameState.actionLog.unshift(
+          `🐉 [Yorinobu Arasaka] ¡PLAY! Desplegaste GRATIS a "${deployed.name}" (puede atacar Unidades rivales este turno).`
+        );
+        executeUnitPlayTrigger(gameState, choice.playerKey || 'player', deployed);
+      }
       setGameState({ ...gameState });
       return;
     }
@@ -2061,12 +2265,12 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
       const { unitInstanceId, ownerKey } = targetData;
       const targetOwner = ownerKey === 'player' ? p : opp;
       const unit = (targetOwner.field || []).find((u) => u.instanceId === unitInstanceId);
+      let keepSelectionForMoreSpends = false;
       if (unit) {
         if (sel.effectType === 'DEFEAT') {
           const idx = targetOwner.field.indexOf(unit);
           const [dead] = targetOwner.field.splice(idx, 1);
-          if (!targetOwner.trash) targetOwner.trash = [];
-          targetOwner.trash.push(dead);
+          sendDefeatedUnitToGraveyardOrExile(targetOwner, dead, gameState);
           gameState.actionLog.unshift(`💥 [${sel.sourceCardName}] Destruyó a la unidad "${dead.name}".`);
         } else if (sel.effectType === 'BUFF') {
           unit.currentPower = (unit.currentPower || unit.power || 0) + (sel.amount || 2);
@@ -2077,10 +2281,35 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
         } else if (sel.effectType === 'FREEZE') {
           unit.cannotAttackUntilNextTurn = true;
           gameState.actionLog.unshift(`🛑 [${sel.sourceCardName}] "${unit.name}" no podrá atacar hasta tu próximo turno.`);
+        } else if (sel.effectType === 'MUST_ATTACK') {
+          unit.mustAttackNextTurn = true;
+          gameState.actionLog.unshift(`⚡ [${sel.sourceCardName}] "${unit.name}" deberá atacar en su próximo turno si puede.`);
+        } else if (sel.effectType === 'CANNOT_READY') {
+          unit.cannotReadyUntilNextTurn = true;
+          gameState.actionLog.unshift(`💻 [${sel.sourceCardName}] "${unit.name}" no podrá enderezarse hasta tu próximo turno.`);
+        } else if (sel.effectType === 'ADRENALINE') {
+          unit.isLagging = false;
+          unit.hasAdrenaline = true;
+          gameState.actionLog.unshift(`🏎️ [${sel.sourceCardName}] Otorgó ADRENALINE a "${unit.name}" este turno.`);
+        } else if (sel.effectType === 'EQUIP_GEAR' && sel.gearToEquip) {
+          unit.gear = unit.gear || [];
+          unit.gear.push(sel.gearToEquip);
+          const bonus = sel.gearToEquip.powerBonus || sel.gearToEquip.parsedPower || parseCardPower(sel.gearToEquip.power) || 1;
+          unit.currentPower = (unit.currentPower || 0) + bonus;
+          gameState.actionLog.unshift(`💉 [${sel.sourceCardName}] Equipó "${sel.gearToEquip.name}" a "${unit.name}" (+${bonus} Fuerza).`);
         } else if (sel.effectType === 'SPEND') {
           unit.isSpent = true;
           if (sel.cannotReady) unit.cannotReadyUntilNextTurn = true;
           gameState.actionLog.unshift(`✝️ [${sel.sourceCardName}] Giró a la unidad rival "${unit.name}".`);
+          const remainingReady = (opp.field || []).filter((u) => !u.isSpent);
+          if (sel.remainingSpends && sel.remainingSpends > 0 && remainingReady.length > 0) {
+            gameState.pendingTargetSelection = {
+              ...sel,
+              remainingSpends: sel.remainingSpends - 1,
+              prompt: `Selecciona otra Unidad rival para girar (${sel.remainingSpends} restante(s)):`
+            };
+            keepSelectionForMoreSpends = true;
+          }
         } else if (sel.effectType === 'PROTECT') {
           unit.cannotBeDefeatedThisTurn = true;
           gameState.actionLog.unshift(`🚗 [${sel.sourceCardName}] "${unit.name}" no podrá ser derrotada en combate este turno.`);
@@ -2092,11 +2321,15 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
           gameState.actionLog.unshift(`🌊 [${sel.sourceCardName}] "${dead.name}" fue enviada al fondo del mazo.`);
         }
       }
-      delete gameState.pendingTargetSelection;
-      const pendingAttack = gameState.pendingAttackContinuation;
-      delete gameState.pendingAttackContinuation;
-      if (pendingAttack) {
-        continueAttackAfterTrigger(pendingAttack);
+      if (!keepSelectionForMoreSpends) {
+        delete gameState.pendingTargetSelection;
+        const pendingAttack = gameState.pendingAttackContinuation;
+        delete gameState.pendingAttackContinuation;
+        if (pendingAttack) {
+          continueAttackAfterTrigger(pendingAttack);
+        } else {
+          setGameState({ ...gameState });
+        }
       } else {
         setGameState({ ...gameState });
       }
@@ -2104,10 +2337,15 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
       const { unitInstanceId, gearInstanceId, ownerKey } = targetData;
       const targetOwner = ownerKey === 'player' ? p : opp;
       const unit = (targetOwner.field || []).find((u) => u.instanceId === unitInstanceId);
+      let chainedSelection = null;
       if (unit && unit.gear) {
         const gIdx = unit.gear.findIndex((g) => g.instanceId === gearInstanceId);
         if (gIdx !== -1) {
           const [sacrificed] = unit.gear.splice(gIdx, 1);
+          const lostBonus = sacrificed.powerBonus || sacrificed.parsedPower || parseCardPower(sacrificed.power) || 0;
+          if (lostBonus > 0) {
+            unit.currentPower = Math.max(0, (unit.currentPower || 0) - lostBonus);
+          }
           if (!targetOwner.trash) targetOwner.trash = [];
           targetOwner.trash.push(sacrificed);
           gameState.actionLog.unshift(`🔧 [${sel.sourceCardName}] Destruyó el Gear "${sacrificed.name}".`);
@@ -2121,16 +2359,51 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
               drawnCards.push(d.name);
             }
             gameState.actionLog.unshift(`💉 [Dum Dum] Robó 2 cartas: ${drawnCards.join(', ')}.`);
+          } else if (sel.gearAction === 'GILDED_MATON_REWARD') {
+            const eligibleOpp = (opp.field || []).filter((u) => getNumericCost(u) <= 3);
+            if (eligibleOpp.length === 1) {
+              const [dead] = opp.field.splice(opp.field.indexOf(eligibleOpp[0]), 1);
+              sendDefeatedUnitToGraveyardOrExile(opp, dead, gameState);
+              gameState.actionLog.unshift(`🔫 [Gilded Matón] ¡PLAY! Destruyó a la unidad rival "${dead.name}" (Coste ≤ 3).`);
+            } else if (eligibleOpp.length > 1) {
+              chainedSelection = {
+                actionType: 'TARGET_UNIT',
+                sourceCardId: 'CP-038',
+                sourceCardName: 'Gilded Matón',
+                sourceCardImage: sel.sourceCardImage,
+                title: '🔫 GILDED MATÓN // DESTRUIR UNIDAD RIVAL',
+                prompt: 'Selecciona una Unidad rival con coste ≤ 3 €$ para destruirla:',
+                effectType: 'DEFEAT',
+                targetScope: 'RIVAL_UNITS',
+                maxCost: 3
+              };
+            } else {
+              gameState.actionLog.unshift(`🔫 [Gilded Matón] El rival no tiene unidades con coste ≤ 3 €$.`);
+            }
+          } else if (sel.gearAction === 'HEYWOOD_RIPPERDOC_REWARD') {
+            const gearCost = getNumericCost(sacrificed);
+            const gigVals = new Set((p.gigs || []).map((g) => Number(g.value)));
+            if (gigVals.has(gearCost) && p.deck && p.deck.length > 0) {
+              const d = p.deck.shift();
+              d.isJustDrawn = true;
+              p.hand.push(d);
+              gameState.actionLog.unshift(`🩺 [Heywood Ripperdoc] El coste del Gear (${gearCost}) coincide con tu Gig: robas "${d.name}".`);
+            }
           }
         }
       }
-      delete gameState.pendingTargetSelection;
-      const pendingAttack = gameState.pendingAttackContinuation;
-      delete gameState.pendingAttackContinuation;
-      if (pendingAttack) {
-        continueAttackAfterTrigger(pendingAttack);
-      } else {
+      if (chainedSelection) {
+        gameState.pendingTargetSelection = chainedSelection;
         setGameState({ ...gameState });
+      } else {
+        delete gameState.pendingTargetSelection;
+        const pendingAttack = gameState.pendingAttackContinuation;
+        delete gameState.pendingAttackContinuation;
+        if (pendingAttack) {
+          continueAttackAfterTrigger(pendingAttack);
+        } else {
+          setGameState({ ...gameState });
+        }
       }
     }
   };
@@ -6446,7 +6719,9 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                         {/* Badge superior */}
                         <div className="absolute top-1 inset-x-1 flex items-center justify-between">
                           <span className="px-1 py-0.2 bg-black/90 text-[7px] text-gray-300 rounded font-black uppercase">
-                            {card.officialType || 'CARD'}
+                            {(card._lizzyZone || card._yorinobuZone)
+                              ? ((card._lizzyZone || card._yorinobuZone) === 'HAND' ? '🖐️ MANO' : '🗑️ BASURA')
+                              : (card.officialType || 'CARD')}
                           </span>
                           {isSelected && (
                             <span className="px-1.5 py-0.5 bg-[#0dfceb] text-black font-black text-[9px] rounded-full shadow">
@@ -7283,7 +7558,11 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                       ) : (
                         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5">
                           {playerUnits.map((u) => {
-                            const isEligible = sel.maxPower === undefined || (u.currentPower || u.power || 0) <= sel.maxPower;
+                            const isEligible =
+                              (sel.maxPower === undefined || (u.currentPower || u.power || 0) <= sel.maxPower) &&
+                              (sel.maxCost === undefined || getNumericCost(u) <= sel.maxCost) &&
+                              (!sel.onlyUnequipped || !u.gear || u.gear.length === 0) &&
+                              (!sel.excludeInstanceId || u.instanceId !== sel.excludeInstanceId);
 
                             return (
                               <div
@@ -7332,7 +7611,11 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                       ) : (
                         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5">
                           {botUnits.map((u) => {
-                            const isEligible = sel.maxPower === undefined || (u.currentPower || u.power || 0) <= sel.maxPower;
+                            const isEligible =
+                              (sel.maxPower === undefined || (u.currentPower || u.power || 0) <= sel.maxPower) &&
+                              (sel.maxCost === undefined || getNumericCost(u) <= sel.maxCost) &&
+                              (!sel.onlyUnequipped || !u.gear || u.gear.length === 0) &&
+                              (!sel.excludeInstanceId || u.instanceId !== sel.excludeInstanceId);
 
                             return (
                               <div
@@ -7411,6 +7694,49 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                       </div>
                     )}
                   </div>
+
+                  {sel.targetScope === 'ALL' && (() => {
+                    const allBotGears = [];
+                    (bot.field || []).forEach((u) => (u.gear || []).forEach((g) => allBotGears.push({ gear: g, unit: u })));
+                    return (
+                      <div className="bg-[#000000]/80 border border-[#FF003C]/40 rounded-xl p-3 space-y-2">
+                        <span className="text-[11px] font-black uppercase text-[#FF003C] block pb-1 border-b border-[#FF003C]/20">
+                          GEARS EQUIPADOS EN UNIDADES RIVALES ({allBotGears.length}):
+                        </span>
+                        {allBotGears.length === 0 ? (
+                          <span className="text-xs text-gray-500 italic block py-2">El rival no tiene ningún Gear equipado actualmente.</span>
+                        ) : (
+                          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5">
+                            {allBotGears.map((item, gi) => (
+                              <div
+                                key={item.gear.instanceId || gi}
+                                onClick={() => {
+                                  handleResolveTargetSelection({
+                                    unitInstanceId: item.unit.instanceId,
+                                    gearInstanceId: item.gear.instanceId,
+                                    ownerKey: 'bot'
+                                  });
+                                }}
+                                onContextMenu={(e) => handleCardRightClick(e, item.gear)}
+                                className="p-2.5 rounded-lg border-2 border-[#FF003C]/60 hover:border-[#FCEE0A] hover:bg-[#FF003C]/15 transition-all flex flex-col items-center gap-1.5 bg-[#050912] cursor-pointer hover:scale-105 shadow-md group"
+                              >
+                                <img src={item.gear.image} alt={item.gear.name} className="w-16 h-22 object-cover rounded border border-[#FF003C]" />
+                                <span className="text-[10px] font-black text-[#FF003C] uppercase truncate max-w-full text-center">
+                                  🔧 {item.gear.name}
+                                </span>
+                                <span className="text-[8px] text-gray-300 block text-center truncate">
+                                  En: {item.unit.name}
+                                </span>
+                                <span className="text-[8px] font-black px-2 py-0.5 rounded uppercase bg-[#FF003C] text-white group-hover:bg-[#FCEE0A] group-hover:text-black">
+                                  💥 DESTRUIR GEAR RIVAL
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
                 </div>
               )}
 

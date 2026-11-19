@@ -112,7 +112,16 @@ export function canUnitAttack(unit, playerState = null, gameState = null, target
 
   // 1. Estados básicos: Una unidad girada (Spent) o con Lag no puede atacar
   if (unit.isSpent) return false;
-  if (unit.isLagging) return false;
+  if (unit.isLagging) {
+    // Excepción oficial (Sandayu Oda, Johnny Silverhand, Yorinobu): puede atacar a Unidades rivales gastadas el turno que entra
+    if (!(unit.canAttackSpentUnitsTurnPlayed && (targetType === 'UNIT' || targetType === null))) {
+      return false;
+    }
+  }
+  // Si tiene Lag pero canAttackSpentUnitsTurnPlayed, NO puede atacar Gigs ese turno
+  if (unit.isLagging && unit.canAttackSpentUnitsTurnPlayed && targetType === 'GIGS') {
+    return false;
+  }
 
   // 2. Efectos temporales de congelación (Chrome Reverie, Nocturne Op55N1, etc.)
   if (unit.cannotAttackUntilNextTurn) return false;
@@ -805,7 +814,21 @@ export function playGearCard(state, playerKey, cardInstanceId, targetInstanceId 
   if (cardIdx === -1) return { success: false, reason: 'Gear no encontrado en mano.' };
 
   const card = p.hand[cardIdx];
-  const cost = card.parsedCost || parseCardCost(card.cost);
+  let cost = card.parsedCost || parseCardCost(card.cost);
+  const cId = String(card.id || '').toUpperCase();
+  // CP-150 Zetatech Berserk: -1 €$ por cada Leyenda aliada boca arriba (mín 1 €$)
+  if (cId === 'CP-150' || (card.slug || '').includes('zetatech-berserk')) {
+    const faceUpLegends = (p.legends || []).filter((l) => l.isFaceUp).length;
+    if (faceUpLegends > 0) cost = Math.max(1, cost - faceUpLegends);
+  }
+  // CP-140 Viktor Vektor // Drop Your Illusions: primer Gear CYBERWARE cada turno -3 €$ (mín 1 €$)
+  const hasViktorDiscount = (p.field || []).some((u) => String(u.id || '').toUpperCase() === 'CP-140');
+  const isCyberware = String(card.traits || card.cardType || '').toUpperCase().includes('CYBERWARE');
+  let usedViktor = false;
+  if (hasViktorDiscount && isCyberware && !p.usedViktorCyberwareDiscountThisTurn) {
+    cost = Math.max(1, cost - 3);
+    usedViktor = true;
+  }
   const available = getAvailableEddies(p);
 
   if (available < cost) {
@@ -883,11 +906,28 @@ export function playGearCard(state, playerKey, cardInstanceId, targetInstanceId 
  */
 export function playUnitCard(state, playerKey, cardInstanceId) {
   const p = state[playerKey];
+  const opp = state[playerKey === 'player' ? 'bot' : 'player'];
   const cardIdx = (p.hand || []).findIndex((c) => c.instanceId === cardInstanceId);
   if (cardIdx === -1) return { success: false, reason: 'Carta no encontrada en mano.' };
 
   const card = p.hand[cardIdx];
-  const cost = card.parsedCost || parseCardCost(card.cost);
+  let cost = card.parsedCost || parseCardCost(card.cost);
+  const cId = String(card.id || '').toUpperCase();
+  // CP-071 MaxTac Heavy: -1 €$ por cada Unidad rival (mín 1 €$)
+  if (cId === 'CP-071' || (card.slug || '').includes('maxtac-heavy')) {
+    const oppUnitsCount = (opp?.field || []).length;
+    if (oppUnitsCount > 0) cost = Math.max(1, cost - oppUnitsCount);
+  }
+  // CP-086 Octant: -1 €$ por cada Gig aliado con valor 8+ (mín 1 €$)
+  if (cId === 'CP-086' || (card.slug || '').includes('octant')) {
+    const highGigs = (p.gigs || []).filter((g) => (g.value || 0) >= 8).length;
+    if (highGigs > 0) cost = Math.max(1, cost - highGigs);
+  }
+  // CP-131 Trauma Team Operatives: -1 €$ por cada Unidad en tu Basura (mín 1 €$)
+  if (cId === 'CP-131' || (card.slug || '').includes('trauma-team-operatives')) {
+    const trashUnits = (p.trash || []).filter((c) => String(c.officialType || '').toUpperCase() === 'UNIT' || String(c.type || '').toUpperCase().includes('UNIT')).length;
+    if (trashUnits > 0) cost = Math.max(1, cost - trashUnits);
+  }
   const available = getAvailableEddies(p);
 
   if (available < cost) {
@@ -1158,32 +1198,48 @@ export function attackRivalGigs(
     return { success: true, stolenCount: 0 };
   }
 
-  // Se roban hasta gigsToSteal dados (priorizando dados elegidos por el usuario)
-  const countToSteal = Math.min(gigsToSteal, defender.gigs.length);
+  // Filtrar Gigs elegibles según protecciones activas (Chrome Fang CP-017 / Westbrook Netrunner CP-145)
+  const isAttackerLegend = unit.officialType === 'LEGEND' || unit.isLegendUnit || Boolean(unit.isLegend);
+  const isGigStealable = (g) => {
+    if (defender.chromeFangProtectionActive && (g.value || 0) > (unit.currentPower || 0)) return false;
+    if (defender.westbrookProtectionActive && isAttackerLegend && (g.value || 0) < (unit.currentPower || 0)) return false;
+    return true;
+  };
+  const stealableCount = defender.gigs.filter(isGigStealable).length;
+  if (stealableCount === 0) {
+    state.actionLog.unshift(
+      `🛡️ [PROTECCIÓN DE GIGS] Ningún Gig de ${defender.name} puede ser robado por "${unit.name}" debido a protección activa (Chrome Fang / Westbrook Netrunner).`
+    );
+    return { success: true, stolenCount: 0, stolenDice: [] };
+  }
+
+  // Se roban hasta gigsToSteal dados elegibles (priorizando dados elegidos por el usuario)
+  const countToSteal = Math.min(gigsToSteal, stealableCount);
   const stolenDice = [];
   const prefs = [...(preferredDice || [])];
 
   for (let i = 0; i < countToSteal; i++) {
     let chosenIdx = -1;
 
-    // Si el usuario eligió un dado específico (ej: 'd20'), buscarlo en los gigs del defensor
+    // Si el usuario eligió un dado específico (ej: 'd20'), buscarlo entre los gigs elegibles del defensor
     if (prefs.length > 0) {
       const targetDie = String(prefs.shift()).toLowerCase();
       chosenIdx = defender.gigs.findIndex(
-        (g) => g.die.toLowerCase() === targetDie
+        (g) => g.die.toLowerCase() === targetDie && isGigStealable(g)
       );
     }
 
-    // Si no se encontró el preferido o no quedan preferencias, escoger el de mayor valor
+    // Si no se encontró el preferido o no quedan preferencias, escoger el elegible de mayor valor
     if (chosenIdx === -1) {
-      chosenIdx = 0;
-      for (let j = 1; j < defender.gigs.length; j++) {
-        if ((defender.gigs[j].value || 0) > (defender.gigs[chosenIdx].value || 0)) {
+      for (let j = 0; j < defender.gigs.length; j++) {
+        if (!isGigStealable(defender.gigs[j])) continue;
+        if (chosenIdx === -1 || (defender.gigs[j].value || 0) > (defender.gigs[chosenIdx].value || 0)) {
           chosenIdx = j;
         }
       }
     }
 
+    if (chosenIdx === -1) break;
     const [stolenDie] = defender.gigs.splice(chosenIdx, 1);
     stolenDie.stolenFrom = defenderKey;
     attacker.gigs.push(stolenDie);
@@ -1372,7 +1428,7 @@ export function fightRivalUnit(state, attackerPlayerKey, attackerUnitId, targetU
   if (attUnit.isSpent && !attUnit.hasTriggeredAttackThisDeclaration && (!state.pendingReaction || state.pendingReaction.attackerUnitId !== attackerUnitId)) {
     return { success: false, reason: 'Tu unidad está girada.' };
   }
-  if (attUnit.isLagging) return { success: false, reason: 'Tu unidad tiene Lag.' };
+  if (attUnit.isLagging && !attUnit.canAttackSpentUnitsTurnPlayed) return { success: false, reason: 'Tu unidad tiene Lag.' };
   if (!canUnitAttack(attUnit, attacker, state, 'UNIT')) {
     const restriction = getUnitAttackRestriction(attUnit, attacker, state, 'UNIT') || 'Esta unidad no puede atacar a unidades rivales.';
     return { success: false, reason: restriction };
@@ -1511,10 +1567,16 @@ export function executeStartPhase(state, playerKey) {
     });
   }
 
-  // Enderezar Unidades y limpiar Lag
+  // Enderezar Unidades y limpiar Lag (respetando Pacifica Netrunner: cannotReadyUntilNextTurn)
   p.field.forEach((u) => {
-    u.isSpent = false;
+    if (u.cannotReadyUntilNextTurn) {
+      delete u.cannotReadyUntilNextTurn;
+      state.actionLog.unshift(`💻 "${u.name}" no se endereza en esta Fase de Inicio (efecto de bloqueo de enderezado).`);
+    } else {
+      u.isSpent = false;
+    }
     u.isLagging = false;
+    delete u.canAttackSpentUnitsTurnPlayed;
     // Si la congelación expiró en este turno
     if (u.cannotAttackUntilNextTurn && u.frozenAtTurn && state.turnNumber > u.frozenAtTurn) {
       delete u.cannotAttackUntilNextTurn;
@@ -1526,6 +1588,9 @@ export function executeStartPhase(state, playerKey) {
   p.hasCalledLegendThisTurn = false;
   p.programsPlayedThisTurn = 0;
   delete p.altCunninghamProgramDiscount;
+  delete p.chromeFangProtectionActive;
+  delete p.westbrookProtectionActive;
+  delete p.usedViktorCyberwareDiscountThisTurn;
 
   // 3. ROBO DE CARTA (DRAW 1 CARD)
   if (p.deck.length > 0) {
