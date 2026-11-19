@@ -71,13 +71,32 @@ export function rollDie(dieType) {
  */
 export function hasKeyword(card, keyword) {
   if (!card) return false;
-  const kw = (card.keywords || '').toLowerCase();
   const target = keyword.toLowerCase();
+  const kw = (card.keywords || '').toLowerCase();
   if (kw.includes(target)) return true;
   const traits = (card.traits || '').toLowerCase();
   if (traits.includes(target)) return true;
-  const text = (card.rules || card.text || card.effect || '').toLowerCase();
+  const text = (card.rulesText || card.rules || card.text || card.effect || card.ability || '').toLowerCase();
   return text.includes(target);
+}
+
+/**
+ * Comprueba si una Leyenda puede desplegarse al campo de batalla.
+ * Regla oficial de Cyberpunk TCG:
+ * 1. Debe poseer la palabra clave oficial 'Go Solo'.
+ * 2. Su coste NO puede ser '-' ni '(-)'.
+ * 3. Debe tener un coste numérico en Eddies mayor que 0.
+ */
+export function canLegendDeployToField(card) {
+  if (!card) return false;
+  const hasGoSolo = hasKeyword(card, 'Go Solo');
+  if (!hasGoSolo) return false;
+
+  const rawCost = String(card.cost || '').trim();
+  if (rawCost === '-' || rawCost === '(-)' || rawCost === '--') return false;
+
+  const cost = card.parsedCost || (typeof card.costNum === 'number' ? card.costNum : parseCardCost(card.cost));
+  return typeof cost === 'number' && cost > 0;
 }
 
 /**
@@ -833,6 +852,13 @@ export function playLegendToField(state, playerKey, legendInstanceId, isGoSolo =
     return {
       success: false,
       reason: 'Debes hacer Call (dar la vuelta) a la Leyenda antes de poder activar Go Solo o desplegarla al campo de batalla.'
+    };
+  }
+
+  if (!canLegendDeployToField(leg)) {
+    return {
+      success: false,
+      reason: `"${leg.name}" no tiene la palabra clave "Go Solo" o su coste es (-). Las Leyendas sin Go Solo no pueden desplegarse al campo de batalla.`
     };
   }
 

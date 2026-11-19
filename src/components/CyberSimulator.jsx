@@ -71,6 +71,7 @@ import {
   toggleEddieSpent,
   toggleLegendSpent,
   playLegendToField,
+  canLegendDeployToField,
   sendDefeatedUnitToGraveyardOrExile,
   resolveFight,
   DICE_CONFIG
@@ -1222,7 +1223,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
     setGameState({ ...gameState });
   };
 
-  // Desplegar Leyenda al campo de batalla (con Go Solo o Despliegue normal)
+  // Desplegar Leyenda al campo de batalla (únicamente permitido para leyendas con Go Solo y coste > 0)
   const handlePlayLegendToFieldAction = (legendInstanceId, isGoSolo = true) => {
     if (!gameState || gameState.activePlayer !== 'player' || gameState.isGameOver) return;
     const p = gameState.player;
@@ -1232,7 +1233,17 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
     if (!leg.isFaceUp) {
       setHolocall({
         title: 'LEYENDA BOCA ABAJO',
-        message: 'Esta Leyenda está boca abajo. Para activar Go Solo o desplegarla al combate, primero debes pagar 1 €$ y hacer Call para ponerla boca arriba.',
+        message: 'Esta Leyenda está boca abajo. Para activar Go Solo, primero debes pagar 1 €$ y hacer Call para ponerla boca arriba.',
+        characterName: 'VIKTOR // RIPPERDOC',
+        type: 'warning'
+      });
+      return;
+    }
+
+    if (!canLegendDeployToField(leg)) {
+      setHolocall({
+        title: 'NO PUEDE DESPLEGARSE',
+        message: `La Leyenda "${leg.name}" no tiene la palabra clave "Go Solo" o su coste es (-). Las Leyendas que no tienen Go Solo o cuyo coste es (-) no pueden desplegarse al campo de batalla.`,
         characterName: 'VIKTOR // RIPPERDOC',
         type: 'warning'
       });
@@ -4111,8 +4122,16 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                     if (cardId.startsWith('legend:')) {
                       const legId = cardId.replace(/^legend:/, '');
                       const leg = (p.legends || []).find((l) => l.instanceId === legId);
-                      const isGoSolo = leg ? hasKeyword(leg, 'Go Solo') : true;
-                      handlePlayLegendToFieldAction(legId, isGoSolo);
+                      if (!canLegendDeployToField(leg)) {
+                        setHolocall({
+                          title: 'NO PUEDE DESPLEGARSE',
+                          message: `"${leg?.name || 'Esta Leyenda'}" no tiene la palabra clave "Go Solo" o su coste es (-). No puede desplegarse al campo de batalla.`,
+                          characterName: 'VIKTOR // RIPPERDOC',
+                          type: 'warning'
+                        });
+                        return;
+                      }
+                      handlePlayLegendToFieldAction(legId, true);
                     } else {
                       handlePlayCard(cardId);
                     }
@@ -4434,6 +4453,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                     const isMenuOpen = legendMenuId === leg.instanceId;
                     const legCost = leg.parsedCost || parseCardCost(leg.cost) || leg.costNum || 0;
                     const hasGoSoloKw = hasKeyword(leg, 'Go Solo');
+                    const canDeploy = canLegendDeployToField(leg);
 
                     if (leg.isOnField) {
                       return (
@@ -4617,54 +4637,29 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                               </div>
                             )}
 
-                            {/* Opciones GO SOLO y DESPLIEGUE SOLO si la leyenda está BOCA ARRIBA y tiene coste > 0 */}
-                            {leg.isFaceUp && legCost > 0 && (
+                            {/* Opción ACTIVAR GO SOLO si la leyenda está BOCA ARRIBA y puede desplegarse (Go Solo y coste > 0) */}
+                            {leg.isFaceUp && canDeploy && (
                               <div className="pt-1 border-t border-[#0dfceb]/30 mb-1 flex flex-col gap-1">
-                                {hasGoSoloKw && (
-                                  <button
-                                    type="button"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setLegendMenuId(null);
-                                      handlePlayLegendToFieldAction(leg.instanceId, true);
-                                    }}
-                                    className="w-full py-1.5 px-2 text-left rounded text-[10px] font-black uppercase transition-all bg-gradient-to-r from-[#FF003C] to-[#FCEE0A] text-black shadow-[0_0_14px_rgba(255,0,60,0.5)] cursor-pointer hover:scale-[1.02] hover:brightness-110 flex flex-col gap-0.5 border border-[#FF003C]"
-                                  >
-                                    <div className="flex items-center justify-between w-full">
-                                      <span className="flex items-center gap-1.5">
-                                        <span>🔥</span>
-                                        <span>ACTIVAR GO SOLO</span>
-                                      </span>
-                                      <span className="text-[9px] font-black px-1.5 py-0.2 rounded bg-black text-[#FCEE0A]">
-                                        {legCost} €$
-                                      </span>
-                                    </div>
-                                    <span className="text-[8px] font-sans text-black/90 font-bold lowercase tracking-tight">
-                                      entra lista y sin lag • ataca ya
-                                    </span>
-                                  </button>
-                                )}
-
                                 <button
                                   type="button"
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     setLegendMenuId(null);
-                                    handlePlayLegendToFieldAction(leg.instanceId, false);
+                                    handlePlayLegendToFieldAction(leg.instanceId, true);
                                   }}
-                                  className="w-full py-1.5 px-2 text-left rounded text-[10px] font-black uppercase transition-all bg-gray-800 hover:bg-gray-700 text-gray-200 border border-gray-600 cursor-pointer flex flex-col gap-0.5 hover:scale-[1.01]"
+                                  className="w-full py-1.5 px-2 text-left rounded text-[10px] font-black uppercase transition-all bg-gradient-to-r from-[#FF003C] to-[#FCEE0A] text-black shadow-[0_0_14px_rgba(255,0,60,0.5)] cursor-pointer hover:scale-[1.02] hover:brightness-110 flex flex-col gap-0.5 border border-[#FF003C]"
                                 >
                                   <div className="flex items-center justify-between w-full">
                                     <span className="flex items-center gap-1.5">
-                                      <span>⚔️</span>
-                                      <span>DESPLEGAR AL CAMPO</span>
+                                      <span>🔥</span>
+                                      <span>ACTIVAR GO SOLO</span>
                                     </span>
-                                    <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-black/70 text-gray-300">
+                                    <span className="text-[9px] font-black px-1.5 py-0.2 rounded bg-black text-[#FCEE0A]">
                                       {legCost} €$
                                     </span>
                                   </div>
-                                  <span className="text-[8px] font-sans text-gray-400 font-normal lowercase tracking-tight">
-                                    entra con lag {leg.isSpent ? '• entrará girada' : '• entrará ready'}
+                                  <span className="text-[8px] font-sans text-black/90 font-bold lowercase tracking-tight">
+                                    entra lista y sin lag • ataca ya
                                   </span>
                                 </button>
                               </div>
@@ -4692,7 +4687,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
 
                         {/* Carta de Leyenda */}
                         <div
-                          draggable={Boolean(leg.isFaceUp && legCost > 0 && !leg.isOnField && !leg.isRemovedFromGame)}
+                          draggable={Boolean(leg.isFaceUp && canDeploy && !leg.isOnField && !leg.isRemovedFromGame)}
                           onDragStart={(e) => {
                             e.dataTransfer.setData('text/plain', `legend:${leg.instanceId}`);
                           }}
