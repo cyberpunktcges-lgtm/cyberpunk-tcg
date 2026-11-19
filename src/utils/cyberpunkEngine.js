@@ -80,6 +80,11 @@ export function hasKeyword(card, keyword) {
   if (target === 'blocker' && card.isTemporaryBlockerThisTurn) return true;
   if (target === 'adrenaline' && card.hasAdrenaline) return true;
 
+  // Gears equipados que conceden BLOCKER a la unidad portadora (CP-068 Mandibular Upgrade, CP-102 Riot Shield)
+  if (target === 'blocker' && Array.isArray(card.gear) && card.gear.length > 0) {
+    if (card.gear.some((g) => hasKeyword(g, 'Blocker'))) return true;
+  }
+
   const rawKw = Array.isArray(card.keywords) ? card.keywords.join(', ') : String(card.keywords || '');
   if (rawKw.toLowerCase().includes(target)) return true;
 
@@ -1051,7 +1056,11 @@ export function playGearCard(state, playerKey, cardInstanceId, targetInstanceId 
     target.isLagging = false;
   }
 
-  const bonusText = powerBonus > 0 ? ` (+${powerBonus} Fuerza)` : '';
+  const grantsBlocker = hasKeyword(card, 'Blocker');
+  const bonusParts = [];
+  if (powerBonus > 0) bonusParts.push(`+${powerBonus} Fuerza`);
+  if (grantsBlocker) bonusParts.push('🛡️ BLOCKER');
+  const bonusText = bonusParts.length > 0 ? ` (${bonusParts.join(' • ')})` : '';
   (state.actionLog = state.actionLog || []).unshift(
     `🔧 ${p.name} paga ${cost} €$ y equipa el Gear "${card.name}"${bonusText} a "${target.name}".`
   );

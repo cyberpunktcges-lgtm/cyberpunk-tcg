@@ -23,7 +23,7 @@ import {
   canUnitAttack,
   executeStartPhase
 } from './cyberpunkEngine.js';
-import { executeUnitAttackTrigger, executeBlockerUsedTrigger } from './cardEffects.js';
+import { executeUnitAttackTrigger, executeBlockerUsedTrigger, executeCardSpentTriggers } from './cardEffects.js';
 
 /**
  * Decide si el bot desea interceptar un ataque del jugador usando una de sus unidades con Blocker.
@@ -367,6 +367,8 @@ export async function resolvePendingAttackAndContinueBot(gameState, updateCallba
           gameState.actionLog.unshift(
             `🛡️ ¡BLOCKER! "${blocker.name}" intercepta el ataque a tus Gigs. ¡No se roba ningún Gig!`
           );
+          executeCardSpentTriggers(gameState, 'player', blocker);
+          executeBlockerUsedTrigger(gameState, 'player', blocker);
           resolveFight(gameState, 'bot', attackerUnit, 'player', blocker);
         }
       } else {
