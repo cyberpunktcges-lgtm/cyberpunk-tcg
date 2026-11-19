@@ -1286,13 +1286,19 @@ export function attackRivalGigs(
 
   const unit = attacker.field.find((u) => u.instanceId === attackerUnitId);
   if (!unit) return { success: false, reason: 'Unidad atacante no encontrada.' };
-  if (unit.isSpent && !unit.hasTriggeredAttackThisDeclaration && (!state.pendingReaction || state.pendingReaction.attackerUnitId !== attackerUnitId)) {
-    return { success: false, reason: 'La unidad ya está girada (Spent).' };
-  }
-  if (unit.isLagging) return { success: false, reason: 'La unidad tiene Lag (no puede atacar este turno).' };
-  if (!canUnitAttack(unit, attacker, state, 'GIGS')) {
-    const restriction = getUnitAttackRestriction(unit, attacker, state, 'GIGS') || 'Esta unidad no puede atacar a los Gigs.';
-    return { success: false, reason: restriction };
+  const isMidAttack = Boolean(
+    unit.hasTriggeredAttackThisDeclaration ||
+    (state.pendingReaction && state.pendingReaction.attackerUnitId === attackerUnitId)
+  );
+  if (!isMidAttack) {
+    if (unit.isSpent) {
+      return { success: false, reason: 'La unidad ya está girada (Spent).' };
+    }
+    if (unit.isLagging) return { success: false, reason: 'La unidad tiene Lag (no puede atacar este turno).' };
+    if (!canUnitAttack(unit, attacker, state, 'GIGS')) {
+      const restriction = getUnitAttackRestriction(unit, attacker, state, 'GIGS') || 'Esta unidad no puede atacar a los Gigs.';
+      return { success: false, reason: restriction };
+    }
   }
   if (defender.gigs.length === 0) return { success: false, reason: 'El rival no tiene Gigs para robar.' };
 
@@ -1645,13 +1651,19 @@ export function fightRivalUnit(state, attackerPlayerKey, attackerUnitId, targetU
   const defUnit = defender.field.find((u) => u.instanceId === targetUnitId);
 
   if (!attUnit || !defUnit) return { success: false, reason: 'Unidades no encontradas.' };
-  if (attUnit.isSpent && !attUnit.hasTriggeredAttackThisDeclaration && (!state.pendingReaction || state.pendingReaction.attackerUnitId !== attackerUnitId)) {
-    return { success: false, reason: 'Tu unidad está girada.' };
-  }
-  if (attUnit.isLagging && !attUnit.canAttackSpentUnitsTurnPlayed) return { success: false, reason: 'Tu unidad tiene Lag.' };
-  if (!canUnitAttack(attUnit, attacker, state, 'UNIT')) {
-    const restriction = getUnitAttackRestriction(attUnit, attacker, state, 'UNIT') || 'Esta unidad no puede atacar a unidades rivales.';
-    return { success: false, reason: restriction };
+  const isMidAttack = Boolean(
+    attUnit.hasTriggeredAttackThisDeclaration ||
+    (state.pendingReaction && state.pendingReaction.attackerUnitId === attackerUnitId)
+  );
+  if (!isMidAttack) {
+    if (attUnit.isSpent) {
+      return { success: false, reason: 'Tu unidad está girada.' };
+    }
+    if (attUnit.isLagging && !attUnit.canAttackSpentUnitsTurnPlayed) return { success: false, reason: 'Tu unidad tiene Lag.' };
+    if (!canUnitAttack(attUnit, attacker, state, 'UNIT')) {
+      const restriction = getUnitAttackRestriction(attUnit, attacker, state, 'UNIT') || 'Esta unidad no puede atacar a unidades rivales.';
+      return { success: false, reason: restriction };
+    }
   }
   if (!defUnit.isSpent && !blockerUnitId && !attUnit.canAttackReadyUnits) {
     return { success: false, reason: 'Solo puedes atacar a unidades rivales giradas (Spent). Las unidades enderezadas no pueden ser atacadas.' };
