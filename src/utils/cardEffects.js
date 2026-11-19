@@ -2068,6 +2068,55 @@ export function executeUnitAttackTrigger(state, playerKey, attackerUnit) {
   const cardId = resolveCardId(attackerUnit);
   const cardName = attackerUnit.name || 'Unidad';
 
+  // CP-095: Pepe Najarro // Working Doubles
+  // "ATTACK If you control a value-pair of Gigs, ready up to 2 MERC Legends in your Legends area."
+  if (cardId === 'CP-095') {
+    const pairs = countGigValuePairs(p.gigs || []);
+    if (pairs <= 0) {
+      state.actionLog.unshift(
+        `🍸 [Pepe Najarro] ¡ATTACK activado! No controlas ninguna pareja de Gigs con el mismo valor.`
+      );
+      return;
+    }
+    const spentMercLegends = (p.legends || []).filter((l) => {
+      if (!l.isFaceUp || !l.isSpent || l.isOnField || l.isRemovedFromGame) return false;
+      const meta = `${l.traits || ''} ${l.cardType || ''}`;
+      return /\bMERC\b/i.test(meta);
+    });
+    if (spentMercLegends.length === 0) {
+      state.actionLog.unshift(
+        `🍸 [Pepe Najarro] ¡ATTACK! Controlas pareja de Gigs, pero no tienes Leyendas MERC boca arriba y giradas en tu Zona de Leyendas.`
+      );
+      return;
+    }
+    if (playerKey === 'player' && spentMercLegends.length > 2) {
+      state.pendingCardChoice = {
+        type: 'PEPE_READY_MERC_LEGENDS',
+        playerKey: 'player',
+        sourceCardId: 'CP-095',
+        sourceCardName: 'Pepe Najarro // Working Doubles',
+        sourceCardImage: attackerUnit.image,
+        title: '🍸 PEPE NAJARRO // HABILIDAD ATTACK',
+        prompt: '¡Controlas una pareja de Gigs! Elige hasta 2 Leyendas MERC giradas en tu Zona de Leyendas para enderezarlas:',
+        cards: spentMercLegends,
+        eligibleIds: spentMercLegends.map((l) => l.instanceId),
+        maxChoices: 2,
+        minChoices: 0,
+        selectedIds: [],
+        filterDescription: 'Hasta 2 Leyendas MERC giradas en tu Zona de Leyendas'
+      };
+      return;
+    }
+    const toReady = spentMercLegends.slice(0, 2);
+    toReady.forEach((l) => {
+      l.isSpent = false;
+    });
+    state.actionLog.unshift(
+      `🍸 [Pepe Najarro] ¡ATTACK! ¡Pareja de Gigs confirmada! Endereza ${toReady.length} Leyenda(s) MERC: ${toReady.map((l) => l.name).join(', ')}.`
+    );
+    return;
+  }
+
   // CP-096: Placide // Voodoo Sentinel ("PLAY ATTACK You may discard 1 Program. If you do, bottom-deck a rival Unit.")
   if (cardId === 'CP-096') {
     const handProgs = (p.hand || []).filter((c) => isProgramCard(c));

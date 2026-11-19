@@ -1597,6 +1597,32 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
       return;
     }
 
+    if (choice.type === 'PEPE_READY_MERC_LEGENDS') {
+      const p = gameState[choice.playerKey || 'player'];
+      const chosenIds = new Set(selectedCardIds);
+      const readiedNames = [];
+      (p.legends || []).forEach((l) => {
+        if (chosenIds.has(l.instanceId) && !l.isOnField && !l.isRemovedFromGame) {
+          l.isSpent = false;
+          readiedNames.push(l.name);
+        }
+      });
+      if (readiedNames.length > 0) {
+        gameState.actionLog.unshift(
+          `🍸 [Pepe Najarro] ¡ATTACK! Has enderezado ${readiedNames.length} Leyenda(s) MERC: ${readiedNames.join(', ')}.`
+        );
+      }
+      delete gameState.pendingCardChoice;
+      const pendingAttack = gameState.pendingAttackContinuation;
+      delete gameState.pendingAttackContinuation;
+      if (pendingAttack) {
+        continueAttackAfterTrigger(pendingAttack);
+      } else {
+        setGameState({ ...gameState });
+      }
+      return;
+    }
+
     if (choice.type === 'TAKEMURA_BLOCKER_LOOT') {
       const p = gameState[choice.playerKey || 'player'];
       const selected = (choice.cards || []).find((c) => selectedCardIds.includes(c.instanceId));
