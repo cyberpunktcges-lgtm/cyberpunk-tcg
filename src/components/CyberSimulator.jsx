@@ -27,7 +27,9 @@ import {
   User,
   Radio,
   Save,
-  Layers
+  Layers,
+  Menu,
+  LogOut
 } from 'lucide-react';
 import CyberAuthModal from './CyberAuthModal.jsx';
 import CyberProfileModal from './CyberProfileModal.jsx';
@@ -847,6 +849,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
 
   // Drawer / menú lateral HUD para resoluciones móviles y tablets (< lg)
   const [isHudOpen, setIsHudOpen] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   // Estados de Adaptación de Resolución, Zoom y Pantalla Completa
   const [zoomMode, setZoomMode] = useState(() => {
@@ -3108,7 +3111,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
   const gigsToSteal = canAttackGigs ? calculateGigsToSteal(selectedFieldUnit.currentPower) : 0;
 
   return (
-    <div className="min-h-screen max-h-screen h-screen bg-[#070a10] text-white font-sans select-none flex flex-col justify-between relative overflow-hidden">
+    <div className="min-h-[100dvh] max-h-[100dvh] h-[100dvh] bg-[#070a10] text-white font-sans select-none flex flex-col justify-between relative overflow-hidden">
       {/* =====================================================================
           1. ESTRUCTURA DEL TABLERO: FONDO OSCURO SÓLIDO Y LÍNEAS DE CUADRÍCULA NEÓN
          ===================================================================== */}
@@ -3125,7 +3128,83 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
           BARRA SUPERIOR: BOTONES CON BORDES AFILADOS Y EFECTO EXTERIOR
           hover:shadow-[0_0_15px_rgba(13,252,235,0.4)]
          ===================================================================== */}
-      <header className="relative z-20 bg-[#070a10]/95 border-b border-[#0dfceb]/30 px-2.5 sm:px-3 py-1.5 flex items-center justify-between gap-2 font-mono text-xs shrink-0 shadow-lg backdrop-blur-md">
+      <header className="relative z-30 bg-[#070a10]/95 border-b border-[#0dfceb]/30 px-2.5 sm:px-3 py-1.5 font-mono text-xs shrink-0 shadow-lg backdrop-blur-md">
+        {/* ================= BARRA SUPERIOR MÓVIL / TABLET (< lg) ================= */}
+        <div className="flex lg:hidden items-center justify-between gap-1.5 w-full min-w-0">
+          {/* Izquierda: Turno y Estado compacto */}
+          <div className="flex items-center gap-1.5 min-w-0">
+            <span className="w-2 h-2 rounded-full bg-[#0dfceb] animate-pulse shrink-0" />
+            <span className="text-[#0dfceb] font-black text-[11px] whitespace-nowrap">
+              T{gameState.turnNumber}
+            </span>
+            <span
+              className={`font-black uppercase px-1.5 py-0.5 text-[10px] whitespace-nowrap truncate ${
+                isMyTurn
+                  ? 'bg-[#0dfceb] text-[#070a10]'
+                  : 'bg-[#FF003C] text-white animate-pulse'
+              }`}
+            >
+              {isMyTurn ? 'TU TURNO' : 'IA...'}
+            </span>
+          </div>
+
+          {/* Derecha: Botones esenciales que caben sin solaparse en cualquier móvil */}
+          <div className="flex items-center gap-1.5 shrink-0">
+            {/* Deshacer rápido */}
+            <button
+              type="button"
+              disabled={history.length === 0 || !isMyTurn}
+              onClick={handleUndo}
+              style={{ clipPath: CYBER_BUTTON }}
+              className="p-1.5 bg-[#000000] border border-[#0dfceb]/40 text-[#0dfceb] disabled:opacity-30 cursor-pointer"
+              title="Deshacer"
+            >
+              <Undo2 className="w-4 h-4" />
+            </button>
+
+            {/* Botón HUD / Escáner */}
+            <button
+              type="button"
+              onClick={() => setIsHudOpen((prev) => !prev)}
+              style={{ clipPath: CYBER_BUTTON }}
+              className={`px-2 py-1.5 font-black uppercase flex items-center gap-1 text-[10px] cursor-pointer whitespace-nowrap ${
+                isHudOpen
+                  ? 'bg-[#0dfceb] text-black shadow-[0_0_12px_rgba(13,252,235,0.6)]'
+                  : 'bg-[#000000] border border-[#0dfceb]/50 text-[#0dfceb]'
+              }`}
+              title="Ver Escáner Kiroshi y estadísticas"
+            >
+              <Eye className="w-3.5 h-3.5" />
+              <span>{isHudOpen ? 'MESA' : 'HUD'}</span>
+            </button>
+
+            {/* Botón Elegir Mazo rápido */}
+            <button
+              type="button"
+              onClick={() => setShowDeckSelectorModal(true)}
+              style={{ clipPath: CYBER_BUTTON }}
+              className="p-1.5 bg-[#000000] border border-[#FCEE0A]/50 text-[#FCEE0A] cursor-pointer"
+              title="Elegir Mazo"
+            >
+              <Layers className="w-4 h-4" />
+            </button>
+
+            {/* Botón Menú Hamburguesa (Abre panel completo de opciones) */}
+            <button
+              type="button"
+              onClick={() => setIsMobileMenuOpen(true)}
+              style={{ clipPath: CYBER_BUTTON }}
+              className="px-2.5 py-1.5 bg-[#FCEE0A] text-[#070a10] font-black uppercase flex items-center gap-1 text-[10px] cursor-pointer shadow-[0_0_12px_rgba(252,238,10,0.4)] whitespace-nowrap"
+              title="Abrir Menú del Simulador"
+            >
+              <Menu className="w-4 h-4" />
+              <span>MENÚ</span>
+            </button>
+          </div>
+        </div>
+
+        {/* ================= BARRA SUPERIOR DESKTOP (>= lg) ================= */}
+        <div className="hidden lg:flex items-center justify-between gap-2 w-full">
         <div className="flex items-center gap-2 sm:gap-2.5 min-w-0">
           <div className="flex items-center gap-1.5 shrink-0">
             <span className="w-2 h-2 rounded-full bg-[#0dfceb] animate-pulse shrink-0" />
@@ -3376,7 +3455,194 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
             <span>NUEVA PARTIDA</span>
           </button>
         </div>
+        </div>
       </header>
+
+      {/* ================= MENÚ DESPLEGABLE MÓVIL (100% ACCESIBLE) ================= */}
+      <AnimatePresence>
+        {isMobileMenuOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setIsMobileMenuOpen(false)}
+            className="fixed inset-0 z-[100] lg:hidden bg-black/85 backdrop-blur-md flex justify-end font-mono"
+          >
+            <motion.div
+              initial={{ x: '100%' }}
+              animate={{ x: 0 }}
+              exit={{ x: '100%' }}
+              transition={{ type: 'spring', damping: 26, stiffness: 260 }}
+              onClick={(e) => e.stopPropagation()}
+              className="w-[86vw] max-w-xs h-full bg-[#070a10] border-l-2 border-[#0dfceb] p-4 flex flex-col justify-between overflow-y-auto cyber-scrollbar shadow-[-10px_0_40px_rgba(13,252,235,0.25)]"
+            >
+              <div className="space-y-4">
+                {/* Cabecera del Menú Móvil */}
+                <div className="flex items-center justify-between pb-3 border-b border-[#0dfceb]/30">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full bg-[#0dfceb] animate-pulse" />
+                    <span className="font-black text-xs uppercase tracking-wider text-white">
+                      CYBERPUNK <span className="text-[#FCEE0A]">MENÚ</span>
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsMobileMenuOpen(false)}
+                    className="p-1.5 rounded bg-[#FF003C]/20 border border-[#FF003C]/60 text-[#FF003C] hover:bg-[#FF003C] hover:text-white cursor-pointer"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+
+                {/* Bloque de Cuenta / Usuario */}
+                <div className="bg-black/70 border border-[#0dfceb]/30 rounded-lg p-3 space-y-2">
+                  {currentUser ? (
+                    <>
+                      <div className="flex items-center gap-2.5 pb-2 border-b border-gray-800">
+                        <div className="w-8 h-8 rounded-full bg-[#0dfceb]/20 border border-[#0dfceb] flex items-center justify-center text-[#0dfceb] font-black text-xs">
+                          {(userProfile?.username || currentUser.displayName || currentUser.email || 'N')[0].toUpperCase()}
+                        </div>
+                        <div className="min-w-0">
+                          <span className="text-xs font-black text-white block truncate">
+                            {userProfile?.username || currentUser.displayName || 'Netrunner'}
+                          </span>
+                          <span className="text-[9px] text-gray-400 block truncate">{currentUser.email}</span>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => { setIsMobileMenuOpen(false); setShowMyDecksModal(true); }}
+                          className="py-2 px-2 bg-[#0dfceb]/15 border border-[#0dfceb]/50 text-[#0dfceb] font-black text-[10px] uppercase rounded cursor-pointer"
+                        >
+                          📚 MIS MAZOS ({userCloudDecks.length})
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => { setIsMobileMenuOpen(false); setShowProfileModal(true); }}
+                          className="py-2 px-2 bg-gray-900 border border-gray-700 text-gray-200 font-black text-[10px] uppercase rounded cursor-pointer"
+                        >
+                          👤 PERFIL
+                        </button>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          setIsMobileMenuOpen(false);
+                          try { await logoutUser(); } catch (err) {}
+                        }}
+                        className="w-full py-1.5 bg-[#FF003C]/10 border border-[#FF003C]/40 text-[#FF003C] font-bold text-[10px] uppercase rounded flex items-center justify-center gap-1.5 cursor-pointer"
+                      >
+                        <LogOut className="w-3.5 h-3.5" />
+                        <span>CERRAR SESIÓN</span>
+                      </button>
+                    </>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => { setIsMobileMenuOpen(false); setShowAuthModal(true); }}
+                      style={{ clipPath: CYBER_BUTTON }}
+                      className="w-full py-2.5 bg-[#0dfceb] text-[#070a10] font-black text-xs uppercase flex items-center justify-center gap-2 cursor-pointer"
+                    >
+                      <User className="w-4 h-4" />
+                      <span>ENTRAR / REGISTRARSE</span>
+                    </button>
+                  )}
+                </div>
+
+                {/* Acciones de Partida */}
+                <div className="space-y-2">
+                  <button
+                    type="button"
+                    onClick={() => { setIsMobileMenuOpen(false); setShowDeckSelectorModal(true); }}
+                    style={{ clipPath: CYBER_BUTTON }}
+                    className="w-full py-2.5 px-3 bg-black border border-[#FCEE0A]/60 text-[#FCEE0A] font-black text-xs uppercase flex items-center justify-between cursor-pointer"
+                  >
+                    <span className="flex items-center gap-2"><Layers className="w-4 h-4" /> ELEGIR MAZO</span>
+                    <ChevronRight className="w-4 h-4" />
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => { setIsMobileMenuOpen(false); setShowLogModal(true); }}
+                    style={{ clipPath: CYBER_BUTTON }}
+                    className="w-full py-2.5 px-3 bg-black border border-[#0dfceb]/40 text-[#0dfceb] font-black text-xs uppercase flex items-center justify-between cursor-pointer"
+                  >
+                    <span className="flex items-center gap-2"><Terminal className="w-4 h-4 text-[#FCEE0A]" /> REGISTRO (LOGS)</span>
+                    <span className="px-1.5 py-0.5 bg-[#0dfceb]/20 rounded text-[10px]">{gameState.actionLog.length}</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => { setIsMobileMenuOpen(false); setShowTurnGuideModal(true); }}
+                    style={{ clipPath: CYBER_BUTTON }}
+                    className="w-full py-2.5 px-3 bg-black border border-[#0dfceb]/40 text-white font-black text-xs uppercase flex items-center justify-between cursor-pointer"
+                  >
+                    <span className="flex items-center gap-2"><HelpCircle className="w-4 h-4 text-[#0dfceb]" /> CÓMO FUNCIONA UN TURNO</span>
+                    <ChevronRight className="w-4 h-4 text-gray-500" />
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => { setIsMobileMenuOpen(false); setShowRulesModal(true); }}
+                    style={{ clipPath: CYBER_BUTTON }}
+                    className="w-full py-2.5 px-3 bg-black border border-gray-700 text-gray-200 font-black text-xs uppercase flex items-center justify-between cursor-pointer"
+                  >
+                    <span className="flex items-center gap-2"><FileText className="w-4 h-4 text-[#FCEE0A]" /> REGLAS RÁPIDAS</span>
+                    <ChevronRight className="w-4 h-4 text-gray-500" />
+                  </button>
+
+                  {/* Zoom en Móvil */}
+                  <div className="p-2.5 bg-black border border-[#0dfceb]/30 rounded flex items-center justify-between">
+                    <span className="text-[10px] font-bold text-gray-400 uppercase">ZOOM TABLERO</span>
+                    <select
+                      value={zoomMode}
+                      onChange={(e) => {
+                        setZoomMode(e.target.value);
+                        try { localStorage.setItem('cyber_sim_zoom', e.target.value); } catch (err) {}
+                      }}
+                      className="bg-[#070a10] border border-[#0dfceb]/50 text-[#FCEE0A] font-black text-xs px-2 py-1 rounded focus:outline-none"
+                    >
+                      <option value="auto">AUTO ({Math.round(autoScale * 100)}%)</option>
+                      <option value="1">100%</option>
+                      <option value="0.9">90%</option>
+                      <option value="0.8">80%</option>
+                      <option value="0.75">75%</option>
+                      <option value="0.7">70%</option>
+                      <option value="0.65">65%</option>
+                    </select>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => { setIsMobileMenuOpen(false); toggleFullscreen(); }}
+                    style={{ clipPath: CYBER_BUTTON }}
+                    className="w-full py-2.5 px-3 bg-black border border-gray-700 text-gray-200 font-black text-xs uppercase flex items-center justify-between cursor-pointer"
+                  >
+                    <span className="flex items-center gap-2">
+                      {isFullscreen ? <Minimize2 className="w-4 h-4 text-[#FCEE0A]" /> : <Maximize2 className="w-4 h-4 text-[#0dfceb]" />}
+                      {isFullscreen ? 'SALIR PANTALLA COMPLETA' : 'PANTALLA COMPLETA'}
+                    </span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Pie del Menú Móvil: Nueva Partida */}
+              <div className="pt-4 border-t border-gray-800 space-y-2">
+                <button
+                  type="button"
+                  onClick={() => { setIsMobileMenuOpen(false); handleResetGame(); }}
+                  style={{ clipPath: CYBER_BUTTON }}
+                  className="w-full py-2.5 px-3 bg-[#FF003C]/20 hover:bg-[#FF003C] border border-[#FF003C] text-[#FF003C] hover:text-white font-black text-xs uppercase flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <RotateCcw className="w-4 h-4" />
+                  <span>NUEVA PARTIDA</span>
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* =====================================================================
           CUERPO PRINCIPAL DEL JUEGO:
@@ -5559,7 +5825,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
             - Contenedor flexible en la parte inferior para la mano del jugador
             - Dock horizontal responsivo que se adapta a cualquier resolución
            ===================================================================== */}
-        <footer className="relative z-30 shrink-0 bg-[#070a10]/95 backdrop-blur-md border-t border-[#0dfceb]/40 shadow-[0_-10px_35px_rgba(0,0,0,0.85)] font-mono overflow-visible">
+        <footer className="relative z-30 shrink-0 bg-[#070a10]/95 backdrop-blur-md border-t border-[#0dfceb]/40 shadow-[0_-10px_35px_rgba(0,0,0,0.85)] font-mono overflow-visible pb-[env(safe-area-inset-bottom)]">
           <div className="w-full px-2.5 sm:px-4 py-1 sm:py-1.5">
           {/* Barra Superior del Dock: Estado o Acciones de la Carta Seleccionada */}
           <div className="flex flex-wrap items-center justify-between text-xs border-b border-[#0dfceb]/20 pb-1 mb-1">
@@ -5808,7 +6074,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                   setGameState({ ...gameState });
                 }}
                 style={{ clipPath: CYBER_BUTTON }}
-                className="px-4 sm:px-6 py-2.5 sm:py-3.5 bg-[#FCEE0A] hover:bg-[#0dfceb] text-[#070a10] font-mono font-black text-xs sm:text-sm uppercase tracking-wider cursor-pointer shadow-[0_0_20px_rgba(252,238,10,0.6)] hover:shadow-[0_0_25px_rgba(13,252,235,0.7)] transition-all disabled:opacity-30 disabled:pointer-events-none"
+                className="px-3 sm:px-6 py-2 sm:py-3.5 bg-[#FCEE0A] hover:bg-[#0dfceb] text-[#070a10] font-mono font-black text-[10px] sm:text-sm uppercase tracking-wider cursor-pointer shadow-[0_0_20px_rgba(252,238,10,0.6)] hover:shadow-[0_0_25px_rgba(13,252,235,0.7)] transition-all disabled:opacity-30 disabled:pointer-events-none whitespace-nowrap"
               >
                 TERMINAR TURNO ➔
               </button>
