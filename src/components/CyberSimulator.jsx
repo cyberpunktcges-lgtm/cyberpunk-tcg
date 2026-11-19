@@ -2773,20 +2773,20 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
           BARRA SUPERIOR: BOTONES CON BORDES AFILADOS Y EFECTO EXTERIOR
           hover:shadow-[0_0_15px_rgba(13,252,235,0.4)]
          ===================================================================== */}
-      <header className="relative z-20 bg-[#070a10]/95 border-b border-[#0dfceb]/30 px-3 sm:px-4 py-2 flex items-center justify-between font-mono text-xs shrink-0 shadow-lg backdrop-blur-md">
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2">
-            <span className="w-2.5 h-2.5 rounded-full bg-[#0dfceb] animate-pulse" />
-            <span className="font-black text-white uppercase tracking-wider text-xs sm:text-sm">
+      <header className="relative z-20 bg-[#070a10]/95 border-b border-[#0dfceb]/30 px-2.5 sm:px-3 py-1.5 flex items-center justify-between gap-2 font-mono text-xs shrink-0 shadow-lg backdrop-blur-md">
+        <div className="flex items-center gap-2 sm:gap-2.5 min-w-0">
+          <div className="flex items-center gap-1.5 shrink-0">
+            <span className="w-2 h-2 rounded-full bg-[#0dfceb] animate-pulse shrink-0" />
+            <span className="font-black text-white uppercase tracking-wider text-xs whitespace-nowrap">
               CYBERPUNK TCG // <span className="text-[#FCEE0A]">SIMULADOR</span>
             </span>
           </div>
 
-          <div className="hidden md:flex items-center gap-2 text-gray-400 pl-3 border-l border-[#0dfceb]/30">
-            <span className="text-[#0dfceb] font-bold">TURNO {gameState.turnNumber}</span>
+          <div className="hidden md:flex items-center gap-1.5 text-gray-400 pl-2 border-l border-[#0dfceb]/30 shrink-0">
+            <span className="text-[#0dfceb] font-bold whitespace-nowrap">TURNO {gameState.turnNumber}</span>
             <span className="text-gray-700">•</span>
             <span
-              className={`font-black uppercase px-2 py-0.5 text-[11px] ${
+              className={`font-black uppercase px-2 py-0.5 text-[10px] sm:text-[11px] whitespace-nowrap ${
                 isMyTurn
                   ? 'bg-[#0dfceb] text-[#070a10]'
                   : 'bg-[#FF003C] text-white animate-pulse'
@@ -2794,6 +2794,19 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
             >
               {isMyTurn ? 'TU TURNO // FASE PRINCIPAL' : 'IA PENSANDO ACCIONES...'}
             </span>
+
+            {/* Botón Guía de Fases oficial */}
+            <button
+              type="button"
+              onClick={() => setShowTurnGuideModal(true)}
+              style={{ clipPath: CYBER_BUTTON }}
+              className="px-2 py-1 bg-[#0dfceb]/10 hover:bg-[#0dfceb] text-[#0dfceb] hover:text-black border border-[#0dfceb]/50 text-[10px] font-black uppercase transition-all flex items-center gap-1 cursor-pointer whitespace-nowrap shrink-0"
+              title="Ver infografía oficial de cómo funciona un turno (Rules 8.1–8.18)"
+            >
+              <HelpCircle className="w-3 h-3 shrink-0" />
+              <span className="hidden xl:inline">CÓMO FUNCIONA UN TURNO</span>
+              <span className="inline xl:hidden">GUÍA TURNO</span>
+            </button>
           </div>
         </div>
 
@@ -3988,7 +4001,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
             {/* Contenedor flotante central con indicadores de fase */}
             <div
               style={{ clipPath: CYBER_CLIP }}
-              className="relative z-10 flex flex-wrap items-center justify-between gap-2.5 bg-[#070a10]/95 border-2 border-[#FCEE0A] px-3 sm:px-4 py-1.5 font-mono text-xs shadow-[0_0_25px_rgba(252,238,10,0.5)] max-w-5xl w-full"
+              className="relative z-10 flex flex-wrap items-center justify-center gap-2.5 sm:gap-4 bg-[#070a10]/95 border-2 border-[#FCEE0A] px-3 sm:px-4 py-1.5 font-mono text-xs shadow-[0_0_25px_rgba(252,238,10,0.5)] max-w-5xl w-fit"
             >
               {/* Turno e Indicador Oficial */}
               <div className="flex items-center gap-2">
@@ -3996,17 +4009,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                   TURNO {gameState.turnNumber}
                 </span>
 
-                {/* Botón Guía de Fases oficial */}
-                <button
-                  type="button"
-                  onClick={() => setShowTurnGuideModal(true)}
-                  style={{ clipPath: CYBER_BUTTON }}
-                  className="px-2 py-0.5 bg-[#0dfceb]/10 hover:bg-[#0dfceb] text-[#0dfceb] hover:text-black border border-[#0dfceb]/50 text-[10px] font-black uppercase transition-all flex items-center gap-1 cursor-pointer"
-                  title="Ver infografía oficial de cómo funciona un turno (Rules 8.1–8.18)"
-                >
-                  <HelpCircle className="w-3 h-3" />
-                  <span className="hidden sm:inline">CÓMO FUNCIONA UN TURNO</span>
-                </button>
+
               </div>
 
               {/* Stepper Oficial de Fases: 1. START PHASE -> 2. MAIN PHASE -> 3. END */}
@@ -4078,7 +4081,8 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                 )}
               </div>
 
-              {/* Botón de Asaltar Gigs o Acciones Rápidas */}
+              {/* Botón de Asaltar Gigs o Acciones Rápidas (solo visible con unidad seleccionada) */}
+              {selectedFieldUnit && (
               <div className="flex items-center gap-2">
                 {/* Habilidades activadas (↷) de la Unidad seleccionada */}
                 {selectedFieldUnit && (() => {
@@ -4137,27 +4141,8 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                     </button>
                   );
                 })()}
-
-                {/* Si no hay unidad seleccionada, acceso directo a terminar turno */}
-                {isMyTurn && !selectedFieldUnit && !gameState.pendingGigRoll && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSelectedHandCard(null);
-                      setSelectedFieldUnit(null);
-                      setHistory([]);
-                      passTurn(gameState);
-                      setGameState({ ...gameState });
-                    }}
-                    style={{ clipPath: CYBER_BUTTON }}
-                    className="px-2.5 sm:px-3 py-1 bg-[#FCEE0A] hover:bg-[#0dfceb] text-black font-black text-[10px] sm:text-xs uppercase transition-all shadow-[0_0_10px_rgba(252,238,10,0.4)] cursor-pointer flex items-center gap-1"
-                    title="Terminar turno (Limpia Lag y efectos de turno)"
-                  >
-                    <span>TERMINAR TURNO</span>
-                    <ChevronRight className="w-3.5 h-3.5" />
-                  </button>
-                )}
               </div>
+              )}
             </div>
           </div>
 
