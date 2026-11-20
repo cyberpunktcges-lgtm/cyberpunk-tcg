@@ -1,15 +1,26 @@
 /**
  * botAi.js
- * Inteligencia Artificial táctica para el Bot de Cyberpunk TCG
- * Respeta el reglamento oficial: costes de 1 €$ para llamar leyendas, palabras clave
- * (Blocker, Adrenaline, Go Solo), tabla de robo de Gigs por poder y resolución de empates.
+ * Inteligencia Artificial Táctica v2 para el Bot de Cyberpunk TCG (Set 01)
+ *
+ * Principios tácticos incorporados:
+ * - Turno 1 saliendo primero (2 Leyendas giradas -> 1 €$ base): vende 1 carta -> 2 €$.
+ *   Si tiene Unidad de coste 2 (o 1), la juega; si no, llama 1 Leyenda (Call) y pasa.
+ * - Turno 1 saliendo segundo (3 Leyendas listas -> 3 €$ base, 4 €$ tras vender):
+ *   Prioriza desplegar Unidades fuertes en mesa y llamar Leyendas progresivamente con el sobrante.
+ * - Turnos siguientes: prioriza Unidades y Gears antes que Programas, salvo Programas de
+ *   robo/ventaja de cartas o de destrucción/bottom-deck cuando el rival tiene objetivo válido.
+ * - Nunca desperdicia Programas ni Quick sin objetivo útil; activa habilidades (↷) de Leyendas
+ *   y Unidades cuando generan ventaja; equipa Gears al portador óptimo; evalúa Blockers y Johnny vs CORPO.
  */
 
 import {
   getAvailableEddies,
+  getEffectiveCardCost,
+  getCardType,
   sellCardForEddies,
   playCard,
   playUnitCard,
+  playGearCard,
   callLegendFaceUp,
   playLegendToField,
   attackRivalGigs,
@@ -20,34 +31,505 @@ import {
   calculateGigsToSteal,
   isCardVendible,
   parseCardCost,
+  parseCardPower,
   canUnitAttack,
   executeStartPhase
 } from './cyberpunkEngine.js';
-import { executeUnitAttackTrigger, executeBlockerUsedTrigger, executeCardSpentTriggers } from './cardEffects.js';
+import {
+  executeUnitAttackTrigger,
+  executeBlockerUsedTrigger,
+  executeCardSpentTriggers,
+  resolveCardId,
+  getGigMaxFace
+} from './cardEffects.js';
+import {
+  getCardActivatedAbilities,
+  executeCardActivatedAbility
+} from './activatedAbilities.js';
+
+// =========================================================================
+// HELPERS TÁCTICOS
+// =========================================================================
+
+function isCorpoUnit(u) {
+  return /\bCORPO\b/i.test(`${u?.traits || ''} ${u?.cardType || ''}`);
+}
+
+function isJohnnyUnit(u) {
+  return String(u?.id || '').toUpperCase() === 'CP-054';
+}
+
+/**
+ * Ayudante para que la IA gire automáticamente sus cartas de Eddies o Leyendas
+ * para reunir la cantidad necesaria de Eddies en bot.floatingEddies antes de pagar una acción.
+ */
+function botPrepareEddies(bot, neededAmount, preserveLegendId = null) {
+  let current = bot.floatingEddies || 0;
+  if (current >= neededAmount) return true;
+
+  // 1. Girar cartas de Eddies del bot primero (preservar Leyendas listas para sus habilidades ↷)
+  for (const ed of bot.eddies || []) {
+    if (current >= neededAmount) break;
+    if (!ed.isSpent) {
+      ed.isSpent = true;
+      current++;
+    }
+  }
+
+  // 2. Si todavía faltan, girar Leyendas boca abajo primero, luego boca arriba (evitando preserveLegendId)
+  const sortedLegends = [...(bot.legends || [])].sort((a, b) => (a.isFaceUp ? 1 : 0) - (b.isFaceUp ? 1 : 0));
+  for (const leg of sortedLegends) {
+    if (current >= neededAmount) break;
+    if (!leg.isSpent && !leg.isOnField && !leg.isRemovedFromGame && leg.instanceId !== preserveLegendId) {
+      leg.isSpent = true;
+      current++;
+    }
+  }
+
+  // 3. Como último recurso, girar también la leyenda preservada si hace falta
+  if (current < neededAmount && preserveLegendId) {
+    const preserved = (bot.legends || []).find((l) => l.instanceId === preserveLegendId);
+    if (preserved && !preserved.isSpent && !preserved.isOnField && !preserved.isRemovedFromGame) {
+      preserved.isSpent = true;
+      current++;
+    }
+  }
+
+  bot.floatingEddies = current;
+  return current >= neededAmount;
+}
+
+/**
+ * Calcula la capacidad total máxima de Eddies que el bot puede generar este turno.
+ */
+function getBotMaxCapacity(bot) {
+  const current = bot.floatingEddies || 0;
+  const readyEddies = (bot.eddies || []).filter((e) => !e.isSpent).length;
+  const readyLegends = (bot.legends || []).filter(
+    (l) => !l.isSpent && !l.isOnField && !l.isRemovedFromGame
+  ).length;
+  return current + readyEddies + readyLegends;
+}
+
+/**
+ * Evalúa si un Programa es útil en el estado actual del tablero y devuelve una puntuación táctica:
+ * - 0 = NO JUGAR (sin objetivo válido, desperdicio o Quick que debe guardarse para Reacción)
+ * - 30..49 = Utilidad secundaria (solo tras jugar Unidades/Gears si sobran Eddies)
+ * - 55..90 = Alta prioridad (robo de cartas o removal/bottom-deck contra amenaza rival real)
+ */
+function evaluateProgramScore(card, bot, player, gameState) {
+  const cid = resolveCardId(card);
+  const oppUnits = player.field || [];
+  const myUnits = bot.field || [];
+  const myGigs = bot.gigs || [];
+  const oppGigs = player.gigs || [];
+  const myHandSize = (bot.hand || []).length;
+
+  // --- PROGRAMAS QUICK: reservar para Fase de Reacción (salvo Detonate si hay Gear rival) ---
+  if (hasKeyword(card, 'Quick') || ['CP-021', 'CP-025', 'CP-036', 'CP-100', 'CP-112', 'CP-123', 'CP-125'].includes(cid)) {
+    if (cid === 'CP-025') {
+      // Detonate: destruir Gear rival con poder <= 2
+      const hasRivalGear = oppUnits.some((u) => (u.gear || []).some((g) => (parseCardPower(g.power) || 0) <= 2));
+      return hasRivalGear ? 62 : 0;
+    }
+    return 0; // Guardar el resto de Quick para Fase de Reacción
+  }
+
+  // --- EXCEPCIÓN DE ALTA PRIORIDAD 1: ROBO / VENTAJA DE CARTAS ---
+  if (cid === 'CP-129') return (bot.deck?.length || 0) >= 2 ? 70 : 0; // Three Mouths, One Desire
+  if (cid === 'CP-037') return (bot.deck?.length || 0) >= 2 ? 66 : 0; // Fool on the Hill
+  if (cid === 'CP-006') return (bot.deck?.length || 0) >= 3 ? 64 : 0; // All Is Lost (Trash 3, add Unit)
+  if (cid === 'CP-127') return (bot.deck?.length || 0) >= 4 ? 62 : 0; // The Heist (Trash 4, add Gear)
+  if (cid === 'CP-085') return (bot.deck?.length || 0) >= 2 ? 72 : 0; // Nocturne Op55N1 (Draw 2)
+  if (cid === 'CP-014') {
+    // Bootleg Black Sapphire: vender top + robar 2 si tienes Gig par e impar
+    const hasEven = myGigs.some((g) => Number(g.value) % 2 === 0);
+    const hasOdd = myGigs.some((g) => Number(g.value) % 2 === 1);
+    return hasEven && hasOdd ? 74 : 25;
+  }
+  if (cid === 'CP-120') {
+    // Shattered Memories: solo si tiene pocas cartas en mano (<= 2) y el rival tiene más
+    return myHandSize <= 2 && (bot.deck?.length || 0) >= 5 ? 70 : 0;
+  }
+  if (cid === 'CP-144') {
+    // We Gotta Live Together: revivir hasta 2 Unidades de coste <= 3 desde Trash
+    const trashUnits = (bot.trash || []).filter(
+      (c) => getCardType(c) === 'UNIT' && (c.parsedCost || parseCardCost(c.cost) || 0) <= 3
+    );
+    if (trashUnits.length >= 2) return 84;
+    if (trashUnits.length === 1) return 60;
+    return 0;
+  }
+
+  // --- EXCEPCIÓN DE ALTA PRIORIDAD 2: DESTRUIR / BOTTOM-DECK UNIDAD RIVAL ---
+  if (cid === 'CP-013') {
+    // Bonnie and Clyde: derrotar unidad rival con poder <= 4
+    const targets = oppUnits.filter((u) => (u.currentPower || 0) <= 4);
+    return targets.length > 0 ? 74 + targets.length * 6 : 0;
+  }
+  if (cid === 'CP-016') {
+    // Carnage at the Colosseum: derrotar unidad rival con menor poder que una unidad aliada
+    const maxMyPower = Math.max(0, ...myUnits.map((u) => u.currentPower || 0));
+    const hasTarget = oppUnits.some((u) => (u.currentPower || 0) < maxMyPower);
+    return hasTarget ? 76 : 0;
+  }
+  if (cid === 'CP-028') {
+    // (Don't Fear) The Reaper: girar todas las unidades rivales + destruir 1
+    return oppUnits.length >= 2 ? 85 : oppUnits.length === 1 ? 66 : 0;
+  }
+  if (cid === 'CP-062') {
+    // Les Éléments: bottom-deck la unidad rival de menor poder
+    return oppUnits.length > 0 ? 72 : 0;
+  }
+  if (cid === 'CP-088') {
+    // Over the Edge: derrotar unidad con poder <= valor de d20 aliado
+    const myD20 = myGigs.find((g) => String(g.die || '').toLowerCase() === 'd20');
+    if (!myD20) return 0;
+    const hasTarget = oppUnits.some((u) => (u.currentPower || 0) <= (myD20.value || 0));
+    return hasTarget ? 78 : 0;
+  }
+  if (cid === 'CP-098') {
+    // Pyramid Song: -4 poder a unidad rival (o bottom-deck si poder 0)
+    if (oppUnits.length === 0) return 0;
+    const hasZero = oppUnits.some((u) => (u.currentPower || 0) === 0);
+    const hasMinD4 = myGigs.some((g) => String(g.die || '').toLowerCase() === 'd4' && Number(g.value) === 1);
+    if (hasZero || (hasMinD4 && oppUnits.some((u) => (u.currentPower || 0) <= 4))) return 82;
+    // Útil si el bot va a combatir este turno contra esa unidad o bajar una amenaza grande
+    const hasReadyAttacker = myUnits.some((u) => canUnitAttack(u, bot, gameState, 'UNIT'));
+    return hasReadyAttacker || oppUnits.some((u) => (u.currentPower || 0) >= 5) ? 68 : 0;
+  }
+  if (cid === 'CP-130') {
+    // Towerfall: -5 a todas las rivales (+ bottom-deck si 0)
+    if (oppUnits.length === 0) return 0;
+    return oppUnits.length >= 2 ? 86 : 64;
+  }
+  if (cid === 'CP-134') {
+    // Unlikely Bond: bottom-deck aliada lista + rival gastada
+    const readyAlly = myUnits.find((u) => !u.isSpent && (u.currentPower || 0) <= 3);
+    const spentBigOpp = oppUnits.find((u) => u.isSpent && (u.currentPower || 0) >= 4);
+    return readyAlly && spentBigOpp ? 72 : 0;
+  }
+  if (cid === 'CP-146') {
+    // Wild in the Streets: derrotar unidad gastada
+    const spentOpp = oppUnits.find((u) => u.isSpent);
+    return spentOpp ? 75 : 0;
+  }
+  if (cid === 'CP-063') {
+    // Live With the Aftermath: cada jugador destruye 1 unidad
+    if (oppUnits.length === 0) return 0;
+    const minMy = myUnits.length > 0 ? Math.min(...myUnits.map((u) => u.currentPower || 0)) : 0;
+    const maxOpp = Math.max(...oppUnits.map((u) => u.currentPower || 0));
+    return myUnits.length === 0 || maxOpp >= minMy + 2 ? 70 : 0;
+  }
+
+  // --- CONTROL DE UNIDADES RIVALES ---
+  if (cid === 'CP-018') {
+    // Chrome Reverie: congelar unidad rival (+ Call gratis si min Gig)
+    return oppUnits.length > 0 ? 52 : 0;
+  }
+  if (cid === 'CP-020') {
+    // Corporate Surveillance: girar unidad rival de coste <= 4
+    const readyOpp = oppUnits.some((u) => !u.isSpent && (u.parsedCost || parseCardCost(u.cost) || 0) <= 4);
+    return readyOpp ? 50 : 0;
+  }
+  if (cid === 'CP-074') {
+    // Memory Relapse: girar rival + no endereza (+ robar si cred par)
+    return oppUnits.length > 0 ? 58 : 0;
+  }
+
+  // --- AJUSTE DE GIGS (secundarios: solo si realmente dan robo o ventaja clara, tras Unidades/Gears) ---
+  if (cid === 'CP-005') {
+    // Afterparty at Lizzie's: ±1 Gig + robar si 2+ valores distintos
+    if (myGigs.length + oppGigs.length === 0) return 0;
+    return myGigs.length >= 2 ? 48 : 0;
+  }
+  if (cid === 'CP-048') {
+    // Industrial Assembly: +4 Gig + robar si 8+
+    const canGrow = myGigs.some((g) => (g.value || 1) < getGigMaxFace(g));
+    if (!canGrow) return 0;
+    const hitsEight = myGigs.some((g) => Math.min(getGigMaxFace(g), (g.value || 1) + 4) >= 8);
+    return hitsEight ? 54 : 36;
+  }
+  if (cid === 'CP-132') {
+    // Trust No One: -3 Gig + robar si min Gig (1)
+    if (myGigs.length + oppGigs.length === 0) return 0;
+    const hitsMin = myGigs.some((g) => g.value >= 2 && g.value <= 4);
+    return hitsMin ? 56 : oppGigs.some((g) => g.value >= 6) ? 38 : 0;
+  }
+  if (cid === 'CP-094') {
+    // Peace Offering: copiar valor + robar si pareja
+    if (myGigs.length + oppGigs.length < 2) return 0;
+    return myGigs.length >= 2 ? 46 : 0;
+  }
+
+  // --- BUFFOS DE COMBATE EN FASE PRINCIPAL ---
+  if (cid === 'CP-010' || cid === 'CP-043') {
+    const hasAttacker = myUnits.some((u) => canUnitAttack(u, bot, gameState));
+    return hasAttacker && oppUnits.length > 0 ? 45 : 0;
+  }
+
+  return 30;
+}
+
+/**
+ * Elige la mejor unidad aliada (o leyenda si es Gear de trigger al girar) para equipar un Gear.
+ */
+function chooseBestGearTarget(gear, bot, player, gameState) {
+  const cid = resolveCardId(gear);
+  const myUnits = bot.field || [];
+  const isSpendTriggerGear = ['CP-011', 'CP-084', 'CP-126', 'CP-151'].includes(cid);
+  const grantsBlocker = hasKeyword(gear, 'Blocker');
+
+  if (myUnits.length > 0) {
+    let best = null;
+    let bestScore = -999;
+    for (const u of myUnits) {
+      let score = (u.currentPower || 0) * 2;
+      if (!u.isSpent) score += 8;
+      if (canUnitAttack(u, bot, gameState)) score += 10;
+      if (grantsBlocker) {
+        score += hasKeyword(u, 'Blocker') ? -20 : 18;
+      }
+      if (cid === 'CP-030' && /^V(\s|$|\/\/)/i.test(String(u.name || '').trim())) {
+        score += 25; // Dying Night sobre V endereza 2 Eddies
+      }
+      if ((cid === 'CP-039' || cid === 'CP-116') && (u.currentPower || 0) >= 4) {
+        score += 12; // Gorilla Arms / Satori sobre atacante fuerte
+      }
+      if (score > bestScore) {
+        bestScore = score;
+        best = u;
+      }
+    }
+    return best;
+  }
+
+  // Solo equipar en Leyenda boca arriba si es un Gear con habilidad al girar (Zetatech Faceplate, NetWatch, Rippler, Radioport)
+  if (isSpendTriggerGear) {
+    return (bot.legends || []).find((l) => l.isFaceUp && !l.isRemovedFromGame && !l.isOnField) || null;
+  }
+  return null;
+}
+
+/**
+ * Decide qué carta vender (si conviene vender) siguiendo la estrategia de curva de Eddies:
+ * - Turno 1 saliendo primero (1 Leyenda lista): SIEMPRE vender para llegar a 2 €$,
+ *   SIN vender tu única Unidad de coste 2.
+ * - Turno 1 saliendo segundo (3 Leyendas listas): vender para llegar a 4 €$,
+ *   SIN vender tu única Unidad de coste 3–4.
+ * - Turnos posteriores: vender hasta alcanzar ~7 Eddies de capacidad o poder pagar cartas caras en mano.
+ */
+function chooseCardToSellForBot(bot, player, gameState) {
+  if (bot.hasSoldThisTurn || !bot.hand || bot.hand.length === 0) return null;
+
+  const vendible = bot.hand.filter((c) => isCardVendible(c));
+  if (vendible.length === 0) return null;
+
+  const currentCap = getBotMaxCapacity(bot);
+  const isTurn1GoingFirst = gameState.turnNumber === 1;
+  const isTurn1GoingSecond = gameState.turnNumber === 2;
+  const maxHandCost = Math.max(0, ...bot.hand.map((c) => getEffectiveCardCost(c, bot, gameState)));
+
+  // Si ya tiene mucha capacidad (>= 7) y puede pagar toda su mano con holgura, conservar cartas
+  if (!isTurn1GoingFirst && !isTurn1GoingSecond && currentCap >= 7 && currentCap >= maxHandCost) {
+    return null;
+  }
+  // Si solo le queda 1 carta y ya tiene >= 4 Eddies, no quedarse con la mano vacía salvo que no pueda jugarla
+  if (bot.hand.length === 1 && currentCap >= 4 && getEffectiveCardCost(bot.hand[0], bot, gameState) <= currentCap) {
+    return null;
+  }
+
+  const unitsOfCost2 = bot.hand.filter(
+    (c) => getCardType(c) === 'UNIT' && getEffectiveCardCost(c, bot, gameState) === 2
+  );
+  const unitsOfCost3to4 = bot.hand.filter((c) => {
+    const cost = getEffectiveCardCost(c, bot, gameState);
+    return getCardType(c) === 'UNIT' && cost >= 3 && cost <= 4;
+  });
+
+  // Puntuar cada carta vendible: mayor puntuación = MEJOR candidata para vender
+  let bestCard = null;
+  let bestSellScore = -999;
+
+  for (const card of vendible) {
+    const type = getCardType(card);
+    const cost = getEffectiveCardCost(card, bot, gameState);
+    let sellScore = 0;
+
+    // 1. Proteger la jugada clave de Turno 1
+    if (isTurn1GoingFirst && type === 'UNIT' && cost === 2 && unitsOfCost2.length === 1) {
+      sellScore -= 100; // NUNCA vender tu única unidad de coste 2 en Turno 1 saliendo primero
+    }
+    if (isTurn1GoingSecond && type === 'UNIT' && cost >= 3 && cost <= 4 && unitsOfCost3to4.length === 1) {
+      sellScore -= 80; // Proteger tu unidad en curva de Turno 1 saliendo segundo
+    }
+
+    // 2. Cartas caras imposibles de jugar aún son las mejores para vender al inicio
+    if (cost >= currentCap + 3) sellScore += 35;
+    else if (cost >= currentCap + 2) sellScore += 22;
+    else if (cost >= 5 && gameState.turnNumber <= 4) sellScore += 18;
+
+    // 3. Copias duplicadas en mano se venden con mucha menos pena
+    const copies = bot.hand.filter((c) => resolveCardId(c) === resolveCardId(card)).length;
+    if (copies >= 2) sellScore += 20;
+
+    // 4. Programas situacionales o inútiles ahora son excelentes para vender
+    if (type === 'PROGRAM') {
+      const progUtility = evaluateProgramScore(card, bot, player, gameState);
+      if (progUtility === 0) sellScore += 25;
+      else if (progUtility < 50) sellScore += 10;
+      else sellScore -= 15; // Conservar robo/removal útil
+    } else if (type === 'GEAR') {
+      // Si aún no hay unidades en mesa, vender Gears sobrantes es buena idea
+      if ((bot.field || []).length === 0) sellScore += 16;
+      else sellScore += 6;
+    } else if (type === 'UNIT') {
+      // Evitar vender unidades en curva jugables este turno
+      if (cost <= currentCap + 1) sellScore -= 20;
+    }
+
+    if (sellScore > bestSellScore) {
+      bestSellScore = sellScore;
+      bestCard = card;
+    }
+  }
+
+  return bestCard;
+}
+
+/**
+ * Elige la mejor Leyenda boca abajo para hacer Call (prioriza efectos útiles ahora).
+ */
+function chooseBestLegendToCall(bot, player) {
+  const faceDown = (bot.legends || []).filter((l) => !l.isFaceUp && !l.isRemovedFromGame && !l.isOnField);
+  if (faceDown.length === 0) return null;
+
+  let best = faceDown[0];
+  let bestScore = -999;
+
+  for (const leg of faceDown) {
+    const cid = resolveCardId(leg);
+    let score = 10;
+    // Leyendas con habilidades pasivas o ↷ muy fuertes tempranas
+    if (['CP-026', 'CP-045', 'CP-051', 'CP-058', 'CP-082', 'CP-091', 'CP-143'].includes(cid)) score += 15;
+    // Si tiene CALL que interactúa con mesa rival y el rival está vacío, esperar un poco
+    if ((cid === 'CP-091' || cid === 'CP-143') && (player.field || []).length === 0) score -= 5;
+    // Si está enderezada y tiene Go Solo, vale la pena revelarla pronto
+    if (hasKeyword(leg, 'Go Solo') && !leg.isSpent) score += 8;
+    // Preferir llamar una leyenda que esté girada en Turno 1 para que ya quede boca arriba sin perder capacidad
+    if (leg.isSpent) score += 5;
+
+    if (score > bestScore) {
+      bestScore = score;
+      best = leg;
+    }
+  }
+  return best;
+}
+
+/**
+ * Evalúa si conviene activar una habilidad (↷) gratuita o rentable de una Leyenda/Unidad del bot.
+ */
+function tryActivateBotAbilities(gameState, bot, player) {
+  let activatedAny = false;
+  const candidates = [
+    ...(bot.legends || []).filter((l) => l.isFaceUp && !l.isSpent && !l.isOnField && !l.isRemovedFromGame),
+    ...(bot.field || []).filter((u) => !u.isSpent && !u.isLagging)
+  ];
+
+  for (const card of candidates) {
+    const cid = resolveCardId(card);
+    const abilities = getCardActivatedAbilities(card, 'bot', gameState);
+    for (const ab of abilities) {
+      if (!ab.canActivateNow) continue;
+      // Solo activar habilidades gratuitas (costEddie === 0) o de alto impacto cuando realmente convenga
+      if (ab.costEddie > 0) continue;
+
+      let shouldUse = false;
+      if (cid === 'CP-059') shouldUse = true; // Kerry Unit: robar 2 si Gig >= 8
+      else if (cid === 'CP-057') shouldUse = true; // Judy Legend: filtrar top deck (si Programa -> mano)
+      else if (cid === 'CP-026') {
+        // Dexter Legend: +2 a Gig si alguno no está al máximo
+        shouldUse = (bot.gigs || []).some((g) => (g.value || 1) < getGigMaxFace(g));
+      } else if (cid === 'CP-082') {
+        // Muamar Reyes: +1 a Gig si alguno puede subir
+        shouldUse = (bot.gigs || []).some((g) => (g.value || 1) < getGigMaxFace(g));
+      } else if (cid === 'CP-143') {
+        // Wakako: -2 a un Gig rival con valor > 1
+        shouldUse = (player.gigs || []).some((g) => (g.value || 1) > 1);
+      } else if (cid === 'CP-045') {
+        // Hanako: intercambiar solo si el mayor Gig del jugador es superior al menor Gig del bot
+        const minBot = Math.min(...(bot.gigs || []).map((g) => g.value || 99));
+        const maxPlayer = Math.max(0, ...(player.gigs || []).map((g) => g.value || 0));
+        shouldUse = maxPlayer > minBot + 1;
+      } else if (cid === 'CP-091') {
+        // Padre: igualar Gig propio al mayor del jugador si mejora valor
+        const minBot = Math.min(...(bot.gigs || []).map((g) => g.value || 99));
+        const maxPlayer = Math.max(0, ...(player.gigs || []).map((g) => g.value || 0));
+        shouldUse = maxPlayer > minBot + 1;
+      } else if (cid === 'CP-008' && ab.id === 'CP-008-DISCOUNT') {
+        // Alt Cunningham: solo activar descuento si tiene un Programa jugable en mano y algún min Gig
+        const hasMinGig = (bot.gigs || []).some((g) => Number(g.value) === 1);
+        const hasProg = (bot.hand || []).some((c) => getCardType(c) === 'PROGRAM');
+        shouldUse = hasMinGig && hasProg;
+      }
+
+      if (shouldUse) {
+        const res = executeCardActivatedAbility(gameState, 'bot', card.instanceId, ab.id);
+        if (res && res.success) {
+          activatedAny = true;
+          break;
+        }
+      }
+    }
+  }
+  return activatedAny;
+}
+
+// =========================================================================
+// 1. FASE DE REACCIÓN DEL BOT (BLOCKER / CALL / QUICK)
+// =========================================================================
 
 /**
  * Decide si el bot desea interceptar un ataque del jugador usando una de sus unidades con Blocker.
+ * Respeta la regla de Johnny Silverhand (CP-054) contra unidades CORPO.
  */
-export function decideBotBlocker(botState, attackerPower, isGigAttack = false) {
-  // REGLA OFICIAL: Las unidades con Blocker pueden bloquear aunque tengan Lag (solo deben estar Ready/no giradas)
+export function decideBotBlocker(botState, attackerPower, isGigAttack = false, attackerUnit = null) {
   const readyBlockers = (botState.field || []).filter(
     (u) => !u.isSpent && hasKeyword(u, 'Blocker')
   );
-
   if (readyBlockers.length === 0) return null;
 
-  // Si es un ataque a los Gigs del bot, bloquear es prioritario si el atacante va a robar Gigs valiosos
+  const attIsJohnny = isJohnnyUnit(attackerUnit);
+
+  const canBlockerWin = (b) => {
+    if (attIsJohnny && isCorpoUnit(b)) return false; // Johnny siempre gana a CORPO
+    if (isJohnnyUnit(b) && isCorpoUnit(attackerUnit)) return true;
+    return (b.currentPower || 0) > attackerPower;
+  };
+  const canBlockerTieOrWin = (b) => {
+    if (attIsJohnny && isCorpoUnit(b)) return false;
+    if (isJohnnyUnit(b) && isCorpoUnit(attackerUnit)) return true;
+    return (b.currentPower || 0) >= attackerPower;
+  };
+
   if (isGigAttack) {
-    // Escoger el mejor blocker (el que pueda empatar o sobrevivir, o el más débil si salva el Gig)
-    const winningBlocker = readyBlockers.find((b) => (b.currentPower || 0) >= attackerPower);
-    if (winningBlocker) return winningBlocker;
-    // Si no tiene ganador pero el atacante roba Gigs, bloquear con el más débil si le quedan pocos gigs
-    if (calculateGigsToSteal(attackerPower) >= 1 && botState.gigs.length <= 4) {
+    // 1. Mejor blocker que gane o empate limpiamente
+    const strongBlocker = [...readyBlockers]
+      .filter(canBlockerTieOrWin)
+      .sort((a, b) => (a.currentPower || 0) - (b.currentPower || 0))[0];
+    if (strongBlocker) return strongBlocker;
+
+    // 2. Si el atacante va a robar Gigs (especialmente si el jugador se acerca a 7 o bot tiene pocos), sacrificar el blocker más débil
+    const gigsStolen = calculateGigsToSteal(attackerPower);
+    if (gigsStolen >= 1 && ((botState.gigs || []).length <= 4 || gigsStolen >= 2)) {
       return [...readyBlockers].sort((a, b) => (a.currentPower || 0) - (b.currentPower || 0))[0];
     }
   } else {
-    // Si ataca una unidad enemiga, bloquear si el blocker gana al atacante
-    const winningBlocker = readyBlockers.find((b) => (b.currentPower || 0) > attackerPower);
+    // Ataque a una unidad del bot: solo bloquear si el blocker GANA limpiamente al atacante
+    const winningBlocker = [...readyBlockers]
+      .filter(canBlockerWin)
+      .sort((a, b) => (a.currentPower || 0) - (b.currentPower || 0))[0];
     if (winningBlocker) return winningBlocker;
   }
 
@@ -56,22 +538,48 @@ export function decideBotBlocker(botState, attackerPower, isGigAttack = false) {
 
 /**
  * Evalúa y ejecuta la Fase de Respuesta (React Phase) del Bot cuando el Jugador declara un ataque:
- * REGLAS OFICIALES:
- * 1. Puede bloquear con una unidad (Blocker)
- * 2. Puede llamar a una leyenda (si no ha llamado este turno y tiene 1 €$)
- * 3. Puede jugar cartas o efectos con Quick
+ * 1. Decide primero si intercepta con Blocker (para saber si habrá combate o robo de Gigs).
+ * 2. Juega cartas Quick SOLO si realmente impactan el combate o el robo de Gigs actual.
+ * 3. Llama una Leyenda boca arriba solo si le sobra 1 €$ y resulta provechoso.
  */
 export function executeBotReaction(gameState, attackerUnit, targetType, targetUnitId = null) {
   const bot = gameState.bot;
-  let chosenBlocker = null;
+  const isGigAttack = targetType === 'GIGS';
 
-  // 1. Evaluar si el Bot llama a una Leyenda durante su reacción
-  // REGLA OFICIAL: Al hacer call a la leyenda se da la vuelta a la carta;
-  // si está girada se queda girada, y si no, se queda enderezada.
-  if (!bot.hasCalledLegendThisTurn) {
-    const uncalledLeg = (bot.legends || []).find((l) => !l.isFaceUp);
-    const capacity = getBotMaxCapacity(bot);
-    if (uncalledLeg && capacity >= 1) {
+  // 1. Evaluar Blocker primero (respetando Johnny vs CORPO)
+  const chosenBlocker = decideBotBlocker(bot, attackerUnit.currentPower || 0, isGigAttack, attackerUnit);
+  const willFight = Boolean(chosenBlocker || targetType === 'UNIT');
+
+  // 2. Evaluar cartas Quick útiles para ESTA situación concreta
+  const quickCards = (bot.hand || []).filter((c) => {
+    const cid = resolveCardId(c);
+    const isQuick = hasKeyword(c, 'Quick') || ['CP-021', 'CP-025', 'CP-036', 'CP-100', 'CP-112', 'CP-123', 'CP-125'].includes(cid);
+    if (!isQuick) return false;
+    const cost = getEffectiveCardCost(c, bot, gameState);
+    if (cost > getBotMaxCapacity(bot)) return false;
+
+    // Filtrar según relevancia real en esta reacción:
+    if (cid === 'CP-125') return isGigAttack && !chosenBlocker && calculateGigsToSteal(attackerUnit.currentPower || 0) >= 1; // Take Control
+    if (cid === 'CP-036') return true; // Floor It! (-1 poder + robar 1 siempre es bueno en combate/asalto)
+    if (cid === 'CP-100' || cid === 'CP-112' || cid === 'CP-123') return willFight; // Solo si habrá pelea
+    if (cid === 'CP-021') return willFight && (bot.field || []).some((u) => (u.gear || []).length > 0);
+    return false;
+  });
+
+  if (quickCards.length > 0) {
+    const qCard = quickCards[0];
+    const cost = getEffectiveCardCost(qCard, bot, gameState);
+    botPrepareEddies(bot, cost);
+    playCard(gameState, 'bot', qCard.instanceId);
+    gameState.actionLog.unshift(
+      `⚡ [FASE 2: REACCIÓN] ¡QUICK! El rival responde jugando "${qCard.name}".`
+    );
+  }
+
+  // 3. Evaluar si el Bot llama a una Leyenda en Reacción (solo si le sobra >= 1 €$ y tiene leyenda boca abajo)
+  if (!bot.hasCalledLegendThisTurn && getBotMaxCapacity(bot) >= 1) {
+    const uncalledLeg = chooseBestLegendToCall(bot, gameState.player);
+    if (uncalledLeg) {
       botPrepareEddies(bot, 1, uncalledLeg.instanceId);
       callLegendFaceUp(gameState, 'bot', uncalledLeg.instanceId);
       gameState.actionLog.unshift(
@@ -79,23 +587,6 @@ export function executeBotReaction(gameState, attackerUnit, targetType, targetUn
       );
     }
   }
-
-  // 2. Evaluar si el Bot juega un Programa con Quick
-  const quickCards = (bot.hand || []).filter(
-    (c) => hasKeyword(c, 'Quick') && (c.parsedCost || 0) <= getBotMaxCapacity(bot)
-  );
-  if (quickCards.length > 0) {
-    const qCard = quickCards[0];
-    botPrepareEddies(bot, qCard.parsedCost || 0);
-    playCard(gameState, 'bot', qCard.instanceId);
-    gameState.actionLog.unshift(
-      `⚡ [FASE 2: REACCIÓN] ¡QUICK! El rival responde jugando "${qCard.name}".`
-    );
-  }
-
-  // 3. Evaluar si el Bot intercepta con una unidad Blocker
-  const isGigAttack = targetType === 'GIGS';
-  chosenBlocker = decideBotBlocker(bot, attackerUnit.currentPower, isGigAttack);
 
   if (chosenBlocker) {
     chosenBlocker.isSpent = true;
@@ -111,56 +602,12 @@ export function executeBotReaction(gameState, attackerUnit, targetType, targetUn
   return chosenBlocker;
 }
 
-/**
- * Ayudante para que la IA gire automáticamente sus cartas de Eddies o Leyendas
- * para reunir la cantidad necesaria de Eddies en bot.floatingEddies antes de pagar una acción.
- */
-function botPrepareEddies(bot, neededAmount, preserveLegendId = null) {
-  let current = bot.floatingEddies || 0;
-  if (current >= neededAmount) return true;
-
-  // 1. Girar cartas de Eddies del bot
-  for (const ed of (bot.eddies || [])) {
-    if (current >= neededAmount) break;
-    if (!ed.isSpent) {
-      ed.isSpent = true;
-      current++;
-    }
-  }
-
-  // 2. Si todavía faltan, girar Leyendas del bot (evitando girar la leyenda que se desea llamar si hay otras opciones)
-  if (current < neededAmount) {
-    for (const leg of (bot.legends || [])) {
-      if (current >= neededAmount) break;
-      if (!leg.isSpent && leg.instanceId !== preserveLegendId) {
-        leg.isSpent = true;
-        current++;
-      }
-    }
-    // Si aún falta y la única opción es la leyenda preservada
-    if (current < neededAmount && preserveLegendId) {
-      const presLeg = (bot.legends || []).find((l) => l.instanceId === preserveLegendId && !l.isSpent);
-      if (presLeg) {
-        presLeg.isSpent = true;
-        current++;
-      }
-    }
-  }
-
-  bot.floatingEddies = current;
-  return current >= neededAmount;
-}
-
-function getBotMaxCapacity(bot) {
-  const current = bot.floatingEddies || 0;
-  const readyEddies = (bot.eddies || []).filter((e) => !e.isSpent).length;
-  const readyLegends = (bot.legends || []).filter((l) => !l.isSpent).length;
-  return current + readyEddies + readyLegends;
-}
+// =========================================================================
+// 2. TURNO PRINCIPAL DEL BOT (IA TÁCTICA v2)
+// =========================================================================
 
 /**
- * Ejecuta el turno del Bot paso a paso con pequeños retrasos para que el jugador
- * pueda observar las acciones en pantalla.
+ * Ejecuta el turno del Bot paso a paso con decisiones tácticas reales.
  */
 export async function runBotTurn(gameState, updateCallback, delayMs = 700) {
   if (gameState.isGameOver || gameState.activePlayer !== 'bot') return;
@@ -169,106 +616,252 @@ export async function runBotTurn(gameState, updateCallback, delayMs = 700) {
   const bot = gameState.bot;
   const player = gameState.player;
 
-  // Salvaguarda de Turno 1: si el bot empieza la partida y aún no se ejecutó su Fase de Inicio (0 dados lanzados), lanzarla ahora
+  // Salvaguarda de Turno 1: si el bot empieza la partida y aún no se ejecutó su Fase de Inicio (0 dados lanzados)
   if (gameState.turnNumber === 1 && (bot.gigs || []).length === 0 && (bot.fixerDice || []).length === 6) {
     executeStartPhase(gameState, 'bot');
     updateCallback({ ...gameState });
   }
 
-  // Paso 1: Si tiene cartas en mano y aún no ha vendido este turno, vender una carta vendible (Programas, Gears o Flathead)
-  if (bot.hand.length > 0 && !bot.hasSoldThisTurn) {
-    const vendibleCards = bot.hand.filter((c) => isCardVendible(c));
-    if (vendibleCards.length > 0) {
-      // Priorizar vender un programa o gear prescindible
-      const cardToSell =
-        vendibleCards.find((c) => (c.parsedCost || 0) >= 4) ||
-        vendibleCards[vendibleCards.length - 1];
-      if (cardToSell) {
-        await wait(delayMs);
-        sellCardForEddies(gameState, 'bot', cardToSell.instanceId);
-        updateCallback({ ...gameState });
-      }
-    }
+  const isBotTurn1GoingFirst = gameState.turnNumber === 1;
+  const isBotTurn1GoingSecond = gameState.turnNumber === 2;
+
+  // -----------------------------------------------------------------------
+  // PASO 1: VENDER 1 CARTA PARA EDDIES (CON PROTECCIÓN DE CURVA)
+  // -----------------------------------------------------------------------
+  const cardToSell = chooseCardToSellForBot(bot, player, gameState);
+  if (cardToSell) {
+    await wait(delayMs);
+    sellCardForEddies(gameState, 'bot', cardToSell.instanceId);
+    updateCallback({ ...gameState });
   }
 
-  // Paso 2: Llamar a una leyenda boca arriba si tiene alguna boca abajo y puede pagar el coste oficial de 1 €$
-  const faceDownLegend = bot.legends.find((l) => !l.isFaceUp);
-  if (faceDownLegend && !bot.hasCalledLegendThisTurn) {
-    const maxCapacity = getBotMaxCapacity(bot);
-    if (maxCapacity >= 1) {
-      await wait(delayMs);
-      botPrepareEddies(bot, 1, faceDownLegend.instanceId);
-      callLegendFaceUp(gameState, 'bot', faceDownLegend.instanceId);
-      updateCallback({ ...gameState });
-    }
-  }
+  // -----------------------------------------------------------------------
+  // PASO 2: APERTURA DE TURNO 1 SALIENDO PRIMERO (2 €$ DISPONIBLES)
+  // Regla táctica oficial del jugador:
+  // - Si tiene Unidad de coste 2 (o 1) -> Juega la Unidad (NO gasta 1 €$ en Call antes!)
+  // - Si NO tiene Unidad de coste 2 (ni 1) -> Hace Call a 1 Leyenda y pasa.
+  // -----------------------------------------------------------------------
+  if (isBotTurn1GoingFirst) {
+    const cap = getBotMaxCapacity(bot);
+    const playableOpeningUnits = (bot.hand || [])
+      .filter((c) => getCardType(c) === 'UNIT' && getEffectiveCardCost(c, bot, gameState) <= cap)
+      .sort((a, b) => {
+        // Priorizar Unidad de coste 2 en curva, luego mayor poder
+        const costDiff = getEffectiveCardCost(b, bot, gameState) - getEffectiveCardCost(a, bot, gameState);
+        if (costDiff !== 0) return costDiff;
+        return (b.parsedPower || parseCardPower(b.power) || 0) - (a.parsedPower || parseCardPower(a.power) || 0);
+      });
 
-  // Paso 2.B: Si tiene una leyenda boca arriba con Go Solo disponible y suficiente capacidad, activar Go Solo
-  const goSoloLegend = (bot.legends || []).find(
-    (l) =>
-      !l.isOnField &&
-      !l.isRemovedFromGame &&
-      l.isFaceUp &&
-      hasKeyword(l, 'Go Solo')
-  );
-  if (goSoloLegend) {
-    const cost = goSoloLegend.parsedCost || parseCardCost(goSoloLegend.cost) || goSoloLegend.costNum || 0;
-    const maxCapacity = getBotMaxCapacity(bot);
-    if (cost > 0 && maxCapacity >= cost) {
+    if (playableOpeningUnits.length > 0) {
+      const unitToPlay = playableOpeningUnits[0];
+      const uCost = getEffectiveCardCost(unitToPlay, bot, gameState);
       await wait(delayMs);
-      botPrepareEddies(bot, cost);
-      playLegendToField(gameState, 'bot', goSoloLegend.instanceId, true);
-      updateCallback({ ...gameState });
-    }
-  }
-
-  // Paso 3: Jugar cartas desde la mano (priorizando mayor relación poder/coste)
-  let keepPlaying = true;
-  while (keepPlaying && !gameState.isGameOver) {
-    const maxCapacity = getBotMaxCapacity(bot);
-    const playableCards = bot.hand
-      .filter((c) => (c.parsedCost || 0) <= maxCapacity)
-      .sort((a, b) => (b.parsedPower || 0) - (a.parsedPower || 0)); // Priorizar la más fuerte
-
-    if (playableCards.length > 0) {
-      await wait(delayMs);
-      const chosenCard = playableCards[0];
-      botPrepareEddies(bot, chosenCard.parsedCost || 0);
-      const res = playCard(gameState, 'bot', chosenCard.instanceId);
-      if (res.success) {
-        updateCallback({ ...gameState });
-      } else {
-        keepPlaying = false;
-      }
+      botPrepareEddies(bot, uCost);
+      const res = playUnitCard(gameState, 'bot', unitToPlay.instanceId);
+      if (res.success) updateCallback({ ...gameState });
     } else {
-      keepPlaying = false;
+      // Sin unidad de coste 2 (ni 1): llamar 1 Leyenda boca arriba y pasar turno
+      if (!bot.hasCalledLegendThisTurn && getBotMaxCapacity(bot) >= 1) {
+        const leg = chooseBestLegendToCall(bot, player);
+        if (leg) {
+          await wait(delayMs);
+          botPrepareEddies(bot, 1, leg.instanceId);
+          callLegendFaceUp(gameState, 'bot', leg.instanceId);
+          updateCallback({ ...gameState });
+        }
+      }
+      // Si la unidad jugada tuviera Adrenaline (no hubo) -> aquí no hay ataques posibles en Turno 1 sin unidades
+      await wait(delayMs);
+      passTurn(gameState);
+      updateCallback({ ...gameState });
+      return;
+    }
+  } else {
+    // ---------------------------------------------------------------------
+    // PASO 3: FASE PRINCIPAL (TURNO 1 SALIENDO SEGUNDO Y TURNOS SIGUIENTES)
+    // Prioridad:
+    //   1. Programas de robo o destrucción/bottom-deck con objetivo real
+    //   2. Unidades (en curva, priorizando presencia de mesa) y Gears al mejor portador
+    //   3. Go Solo cuando sea rentable o remate partida
+    //   4. Llamar a 1 Leyenda (Call) progresivamente sin ahogar el despliegue de Unidades
+    //   5. Habilidades activadas (↷) de Leyendas y Unidades
+    // ---------------------------------------------------------------------
+
+    // 3.A: Activar habilidades (↷) gratuitas de robo/filtro/buff antes de jugar si convienen
+    if (tryActivateBotAbilities(gameState, bot, player)) {
+      await wait(Math.floor(delayMs * 0.7));
+      updateCallback({ ...gameState });
+    }
+
+    // 3.B: Bucle táctico de despliegue (Unidades, Gears, Programas de alto valor, Go Solo)
+    let keepPlaying = true;
+    let safetyCounter = 0;
+    while (keepPlaying && !gameState.isGameOver && safetyCounter < 12) {
+      safetyCounter++;
+      const maxCapacity = getBotMaxCapacity(bot);
+      if (maxCapacity <= 0) break;
+
+      const actions = [];
+
+      // Evaluar cartas en mano
+      for (const card of bot.hand || []) {
+        const cost = getEffectiveCardCost(card, bot, gameState);
+        if (cost > maxCapacity) continue;
+        const type = getCardType(card);
+
+        if (type === 'UNIT') {
+          const power = card.parsedPower || parseCardPower(card.power) || 0;
+          let score = 62 + power * 4 + cost * 2.5;
+          if (hasKeyword(card, 'Adrenaline')) score += 14;
+          if (hasKeyword(card, 'Blocker') && (player.field || []).length > (bot.field || []).length) score += 10;
+          if (isJohnnyUnit(card) && (player.field || []).some(isCorpoUnit)) score += 16;
+          // En Turno 1 saliendo segundo, priorizar aún más desplegar Unidades fuertes en curva
+          if (isBotTurn1GoingSecond) score += 15;
+          actions.push({ kind: 'CARD', card, cost, score, targetId: null });
+        } else if (type === 'GEAR') {
+          const target = chooseBestGearTarget(card, bot, player, gameState);
+          if (!target) continue; // Nunca jugar Gear sin portador válido útil
+          const pBonus = parseCardPower(card.power) || 0;
+          let score = 54 + pBonus * 5;
+          if (hasKeyword(card, 'Blocker') && !hasKeyword(target, 'Blocker')) score += 12;
+          if (['CP-030', 'CP-039', 'CP-114', 'CP-116', 'CP-151'].includes(resolveCardId(card))) score += 10;
+          actions.push({ kind: 'CARD', card, cost, score, targetId: target.instanceId });
+        } else if (type === 'PROGRAM') {
+          const score = evaluateProgramScore(card, bot, player, gameState);
+          if (score > 0) {
+            // En Turno 1 saliendo segundo, solo jugar Programas si son robo o removal real (>= 60)
+            if (isBotTurn1GoingSecond && score < 60) continue;
+            actions.push({ kind: 'CARD', card, cost, score, targetId: null });
+          }
+        }
+      }
+
+      // Evaluar Leyendas boca arriba con Go Solo
+      for (const leg of bot.legends || []) {
+        if (leg.isOnField || leg.isRemovedFromGame || !leg.isFaceUp || !hasKeyword(leg, 'Go Solo')) continue;
+        const cost = getEffectiveCardCost(leg, bot, gameState);
+        if (cost <= 0 || cost > maxCapacity) continue;
+        const power = leg.parsedPower || parseCardPower(leg.power) || 0;
+        let score = 66 + power * 4;
+        if (gameState.overtime && (bot.gigs?.length || 0) >= 5) score += 25;
+        actions.push({ kind: 'GO_SOLO', card: leg, cost, score });
+      }
+
+      if (actions.length === 0) {
+        keepPlaying = false;
+        break;
+      }
+
+      actions.sort((a, b) => b.score - a.score);
+      const best = actions[0];
+
+      await wait(delayMs);
+      if (best.kind === 'GO_SOLO') {
+        botPrepareEddies(bot, best.cost);
+        const res = playLegendToField(gameState, 'bot', best.card.instanceId, true);
+        if (res.success) updateCallback({ ...gameState });
+        else keepPlaying = false;
+      } else {
+        botPrepareEddies(bot, best.cost);
+        const res =
+          getCardType(best.card) === 'GEAR'
+            ? playGearCard(gameState, 'bot', best.card.instanceId, best.targetId)
+            : playCard(gameState, 'bot', best.card.instanceId, best.targetId);
+        if (res.success) updateCallback({ ...gameState });
+        else keepPlaying = false;
+      }
+    }
+
+    // 3.C: Llamar a 1 Leyenda boca arriba progresivamente si queda >= 1 €$ disponible
+    if (!bot.hasCalledLegendThisTurn && getBotMaxCapacity(bot) >= 1 && !gameState.isGameOver) {
+      const faceDownLegend = chooseBestLegendToCall(bot, player);
+      if (faceDownLegend) {
+        await wait(delayMs);
+        botPrepareEddies(bot, 1, faceDownLegend.instanceId);
+        callLegendFaceUp(gameState, 'bot', faceDownLegend.instanceId);
+        updateCallback({ ...gameState });
+      }
+    }
+
+    // 3.D: Reintentar habilidades activadas (↷) de Leyendas recién llamadas o tras jugar cartas
+    if (!gameState.isGameOver && tryActivateBotAbilities(gameState, bot, player)) {
+      await wait(Math.floor(delayMs * 0.7));
+      updateCallback({ ...gameState });
     }
   }
 
-  // Paso 4: Fase de Ataques con Unidades Listas (Ready, sin Lag y sin restricciones de ataque)
+  if (gameState.isGameOver) return;
+
+  // -----------------------------------------------------------------------
+  // PASO 4: FASE DE ATAQUES CON CONCIENCIA DE BLOCKERS, LETHAL Y JOHNNY
+  // -----------------------------------------------------------------------
   const readyUnits = (bot.field || [])
     .filter((u) => canUnitAttack(u, bot, gameState))
-    .sort((a, b) => (b.mustAttackNextTurn ? 1 : 0) - (a.mustAttackNextTurn ? 1 : 0));
+    .sort((a, b) => {
+      // Obligadas a atacar primero; luego ordenar para atravesar Blockers de forma inteligente
+      if (a.mustAttackNextTurn !== b.mustAttackNextTurn) return (b.mustAttackNextTurn ? 1 : 0) - (a.mustAttackNextTurn ? 1 : 0);
+      return (b.currentPower || 0) - (a.currentPower || 0);
+    });
+
+  const playerReadyBlockers = (player.field || []).filter(
+    (u) => !u.isSpent && hasKeyword(u, 'Blocker')
+  );
+  const maxPlayerBlockerPower = Math.max(0, ...playerReadyBlockers.map((b) => b.currentPower || 0));
 
   for (const unit of readyUnits) {
     if (gameState.isGameOver) break;
 
-    // Prioridad A: Destruir unidades enemigas giradas (Spent) donde el bot gana (o Johnny CP-054 contra cualquier CORPO)
-    const isBotJohnny = String(unit.id || '').toUpperCase() === 'CP-054';
-    const killableSpentEnemy = (player.field || []).find((pu) => {
-      if (!pu.isSpent) return false;
-      const enemyIsCorpo = /\bCORPO\b/i.test(`${pu.traits || ''} ${pu.cardType || ''}`);
-      if (isBotJohnny && enemyIsCorpo) return true;
-      // No atacar a Johnny enemigo si el atacante del bot es CORPO (perdería automáticamente)
-      const enemyIsJohnny = String(pu.id || '').toUpperCase() === 'CP-054';
-      const botUnitIsCorpo = /\bCORPO\b/i.test(`${unit.traits || ''} ${unit.cardType || ''}`);
-      if (enemyIsJohnny && botUnitIsCorpo) return false;
-      return (pu.currentPower || 0) < (unit.currentPower || 0);
-    });
+    const unitPower = unit.currentPower || 0;
+    const isBotJohnny = isJohnnyUnit(unit);
+    const botUnitIsCorpo = isCorpoUnit(unit);
+
+    // 4.A: Victoria inmediata en Overtime (si robar Gigs da 7+ Gigs y no hay Blocker invencible)
+    const gigsToSteal = calculateGigsToSteal(unitPower);
+    const canOvertimeWin =
+      gameState.overtime &&
+      (bot.gigs?.length || 0) + gigsToSteal >= 7 &&
+      (player.gigs?.length || 0) > 0 &&
+      canUnitAttack(unit, bot, gameState, 'GIGS');
+
+    if (canOvertimeWin) {
+      unit.isSpent = true;
+      unit.hasTriggeredAttackThisDeclaration = true;
+      executeCardSpentTriggers(gameState, 'bot', unit);
+      executeUnitAttackTrigger(gameState, 'bot', unit);
+      gameState.pendingReaction = {
+        attackerPlayerKey: 'bot',
+        attackerUnitId: unit.instanceId,
+        attackerName: unit.name,
+        attackerPower: unit.currentPower,
+        attackerImage: unit.image,
+        targetType: 'GIGS',
+        targetUnitId: null,
+        targetName: 'Tus Gigs',
+        targetPower: null,
+        targetImage: null,
+        blockerUnitId: null
+      };
+      gameState.actionLog.unshift(
+        `⚔️ [FASE 1: DECLARACIÓN DE ATAQUE] "${unit.name}" [Fuerza: ${unit.currentPower}] del rival asalta tus Gigs buscando la victoria. Se activa tu Fase de Reacción.`
+      );
+      updateCallback({ ...gameState });
+      return;
+    }
+
+    // 4.B: Destruir unidades enemigas giradas (Spent) donde el bot gana limpiamente (o Johnny vs CORPO)
+    const killableSpentEnemy = [...(player.field || [])]
+      .filter((pu) => {
+        if (!pu.isSpent) return false;
+        if (isBotJohnny && isCorpoUnit(pu)) return true;
+        if (isJohnnyUnit(pu) && botUnitIsCorpo) return false;
+        return (pu.currentPower || 0) < unitPower;
+      })
+      .sort((a, b) => (b.currentPower || 0) - (a.currentPower || 0))[0];
 
     if (killableSpentEnemy && canUnitAttack(unit, bot, gameState, 'UNIT')) {
       unit.isSpent = true;
       unit.hasTriggeredAttackThisDeclaration = true;
+      executeCardSpentTriggers(gameState, 'bot', unit);
       executeUnitAttackTrigger(gameState, 'bot', unit);
 
       gameState.pendingReaction = {
@@ -288,42 +881,58 @@ export async function runBotTurn(gameState, updateCallback, delayMs = 700) {
         `⚔️ [FASE 1: DECLARACIÓN DE ATAQUE] "${unit.name}" [Fuerza: ${unit.currentPower}] del rival ataca a tu unidad gastada "${killableSpentEnemy.name}". Se activa tu Fase de Reacción.`
       );
       updateCallback({ ...gameState });
-      return; // Cede el control y espera la respuesta del jugador humano en la UI
+      return;
     }
 
-    // Prioridad B: Atacar los Gigs del jugador para robar dados de Gig según la tabla de poder
+    // 4.C: Atacar los Gigs del jugador (evitar suicidarse contra un Blocker más grande salvo si hay más atacantes o mustAttack)
     if (player.gigs && player.gigs.length > 0 && canUnitAttack(unit, bot, gameState, 'GIGS')) {
-      unit.isSpent = true;
-      unit.hasTriggeredAttackThisDeclaration = true;
-      executeUnitAttackTrigger(gameState, 'bot', unit);
+      const blockedByStronger =
+        playerReadyBlockers.length > 0 &&
+        maxPlayerBlockerPower > unitPower &&
+        !(isBotJohnny && playerReadyBlockers.every(isCorpoUnit));
+      const hasBackupAttackers = readyUnits.filter((u) => !u.isSpent && u.instanceId !== unit.instanceId).length > 0;
 
-      gameState.pendingReaction = {
-        attackerPlayerKey: 'bot',
-        attackerUnitId: unit.instanceId,
-        attackerName: unit.name,
-        attackerPower: unit.currentPower,
-        attackerImage: unit.image,
-        targetType: 'GIGS',
-        targetUnitId: null,
-        targetName: 'Tus Gigs',
-        targetPower: null,
-        targetImage: null,
-        blockerUnitId: null
-      };
-      gameState.actionLog.unshift(
-        `⚔️ [FASE 1: DECLARACIÓN DE ATAQUE] "${unit.name}" [Fuerza: ${unit.currentPower}] del rival asalta tus Gigs. Se activa tu Fase de Reacción.`
-      );
-      updateCallback({ ...gameState });
-      return; // Cede el control y espera la respuesta del jugador humano en la UI
+      if (!blockedByStronger || hasBackupAttackers || unit.mustAttackNextTurn || gigsToSteal === 0) {
+        // Si tiene poder 0, solo atacar si tiene habilidad ATTACK útil (ej: Sketchy Ripper, Evelyn)
+        if (gigsToSteal > 0 || ['CP-034', 'CP-121'].includes(resolveCardId(unit)) || unit.mustAttackNextTurn) {
+          unit.isSpent = true;
+          unit.hasTriggeredAttackThisDeclaration = true;
+          executeCardSpentTriggers(gameState, 'bot', unit);
+          executeUnitAttackTrigger(gameState, 'bot', unit);
+
+          gameState.pendingReaction = {
+            attackerPlayerKey: 'bot',
+            attackerUnitId: unit.instanceId,
+            attackerName: unit.name,
+            attackerPower: unit.currentPower,
+            attackerImage: unit.image,
+            targetType: 'GIGS',
+            targetUnitId: null,
+            targetName: 'Tus Gigs',
+            targetPower: null,
+            targetImage: null,
+            blockerUnitId: null
+          };
+          gameState.actionLog.unshift(
+            `⚔️ [FASE 1: DECLARACIÓN DE ATAQUE] "${unit.name}" [Fuerza: ${unit.currentPower}] del rival asalta tus Gigs. Se activa tu Fase de Reacción.`
+          );
+          updateCallback({ ...gameState });
+          return;
+        }
+      }
     }
 
-    // Prioridad C: Empate contra unidad girada enemiga si es de alto poder
+    // 4.D: Empate favorable contra unidad girada peligrosa (>= 5 poder) o si está obligada a atacar
     const tieEnemy = (player.field || []).find(
-      (pu) => pu.isSpent && (pu.currentPower || 0) === (unit.currentPower || 0) && (pu.currentPower || 0) >= 4
+      (pu) =>
+        pu.isSpent &&
+        !(isJohnnyUnit(pu) && botUnitIsCorpo) &&
+        ((pu.currentPower || 0) === unitPower && (pu.currentPower || 0) >= 5 || unit.mustAttackNextTurn)
     );
     if (tieEnemy && canUnitAttack(unit, bot, gameState, 'UNIT')) {
       unit.isSpent = true;
       unit.hasTriggeredAttackThisDeclaration = true;
+      executeCardSpentTriggers(gameState, 'bot', unit);
       executeUnitAttackTrigger(gameState, 'bot', unit);
 
       gameState.pendingReaction = {
@@ -347,7 +956,7 @@ export async function runBotTurn(gameState, updateCallback, delayMs = 700) {
     }
   }
 
-  // Paso 5: Finalizar turno si no quedan más ataques y devolver control al Jugador (Start Phase del Jugador)
+  // Paso 5: Finalizar turno y devolver control al Jugador
   await wait(delayMs);
   passTurn(gameState);
   updateCallback({ ...gameState });
@@ -400,7 +1009,7 @@ export async function resolvePendingAttackAndContinueBot(gameState, updateCallba
 
   await wait(delayMs);
 
-  // Continuar con los siguientes ataques del bot si tiene más unidades listas
+  // Continuar con los siguientes ataques del bot si tiene más unidades listas que quieran atacar
   const remainingReadyUnits = (bot.field || []).filter((u) => canUnitAttack(u, bot, gameState));
   if (remainingReadyUnits.length > 0) {
     return runBotTurn(gameState, updateCallback, delayMs);
