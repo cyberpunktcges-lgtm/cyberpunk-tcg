@@ -90,7 +90,7 @@ import {
   executeBotReaction,
   resolvePendingAttackAndContinueBot
 } from '../utils/botAi.js';
-import { getCardRulesText, executeUnitAttackTrigger, executeLegendAbility, executeProgramEffect, executeUnitPlayTrigger, getNumericCost, executeCardSpentTriggers, executeOnGigsStolenTriggers, executeKerryGigRollTrigger, triggerMeredithStoutOnRivalGigModify, getGigMaxFace } from '../utils/cardEffects.js';
+import { getCardRulesText, executeUnitAttackTrigger, executeLegendAbility, executeProgramEffect, executeUnitPlayTrigger, getNumericCost, executeCardSpentTriggers, executeOnGigsStolenTriggers, executeKerryGigRollTrigger, triggerMeredithStoutOnRivalGigModify, getGigMaxFace, executeBlockerUsedTrigger } from '../utils/cardEffects.js';
 import { getCardActivatedAbilities, executeCardActivatedAbility } from '../utils/activatedAbilities.js';
 
 // =========================================================================
@@ -1425,9 +1425,12 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
     // 3. FASE 3: COMBATE / FASE 4: ROBO DE GIGS
     if (targetType === 'GIGS') {
       if (botBlocker) {
+        // Disparar triggers de giro y BLOCKER del bloqueador rival (ej: Augmented Negotiators CP-012, La Llorona CP-061, Takemura CP-042)
+        executeCardSpentTriggers(gameState, 'bot', botBlocker);
+        executeBlockerUsedTrigger(gameState, 'bot', botBlocker);
         // Al haber bloqueador, se convierte en combate contra el bloqueador y no se roban Gigs
         const fightRes = resolveFight(gameState, 'player', attackerUnit, 'bot', botBlocker);
-        if (fightRes && fightRes.success) {
+        if (fightRes && fightRes.success && !gameState.pendingCardChoice && !gameState.pendingTargetSelection) {
           if (fightRes.isTie) {
             setHolocall({
               title: '🛡️ BLOQUEO CON EMPATE LETAL',
@@ -1463,8 +1466,8 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
         botBlocker ? botBlocker.instanceId : null
       );
 
-      // Informar al jugador mediante Holocall visual del resultado del combate
-      if (fightRes && fightRes.success) {
+      // Informar al jugador mediante Holocall visual del resultado del combate (sin tapar modales interactivos pendientes)
+      if (fightRes && fightRes.success && !gameState.pendingCardChoice && !gameState.pendingTargetSelection) {
         if (fightRes.isTie) {
           setHolocall({
             title: '☠️ EMPATE LETAL EN COMBATE',
@@ -1562,6 +1565,34 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
   const handleResolveCardChoice = (selectedCardIds = []) => {
     if (!gameState?.pendingCardChoice) return;
     const choice = gameState.pendingCardChoice;
+
+    if (choice.type === 'FORCED_DISCARD_HAND') {
+      const p = gameState[choice.playerKey || 'player'];
+      const chosenIds = new Set(selectedCardIds);
+      const discardedNames = [];
+      if (!p.trash) p.trash = [];
+      for (let i = (p.hand || []).length - 1; i >= 0; i--) {
+        if (chosenIds.has(p.hand[i].instanceId)) {
+          const [disc] = p.hand.splice(i, 1);
+          p.trash.push(disc);
+          discardedNames.push(disc.name);
+        }
+      }
+      delete gameState.pendingCardChoice;
+      if (discardedNames.length > 0) {
+        gameState.actionLog.unshift(
+          `🗑️ [${choice.sourceCardName || 'Descarte'}] Has descartado de tu mano: ${discardedNames.join(', ')}.`
+        );
+      }
+      const pendingAttack = gameState.pendingAttackContinuation;
+      if (pendingAttack && !gameState.pendingTargetSelection && !gameState.pendingCardChoice) {
+        delete gameState.pendingAttackContinuation;
+        continueAttackAfterTrigger(pendingAttack);
+      } else {
+        setGameState({ ...gameState });
+      }
+      return;
+    }
 
     if (choice.type === 'MEREDITH_TRASH_TO_HAND') {
       const p = gameState[choice.playerKey || 'player'];

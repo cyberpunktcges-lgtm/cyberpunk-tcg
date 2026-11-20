@@ -125,11 +125,33 @@ function drawCards(player, count, state, sourceName) {
 }
 
 /**
- * Helper para descartar N cartas de la mano
+ * Helper para descartar N cartas de la mano.
+ * Si afecta al jugador humano y debe descartar menos cartas de las que tiene en mano, abre el selector interactivo.
  */
-function discardCards(player, count, state, sourceName) {
-  if (!player.hand || player.hand.length === 0) return [];
-  const discarded = player.hand.splice(0, Math.min(count, player.hand.length));
+function discardCards(player, count, state, sourceName, sourceCardImage = null) {
+  if (!player.hand || player.hand.length === 0 || count <= 0) return [];
+  const actualCount = Math.min(count, player.hand.length);
+  if (state && player === state.player && actualCount < player.hand.length && !state.pendingCardChoice) {
+    state.pendingCardChoice = {
+      type: 'FORCED_DISCARD_HAND',
+      playerKey: 'player',
+      sourceCardName: sourceName || 'Descarte',
+      sourceCardImage,
+      title: `🗑️ ${(sourceName || 'DESCARTE').toUpperCase()} // ELEGIR DESCARTE`,
+      prompt: `Por efecto de "${sourceName}", debes elegir ${actualCount} carta(s) de tu mano para descartarla(s) a tu Basura (Trash):`,
+      cards: [...player.hand],
+      eligibleIds: player.hand.map((c) => c.instanceId),
+      maxChoices: actualCount,
+      minChoices: actualCount,
+      selectedIds: [],
+      filterDescription: `Elige exactamente ${actualCount} carta(s) de tu mano para descartar`
+    };
+    state.actionLog.unshift(
+      `🗑️ [${sourceName}] ${player.name} debe elegir ${actualCount} carta(s) de su mano para descartar.`
+    );
+    return [];
+  }
+  const discarded = player.hand.splice(0, actualCount);
   if (!player.trash) player.trash = [];
   player.trash.push(...discarded);
   state.actionLog.unshift(
@@ -3290,11 +3312,36 @@ export function executeBlockerUsedTrigger(state, defenderKey, blockerUnit) {
   // CP-012 Augmented Negotiators: "When this Unit uses BLOCKER, a Rival discards 1."
   if (blockerId === 'CP-012') {
     if (opp.hand && opp.hand.length > 0) {
-      const [disc] = opp.hand.splice(0, 1);
-      if (!opp.trash) opp.trash = [];
-      opp.trash.push(disc);
+      if (oppKey === 'player') {
+        state.pendingCardChoice = {
+          type: 'FORCED_DISCARD_HAND',
+          playerKey: 'player',
+          sourceCardId: 'CP-012',
+          sourceCardName: 'Augmented Negotiators',
+          sourceCardImage: blockerUnit.image,
+          title: '🛡️ AUGMENTED NEGOTIATORS // DESCARTE OBLIGATORIO',
+          prompt: '¡El rival ha bloqueado con Augmented Negotiators! Debes elegir 1 carta de tu mano para descartarla a tu Basura (Trash):',
+          cards: [...opp.hand],
+          eligibleIds: opp.hand.map((c) => c.instanceId),
+          maxChoices: 1,
+          minChoices: 1,
+          selectedIds: [],
+          filterDescription: 'Elige 1 carta de tu mano para descartar'
+        };
+        state.actionLog.unshift(
+          `🛡️ [Augmented Negotiators Rival] ¡Al bloquear! Debes elegir 1 carta de tu mano para descartar.`
+        );
+      } else {
+        const [disc] = opp.hand.splice(0, 1);
+        if (!opp.trash) opp.trash = [];
+        opp.trash.push(disc);
+        state.actionLog.unshift(
+          `🛡️ [Augmented Negotiators] ¡Al bloquear! El rival descarta "${disc.name}".`
+        );
+      }
+    } else {
       state.actionLog.unshift(
-        `🛡️ [Augmented Negotiators] ¡Al bloquear! El rival descarta "${disc.name}".`
+        `🛡️ [Augmented Negotiators] ¡Al bloquear! ${opp.name} no tiene cartas en mano para descartar.`
       );
     }
   }
