@@ -55,6 +55,24 @@ const LOCAL_WALLPAPERS = [
   '/images/wallpapers/Downtown.png'
 ];
 
+const GITHUB_RAW_PUBLIC_BASE = 'https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg/main/public';
+const LOCAL_UPLOAD_PREVIEWS = new Map();
+
+function resolveAdminPreviewUrl(url) {
+  if (!url) return '';
+  if (LOCAL_UPLOAD_PREVIEWS.has(url)) return LOCAL_UPLOAD_PREVIEWS.get(url);
+  return url;
+}
+
+function handleAdminImgError(e, originalUrl) {
+  const img = e.currentTarget;
+  if (!originalUrl || img.dataset.ghFallbackApplied === '1') return;
+  if (typeof originalUrl === 'string' && originalUrl.startsWith('/images/')) {
+    img.dataset.ghFallbackApplied = '1';
+    img.src = `${GITHUB_RAW_PUBLIC_BASE}${originalUrl}`;
+  }
+}
+
 function ImageUploadField({
   label = 'IMAGEN',
   value = '',
@@ -75,6 +93,12 @@ function ImageUploadField({
     try {
       const res = await uploadImageToGithub(file);
       if (res && res.url) {
+        if (res.previewUrl) {
+          LOCAL_UPLOAD_PREVIEWS.set(res.url, res.previewUrl);
+        }
+        if (onUploadSuccess) {
+          onUploadSuccess((prev) => Array.from(new Set([res.url, ...(prev || [])])));
+        }
         onChange(res.url);
         if (showToast) {
           showToast(`Imagen subida a GitHub: ${res.fileName}`);
@@ -154,7 +178,9 @@ function ImageUploadField({
         />
         {value && (
           <img
-            src={value}
+            key={value}
+            src={resolveAdminPreviewUrl(value)}
+            onError={(e) => handleAdminImgError(e, value)}
             alt="Previsualización"
             className="w-12 h-9 object-cover border border-[#FCEE0A]/60 bg-[#000000] shrink-0"
           />
@@ -227,6 +253,12 @@ function HtmlArticleEditor({
     try {
       const res = await uploadImageToGithub(file);
       if (res && res.url) {
+        if (res.previewUrl) {
+          LOCAL_UPLOAD_PREVIEWS.set(res.url, res.previewUrl);
+        }
+        if (onUploadSuccess) {
+          onUploadSuccess((prev) => Array.from(new Set([res.url, ...(prev || [])])));
+        }
         insertHtmlSnippet(`\n<img src="${res.url}" alt="${file.name}" />\n`, '', '');
         if (showToast) showToast('Imagen subida a GitHub e insertada en el artículo');
       }
@@ -427,7 +459,11 @@ function HtmlArticleEditor({
             <div
               className="cyber-article-content"
               dangerouslySetInnerHTML={{
-                __html: content || `<p>${excerpt || 'Sin contenido todavía...'}</p>`
+                __html: (content || `<p>${excerpt || 'Sin contenido todavía...'}</p>`).replace(
+                  /src=(["'])(\/images\/uploads\/[^"']+)\1/g,
+                  (_, quote, imgPath) =>
+                    `src=${quote}${LOCAL_UPLOAD_PREVIEWS.get(imgPath) || `${GITHUB_RAW_PUBLIC_BASE}${imgPath}`}${quote}`
+                )
               }}
             />
           </div>
@@ -1909,7 +1945,8 @@ score: '6 - 0',
                   >
                     <div className="flex items-center gap-4">
                       <img
-                        src={item.image}
+                        src={resolveAdminPreviewUrl(item.image)}
+                        onError={(e) => handleAdminImgError(e, item.image)}
                         alt={item.title}
                         className="w-20 h-16 object-cover border border-gray-800 shrink-0"
                       />
