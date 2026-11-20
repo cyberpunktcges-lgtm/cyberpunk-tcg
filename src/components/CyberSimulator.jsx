@@ -1836,10 +1836,12 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
         }
         const cleanUnit = { ...selected };
         delete cleanUnit._yorinobuZone;
+        const hasInnateAdr = hasKeyword(cleanUnit, 'Adrenaline');
         const deployed = {
           ...cleanUnit,
           isSpent: false,
-          isLagging: false,
+          isLagging: !hasInnateAdr,
+          hasAdrenaline: hasInnateAdr,
           canAttackSpentUnitsTurnPlayed: true,
           turnEntered: gameState.turnNumber,
           currentPower: cleanUnit.parsedPower || parseCardPower(cleanUnit.power) || 1,
@@ -2516,6 +2518,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
         } else if (sel.effectType === 'ADRENALINE') {
           unit.isLagging = false;
           unit.hasAdrenaline = true;
+          unit.hasTemporaryAdrenalineThisTurn = true;
           gameState.actionLog.unshift(`🏎️ [${sel.sourceCardName}] Otorgó ADRENALINE a "${unit.name}" este turno.`);
         } else if (sel.effectType === 'GRANT_BLOCKER_TAKEMURA') {
           unit.isTemporaryBlockerThisTurn = true;
@@ -4632,6 +4635,15 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                                   GASTADA
                                 </span>
                               )}
+                            </div>
+                          )}
+
+                          {/* Estado: LAG en unidad rival recién entrada */}
+                          {unit.isLagging && !unit.isSpent && (
+                            <div className="absolute inset-0 bg-black/45 flex items-center justify-center z-15 pointer-events-none">
+                              <span className="px-1.5 py-0.5 bg-black/90 border border-[#FCEE0A]/80 text-[#FCEE0A] font-mono font-black text-[7px] sm:text-[8px] uppercase tracking-wider shadow">
+                                ⏳ LAG
+                              </span>
                             </div>
                           )}
 

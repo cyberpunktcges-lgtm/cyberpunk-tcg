@@ -77,12 +77,37 @@ export function rollDie(dieType) {
 export function hasKeyword(card, keyword) {
   if (!card) return false;
   const target = keyword.toLowerCase();
-  if (target === 'blocker' && card.isTemporaryBlockerThisTurn) return true;
-  if (target === 'adrenaline' && card.hasAdrenaline) return true;
+  const cardId = String(card.id || '').toUpperCase();
+  const text = String(card.rulesText || card.rules || card.text || card.effect || card.ability || '');
+  const lineRegex = new RegExp('(^|\\n)\\s*' + target.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b', 'i');
 
-  // Gears equipados que conceden BLOCKER a la unidad portadora (CP-068 Mandibular Upgrade, CP-102 Riot Shield)
-  if (target === 'blocker' && Array.isArray(card.gear) && card.gear.length > 0) {
-    if (card.gear.some((g) => hasKeyword(g, 'Blocker'))) return true;
+  if (target === 'adrenaline') {
+    if (card.hasAdrenaline) return true;
+    // CP-139 Valentino Street Racer solo OTORGA Adrenaline a otra unidad; CP-004 Adrenaline Converter es condicional (≥2 Gigs de diferencia)
+    if (cardId === 'CP-139' || cardId === 'CP-004') return false;
+    if (cardId === 'CP-078' || cardId === 'CP-101') return true;
+    return lineRegex.test(text);
+  }
+
+  if (target === 'blocker') {
+    if (card.isTemporaryBlockerThisTurn) return true;
+    // Gears equipados que conceden BLOCKER a la unidad portadora (CP-068 Mandibular Upgrade, CP-102 Riot Shield)
+    if (Array.isArray(card.gear) && card.gear.length > 0) {
+      if (card.gear.some((g) => hasKeyword(g, 'Blocker'))) return true;
+    }
+    // CP-138 Valentino Guerrera y CP-042 Takemura Legend solo mencionan Blocker en su texto, NO tienen Blocker
+    if (cardId === 'CP-138' || cardId === 'CP-042') return false;
+    if (cardId === 'CP-068' || cardId === 'CP-102') return true;
+    if (lineRegex.test(text)) return true;
+    // Reglas con BLOCKER tras otra frase (ej: CP-019 Corpo Security, CP-080 Mox Inciters)
+    if (/(?:^|\n|\.\s+)BLOCKER\b/.test(text)) return true;
+    return false;
+  }
+
+  if (target === 'go solo') {
+    // Excluir cartas que solo mencionan Go Solo en su texto (CP-011 Radioport, CP-085 Nocturne, CP-102 Riot Shield)
+    if (cardId === 'CP-011' || cardId === 'CP-085' || cardId === 'CP-102') return false;
+    if (lineRegex.test(text) || /\bGO SOLO\s*\(/.test(text)) return true;
   }
 
   const rawKw = Array.isArray(card.keywords) ? card.keywords.join(', ') : String(card.keywords || '');
@@ -91,8 +116,6 @@ export function hasKeyword(card, keyword) {
   const rawTraits = Array.isArray(card.traits) ? card.traits.join(', ') : String(card.traits || '');
   if (rawTraits.toLowerCase().includes(target)) return true;
 
-  const text = String(card.rulesText || card.rules || card.text || card.effect || card.ability || '');
-  const lineRegex = new RegExp('(^|\\n)\\s*' + target.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b', 'i');
   return lineRegex.test(text);
 }
 
@@ -156,14 +179,35 @@ export function canUnitAttack(unit, playerState = null, gameState = null, target
 
   // 1. Estados básicos: Una unidad girada (Spent) o con Lag no puede atacar
   if (unit.isSpent) return false;
-  if (unit.isLagging) {
-    // Excepción oficial (Sandayu Oda, Johnny Silverhand, Yorinobu): puede atacar a Unidades rivales gastadas el turno que entra
-    if (!(unit.canAttackSpentUnitsTurnPlayed && (targetType === 'UNIT' || targetType === null))) {
+
+  const cardId = String(unit.id || '').toUpperCase();
+  const oppStateForChecks =
+    gameState && playerState
+      ? (playerState === gameState.player || playerState.id === 'player' ? gameState.bot : gameState.player)
+      : null;
+
+  // Comprobar Adrenaline condicional de CP-004 Adrenaline Converter (si el rival controla ≥ 2 Gigs más que tú)
+  const hasConditionalAdrenalineConverter =
+    Array.isArray(unit.gear) &&
+    unit.gear.some((g) => String(g.id || '').toUpperCase() === 'CP-004') &&
+    oppStateForChecks &&
+    ((oppStateForChecks.gigs?.length || 0) - (playerState?.gigs?.length || 0) >= 2);
+
+  // Comprobar habilidad oficial de CP-083 Nadia // Fighting Through Grief (atacar Gigs el turno que entra si el rival tiene más Gigs)
+  const hasNadiaGigRush =
+    cardId === 'CP-083' &&
+    oppStateForChecks &&
+    ((oppStateForChecks.gigs?.length || 0) > (playerState?.gigs?.length || 0));
+
+  if (unit.isLagging && !hasConditionalAdrenalineConverter) {
+    const canUnitRush = Boolean(unit.canAttackSpentUnitsTurnPlayed) && (targetType === 'UNIT' || targetType === null);
+    const canGigRush = hasNadiaGigRush && (targetType === 'GIGS' || targetType === null);
+    if (!canUnitRush && !canGigRush) {
       return false;
     }
   }
-  // Si tiene Lag pero canAttackSpentUnitsTurnPlayed, NO puede atacar Gigs ese turno
-  if (unit.isLagging && unit.canAttackSpentUnitsTurnPlayed && targetType === 'GIGS') {
+  // Si tiene Lag pero canAttackSpentUnitsTurnPlayed, NO puede atacar Gigs ese turno (salvo Nadia o Adrenaline Converter activo)
+  if (unit.isLagging && !hasConditionalAdrenalineConverter && unit.canAttackSpentUnitsTurnPlayed && targetType === 'GIGS' && !hasNadiaGigRush) {
     return false;
   }
 
@@ -173,7 +217,6 @@ export function canUnitAttack(unit, playerState = null, gameState = null, target
     return false;
   }
 
-  const cardId = String(unit.id || '').toUpperCase();
   const cardName = String(unit.name || '').toLowerCase();
   const rules = String(unit.rulesText || unit.ability || '').toLowerCase();
 
@@ -1051,7 +1094,11 @@ export function playGearCard(state, playerKey, cardInstanceId, targetInstanceId 
     target.currentPower = Math.max(0, target.currentPower + powerBonus);
   }
 
-  if (hasKeyword(card, 'Adrenaline')) {
+  // CP-004 Adrenaline Converter: solo concede ADRENALINE si el rival controla al menos 2 Gigs más que tú
+  const opp = state[playerKey === 'player' ? 'bot' : 'player'];
+  const isAdrenalineConverter = cId === 'CP-004' || (card.slug || '').includes('adrenaline-converter');
+  const adrenalineConverterActive = isAdrenalineConverter && ((opp?.gigs?.length || 0) - (p.gigs?.length || 0) >= 2);
+  if (adrenalineConverterActive || (!isAdrenalineConverter && hasKeyword(card, 'Adrenaline'))) {
     target.hasAdrenaline = true;
     target.isLagging = false;
   }
@@ -1060,6 +1107,7 @@ export function playGearCard(state, playerKey, cardInstanceId, targetInstanceId 
   const bonusParts = [];
   if (powerBonus > 0) bonusParts.push(`+${powerBonus} Fuerza`);
   if (grantsBlocker) bonusParts.push('🛡️ BLOCKER');
+  if (adrenalineConverterActive) bonusParts.push('⚡ ADRENALINE');
   const bonusText = bonusParts.length > 0 ? ` (${bonusParts.join(' • ')})` : '';
   (state.actionLog = state.actionLog || []).unshift(
     `🔧 ${p.name} paga ${cost} €$ y equipa el Gear "${card.name}"${bonusText} a "${target.name}".`
@@ -1993,6 +2041,10 @@ export function passTurn(state) {
       u.currentPower = Math.max(0, basePower + gearBonus);
       delete u.tempPowerMod;
       delete u.cannotBeDefeatedThisTurn;
+      if (u.hasTemporaryAdrenalineThisTurn) {
+        delete u.hasTemporaryAdrenalineThisTurn;
+        delete u.hasAdrenaline;
+      }
       if (u.isTemporaryBlockerThisTurn) {
         delete u.isTemporaryBlockerThisTurn;
         if (Array.isArray(u.keywords)) {

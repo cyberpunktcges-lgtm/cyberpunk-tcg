@@ -471,7 +471,7 @@ export const ACTIVATED_ABILITIES_CONFIG = {
         card.isSpent = true;
 
         const target = p.field[p.field.length - 1]; // Última unidad jugada o desplegada
-        target.isLagging = false; // Permite atacar unidades enemigas
+        // REGLA OFICIAL: "A friendly Unit can attack spent rival Units the turn it's played." (NO Gigs)
         target.canAttackSpentUnitsTurnPlayed = true;
 
         const isRocker = (target.traits || target.cardType || '').toUpperCase().includes('ROCKER');

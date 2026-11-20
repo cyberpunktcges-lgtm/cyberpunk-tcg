@@ -313,7 +313,7 @@ export async function runBotTurn(gameState, updateCallback, delayMs = 700) {
     const tieEnemy = (player.field || []).find(
       (pu) => pu.isSpent && (pu.currentPower || 0) === (unit.currentPower || 0) && (pu.currentPower || 0) >= 4
     );
-    if (tieEnemy) {
+    if (tieEnemy && canUnitAttack(unit, bot, gameState, 'UNIT')) {
       unit.isSpent = true;
       unit.hasTriggeredAttackThisDeclaration = true;
       executeUnitAttackTrigger(gameState, 'bot', unit);

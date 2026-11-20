@@ -2354,6 +2354,7 @@ export function executeUnitPlayTrigger(state, playerKey, unitInstance) {
       const otherUnit = eligible[0];
       otherUnit.isLagging = false;
       otherUnit.hasAdrenaline = true;
+      otherUnit.hasTemporaryAdrenalineThisTurn = true;
       state.actionLog.unshift(`🏎️ [Valentino Street Racer] ¡PLAY! Otorga ADRENALINE a "${otherUnit.name}" (puede atacar ya).`);
       notifyTrigger('🏎️ VALENTINO STREET RACER // PLAY', `"${otherUnit.name}" gana ADRENALINE y puede atacar este turno.`, 'success');
     }
@@ -2465,10 +2466,13 @@ export function executeUnitPlayTrigger(state, playerKey, unitInstance) {
         const idx = p.trash.findIndex((c) => c.instanceId === chosen.instanceId);
         if (idx !== -1) p.trash.splice(idx, 1);
       }
+      const chosenId = resolveCardId(chosen);
+      const hasInnateAdrenaline = chosenId === 'CP-078' || chosenId === 'CP-101';
       const deployed = {
         ...chosen,
         isSpent: false,
-        isLagging: false,
+        isLagging: !hasInnateAdrenaline,
+        hasAdrenaline: hasInnateAdrenaline,
         canAttackSpentUnitsTurnPlayed: true,
         turnEntered: state.turnNumber,
         currentPower: chosen.parsedPower || Number(chosen.powerVal) || 1,
