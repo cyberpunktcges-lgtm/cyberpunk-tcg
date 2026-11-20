@@ -147,10 +147,20 @@
 }
 
 .cyber-article-content img {
-  max-width: 100%;
+  display: block;
+  max-width: 75%;
+  max-height: 540px;
+  width: auto;
   height: auto;
   border: 1px solid #1f2937;
-  margin: 1.25rem 0;
+  margin: 1.25rem auto;
+}
+
+@media (max-width: 640px) {
+  .cyber-article-content img {
+    max-width: 75%;
+    max-height: 420px;
+  }
 }
 
 .cyber-article-content hr {
