@@ -2865,7 +2865,10 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
       }
     }
     callLegendFaceUp(gameState, 'player', legendInstanceId);
-    gameState.actionLog.unshift(`🛡️ [Fase de Respuesta] ¡Has llamado a tu Leyenda boca arriba!`);
+    const revealedLeg = (gameState.player.legends || []).find((l) => l.instanceId === legendInstanceId);
+    gameState.actionLog.unshift(
+      `🛡️ [Fase de Respuesta] ¡Has volteado tu Leyenda boca arriba: ${revealedLeg?.name || 'Leyenda'}!`
+    );
     setGameState({ ...gameState });
   };
 
@@ -7177,50 +7180,41 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5 my-2">
                       {uncalledLegends.map((leg) => {
                         const slotIdx = (p.legends || []).findIndex((l) => l.instanceId === leg.instanceId) + 1;
-                        const rules = getCardRulesText(leg);
-                        const hasCall = /CALL\b/i.test(rules);
 
                         return (
                           <div
                             key={leg.instanceId}
-                            onContextMenu={(e) => handleCardRightClick(e, leg)}
                             className="bg-[#070a10] border border-[#FCEE0A]/40 hover:border-[#FCEE0A] p-2 rounded flex flex-col justify-between transition-all shadow-[0_0_12px_rgba(252,238,10,0.15)] group"
                           >
                             <div>
                               <div className="flex items-start gap-2 mb-1.5">
-                                <div className="w-12 h-16 rounded border border-[#FCEE0A] overflow-hidden shrink-0 bg-black shadow">
+                                <div className="w-12 h-16 rounded border border-[#FCEE0A]/70 overflow-hidden shrink-0 bg-black shadow">
                                   <img
-                                    src={leg.image || leg.img}
-                                    alt={leg.name}
+                                    src="/images/back_leyenda.jpg"
+                                    alt={`Leyenda #${slotIdx} boca abajo`}
                                     className="w-full h-full object-cover"
                                   />
                                 </div>
                                 <div className="min-w-0 flex-1">
-                                  <div className="flex items-center justify-between">
+                                  <div className="flex items-center justify-between gap-1">
                                     <span className="text-[8px] px-1 bg-[#FCEE0A] text-black font-black uppercase rounded">
                                       SLOT #{slotIdx}
                                     </span>
-                                    <span className="text-[8px] text-gray-400 font-mono">
-                                      {leg.aspect || 'NEUTRAL'}
+                                    <span className={`text-[8px] font-mono font-bold uppercase ${leg.isSpent ? 'text-[#FF003C]' : 'text-[#0dfceb]'}`}>
+                                      {leg.isSpent ? 'GIRADA' : 'LISTA'}
                                     </span>
                                   </div>
-                                  <span className="text-[11px] font-black text-white uppercase block truncate mt-0.5" title={leg.name}>
-                                    {leg.name}
+                                  <span className="text-[11px] font-black text-white uppercase block truncate mt-0.5">
+                                    LEYENDA #{slotIdx}
                                   </span>
-                                  {hasCall ? (
-                                    <span className="text-[8px] font-bold text-[#FCEE0A] animate-pulse block">
-                                      ⚡ TIENE DISPARADOR CALL
-                                    </span>
-                                  ) : (
-                                    <span className="text-[8px] text-[#0dfceb] block">
-                                      👑 HABILIDAD PASIVA
-                                    </span>
-                                  )}
+                                  <span className="text-[8px] font-bold text-gray-400 block">
+                                    🔒 BOCA ABAJO (OCULTA)
+                                  </span>
                                 </div>
                               </div>
 
-                              <div className="bg-black/80 border border-gray-800 p-1 rounded text-[8px] text-gray-300 font-mono mb-2 max-h-16 overflow-y-auto cyber-scrollbar leading-tight">
-                                {rules || 'Sin texto de reglas.'}
+                              <div className="bg-black/80 border border-gray-800 p-1.5 rounded text-[8px] text-gray-400 font-mono mb-2 leading-tight">
+                                Identidad oculta hasta darle la vuelta. Paga 1 €$ para hacer Call y revelar esta Leyenda.
                               </div>
                             </div>
 
@@ -7236,7 +7230,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                               }`}
                             >
                               <Crown className="w-3.5 h-3.5" />
-                              <span>LLAMAR (1 €$)</span>
+                              <span>VOLTEAR #{slotIdx} (1 €$)</span>
                             </button>
                           </div>
                         );
