@@ -36,7 +36,7 @@ import CyberProfileModal from './CyberProfileModal.jsx';
 import CyberMyDecksModal from './CyberMyDecksModal.jsx';
 import CyberUserDropdown from './CyberUserDropdown.jsx';
 import CyberDeckSelectorModal, { AvatarDisplay } from './CyberDeckSelectorModal.jsx';
-import { AVATARS, DEFAULT_PLAYER_AVATAR, DEFAULT_BOT_AVATAR } from '../data/avatars.js';
+import { AVATARS, DEFAULT_PLAYER_AVATAR, DEFAULT_BOT_AVATAR, getRandomBotAvatar } from '../data/avatars.js';
 import {
   subscribeToAuth,
   logoutUser,
@@ -947,6 +947,19 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
     return DEFAULT_BOT_AVATAR;
   });
 
+  // Si no hay avatar de rival guardado, asignar uno aleatorio en cliente (siempre excluyendo v-chico)
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      const saved = localStorage.getItem('cyber_sim_bot_avatar');
+      if (!saved) {
+        setBotAvatar(getRandomBotAvatar('v-chico'));
+      }
+    } catch {
+      setBotAvatar(getRandomBotAvatar('v-chico'));
+    }
+  }, []);
+
   useEffect(() => {
     const unsubscribe = subscribeToAuth((user) => {
       setCurrentUser(user);
@@ -1009,6 +1022,32 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
 
   // Estado para previsualización fija en la zona central izquierda del HUD (Kiroshi Scanner)
   const [hoveredCard, setHoveredCard] = useState(null);
+
+  const makeLegendBackPreview = (label, isSpent = false) => ({
+    isCardBackPreview: true,
+    isLegendBack: true,
+    isSpent: Boolean(isSpent),
+    name: label || 'LEYENDA BOCA ABAJO',
+    image: '/images/back_leyenda.jpg',
+    rulesText: 'Carta de Leyenda boca abajo. Paga 1 €$ (Call) para darle la vuelta boca arriba.'
+  });
+
+  const makeEddieBackPreview = (label, isSpent = false) => ({
+    isCardBackPreview: true,
+    isLegendBack: false,
+    isSpent: Boolean(isSpent),
+    name: label || 'EDDIE (1 €$) // CARTA VENDIDA',
+    image: '/images/back_normal.png',
+    rulesText: 'Carta vendida boca abajo en la Zona de Eddies. Gírala para generar 1 €$.'
+  });
+
+  const makeDeckBackPreview = (label, count) => ({
+    isCardBackPreview: true,
+    isLegendBack: false,
+    name: `${label} (${count} cartas)`,
+    image: '/images/back_normal.png',
+    rulesText: `Mazo boca abajo con ${count} carta(s) restante(s).`
+  });
   const [previewCard, setPreviewCard] = useState(null);
   const [isKiroshiHoverZoom, setIsKiroshiHoverZoom] = useState(false);
   const rawDisplayCard = hoveredCard || previewCard || selectedFieldUnit || selectedHandCard;
@@ -3821,10 +3860,15 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
               <div className="w-full flex flex-col items-center">
                 {/* Carta a Gran Tamaño en el Escáner Kiroshi */}
                 <div
-                  onClick={() => setInspectedCard(displayCard)}
-                  onContextMenu={(e) => handleCardRightClick(e, displayCard)}
+                  onClick={() => {
+                    if (!displayCard.isCardBackPreview) setInspectedCard(displayCard);
+                  }}
+                  onContextMenu={(e) => {
+                    if (!displayCard.isCardBackPreview) handleCardRightClick(e, displayCard);
+                    else e.preventDefault();
+                  }}
                   className="relative w-full max-w-[280px] aspect-[7/10] h-auto max-h-[34vh] sm:max-h-[37vh] mx-auto rounded-lg overflow-hidden border-2 border-[#FCEE0A] shadow-[0_0_25px_rgba(252,238,10,0.45)] bg-black cursor-pointer group transition-all duration-200 hover:border-[#0dfceb] hover:shadow-[0_0_35px_rgba(13,252,235,0.6)] shrink-0"
-                  title="Clic para ampliar a pantalla completa // Clic derecho para opciones"
+                  title={displayCard.isCardBackPreview ? displayCard.name : 'Clic para ampliar a pantalla completa // Clic derecho para opciones'}
                 >
                   <img
                     src={displayCard.image}
@@ -4168,6 +4212,8 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                         if (leg.isFaceUp) {
                           setHoveredCard(leg);
                           setPreviewCard(leg);
+                        } else {
+                          setHoveredCard(makeLegendBackPreview('LEYENDA BOCA ABAJO (RIVAL)', leg.isSpent));
                         }
                       }}
                       onMouseLeave={() => setHoveredCard(null)}
@@ -4253,6 +4299,8 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                       {bot.eddies.map((ed, idx) => (
                         <div
                           key={ed.instanceId || idx}
+                          onMouseEnter={() => setHoveredCard(makeEddieBackPreview('EDDIE RIVAL (1 €$) // VENDIDA', ed.isSpent))}
+                          onMouseLeave={() => setHoveredCard(null)}
                           className={`transition-all duration-300 flex items-center justify-center shrink-0 ${
                             ed.isSpent ? 'w-14 sm:w-16 h-10 sm:h-12 my-0.5' : 'w-10 sm:w-12 h-14 sm:h-16'
                           }`}
@@ -5264,8 +5312,10 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
             <div className="flex flex-col justify-between gap-1.5 sm:gap-2 shrink-0 w-13 sm:w-16 md:w-18">
               {/* DECK RIVAL (MAZO CON REVERSO AMARILLO OFICIAL Y CONTADOR NEÓN) */}
               <div
+                onMouseEnter={() => setHoveredCard(makeDeckBackPreview('DECK RIVAL', bot.deck.length))}
+                onMouseLeave={() => setHoveredCard(null)}
                 style={{ clipPath: CYBER_CLIP }}
-                className="relative w-full aspect-[5/7] rounded-xl overflow-hidden border-2 border-[#FF003C]/50 bg-[#070a10] shadow-md select-none group transition-transform hover:scale-105"
+                className="relative w-full aspect-[5/7] rounded-xl overflow-hidden border-2 border-[#FF003C]/50 bg-[#070a10] shadow-md select-none group transition-transform hover:scale-105 cursor-pointer"
                 title={`Mazo del Rival (Deck): ${bot.deck.length} cartas restantes`}
               >
                 <img
@@ -5292,8 +5342,10 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
               </div>
               {/* DECK JUGADOR (MAZO CON REVERSO AMARILLO OFICIAL Y CONTADOR NEÓN) */}
               <div
+                onMouseEnter={() => setHoveredCard(makeDeckBackPreview('TU MAZO', p.deck.length))}
+                onMouseLeave={() => setHoveredCard(null)}
                 style={{ clipPath: CYBER_CLIP }}
-                className="relative w-full aspect-[5/7] rounded-xl overflow-hidden border-2 border-[#0dfceb]/50 bg-[#070a10] shadow-md select-none group transition-transform hover:scale-105"
+                className="relative w-full aspect-[5/7] rounded-xl overflow-hidden border-2 border-[#0dfceb]/50 bg-[#070a10] shadow-md select-none group transition-transform hover:scale-105 cursor-pointer"
                 title={`Tu Mazo (Deck): ${p.deck.length} cartas restantes`}
               >
                 <img
@@ -5645,13 +5697,11 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                             if (leg.isFaceUp) {
                               setHoveredCard(leg);
                               setPreviewCard(leg);
+                            } else {
+                              setHoveredCard(makeLegendBackPreview('TU LEYENDA BOCA ABAJO', leg.isSpent));
                             }
                           }}
-                          onMouseLeave={() => {
-                            if (leg.isFaceUp) {
-                              setHoveredCard(null);
-                            }
-                          }}
+                          onMouseLeave={() => setHoveredCard(null)}
                           onContextMenu={(e) => {
                             if (leg.isFaceUp) {
                               handleCardRightClick(e, leg);
@@ -5798,6 +5848,8 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                       {p.eddies.map((ed, idx) => (
                         <div
                           key={ed.instanceId || idx}
+                          onMouseEnter={() => setHoveredCard(makeEddieBackPreview('TU EDDIE (1 €$) // CARTA VENDIDA', ed.isSpent))}
+                          onMouseLeave={() => setHoveredCard(null)}
                           onClick={() => handleToggleEddie(ed.instanceId)}
                           onContextMenu={(e) => handleCardRightClick(e, ed)}
                           className={`transition-all duration-300 flex items-center justify-center shrink-0 cursor-pointer ${

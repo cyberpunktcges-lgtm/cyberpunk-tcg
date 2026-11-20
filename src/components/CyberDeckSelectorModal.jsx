@@ -23,7 +23,8 @@ import { getUserDecks, deleteUserDeck } from '../utils/firebase.js';
 import {
   AVATARS,
   DEFAULT_PLAYER_AVATAR,
-  DEFAULT_BOT_AVATAR
+  DEFAULT_BOT_AVATAR,
+  getRandomBotAvatar
 } from '../data/avatars.js';
 
 const CYBER_CLIP =
@@ -115,7 +116,11 @@ export default function CyberDeckSelectorModal({
     else if (!selectedBotDeck && metaDecks.length > 1) setSelectedBotDeck(metaDecks[1]);
 
     if (currentSelectedPlayerAvatar) setSelectedPlayerAvatar(currentSelectedPlayerAvatar);
-    if (currentSelectedBotAvatar) setSelectedBotAvatar(currentSelectedBotAvatar);
+    if (currentSelectedBotAvatar) {
+      setSelectedBotAvatar(currentSelectedBotAvatar);
+    } else {
+      setSelectedBotAvatar(getRandomBotAvatar('v-chico'));
+    }
 
     if (currentUser?.uid) {
       setLoadingDecks(true);

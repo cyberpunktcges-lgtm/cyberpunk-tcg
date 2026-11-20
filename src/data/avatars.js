@@ -295,5 +295,14 @@ export const AVATARS = [
   }
 ];
 
-export const DEFAULT_PLAYER_AVATAR = AVATARS[0]; // V Chica
-export const DEFAULT_BOT_AVATAR = AVATARS[4];    // Dum Dum
+export const DEFAULT_PLAYER_AVATAR = AVATARS[1]; // V Chico
+export const DEFAULT_BOT_AVATAR = AVATARS[4];    // Dum Dum (fallback determinista SSR)
+
+/**
+ * Devuelve un avatar aleatorio para el rival IA, excluyendo siempre el avatar indicado (por defecto 'v-chico').
+ */
+export function getRandomBotAvatar(excludeId = 'v-chico') {
+  const pool = AVATARS.filter((a) => a.id !== excludeId);
+  if (pool.length === 0) return DEFAULT_BOT_AVATAR;
+  return pool[Math.floor(Math.random() * pool.length)];
+}
