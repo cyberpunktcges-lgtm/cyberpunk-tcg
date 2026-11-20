@@ -90,7 +90,7 @@ import {
   executeBotReaction,
   resolvePendingAttackAndContinueBot
 } from '../utils/botAi.js';
-import { getCardRulesText, executeUnitAttackTrigger, executeLegendAbility, executeProgramEffect, executeUnitPlayTrigger, getNumericCost, executeCardSpentTriggers, executeOnGigsStolenTriggers, executeKerryGigRollTrigger, triggerMeredithStoutOnRivalGigModify, getGigMaxFace, executeBlockerUsedTrigger } from '../utils/cardEffects.js';
+import { getCardRulesText, executeUnitAttackTrigger, executeLegendAbility, executeProgramEffect, executeUnitPlayTrigger, getNumericCost, executeCardSpentTriggers, executeOnGigsStolenTriggers, executeKerryGigRollTrigger, triggerMeredithStoutOnRivalGigModify, getGigMaxFace, executeBlockerUsedTrigger, executeUnitDefeatedTrigger } from '../utils/cardEffects.js';
 import { getCardActivatedAbilities, executeCardActivatedAbility } from '../utils/activatedAbilities.js';
 
 // =========================================================================
@@ -1469,7 +1469,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
         executeBlockerUsedTrigger(gameState, 'bot', botBlocker);
         // Al haber bloqueador, se convierte en combate contra el bloqueador y no se roban Gigs
         const fightRes = resolveFight(gameState, 'player', attackerUnit, 'bot', botBlocker);
-        if (fightRes && fightRes.success && !gameState.pendingCardChoice && !gameState.pendingTargetSelection) {
+        if (fightRes && fightRes.success && !gameState.pendingCardChoice && !gameState.pendingTargetSelection && !gameState.pendingModalChoice) {
           if (fightRes.isTie) {
             setHolocall({
               title: '🛡️ BLOQUEO CON EMPATE LETAL',
@@ -1506,7 +1506,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
       );
 
       // Informar al jugador mediante Holocall visual del resultado del combate (sin tapar modales interactivos pendientes)
-      if (fightRes && fightRes.success && !gameState.pendingCardChoice && !gameState.pendingTargetSelection) {
+      if (fightRes && fightRes.success && !gameState.pendingCardChoice && !gameState.pendingTargetSelection && !gameState.pendingModalChoice) {
         if (fightRes.isTie) {
           setHolocall({
             title: '☠️ EMPATE LETAL EN COMBATE',
@@ -2016,6 +2016,70 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
     const choice = gameState.pendingModalChoice;
     const p = gameState.player;
     const opp = gameState.bot;
+
+    // CP-050: Jackie Welles // Mama's Favorite (pagar 1 €$ y sacrificar a Jackie para salvar unidad derrotada)
+    if (optionId === 'JACKIE_MAMA_SACRIFICE') {
+      const savedUnit = choice.unitToSave;
+      const paid = payEddieCostWithAutoTap(p, 1, choice.jackieLegendInstanceId) || payEddieCostWithAutoTap(p, 1, null);
+      if (paid && savedUnit) {
+        if (!p.trash) p.trash = [];
+        if (!p.removedFromGame) p.removedFromGame = [];
+        let jackieCard = null;
+
+        // Si Jackie estaba en campo (Go Solo), retirarlo del campo y enviar sus Gears al Trash
+        if (choice.jackieFieldInstanceId) {
+          const fIdx = (p.field || []).findIndex((u) => u.instanceId === choice.jackieFieldInstanceId);
+          if (fIdx !== -1) {
+            const [jField] = p.field.splice(fIdx, 1);
+            (jField.gear || []).forEach((g) => p.trash.push(g));
+            jField.gear = [];
+            jackieCard = jField;
+          }
+        }
+
+        // Marcar a Jackie en Zona de Leyendas como eliminado de la partida (Removed from the game)
+        if (choice.jackieLegendInstanceId) {
+          const jLeg = (p.legends || []).find((l) => l.instanceId === choice.jackieLegendInstanceId);
+          if (jLeg) {
+            (jLeg.gear || []).forEach((g) => p.trash.push(g));
+            jLeg.gear = [];
+            jLeg.isOnField = false;
+            jLeg.isRemovedFromGame = true;
+            jLeg.isSpent = true;
+            if (!jackieCard) jackieCard = jLeg;
+          }
+        }
+        if (jackieCard) p.removedFromGame.push(jackieCard);
+
+        // Restaurar la unidad salvada al campo con todos sus Gears intactos
+        if (!p.field) p.field = [];
+        p.field.push(savedUnit);
+        gameState.actionLog.unshift(
+          `💔 [Jackie Welles // Mama's Favorite] ¡Sacrificio heroico! Pagas 1 €$, Jackie es derrotado y eliminado de la partida, y "${savedUnit.name}" sobrevive en el campo.`
+        );
+      } else if (savedUnit) {
+        // Si no pudo pagar, derrota normal
+        sendDefeatedUnitToGraveyardOrExile(p, savedUnit, gameState, { skipJackieReplacement: true });
+        executeUnitDefeatedTrigger(gameState, 'player', savedUnit);
+      }
+      delete gameState.pendingModalChoice;
+      setGameState({ ...gameState });
+      return;
+    }
+
+    if (optionId === 'JACKIE_MAMA_DECLINE') {
+      const doomedUnit = choice.unitToSave;
+      delete gameState.pendingModalChoice;
+      if (doomedUnit) {
+        sendDefeatedUnitToGraveyardOrExile(p, doomedUnit, gameState, { skipJackieReplacement: true });
+        executeUnitDefeatedTrigger(gameState, 'player', doomedUnit);
+        gameState.actionLog.unshift(
+          `💀 [Jackie Welles // Mama's Favorite] Decides conservar a Jackie. "${doomedUnit.name}" es derrotada normalmente.`
+        );
+      }
+      setGameState({ ...gameState });
+      return;
+    }
 
     // Dexter DeShawn
     if (optionId === 'DEXTER_BUFF') {

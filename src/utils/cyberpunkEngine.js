@@ -18,7 +18,8 @@ import {
   executeOnGigsStolenTriggers,
   executeJackiePourOneOutTrigger,
   executeKerryGigRollTrigger,
-  executeCardSpentTriggers
+  executeCardSpentTriggers,
+  tryJackieMamaSaveReplacement
 } from './cardEffects.js';
 
 // Dados poliédricos de Gigs y sus valores máximos
@@ -1552,8 +1553,11 @@ export function attackRivalGigs(
  * "If it leaves the field, remove it from the game."
  * Si una unidad tiene Go Solo o proviene de una Leyenda, al abandonar el campo queda eliminada de la partida.
  */
-export function sendDefeatedUnitToGraveyardOrExile(playerState, unit, state = null) {
-  if (!unit || !playerState) return;
+export function sendDefeatedUnitToGraveyardOrExile(playerState, unit, state = null, options = {}) {
+  if (!unit || !playerState) return { intercepted: false };
+
+  const jackieCheck = tryJackieMamaSaveReplacement(playerState, unit, state, options);
+  if (jackieCheck?.intercepted) return jackieCheck;
 
   const equippedGears = Array.isArray(unit.gear) ? [...unit.gear] : [];
   unit.gear = [];
@@ -1589,6 +1593,7 @@ export function sendDefeatedUnitToGraveyardOrExile(playerState, unit, state = nu
     if (!playerState.trash) playerState.trash = [];
     equippedGears.forEach((g) => playerState.trash.push(g));
   }
+  return { intercepted: false };
 }
 
 /**
@@ -1688,23 +1693,27 @@ export function resolveFight(state, attPlayerKey, attUnit, defPlayerKey, defUnit
     const idx = defender.field.findIndex((u) => u.instanceId === defUnit.instanceId);
     if (idx !== -1) {
       const [defeated] = defender.field.splice(idx, 1);
-      sendDefeatedUnitToGraveyardOrExile(defender, defeated, state);
-      if (johnnyAttBeatsCorpo) {
-        state.actionLog.unshift(
-          `🎸 [Johnny Silverhand // Never Stop Fighting] ¡Gana SIEMPRE contra unidades CORPO! Derrota automáticamente a "${defUnit.name}" (${attPower} vs ${defPower})${
-            defeated.gear?.length ? ` junto con ${defeated.gear.length} Gear(s)` : ''
-          }.`
-        );
-      } else {
-        state.actionLog.unshift(
-          `💀 [FASE 3: DERROTA] "${defUnit.name}" tiene menor fuerza (${defPower} < ${attPower}) y es derrotada${
-            defeated.gear?.length ? ` junto con ${defeated.gear.length} Gear(s)` : ''
-          }.`
-        );
+      const defOutcome = sendDefeatedUnitToGraveyardOrExile(defender, defeated, state);
+      if (!defOutcome?.intercepted) {
+        if (johnnyAttBeatsCorpo) {
+          state.actionLog.unshift(
+            `🎸 [Johnny Silverhand // Never Stop Fighting] ¡Gana SIEMPRE contra unidades CORPO! Derrota automáticamente a "${defUnit.name}" (${attPower} vs ${defPower})${
+              defeated.gear?.length ? ` junto con ${defeated.gear.length} Gear(s)` : ''
+            }.`
+          );
+        } else {
+          state.actionLog.unshift(
+            `💀 [FASE 3: DERROTA] "${defUnit.name}" tiene menor fuerza (${defPower} < ${attPower}) y es derrotada${
+              defeated.gear?.length ? ` junto con ${defeated.gear.length} Gear(s)` : ''
+            }.`
+          );
+        }
       }
       executeCombatWinTrigger(state, attPlayerKey, attUnit, defeated);
       executeCombatLossTrigger(state, defPlayerKey, defeated, attUnit);
-      executeUnitDefeatedTrigger(state, defPlayerKey, defeated);
+      if (!defOutcome?.intercepted) {
+        executeUnitDefeatedTrigger(state, defPlayerKey, defeated);
+      }
       result = {
         ...result,
         winnerKey: attPlayerKey,
@@ -1720,23 +1729,27 @@ export function resolveFight(state, attPlayerKey, attUnit, defPlayerKey, defUnit
     const idx = attacker.field.findIndex((u) => u.instanceId === attUnit.instanceId);
     if (idx !== -1) {
       const [defeated] = attacker.field.splice(idx, 1);
-      sendDefeatedUnitToGraveyardOrExile(attacker, defeated, state);
-      if (johnnyDefBeatsCorpo) {
-        state.actionLog.unshift(
-          `🎸 [Johnny Silverhand // Never Stop Fighting] ¡Gana SIEMPRE contra unidades CORPO! Derrota automáticamente al atacante "${attUnit.name}" (${defPower} vs ${attPower})${
-            defeated.gear?.length ? ` junto con ${defeated.gear.length} Gear(s)` : ''
-          }.`
-        );
-      } else {
-        state.actionLog.unshift(
-          `💥 [FASE 3: CONTRAATAQUE] "${attUnit.name}" tiene menor fuerza (${attPower} < ${defPower}) y es derrotada${
-            defeated.gear?.length ? ` junto con ${defeated.gear.length} Gear(s)` : ''
-          }.`
-        );
+      const attOutcome = sendDefeatedUnitToGraveyardOrExile(attacker, defeated, state);
+      if (!attOutcome?.intercepted) {
+        if (johnnyDefBeatsCorpo) {
+          state.actionLog.unshift(
+            `🎸 [Johnny Silverhand // Never Stop Fighting] ¡Gana SIEMPRE contra unidades CORPO! Derrota automáticamente al atacante "${attUnit.name}" (${defPower} vs ${attPower})${
+              defeated.gear?.length ? ` junto con ${defeated.gear.length} Gear(s)` : ''
+            }.`
+          );
+        } else {
+          state.actionLog.unshift(
+            `💥 [FASE 3: CONTRAATAQUE] "${attUnit.name}" tiene menor fuerza (${attPower} < ${defPower}) y es derrotada${
+              defeated.gear?.length ? ` junto con ${defeated.gear.length} Gear(s)` : ''
+            }.`
+          );
+        }
       }
       executeCombatWinTrigger(state, defPlayerKey, defUnit, defeated);
       executeCombatLossTrigger(state, attPlayerKey, defeated, defUnit);
-      executeUnitDefeatedTrigger(state, attPlayerKey, defeated);
+      if (!attOutcome?.intercepted) {
+        executeUnitDefeatedTrigger(state, attPlayerKey, defeated);
+      }
       result = {
         ...result,
         winnerKey: defPlayerKey,
@@ -1752,18 +1765,20 @@ export function resolveFight(state, attPlayerKey, attUnit, defPlayerKey, defUnit
     if (attPower > 0 || defPower > 0) {
       const defIdx = defender.field.findIndex((u) => u.instanceId === defUnit.instanceId);
       let defeatedDef = null;
+      let defTieOutcome = null;
       if (defIdx !== -1) {
         [defeatedDef] = defender.field.splice(defIdx, 1);
-        sendDefeatedUnitToGraveyardOrExile(defender, defeatedDef, state);
+        defTieOutcome = sendDefeatedUnitToGraveyardOrExile(defender, defeatedDef, state);
       }
       const attIdx = attacker.field.findIndex((u) => u.instanceId === attUnit.instanceId);
       let defeatedAtt = null;
+      let attTieOutcome = null;
       if (attIdx !== -1) {
         [defeatedAtt] = attacker.field.splice(attIdx, 1);
-        sendDefeatedUnitToGraveyardOrExile(attacker, defeatedAtt, state);
+        attTieOutcome = sendDefeatedUnitToGraveyardOrExile(attacker, defeatedAtt, state);
       }
-      if (defeatedDef) executeUnitDefeatedTrigger(state, defPlayerKey, defeatedDef);
-      if (defeatedAtt) executeUnitDefeatedTrigger(state, attPlayerKey, defeatedAtt);
+      if (defeatedDef && !defTieOutcome?.intercepted) executeUnitDefeatedTrigger(state, defPlayerKey, defeatedDef);
+      if (defeatedAtt && !attTieOutcome?.intercepted) executeUnitDefeatedTrigger(state, attPlayerKey, defeatedAtt);
       state.actionLog.unshift(
         `☠️ [FASE 3: EMPATE LETAL] (${attPower} vs ${defPower}): Ambas unidades tienen la misma fuerza: ¡AMBAS SON DERROTADAS!`
       );

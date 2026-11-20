@@ -1429,12 +1429,136 @@ export function executeProgramEffect(state, playerKey, card) {
 // =========================================================================
 
 /**
+ * CP-050 Jackie Welles // Mama's Favorite:
+ * "If a friendly Unit would be defeated, you may pay 1 €$ to defeat this Legend instead. (Remove it from the game.)"
+ * Comprueba si el controlador de `unit` tiene a Jackie CP-050 boca arriba (en Leyendas o en Campo)
+ * y al menos 1 €$ disponible para ofrecer/ejecutar la sustitución de derrota.
+ */
+export function tryJackieMamaSaveReplacement(playerState, unit, state, options = {}) {
+  if (!state || !playerState || !unit || options?.skipJackieReplacement) return null;
+
+  const unitLegendId = unit.legendInstanceId || (unit.instanceId ? String(unit.instanceId).replace(/_unit$/, '') : null);
+
+  // Buscar un Jackie Welles // Mama's Favorite (CP-050) boca arriba y no eliminado que NO sea la propia unidad derrotada
+  const jackieFieldUnit = (playerState.field || []).find(
+    (u) => resolveCardId(u) === 'CP-050' && u.instanceId !== unit.instanceId
+  );
+  const jackieLegend = (playerState.legends || []).find((l) => {
+    if (!l.isFaceUp || l.isRemovedFromGame || resolveCardId(l) !== 'CP-050') return false;
+    if (l.instanceId === unitLegendId || l.instanceId === unit.instanceId) return false;
+    return true;
+  });
+
+  const jackieSource = jackieFieldUnit || jackieLegend;
+  if (!jackieSource) return null;
+
+  // Comprobar si dispone de al menos 1 €$ (en reserva, Eddies listos o Leyendas listas)
+  const floating = playerState.floatingEddies || 0;
+  const readyEddies = (playerState.eddies || []).filter((e) => !e.isSpent).length;
+  const readyLegends = (playerState.legends || []).filter(
+    (l) => !l.isSpent && !l.isOnField && !l.isRemovedFromGame
+  ).length;
+  if (floating + readyEddies + readyLegends < 1) return null;
+
+  // Jugador humano: abrir modal de elección si no hay otro modal bloqueante abierto
+  if (playerState === state.player) {
+    if (state.pendingModalChoice) return null;
+    state.pendingModalChoice = {
+      type: 'JACKIE_MAMA_SAVE_UNIT',
+      sourceCardId: 'CP-050',
+      sourceCardName: "Jackie Welles // Mama's Favorite",
+      sourceCardImage: jackieSource.image,
+      title: "💔 JACKIE WELLES // MAMA'S FAVORITE — SALVAR UNIDAD",
+      prompt: `Tu unidad "${unit.name}" [Fuerza ${unit.currentPower ?? unit.parsedPower ?? 0}] va a ser derrotada. ¿Quieres pagar 1 €$ y sacrificar a Jackie Welles (se elimina de la partida) en su lugar?`,
+      unitToSave: unit,
+      jackieLegendInstanceId: jackieLegend?.instanceId || jackieFieldUnit?.legendInstanceId || null,
+      jackieFieldInstanceId: jackieFieldUnit?.instanceId || null,
+      options: [
+        {
+          id: 'JACKIE_MAMA_SACRIFICE',
+          title: `💔 PAGAR 1 €$ Y SACRIFICAR A JACKIE (SALVAR A "${unit.name}")`,
+          description: `Pagas 1 €$, Jackie Welles // Mama's Favorite queda derrotado y eliminado de la partida, y "${unit.name}" sobrevive en el campo con todos sus Gears intactos.`,
+          isEligible: true
+        },
+        {
+          id: 'JACKIE_MAMA_DECLINE',
+          title: `💀 DEJAR QUE "${unit.name}" SEA DERROTADA (CONSERVAR A JACKIE)`,
+          description: `No pagas nada. "${unit.name}" es derrotada normalmente y Jackie Welles permanece activo.`,
+          isEligible: true
+        }
+      ]
+    };
+    if (state.actionLog) {
+      state.actionLog.unshift(
+        `💔 [Jackie Welles // Mama's Favorite] "${unit.name}" iba a ser derrotada: puedes pagar 1 €$ y sacrificar a Jackie para salvarla.`
+      );
+    }
+    return { intercepted: true, pending: true };
+  }
+
+  // Bot AI: sacrificar a Jackie si la unidad salvada es valiosa (fuerza >= 5, tiene Gears o es Leyenda)
+  const isValuable =
+    (unit.currentPower || unit.parsedPower || 0) >= 5 ||
+    (Array.isArray(unit.gear) && unit.gear.length > 0) ||
+    Boolean(unit.isLegendUnit || unit.hasGoSolo);
+  if (!isValuable) return null;
+
+  // Pagar 1 Eddie del bot (priorizando reserva -> Eddie -> otra Leyenda -> el propio Jackie)
+  if ((playerState.floatingEddies || 0) >= 1) {
+    playerState.floatingEddies -= 1;
+  } else {
+    const ed = (playerState.eddies || []).find((e) => !e.isSpent);
+    if (ed) {
+      ed.isSpent = true;
+    } else {
+      const otherLeg = (playerState.legends || []).find(
+        (l) => !l.isSpent && !l.isOnField && !l.isRemovedFromGame && l.instanceId !== jackieLegend?.instanceId
+      );
+      if (otherLeg) otherLeg.isSpent = true;
+      else if (jackieLegend) jackieLegend.isSpent = true;
+    }
+  }
+
+  // Derrotar y eliminar de la partida a Jackie (CP-050) + enviar sus Gears al Trash
+  if (!playerState.trash) playerState.trash = [];
+  if (!playerState.removedFromGame) playerState.removedFromGame = [];
+  if (jackieFieldUnit) {
+    const fIdx = (playerState.field || []).findIndex((u) => u.instanceId === jackieFieldUnit.instanceId);
+    if (fIdx !== -1) playerState.field.splice(fIdx, 1);
+    (jackieFieldUnit.gear || []).forEach((g) => playerState.trash.push(g));
+    jackieFieldUnit.gear = [];
+  }
+  if (jackieLegend) {
+    (jackieLegend.gear || []).forEach((g) => playerState.trash.push(g));
+    jackieLegend.gear = [];
+    jackieLegend.isOnField = false;
+    jackieLegend.isRemovedFromGame = true;
+    jackieLegend.isSpent = true;
+  }
+  playerState.removedFromGame.push(jackieSource);
+
+  // Devolver la unidad salvada al campo con todos sus Gears intactos
+  if (!playerState.field) playerState.field = [];
+  playerState.field.push(unit);
+
+  if (state.actionLog) {
+    state.actionLog.unshift(
+      `💔 [Jackie Welles Rival // Mama's Favorite] El rival paga 1 €$ y sacrifica a Jackie (eliminado de la partida) para SALVAR a "${unit.name}"!`
+    );
+  }
+  return { intercepted: true, saved: true };
+}
+
+/**
  * Envía una unidad derrotada al descarte (Trash) o al exilio (Removed from the game):
  * REGLA OFICIAL DE GO SOLO / LEYENDAS:
  * "If it leaves the field, remove it from the game."
  */
-export function sendDefeatedUnitToGraveyardOrExile(playerState, unit, state = null) {
-  if (!unit || !playerState) return;
+export function sendDefeatedUnitToGraveyardOrExile(playerState, unit, state = null, options = {}) {
+  if (!unit || !playerState) return { intercepted: false };
+
+  const jackieCheck = tryJackieMamaSaveReplacement(playerState, unit, state, options);
+  if (jackieCheck?.intercepted) return jackieCheck;
 
   const equippedGears = Array.isArray(unit.gear) ? [...unit.gear] : [];
   unit.gear = [];
@@ -1470,6 +1594,7 @@ export function sendDefeatedUnitToGraveyardOrExile(playerState, unit, state = nu
     if (!playerState.trash) playerState.trash = [];
     equippedGears.forEach((g) => playerState.trash.push(g));
   }
+  return { intercepted: false };
 }
 
 /**
