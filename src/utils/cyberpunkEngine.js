@@ -1662,6 +1662,15 @@ export function resolveFight(state, attPlayerKey, attUnit, defPlayerKey, defUnit
   const attPower = attUnit.currentPower || 0;
   const defPower = defUnit.currentPower || 0;
 
+  const isJohnnyUnit = (u) =>
+    String(u?.id || '').toUpperCase() === 'CP-054' ||
+    String(u?.name || '').toLowerCase().includes('never stop fighting');
+  const isCorpoUnit = (u) =>
+    /\bCORPO\b/i.test(`${u?.traits || ''} ${u?.cardType || ''}`);
+
+  const johnnyAttBeatsCorpo = isJohnnyUnit(attUnit) && isCorpoUnit(defUnit);
+  const johnnyDefBeatsCorpo = isJohnnyUnit(defUnit) && isCorpoUnit(attUnit);
+
   state.actionLog.unshift(
     `🥊 [FASE 3: COMBATE] "${attUnit.name}" [Fuerza: ${attPower}] vs "${defUnit.name}" [Fuerza: ${defPower}].`
   );
@@ -1674,17 +1683,25 @@ export function resolveFight(state, attPlayerKey, attUnit, defPlayerKey, defUnit
     defUnitName: defUnit.name
   };
 
-  if (attPower > defPower) {
-    // Atacante tiene mayor fuerza: la unidad de menor fuerza (defensora) es derrotada
+  if (johnnyAttBeatsCorpo || (!johnnyDefBeatsCorpo && attPower > defPower)) {
+    // Atacante gana (por fuerza mayor o habilidad oficial de Johnny Silverhand CP-054 contra CORPO)
     const idx = defender.field.findIndex((u) => u.instanceId === defUnit.instanceId);
     if (idx !== -1) {
       const [defeated] = defender.field.splice(idx, 1);
       sendDefeatedUnitToGraveyardOrExile(defender, defeated, state);
-      state.actionLog.unshift(
-        `💀 [FASE 3: DERROTA] "${defUnit.name}" tiene menor fuerza (${defPower} < ${attPower}) y es derrotada${
-          defeated.gear?.length ? ` junto con ${defeated.gear.length} Gear(s)` : ''
-        }.`
-      );
+      if (johnnyAttBeatsCorpo) {
+        state.actionLog.unshift(
+          `🎸 [Johnny Silverhand // Never Stop Fighting] ¡Gana SIEMPRE contra unidades CORPO! Derrota automáticamente a "${defUnit.name}" (${attPower} vs ${defPower})${
+            defeated.gear?.length ? ` junto con ${defeated.gear.length} Gear(s)` : ''
+          }.`
+        );
+      } else {
+        state.actionLog.unshift(
+          `💀 [FASE 3: DERROTA] "${defUnit.name}" tiene menor fuerza (${defPower} < ${attPower}) y es derrotada${
+            defeated.gear?.length ? ` junto con ${defeated.gear.length} Gear(s)` : ''
+          }.`
+        );
+      }
       executeCombatWinTrigger(state, attPlayerKey, attUnit, defeated);
       executeCombatLossTrigger(state, defPlayerKey, defeated, attUnit);
       executeUnitDefeatedTrigger(state, defPlayerKey, defeated);
@@ -1694,20 +1711,29 @@ export function resolveFight(state, attPlayerKey, attUnit, defPlayerKey, defUnit
         winnerUnit: attUnit,
         loserKey: defPlayerKey,
         loserUnit: defeated,
-        isTie: false
+        isTie: false,
+        johnnyAntiCorpoWin: johnnyAttBeatsCorpo
       };
     }
-  } else if (defPower > attPower) {
-    // Defensor tiene mayor fuerza: la unidad de menor fuerza (atacante) es derrotada
+  } else if (johnnyDefBeatsCorpo || defPower > attPower) {
+    // Defensor gana (por fuerza mayor o habilidad oficial de Johnny Silverhand CP-054 contra CORPO)
     const idx = attacker.field.findIndex((u) => u.instanceId === attUnit.instanceId);
     if (idx !== -1) {
       const [defeated] = attacker.field.splice(idx, 1);
       sendDefeatedUnitToGraveyardOrExile(attacker, defeated, state);
-      state.actionLog.unshift(
-        `💥 [FASE 3: CONTRAATAQUE] "${attUnit.name}" tiene menor fuerza (${attPower} < ${defPower}) y es derrotada${
-          defeated.gear?.length ? ` junto con ${defeated.gear.length} Gear(s)` : ''
-        }.`
-      );
+      if (johnnyDefBeatsCorpo) {
+        state.actionLog.unshift(
+          `🎸 [Johnny Silverhand // Never Stop Fighting] ¡Gana SIEMPRE contra unidades CORPO! Derrota automáticamente al atacante "${attUnit.name}" (${defPower} vs ${attPower})${
+            defeated.gear?.length ? ` junto con ${defeated.gear.length} Gear(s)` : ''
+          }.`
+        );
+      } else {
+        state.actionLog.unshift(
+          `💥 [FASE 3: CONTRAATAQUE] "${attUnit.name}" tiene menor fuerza (${attPower} < ${defPower}) y es derrotada${
+            defeated.gear?.length ? ` junto con ${defeated.gear.length} Gear(s)` : ''
+          }.`
+        );
+      }
       executeCombatWinTrigger(state, defPlayerKey, defUnit, defeated);
       executeCombatLossTrigger(state, attPlayerKey, defeated, defUnit);
       executeUnitDefeatedTrigger(state, attPlayerKey, defeated);
@@ -1717,7 +1743,8 @@ export function resolveFight(state, attPlayerKey, attUnit, defPlayerKey, defUnit
         winnerUnit: defUnit,
         loserKey: attPlayerKey,
         loserUnit: defeated,
-        isTie: false
+        isTie: false,
+        johnnyAntiCorpoWin: johnnyDefBeatsCorpo
       };
     }
   } else {
@@ -2041,6 +2068,7 @@ export function passTurn(state) {
       u.currentPower = Math.max(0, basePower + gearBonus);
       delete u.tempPowerMod;
       delete u.cannotBeDefeatedThisTurn;
+      delete u.hasReadiedThisTurn;
       if (u.hasTemporaryAdrenalineThisTurn) {
         delete u.hasTemporaryAdrenalineThisTurn;
         delete u.hasAdrenaline;

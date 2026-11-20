@@ -1479,14 +1479,14 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
           setHolocall({
             title: '🥊 VICTORIA EN COMBATE',
             characterName: 'SISTEMA DE COMBATE // NC-PD',
-            message: `"${fightRes.winnerUnit?.name}" [Fuerza ${fightRes.attPower}] superó a "${fightRes.loserUnit?.name}" [Fuerza ${fightRes.defPower}]. La unidad rival tiene menor fuerza y es enviada a la Basura (Trash).`,
+            message: fightRes.johnnyAntiCorpoWin ? `🎸 ¡JOHNNY SILVERHAND APLASTA A LA CORPO! "${fightRes.winnerUnit?.name}" gana automáticamente todo combate contra unidades CORPO y derrota a "${fightRes.loserUnit?.name}" (${fightRes.attPower} vs ${fightRes.defPower}).` : `"${fightRes.winnerUnit?.name}" [Fuerza ${fightRes.attPower}] superó a "${fightRes.loserUnit?.name}" [Fuerza ${fightRes.defPower}]. La unidad rival tiene menor fuerza y es enviada a la Basura (Trash).`,
             type: 'success'
           });
         } else if (fightRes.winnerKey === 'bot') {
           setHolocall({
             title: '💥 CONTRAATAQUE // UNIDAD DERROTADA',
             characterName: 'SISTEMA DE COMBATE // NC-PD',
-            message: `"${fightRes.winnerUnit?.name}" [Fuerza ${fightRes.defPower}] superó a "${fightRes.loserUnit?.name}" [Fuerza ${fightRes.attPower}]. Tu unidad tiene menor fuerza y es enviada a la Basura (Trash).`,
+            message: fightRes.johnnyAntiCorpoWin ? `🎸 ¡JOHNNY SILVERHAND RIVAL APLASTA A TU CORPO! "${fightRes.winnerUnit?.name}" gana automáticamente todo combate contra unidades CORPO (${fightRes.defPower} vs ${fightRes.attPower}).` : `"${fightRes.winnerUnit?.name}" [Fuerza ${fightRes.defPower}] superó a "${fightRes.loserUnit?.name}" [Fuerza ${fightRes.attPower}]. Tu unidad tiene menor fuerza y es enviada a la Basura (Trash).`,
             type: 'danger'
           });
         }

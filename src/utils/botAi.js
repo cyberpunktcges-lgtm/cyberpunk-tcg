@@ -253,10 +253,18 @@ export async function runBotTurn(gameState, updateCallback, delayMs = 700) {
   for (const unit of readyUnits) {
     if (gameState.isGameOver) break;
 
-    // Prioridad A: Destruir unidades enemigas giradas (Spent) donde el bot gana o empata favorablemente
-    const killableSpentEnemy = (player.field || []).find(
-      (pu) => pu.isSpent && (pu.currentPower || 0) < (unit.currentPower || 0)
-    );
+    // Prioridad A: Destruir unidades enemigas giradas (Spent) donde el bot gana (o Johnny CP-054 contra cualquier CORPO)
+    const isBotJohnny = String(unit.id || '').toUpperCase() === 'CP-054';
+    const killableSpentEnemy = (player.field || []).find((pu) => {
+      if (!pu.isSpent) return false;
+      const enemyIsCorpo = /\bCORPO\b/i.test(`${pu.traits || ''} ${pu.cardType || ''}`);
+      if (isBotJohnny && enemyIsCorpo) return true;
+      // No atacar a Johnny enemigo si el atacante del bot es CORPO (perdería automáticamente)
+      const enemyIsJohnny = String(pu.id || '').toUpperCase() === 'CP-054';
+      const botUnitIsCorpo = /\bCORPO\b/i.test(`${unit.traits || ''} ${unit.cardType || ''}`);
+      if (enemyIsJohnny && botUnitIsCorpo) return false;
+      return (pu.currentPower || 0) < (unit.currentPower || 0);
+    });
 
     if (killableSpentEnemy && canUnitAttack(unit, bot, gameState, 'UNIT')) {
       unit.isSpent = true;
