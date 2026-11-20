@@ -489,6 +489,62 @@ excerpt: '',
 
   // Estado formulario Hero
   const [heroForm, setHeroForm] = useState(initialCms?.heroArticle || {});
+  const [archivePreviousHero, setArchivePreviousHero] = useState(false);
+
+  const convertHeroToNewsItem = (hero) => {
+    const viewsNum = Number(hero?.viewsCount) || 0;
+    return {
+      id: `NEWS-${Date.now()}`,
+      title: hero?.title || 'Noticia Destacada',
+      category: hero?.category || hero?.stats?.[0]?.value || 'NOTICIA OFICIAL',
+      source: hero?.source || '',
+      excerpt: hero?.excerpt || '',
+      content: hero?.content || '',
+      author: hero?.author || 'Admin_ES',
+      date: hero?.date || 'HOY',
+      readTime: String(hero?.readTime || '3 MIN').replace(/\s*LECTURA\s*/i, '').trim() || '3 MIN',
+      viewsCount: viewsNum,
+      views: `${viewsNum} ${viewsNum === 1 ? 'VISITA' : 'VISITAS'}`,
+      image: hero?.wallpaper || hero?.image || '/images/wallpapers/Japantown.png'
+    };
+  };
+
+  const convertNewsItemToHero = (article, prevHero = {}) => {
+    const viewsNum = Number(article?.viewsCount) || 0;
+    const cat = article?.category || 'NOTICIA OFICIAL';
+    const keywords = prevHero?.keywords || '#CyberpunkTCG #NightCity';
+    const extraLabel = prevHero?.extraLabel || 'FORMATO / SET';
+    const extraValue = prevHero?.extraValue || 'SET 01 // NIGHT CITY';
+    const rawReadTime = String(article?.readTime || '3 MIN').trim();
+    const heroReadTime = /LECTURA/i.test(rawReadTime) ? rawReadTime : `${rawReadTime} LECTURA`;
+    return {
+      ...prevHero,
+      id: `HERO-${Date.now()}`,
+      tag: 'NOTICIA DESTACADA',
+      title: article?.title || '',
+      source: article?.source || '',
+      excerpt: article?.excerpt || '',
+      content: article?.content || '',
+      author: article?.author || 'Admin_ES',
+      role: prevHero?.role || 'Analista Jefe // CEO',
+      date: article?.date || 'HOY',
+      readTime: heroReadTime,
+      viewsCount: viewsNum,
+      views: `${viewsNum} ${viewsNum === 1 ? 'VISITA' : 'VISITAS'}`,
+      category: cat,
+      keywords,
+      extraLabel,
+      extraValue,
+      wallpaper: article?.image || prevHero?.wallpaper || '/images/wallpapers/Japantown.png',
+      image: article?.image || prevHero?.wallpaper || '/images/wallpapers/Japantown.png',
+      featuredCardImg: prevHero?.featuredCardImg || '',
+      stats: [
+        { label: 'CATEGORÍA', value: cat, color: 'text-[#00F0FF]' },
+        { label: 'PALABRAS CLAVE', value: keywords, color: 'text-[#FCEE0A]' },
+        { label: extraLabel, value: extraValue, color: 'text-[#FF003C]' }
+      ]
+    };
+  };
 
   // Estado formulario Torneos
   const [editingTourId, setEditingTourId] = useState(null);
@@ -618,17 +674,60 @@ score: '6 - 0',
 
   const apiCall = async (payload) => {
     try {
-      const { action, section, item, id, heroArticle, altArtCards, forumUrl } = payload;
+      const { action, section, item, id, heroArticle, archiveOldHero, altArtCards, forumUrl } = payload;
       let newCms = JSON.parse(JSON.stringify(cms));
 
       if (action === 'update_hero' && heroArticle) {
-        const currentCount = Number(newCms.heroArticle?.viewsCount) || 0;
+        if (archiveOldHero && newCms.heroArticle?.title?.trim()) {
+          if (!Array.isArray(newCms.news)) newCms.news = [];
+          const oldNormTitle = newCms.heroArticle.title.trim().toLowerCase();
+          const alreadyExists = newCms.news.some(
+            (n) => String(n.title || '').trim().toLowerCase() === oldNormTitle
+          );
+          if (!alreadyExists) {
+            newCms.news.unshift(convertHeroToNewsItem(newCms.heroArticle));
+          }
+        }
+        const isDifferentArticle =
+          archiveOldHero ||
+          String(newCms.heroArticle?.title || '').trim().toLowerCase() !==
+            String(heroArticle.title || '').trim().toLowerCase();
+        const currentCount = isDifferentArticle ? 0 : Number(newCms.heroArticle?.viewsCount) || 0;
         newCms.heroArticle = {
           ...newCms.heroArticle,
           ...heroArticle,
+          id: isDifferentArticle ? `HERO-${Date.now()}` : (newCms.heroArticle?.id || heroArticle.id || `HERO-${Date.now()}`),
           viewsCount: currentCount,
           views: `${currentCount} ${currentCount === 1 ? 'VISITA' : 'VISITAS'}`
         };
+      } else if (action === 'demote_hero_to_news') {
+        if (newCms.heroArticle?.title?.trim()) {
+          if (!Array.isArray(newCms.news)) newCms.news = [];
+          const oldNormTitle = newCms.heroArticle.title.trim().toLowerCase();
+          const alreadyExists = newCms.news.some(
+            (n) => String(n.title || '').trim().toLowerCase() === oldNormTitle
+          );
+          if (!alreadyExists) {
+            newCms.news.unshift(convertHeroToNewsItem(newCms.heroArticle));
+          }
+        }
+      } else if (action === 'promote_news_to_hero' && id) {
+        if (!Array.isArray(newCms.news)) newCms.news = [];
+        const targetIdx = newCms.news.findIndex((n) => n.id === id);
+        if (targetIdx !== -1) {
+          const [promoted] = newCms.news.splice(targetIdx, 1);
+          const prevHero = newCms.heroArticle;
+          if (prevHero?.title?.trim()) {
+            const oldNormTitle = prevHero.title.trim().toLowerCase();
+            const alreadyExists = newCms.news.some(
+              (n) => String(n.title || '').trim().toLowerCase() === oldNormTitle
+            );
+            if (!alreadyExists) {
+              newCms.news.unshift(convertHeroToNewsItem(prevHero));
+            }
+          }
+          newCms.heroArticle = convertNewsItemToHero(promoted, prevHero);
+        }
       } else if (action === 'update_alt_art' && Array.isArray(altArtCards)) {
         newCms.altArtCards = altArtCards.slice(0, 3);
       } else if (action === 'update_forum_url' && typeof forumUrl === 'string') {
@@ -714,7 +813,7 @@ excerpt: '',
     }
   };
 
-  // Guardar Hero
+  // Guardar Hero (opcionalmente archivando la destacada anterior en Noticias Publicadas)
   const handleSaveHero = async (e) => {
     e.preventDefault();
     const updatedHero = {
@@ -738,9 +837,45 @@ excerpt: '',
       ]
     };
     setHeroForm(updatedHero);
-    const ok = await apiCall({ action: 'update_hero', heroArticle: updatedHero });
+    const ok = await apiCall({
+      action: 'update_hero',
+      heroArticle: updatedHero,
+      archiveOldHero: archivePreviousHero
+    });
     if (ok) {
-      showToast('Portada Destacada (Hero) actualizada');
+      showToast(
+        archivePreviousHero
+          ? 'Portada Hero actualizada y noticia anterior movida a Noticias Publicadas'
+          : 'Portada Destacada (Hero) actualizada'
+      );
+      setArchivePreviousHero(false);
+    }
+  };
+
+  // Pasar directamente la noticia destacada actual a Noticias Publicadas Actualmente
+  const handleDemoteHeroToNews = async () => {
+    if (!cms?.heroArticle?.title?.trim()) return;
+    const confirmed = window.confirm(
+      `¿Mover la noticia destacada "${cms.heroArticle.title}" a "Noticias Publicadas Actualmente"?\n\nDespués podrás editar aquí la nueva noticia destacada sin perder la anterior.`
+    );
+    if (!confirmed) return;
+    const ok = await apiCall({ action: 'demote_hero_to_news', section: 'news' });
+    if (ok) {
+      showToast('Noticia destacada añadida a Noticias Publicadas Actualmente');
+    }
+  };
+
+  // Subir una noticia publicada a Destacada (Hero) bajando automáticamente la destacada anterior a Noticias Publicadas
+  const handlePromoteNewsToHero = async (article) => {
+    if (!article?.id) return;
+    const confirmed = window.confirm(
+      `¿Poner "${article.title}" como NOTICIA DESTACADA (Hero)?\n\nLa noticia destacada anterior pasará automáticamente a "Noticias Publicadas Actualmente".`
+    );
+    if (!confirmed) return;
+    const ok = await apiCall({ action: 'promote_news_to_hero', section: 'news', id: article.id });
+    if (ok) {
+      setHeroForm(convertNewsItemToHero(article, cms?.heroArticle));
+      showToast(`"${article.title}" es ahora la Noticia Destacada (y la anterior pasó a Noticias Publicadas)`);
     }
   };
 
@@ -1798,6 +1933,14 @@ score: '6 - 0',
                     <div className="flex items-center gap-2 shrink-0">
                       <button
                         type="button"
+                        onClick={() => handlePromoteNewsToHero(item)}
+                        className="p-2 bg-[#070a10] border border-gray-800 hover:border-[#FCEE0A] text-[#FCEE0A] cursor-pointer"
+                        title="Hacer Noticia Destacada (Hero) — baja la destacada actual a esta lista"
+                      >
+                        <Sparkles className="w-4 h-4" />
+                      </button>
+                      <button
+                        type="button"
                         onClick={() => handleEditNews(item)}
                         className="p-2 bg-[#070a10] border border-gray-800 hover:border-[#00F0FF] text-[#00F0FF] cursor-pointer"
                         title="Editar"
@@ -1829,9 +1972,20 @@ score: '6 - 0',
             style={{ clipPath: CYBER_CLIP }}
             className="max-w-3xl bg-[#000000] border border-gray-800 p-6 sm:p-8 space-y-4 rounded-none"
           >
-            <h2 className="text-base font-black uppercase text-[#FCEE0A] font-mono border-b border-gray-800 pb-3">
-              CONFIGURAR NOTICIA DESTACADA EN PORTADA (HERO SECTION)
-            </h2>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-800 pb-3">
+              <h2 className="text-base font-black uppercase text-[#FCEE0A] font-mono">
+                CONFIGURAR NOTICIA DESTACADA EN PORTADA (HERO SECTION)
+              </h2>
+              <button
+                type="button"
+                onClick={handleDemoteHeroToNews}
+                className="px-3.5 py-2 bg-[#070a10] border border-[#00F0FF]/60 hover:bg-[#00F0FF] hover:text-[#070a10] text-[#00F0FF] font-mono font-bold text-[10px] uppercase tracking-wider flex items-center gap-1.5 cursor-pointer transition-colors shrink-0"
+                title="Envía la noticia destacada actual a la lista de Noticias Publicadas Actualmente"
+              >
+                <ChevronDown className="w-3.5 h-3.5" />
+                <span>PASAR A NOTICIAS PUBLICADAS</span>
+              </button>
+            </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs font-mono">
               <div>
@@ -1862,7 +2016,16 @@ score: '6 - 0',
                   type="text"
                   required
                   value={heroForm.title}
-                  onChange={(e) => setHeroForm({ ...heroForm, title: e.target.value })}
+                  onChange={(e) => {
+                    const nextTitle = e.target.value;
+                    setHeroForm({ ...heroForm, title: nextTitle });
+                    if (
+                      cms?.heroArticle?.title &&
+                      nextTitle.trim().toLowerCase() !== cms.heroArticle.title.trim().toLowerCase()
+                    ) {
+                      setArchivePreviousHero(true);
+                    }
+                  }}
                   className="w-full bg-[#070a10] border border-gray-800 px-3 py-2.5 text-white"
                 />
               </div>
@@ -2019,6 +2182,24 @@ score: '6 - 0',
                 />
               </div>
             </div>
+
+            {/* Opción para conservar la noticia destacada anterior en Noticias Publicadas */}
+            <label className="flex items-start gap-2.5 p-3 bg-[#070a10] border border-[#00F0FF]/35 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={archivePreviousHero}
+                onChange={(e) => setArchivePreviousHero(e.target.checked)}
+                className="mt-0.5 accent-[#FCEE0A] w-4 h-4 cursor-pointer"
+              />
+              <span className="text-xs font-mono text-gray-200 leading-snug">
+                <strong className="text-[#00F0FF] uppercase block">
+                  Mover la noticia destacada anterior a «Noticias Publicadas Actualmente»
+                </strong>
+                <span className="text-[11px] text-gray-400">
+                  Márcalo cuando publiques una nueva noticia destacada para que la anterior (&quot;{cms?.heroArticle?.title || 'actual'}&quot;) no se pierda y pase automáticamente al listado de noticias publicadas.
+                </span>
+              </span>
+            </label>
 
             <button
               type="submit"
