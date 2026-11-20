@@ -2912,9 +2912,9 @@ export default function CyberpunkPortal({
                 exit={{ scale: 0.94, y: 20 }}
                 onClick={(e) => e.stopPropagation()}
                 style={{ clipPath: CYBER_CLIP }}
-                className="max-w-3xl w-full max-h-[90vh] overflow-y-auto bg-[#070a10] border-2 border-[#00F0FF] shadow-[0_0_45px_rgba(0,240,255,0.35)] rounded-none"
+                className="max-w-5xl xl:max-w-6xl w-full max-h-[92vh] overflow-y-auto bg-[#070a10] border-2 border-[#00F0FF] shadow-[0_0_45px_rgba(0,240,255,0.35)] rounded-none"
               >
-                <div className="relative h-64 w-full overflow-hidden border-b border-gray-800">
+                <div className="relative h-64 sm:h-80 w-full overflow-hidden border-b border-gray-800">
                   <img
                     src={readingArticle.image || readingArticle.wallpaper || '/images/wallpapers/Japantown.png'}
                     alt={readingArticle.title}
@@ -2939,7 +2939,7 @@ export default function CyberpunkPortal({
                   </div>
                 </div>
 
-                <div className="p-6 sm:p-8 space-y-5">
+                <div className="p-6 sm:p-10 space-y-5">
                   <div className="flex flex-wrap items-center justify-between gap-2 text-xs font-mono text-gray-400 border-b border-gray-800 pb-3">
                     <span>AUTOR: @{readingArticle.author}</span>
                     <span>

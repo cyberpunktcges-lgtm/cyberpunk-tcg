@@ -2007,7 +2007,7 @@ score: '6 - 0',
           <form
             onSubmit={handleSaveHero}
             style={{ clipPath: CYBER_CLIP }}
-            className="max-w-3xl bg-[#000000] border border-gray-800 p-6 sm:p-8 space-y-4 rounded-none"
+            className="max-w-5xl w-full bg-[#000000] border border-gray-800 p-6 sm:p-8 space-y-4 rounded-none"
           >
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-800 pb-3">
               <h2 className="text-base font-black uppercase text-[#FCEE0A] font-mono">
