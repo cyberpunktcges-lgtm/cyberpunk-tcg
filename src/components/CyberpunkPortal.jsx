@@ -2974,6 +2974,65 @@ export default function CyberpunkPortal({
                     </div>
                   )}
 
+                  {/* Barra superior de compartir noticia (justo debajo de la fuente de información) */}
+                  <div className="bg-[#000000]/80 border border-gray-800/90 px-4 py-2.5 flex flex-wrap items-center justify-between gap-2.5">
+                    <span className="text-[10px] font-mono text-gray-400 uppercase tracking-wider font-bold">
+                      COMPARTIR NOTICIA:
+                    </span>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <a
+                        href={`https://api.whatsapp.com/send?text=${encodeURIComponent(
+                          (readingArticle.title || '') + ' ' + getArticleShareUrl(readingArticle)
+                        )}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{ clipPath: CYBER_CLIP }}
+                        className="px-2.5 py-1 bg-[#25D366]/20 border border-[#25D366] text-[#25D366] hover:bg-[#25D366] hover:text-black font-mono text-[11px] font-bold transition-all"
+                      >
+                        WhatsApp
+                      </a>
+
+                      <a
+                        href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(
+                          readingArticle.title || ''
+                        )}&url=${encodeURIComponent(
+                          getArticleShareUrl(readingArticle)
+                        )}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{ clipPath: CYBER_CLIP }}
+                        className="px-2.5 py-1 bg-white/10 border border-white text-white hover:bg-white hover:text-black font-mono text-[11px] font-bold transition-all"
+                      >
+                        X (Twitter)
+                      </a>
+
+                      <button
+                        type="button"
+                        onClick={() => handleShareArticle(readingArticle, 'instagram')}
+                        style={{ clipPath: CYBER_CLIP }}
+                        className="px-2.5 py-1 bg-[#E1306C]/20 border border-[#E1306C] text-[#E1306C] hover:bg-[#E1306C] hover:text-black font-mono text-[11px] font-bold transition-all cursor-pointer"
+                        title="Copia titular + enlace directo y abre Instagram (o menú compartir en móvil)"
+                      >
+                        {socialToast || 'Instagram'}
+                      </button>
+
+                      <a
+                        href={`mailto:?subject=${encodeURIComponent(
+                          readingArticle.title || ''
+                        )}&body=${encodeURIComponent(
+                          (readingArticle.excerpt || '') +
+                            '\n\n' +
+                            getArticleShareUrl(readingArticle)
+                        )}`}
+                        style={{ clipPath: CYBER_CLIP }}
+                        className="px-2.5 py-1 bg-[#00F0FF]/20 border border-[#00F0FF] text-[#00F0FF] hover:bg-[#00F0FF] hover:text-black font-mono text-[11px] font-bold transition-all flex items-center gap-1"
+                      >
+                        <Mail className="w-3 h-3" />
+                        <span>Email</span>
+                      </a>
+                    </div>
+                  </div>
+
                   <div
                     className="cyber-article-content"
                     dangerouslySetInnerHTML={{
