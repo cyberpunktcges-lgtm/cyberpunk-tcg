@@ -2353,11 +2353,11 @@ export default function CyberpunkPortal({
 
       <div>
         {/* Barra Superior de Telemetría */}
-        <div className="relative z-40 border-b border-gray-800 bg-[#000000] text-xs font-mono">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-10 flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <span className="flex items-center gap-1.5 text-[#FCEE0A] font-bold tracking-widest">
-                <Radio className="w-3.5 h-3.5 text-[#FF003C] animate-pulse" />
+        <div className="relative z-[45] border-b border-gray-800 bg-[#000000] text-xs font-mono">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 min-h-11 py-1 flex items-center justify-between gap-2">
+            <div className="flex items-center space-x-4 min-w-0">
+              <span className="flex items-center gap-1.5 text-[#FCEE0A] font-bold tracking-widest truncate">
+                <Radio className="w-3.5 h-3.5 text-[#FF003C] animate-pulse shrink-0" />
                 CYBERPUNK TCG ESPAÑA
               </span>
               <span className="hidden sm:inline text-gray-700">|</span>
@@ -2369,11 +2369,16 @@ export default function CyberpunkPortal({
               </span>
             </div>
 
-            <div className="flex items-center space-x-3">
-              <span className="text-[11px] font-mono text-gray-300 tracking-wider">
-                Cyberpunk TCG Set One -{' '}
-                <strong className="text-[#FCEE0A]">Welcome to Night City</strong>
-              </span>
+            <div className="flex items-center shrink-0">
+              <CyberUserDropdown
+                currentUser={currentUser}
+                userProfile={userProfile}
+                userDecksCount={userCloudDecks.length}
+                onOpenAuthModal={() => setAuthModalOpen(true)}
+                onOpenMyDecks={() => setMyDecksModalOpen(true)}
+                onOpenProfile={() => setProfileModalOpen(true)}
+                themeColor="#00F0FF"
+              />
             </div>
           </div>
         </div>
@@ -2495,19 +2500,6 @@ export default function CyberpunkPortal({
                     </div>
                   </div>
                 )}
-              </div>
-
-              {/* Menú de Usuario / Netrunner Dropdown en Navbar */}
-              <div className="hidden sm:flex items-center">
-                <CyberUserDropdown
-                  currentUser={currentUser}
-                  userProfile={userProfile}
-                  userDecksCount={userCloudDecks.length}
-                  onOpenAuthModal={() => setAuthModalOpen(true)}
-                  onOpenMyDecks={() => setMyDecksModalOpen(true)}
-                  onOpenProfile={() => setProfileModalOpen(true)}
-                  themeColor="#00F0FF"
-                />
               </div>
 
               {/* Botón Menú Móvil */}
