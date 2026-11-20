@@ -203,6 +203,23 @@ export default function CyberpunkPortal({
   const [newsSortOrder, setNewsSortOrder] = useState('DESC'); // DESC = más recientes primero
   const [readingArticle, setReadingArticle] = useState(null);
 
+  // Abrir automáticamente una noticia si el usuario llega mediante enlace compartido (?noticia=ID o #ID)
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    const paramId = params.get('noticia') || decodeURIComponent((window.location.hash || '').replace(/^#/, ''));
+    if (!paramId) return;
+    const hero = cmsState?.heroArticle;
+    if (hero && (hero.id === paramId || paramId === 'HERO')) {
+      setReadingArticle(hero);
+      return;
+    }
+    const found = (cmsState?.news || []).find((n) => n.id === paramId);
+    if (found) {
+      setReadingArticle(found);
+    }
+  }, [cmsState?.heroArticle, cmsState?.news]);
+
   // Abrir noticia y contabilizar visita real en el servidor
   const handleOpenArticle = async (article, isHero = false) => {
     if (!article) return;
@@ -951,28 +968,76 @@ export default function CyberpunkPortal({
     });
   };
 
-  // Compartir en redes sociales
-  const handleShareArticle = (article, platform) => {
-    if (!article || typeof window === 'undefined') return;
-    const url = window.location.origin + '/noticias#' + (article.id || '');
-    const title = article.title || 'Cyberpunk TCG Noticia';
-    const text = `${title} - Cyberpunk TCG España`;
+  // Helper fiable para copiar al portapapeles (con fallback para iOS/móviles/HTTP)
+  const copyTextReliable = async (textToCopy) => {
+    try {
+      if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(textToCopy);
+        return true;
+      }
+    } catch {}
+    try {
+      const ta = document.createElement('textarea');
+      ta.value = textToCopy;
+      ta.setAttribute('readonly', '');
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      ta.setSelectionRange(0, textToCopy.length);
+      const ok = document.execCommand('copy');
+      document.body.removeChild(ta);
+      return ok;
+    } catch {
+      return false;
+    }
+  };
 
-    let shareUrl = '';
+  // Enlace directo único a una noticia concreta (?noticia=ID)
+  const getArticleShareUrl = (article) => {
+    if (typeof window === 'undefined') return 'https://cyberpunktcg.es/noticias';
+    const artId = article?.id || 'HERO';
+    return `${window.location.origin}/noticias?noticia=${encodeURIComponent(artId)}`;
+  };
+
+  // Compartir en redes sociales (WhatsApp, X, Instagram, Email)
+  const handleShareArticle = async (article, platform) => {
+    if (!article || typeof window === 'undefined') return;
+    const url = getArticleShareUrl(article);
+    const title = article.title || 'Cyberpunk TCG Noticia';
+    const excerpt = (article.excerpt || '').trim();
+    const text = `${title} — Cyberpunk TCG España`;
+
     if (platform === 'whatsapp') {
-      shareUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(text + ' ' + url)}`;
+      const shareUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(text + '\n' + url)}`;
       window.open(shareUrl, '_blank', 'noopener,noreferrer');
     } else if (platform === 'x') {
-      shareUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`;
+      const shareUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`;
       window.open(shareUrl, '_blank', 'noopener,noreferrer');
     } else if (platform === 'mail') {
-      shareUrl = `mailto:?subject=${encodeURIComponent(title)}&body=${encodeURIComponent(text + '\n\n' + url)}`;
+      const shareUrl = `mailto:?subject=${encodeURIComponent(title)}&body=${encodeURIComponent((excerpt ? excerpt + '\n\n' : '') + url)}`;
       window.location.href = shareUrl;
     } else if (platform === 'instagram') {
-      navigator.clipboard?.writeText(url);
-      setSocialToast('Enlace copiado al portapapeles para Instagram');
-      setTimeout(() => setSocialToast(null), 3000);
-      return;
+      const igCaption = `📰 ${title}\n\n${excerpt ? excerpt + '\n\n' : ''}🔗 ${url}\n#CyberpunkTCG #NightCity #CyberpunkTCGEspaña`;
+      const copied = await copyTextReliable(igCaption);
+
+      // En móvil (iOS/Android), abrir el menú nativo de compartir para enviarlo directo a Instagram Stories/DM
+      const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent || '');
+      if (isMobile && typeof navigator !== 'undefined' && typeof navigator.share === 'function') {
+        try {
+          await navigator.share({ title, text: igCaption, url });
+          setSocialToast('✓ Compartido en Instagram');
+          setTimeout(() => setSocialToast(null), 3000);
+          return;
+        } catch (err) {
+          if (err?.name === 'AbortError') return;
+        }
+      }
+
+      // En escritorio o si falla Web Share: texto+enlace ya copiados y abrimos Instagram para pegar directo
+      setSocialToast(copied ? '✓ Copiado — ¡Pégalo en Instagram!' : 'Abriendo Instagram...');
+      setTimeout(() => setSocialToast(null), 3500);
+      window.open('https://www.instagram.com/', '_blank', 'noopener,noreferrer');
     }
   };
 
@@ -2924,7 +2989,7 @@ export default function CyberpunkPortal({
                       <div className="flex flex-wrap items-center gap-2">
                         <a
                           href={`https://api.whatsapp.com/send?text=${encodeURIComponent(
-                            (readingArticle.title || '') + ' ' + (typeof window !== 'undefined' ? window.location.href : '')
+                            (readingArticle.title || '') + ' ' + getArticleShareUrl(readingArticle)
                           )}`}
                           target="_blank"
                           rel="noopener noreferrer"
@@ -2938,7 +3003,7 @@ export default function CyberpunkPortal({
                           href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(
                             readingArticle.title || ''
                           )}&url=${encodeURIComponent(
-                            typeof window !== 'undefined' ? window.location.href : ''
+                            getArticleShareUrl(readingArticle)
                           )}`}
                           target="_blank"
                           rel="noopener noreferrer"
@@ -2950,15 +3015,10 @@ export default function CyberpunkPortal({
 
                         <button
                           type="button"
-                          onClick={() => {
-                            if (typeof navigator !== 'undefined' && navigator.clipboard) {
-                              navigator.clipboard.writeText(typeof window !== 'undefined' ? window.location.href : '');
-                              setSocialToast('¡Enlace copiado para Instagram!');
-                              setTimeout(() => setSocialToast(null), 2500);
-                            }
-                          }}
+                          onClick={() => handleShareArticle(readingArticle, 'instagram')}
                           style={{ clipPath: CYBER_CLIP }}
                           className="px-3 py-1.5 bg-[#E1306C]/20 border border-[#E1306C] text-[#E1306C] hover:bg-[#E1306C] hover:text-black font-mono text-xs font-bold transition-all cursor-pointer"
+                          title="Copia titular + enlace directo y abre Instagram (o menú compartir en móvil)"
                         >
                           {socialToast || 'Instagram'}
                         </button>
@@ -2968,8 +3028,8 @@ export default function CyberpunkPortal({
                             readingArticle.title || ''
                           )}&body=${encodeURIComponent(
                             (readingArticle.excerpt || '') +
-                              '\\n\\n' +
-                              (typeof window !== 'undefined' ? window.location.href : '')
+                              '\n\n' +
+                              getArticleShareUrl(readingArticle)
                           )}`}
                           style={{ clipPath: CYBER_CLIP }}
                           className="px-3 py-1.5 bg-[#00F0FF]/20 border border-[#00F0FF] text-[#00F0FF] hover:bg-[#00F0FF] hover:text-black font-mono text-xs font-bold transition-all flex items-center gap-1"
