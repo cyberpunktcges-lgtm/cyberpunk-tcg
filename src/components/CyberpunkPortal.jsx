@@ -365,6 +365,33 @@ export default function CyberpunkPortal({
     }, 80);
   };
 
+  // Iniciar un mazo nuevo desde cero en el constructor (sin borrar los ya guardados en la nube)
+  const handleStartNewDeck = () => {
+    const hasCards = customDeckList.length > 0 || customSideboardList.length > 0;
+    if (
+      hasCards &&
+      !window.confirm(
+        '¿Empezar un mazo nuevo desde cero? Se limpiará el constructor actual (tus mazos ya guardados en la nube no se borran).'
+      )
+    ) {
+      return;
+    }
+    setActiveCloudDeckId(null);
+    setCustomDeckName('Nuevo Mazo Edgerunner');
+    setCustomDeckFaction('Arasaka');
+    setCustomDeckList([]);
+    setCustomSideboardList([]);
+    setDeckBuilderTarget('main');
+    try {
+      localStorage.removeItem('cp_tcg_custom_deck');
+      if (typeof window !== 'undefined' && window.location.search.includes('editDeck=1')) {
+        window.history.replaceState({}, '', window.location.pathname);
+      }
+    } catch {}
+    setDeckToast({ type: 'success', text: '✨ Constructor listo para crear un nuevo mazo' });
+    setTimeout(() => setDeckToast(null), 3000);
+  };
+
   // Probar mazo actual en el simulador
   const handleTestDeckInSimulator = () => {
     if (customDeckList.length === 0) {
@@ -4373,18 +4400,37 @@ export default function CyberpunkPortal({
                   style={{ clipPath: CYBER_CLIP }}
                   className="lg:col-span-4 bg-[#000000] border-2 border-[#FCEE0A] p-5 space-y-5 lg:sticky lg:top-24"
                 >
-                  <div className="border-b border-gray-800 pb-3 flex items-center justify-between">
-                    <div>
-                      <span className="text-[10px] font-mono text-[#00F0FF] uppercase block">
-                        DECKBUILDER // MÁX 3 COPIAS POR CARTA
-                      </span>
-                      <h2 className="text-lg font-black uppercase text-[#FCEE0A]">
-                        CONSTRUCTOR DE MAZOS
-                      </h2>
+                  <div className="border-b border-gray-800 pb-3 space-y-2.5">
+                    <div className="flex items-center justify-between gap-2">
+                      <div>
+                        <span className="text-[10px] font-mono text-[#00F0FF] uppercase block">
+                          DECKBUILDER // MÁX 3 COPIAS POR CARTA
+                        </span>
+                        <h2 className="text-lg font-black uppercase text-[#FCEE0A]">
+                          CONSTRUCTOR DE MAZOS
+                        </h2>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleStartNewDeck}
+                        style={{ clipPath: CYBER_CLIP }}
+                        className="px-3 py-1.5 bg-[#00F0FF] hover:bg-[#FCEE0A] text-[#070a10] font-mono font-black text-[11px] uppercase flex items-center gap-1 cursor-pointer shrink-0 transition-colors shadow-[0_0_12px_rgba(0,240,255,0.35)]"
+                        title="Limpiar el constructor y empezar un mazo nuevo desde cero"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        <span>NUEVO MAZO</span>
+                      </button>
                     </div>
-                    <span className="px-2.5 py-1 bg-[#FCEE0A] text-[#070a10] font-mono font-black text-xs">
-                      {totalDeckCards} BARAJA + {totalSideboardCards}/7 BANQ
-                    </span>
+                    <div className="flex items-center justify-between">
+                      <span className="px-2.5 py-1 bg-[#FCEE0A] text-[#070a10] font-mono font-black text-xs">
+                        {totalDeckCards} BARAJA + {totalSideboardCards}/7 BANQ
+                      </span>
+                      {activeCloudDeckId && (
+                        <span className="text-[10px] font-mono text-[#00F0FF] uppercase font-bold">
+                          ✏️ MODO EDICIÓN
+                        </span>
+                      )}
+                    </div>
                   </div>
 
                   <div className="space-y-3 text-xs font-mono">
