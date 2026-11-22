@@ -3156,11 +3156,47 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
       }
     }
 
+    // Reconstruye un mazo exacto a partir de las cartas en partida si activePlayerDeck/activeBotDeck faltaran tras recargar
+    const reconstructDeckFromSide = (sideState, fallbackName) => {
+      if (!sideState) return null;
+      const legends = (sideState.legends || []).slice(0, 3).map((l) => ({
+        id: l.id,
+        slug: l.slug,
+        name: l.name,
+        image: l.image,
+        officialType: 'LEGEND'
+      }));
+      const mainCards = [];
+      const pushCard = (c) => {
+        if (!c || c.isLegendUnit || c.officialType === 'LEGEND') return;
+        mainCards.push({ id: c.id, slug: c.slug, name: c.name, image: c.image, qty: 1 });
+      };
+      (sideState.deck || []).forEach(pushCard);
+      (sideState.hand || []).forEach(pushCard);
+      (sideState.trash || []).forEach(pushCard);
+      (sideState.eddies || []).forEach(pushCard);
+      (sideState.field || []).forEach((u) => {
+        pushCard(u);
+        (u.gear || []).forEach(pushCard);
+      });
+      if (mainCards.length === 0 && legends.length === 0) return null;
+      return { name: fallbackName, legends, deckList: mainCards };
+    };
+
     const pDeck =
-      activePlayerDeck || availableDecks[pDeckIdx] || availableDecks[0] || { deckList: [], legends: [] };
+      activePlayerDeck ||
+      (isRematch ? reconstructDeckFromSide(gameState?.player, 'Tu Mazo') : null) ||
+      availableDecks[pDeckIdx] ||
+      availableDecks[0] || { deckList: [], legends: [] };
     const bDeck =
       activeBotDeck ||
-      availableDecks[bDeckIdx] || availableDecks[1] || availableDecks[0] || { deckList: [], legends: [] };
+      (isRematch ? reconstructDeckFromSide(gameState?.bot, 'Mazo Rival') : null) ||
+      availableDecks[bDeckIdx] ||
+      availableDecks[1] ||
+      availableDecks[0] || { deckList: [], legends: [] };
+
+    setActivePlayerDeck(pDeck);
+    setActiveBotDeck(bDeck);
 
     const initial = createInitialGameState(pDeck, bDeck, initialCards, {
       startingPlayer,
@@ -3177,6 +3213,8 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
           CP_SIM_STORAGE_KEY,
           JSON.stringify({
             gameState: initial,
+            activePlayerDeck: pDeck,
+            activeBotDeck: bDeck,
             selectedPlayerDeckIdx: pDeckIdx,
             selectedBotDeckIdx: bDeckIdx,
             history: [],
@@ -3209,6 +3247,8 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
           CP_SIM_STORAGE_KEY,
           JSON.stringify({
             gameState,
+            activePlayerDeck,
+            activeBotDeck,
             selectedPlayerDeckIdx,
             selectedBotDeckIdx,
             history,
@@ -3334,6 +3374,8 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
         CP_SIM_STORAGE_KEY,
         JSON.stringify({
           gameState,
+          activePlayerDeck,
+          activeBotDeck,
           selectedPlayerDeckIdx,
           selectedBotDeckIdx,
           history: history.slice(-5),
@@ -3343,7 +3385,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
     } catch (err) {
       console.warn('Error al autoguardar en localStorage:', err);
     }
-  }, [gameState, selectedPlayerDeckIdx, selectedBotDeckIdx, history]);
+  }, [gameState, activePlayerDeck, activeBotDeck, selectedPlayerDeckIdx, selectedBotDeckIdx, history]);
 
   // Comprobar contraseña
   const handleLogin = (e) => {
