@@ -1784,8 +1784,7 @@ score: '6 - 0',
               id: 'bugs',
               label: openBetaBugsCount > 0 ? `BUGS BETA (${openBetaBugsCount})` : 'BUGS BETA',
               icon: Bug
-            },
-            { id: 'settings', label: 'FORO DISCOURSE', icon: Terminal }
+            }
           ].map((tab) => {
             const Icon = tab.icon;
             const active = activeTab === tab.id;
