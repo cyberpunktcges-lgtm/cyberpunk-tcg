@@ -25,8 +25,11 @@ import {
   ChevronDown,
   Maximize2,
   Minimize2,
-  X
+  X,
+  Bug
 } from 'lucide-react';
+import AdminBetaBugsTab from './AdminBetaBugsTab.jsx';
+import { getBetaBugReports } from '../utils/firebase.js';
 import { resolveCardFromGithubUrl, enrichCardObject } from '../utils/cardMetadata.js';
 import {
   getStoredToken,
@@ -487,6 +490,15 @@ export default function AdminPanel({ initialAuth = false, initialCms = {}, initi
   const [uploadedFiles, setUploadedFiles] = useState([]);
   const [activeTab, setActiveTab] = useState('news');
   const [statusMessage, setStatusMessage] = useState('');
+  const [openBetaBugsCount, setOpenBetaBugsCount] = useState(0);
+
+  useEffect(() => {
+    getBetaBugReports()
+      .then((list) => {
+        setOpenBetaBugsCount(list.filter((r) => (r.status || 'open') === 'open').length);
+      })
+      .catch(() => {});
+  }, []);
   const [isSyncing, setIsSyncing] = useState(false);
 
   useEffect(() => {
@@ -1768,6 +1780,11 @@ score: '6 - 0',
               icon: Trophy
             },
             { id: 'cards', label: `CARTAS GITHUB (${cards.length})`, icon: Database },
+            {
+              id: 'bugs',
+              label: openBetaBugsCount > 0 ? `BUGS BETA (${openBetaBugsCount})` : 'BUGS BETA',
+              icon: Bug
+            },
             { id: 'settings', label: 'FORO DISCOURSE', icon: Terminal }
           ].map((tab) => {
             const Icon = tab.icon;
@@ -4034,7 +4051,20 @@ score: '6 - 0',
         )}
 
         {/* ===============================================================
-            TAB 8: CONFIGURACIÓN DEL ENLACE AL FORO DISCOURSE
+            TAB 8: BANDEJA DE BUGS BETA DEL SIMULADOR
+           =============================================================== */}
+        {activeTab === 'bugs' && (
+          <AdminBetaBugsTab
+            onOpenCountChange={setOpenBetaBugsCount}
+            onNotify={(msg) => {
+              setStatusMessage(msg);
+              setTimeout(() => setStatusMessage(''), 4000);
+            }}
+          />
+        )}
+
+        {/* ===============================================================
+            TAB 9: CONFIGURACIÓN DEL ENLACE AL FORO DISCOURSE
            =============================================================== */}
         {activeTab === 'settings' && (
           <form

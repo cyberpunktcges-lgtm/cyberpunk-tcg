@@ -29,9 +29,12 @@ import {
   Save,
   Layers,
   Menu,
-  LogOut
+  LogOut,
+  Bug
 } from 'lucide-react';
 import CyberAuthModal from './CyberAuthModal.jsx';
+import CyberBugReportModal from './CyberBugReportModal.jsx';
+import { installGlobalErrorBuffer } from '../utils/betaDiagnostics.js';
 import CyberProfileModal from './CyberProfileModal.jsx';
 import CyberMyDecksModal from './CyberMyDecksModal.jsx';
 import CyberUserDropdown from './CyberUserDropdown.jsx';
@@ -923,6 +926,12 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [showMyDecksModal, setShowMyDecksModal] = useState(false);
   const [showDeckSelectorModal, setShowDeckSelectorModal] = useState(false);
+  const [showBugReportModal, setShowBugReportModal] = useState(false);
+
+  // Instalar captura ligera de errores JS en segundo plano para los reportes Beta
+  useEffect(() => {
+    installGlobalErrorBuffer();
+  }, []);
   const [activePlayerDeck, setActivePlayerDeck] = useState(null);
   const [activeBotDeck, setActiveBotDeck] = useState(null);
 
@@ -3488,6 +3497,16 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
 
             <button
               type="button"
+              onClick={() => setShowBugReportModal(true)}
+              style={{ clipPath: CYBER_BUTTON }}
+              className="p-1.5 bg-[#FF003C]/20 border border-[#FF003C] text-[#FF003C] hover:bg-[#FF003C] hover:text-white cursor-pointer"
+              title="Reportar fallo de la Beta (adjunta log automático)"
+            >
+              <Bug className="w-4 h-4" />
+            </button>
+
+            <button
+              type="button"
               onClick={() => { setHelpModalTab('turn'); setShowRulesModal(true); }}
               style={{ clipPath: CYBER_BUTTON }}
               className="p-1.5 bg-[#000000] border border-gray-700 text-gray-200 cursor-pointer"
@@ -3514,8 +3533,9 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
           <div className="flex items-center gap-2 sm:gap-2.5 min-w-0">
             <div className="flex items-center gap-1.5 shrink-0">
               <span className="w-2 h-2 rounded-full bg-[#0dfceb] animate-pulse shrink-0" />
-              <span className="font-black text-white uppercase tracking-wider text-xs whitespace-nowrap">
-                CYBERPUNK TCG // <span className="text-[#FCEE0A]">SIMULADOR</span>
+              <span className="font-black text-white uppercase tracking-wider text-xs whitespace-nowrap flex items-center gap-1.5">
+                <span>CYBERPUNK TCG // <span className="text-[#FCEE0A]">SIMULADOR</span></span>
+                <span className="px-1.5 py-0.5 bg-[#FF003C] text-white text-[9px] font-black tracking-widest">BETA</span>
               </span>
             </div>
 
@@ -3615,6 +3635,19 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
             >
               <Eye className="w-3.5 h-3.5" />
               <span className="hidden xl:inline">{isKiroshiCollapsed ? 'VER HUD' : 'HUD'}</span>
+            </button>
+
+            {/* Botón Reportar Bug (Fase Beta cerrada) */}
+            <button
+              type="button"
+              onClick={() => setShowBugReportModal(true)}
+              style={{ clipPath: CYBER_BUTTON }}
+              className="px-2.5 py-1.5 bg-[#FF003C]/15 hover:bg-[#FF003C] border border-[#FF003C]/80 text-[#FF003C] hover:text-white font-black uppercase flex items-center gap-1.5 cursor-pointer text-xs transition-all shadow-[0_0_12px_rgba(255,0,60,0.25)] hover:shadow-[0_0_18px_rgba(255,0,60,0.6)] whitespace-nowrap"
+              title="Reportar un fallo de la Beta (captura mesa, logs y errores automáticamente)"
+            >
+              <Bug className="w-3.5 h-3.5" />
+              <span className="hidden xl:inline">REPORTAR BUG</span>
+              <span className="xl:hidden">BUG</span>
             </button>
 
             {/* Único Icono de Ayuda (Fusiona Cómo funciona un turno + Reglas oficiales) */}
@@ -9140,6 +9173,17 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
         onSelectDecks={({ playerDeck, botDeck, playerAvatar: pAv, botAvatar: bAv }) => {
           handleStartWithDecks(playerDeck, botDeck, pAv, bAv);
         }}
+      />
+
+      {/* Modal de Reporte de Fallos Beta con Caja Negra Automática */}
+      <CyberBugReportModal
+        isOpen={showBugReportModal}
+        onClose={() => setShowBugReportModal(false)}
+        gameState={gameState}
+        currentUser={currentUser}
+        userProfile={userProfile}
+        playerDeckName={activePlayerDeck?.name || availableDecks[selectedPlayerDeckIdx]?.name || ''}
+        botDeckName={activeBotDeck?.name || availableDecks[selectedBotDeckIdx]?.name || ''}
       />
     </div>
   );

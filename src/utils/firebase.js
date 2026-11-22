@@ -218,3 +218,84 @@ export async function getUserProfile(userId) {
 
   return null;
 }
+
+// =========================================================================
+// REPORTES DE BUGS BETA DEL SIMULADOR EN FIRESTORE
+// =========================================================================
+
+/**
+ * Envía un reporte de fallo de la Beta del simulador a Firestore (`beta_bug_reports`).
+ * Funciona tanto con usuario autenticado como en modo invitado.
+ */
+export async function submitBetaBugReport(reportData) {
+  const shortCode = Math.random().toString(36).substring(2, 6).toUpperCase();
+  const reportId = `bug_${Date.now()}_${shortCode}`;
+  const reportRef = doc(db, 'beta_bug_reports', reportId);
+
+  const payload = {
+    id: reportId,
+    code: `BUG-${shortCode}`,
+    status: 'open', // 'open' | 'in_progress' | 'resolved' | 'wontfix'
+    category: reportData.category || 'Regla / Habilidad de carta',
+    cardName: reportData.cardName || '',
+    description: String(reportData.description || '').trim(),
+    expectedBehavior: String(reportData.expectedBehavior || '').trim(),
+    reporterName: String(reportData.reporterName || 'Invitado Beta').trim(),
+    reporterEmail: reportData.reporterEmail || '',
+    userId: reportData.userId || null,
+    includeDiagnostics: Boolean(reportData.includeDiagnostics),
+    diagnostics: reportData.includeDiagnostics ? (reportData.diagnostics || null) : null,
+    adminNotes: '',
+    createdAtMs: Date.now(),
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp()
+  };
+
+  await setDoc(reportRef, payload);
+  return payload;
+}
+
+/**
+ * Obtiene todos los reportes de bugs de la Beta ordenados del más reciente al más antiguo.
+ */
+export async function getBetaBugReports() {
+  const reportsRef = collection(db, 'beta_bug_reports');
+  const snapshot = await getDocs(reportsRef);
+  const reports = [];
+  snapshot.forEach((docSnap) => {
+    reports.push({ id: docSnap.id, ...docSnap.data() });
+  });
+
+  return reports.sort((a, b) => {
+    const tA = a.createdAt?.toMillis ? a.createdAt.toMillis() : (a.createdAtMs || 0);
+    const tB = b.createdAt?.toMillis ? b.createdAt.toMillis() : (b.createdAtMs || 0);
+    return tB - tA;
+  });
+}
+
+/**
+ * Actualiza el estado o las notas internas de un reporte de bug en `/admin`.
+ */
+export async function updateBetaBugReport(reportId, updates = {}) {
+  if (!reportId) throw new Error('ID de reporte inválido');
+  const reportRef = doc(db, 'beta_bug_reports', reportId);
+  await setDoc(
+    reportRef,
+    {
+      ...updates,
+      updatedAt: serverTimestamp()
+    },
+    { merge: true }
+  );
+  return true;
+}
+
+/**
+ * Elimina un reporte de bug de Firestore.
+ */
+export async function deleteBetaBugReport(reportId) {
+  if (!reportId) throw new Error('ID de reporte inválido');
+  const reportRef = doc(db, 'beta_bug_reports', reportId);
+  await deleteDoc(reportRef);
+  return true;
+}
