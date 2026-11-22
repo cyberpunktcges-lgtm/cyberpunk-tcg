@@ -477,11 +477,12 @@ function tryActivateBotAbilities(gameState, bot, player) {
       if (shouldUse) {
         const res = executeCardActivatedAbility(gameState, 'bot', card.instanceId, ab.id);
         if (res && res.success) {
-          activatedAny = true;
+          activatedAny = { card, ability: ab };
           break;
         }
       }
     }
+    if (activatedAny) break;
   }
   return activatedAny;
 }
@@ -608,13 +609,39 @@ export function executeBotReaction(gameState, attackerUnit, targetType, targetUn
 
 /**
  * Ejecuta el turno del Bot paso a paso con decisiones tácticas reales.
+ * Si se proporciona `pauseForAck`, el Bot se detiene tras cada carta/habilidad jugada
+ * hasta que el jugador pulsa "OK" para revisar exactamente qué ha ocurrido.
  */
-export async function runBotTurn(gameState, updateCallback, delayMs = 700) {
+export async function runBotTurn(gameState, updateCallback, delayMs = 700, pauseForAck = null) {
   if (gameState.isGameOver || gameState.activePlayer !== 'bot') return;
 
   const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
   const bot = gameState.bot;
   const player = gameState.player;
+
+  const captureLogsSince = (prevLen) => {
+    const all = gameState.actionLog || [];
+    const addedCount = Math.max(0, all.length - prevLen);
+    return all.slice(0, addedCount).reverse();
+  };
+
+  let aborted = false;
+  const pauseAfterPlay = async (actionType, card, prevLogLen, targetName = '') => {
+    updateCallback({ ...gameState });
+    if (typeof pauseForAck === 'function' && !gameState.isGameOver) {
+      const ack = await pauseForAck({
+        actionType,
+        card: card || null,
+        targetName,
+        logs: captureLogsSince(prevLogLen)
+      });
+      if (ack?.cancelled || gameState.isGameOver || gameState.activePlayer !== 'bot') {
+        aborted = true;
+        return false;
+      }
+    }
+    return true;
+  };
 
   // Salvaguarda de Turno 1: si el bot empieza la partida y aún no se ejecutó su Fase de Inicio (0 dados lanzados)
   if (gameState.turnNumber === 1 && (bot.gigs || []).length === 0 && (bot.fixerDice || []).length === 6) {
@@ -630,7 +657,7 @@ export async function runBotTurn(gameState, updateCallback, delayMs = 700) {
   // -----------------------------------------------------------------------
   const cardToSell = chooseCardToSellForBot(bot, player, gameState);
   if (cardToSell) {
-    await wait(delayMs);
+    await wait(Math.min(delayMs, 450));
     sellCardForEddies(gameState, 'bot', cardToSell.instanceId);
     updateCallback({ ...gameState });
   }
@@ -655,23 +682,29 @@ export async function runBotTurn(gameState, updateCallback, delayMs = 700) {
     if (playableOpeningUnits.length > 0) {
       const unitToPlay = playableOpeningUnits[0];
       const uCost = getEffectiveCardCost(unitToPlay, bot, gameState);
-      await wait(delayMs);
+      await wait(Math.min(delayMs, 450));
+      const logBefore = (gameState.actionLog || []).length;
       botPrepareEddies(bot, uCost);
       const res = playUnitCard(gameState, 'bot', unitToPlay.instanceId);
-      if (res.success) updateCallback({ ...gameState });
+      if (res.success) {
+        const cont = await pauseAfterPlay('UNIT', unitToPlay, logBefore);
+        if (!cont) return;
+      }
     } else {
       // Sin unidad de coste 2 (ni 1): llamar 1 Leyenda boca arriba y pasar turno
       if (!bot.hasCalledLegendThisTurn && getBotMaxCapacity(bot) >= 1) {
         const leg = chooseBestLegendToCall(bot, player);
         if (leg) {
-          await wait(delayMs);
+          await wait(Math.min(delayMs, 450));
+          const logBefore = (gameState.actionLog || []).length;
           botPrepareEddies(bot, 1, leg.instanceId);
           callLegendFaceUp(gameState, 'bot', leg.instanceId);
-          updateCallback({ ...gameState });
+          const cont = await pauseAfterPlay('CALL_LEGEND', leg, logBefore);
+          if (!cont) return;
         }
       }
       // Si la unidad jugada tuviera Adrenaline (no hubo) -> aquí no hay ataques posibles en Turno 1 sin unidades
-      await wait(delayMs);
+      await wait(Math.min(delayMs, 450));
       passTurn(gameState);
       updateCallback({ ...gameState });
       return;
@@ -688,15 +721,23 @@ export async function runBotTurn(gameState, updateCallback, delayMs = 700) {
     // ---------------------------------------------------------------------
 
     // 3.A: Activar habilidades (↷) gratuitas de robo/filtro/buff antes de jugar si convienen
-    if (tryActivateBotAbilities(gameState, bot, player)) {
-      await wait(Math.floor(delayMs * 0.7));
-      updateCallback({ ...gameState });
+    const logBeforeAb1 = (gameState.actionLog || []).length;
+    const activated1 = tryActivateBotAbilities(gameState, bot, player);
+    if (activated1) {
+      await wait(Math.min(Math.floor(delayMs * 0.6), 400));
+      const cont = await pauseAfterPlay(
+        'ABILITY',
+        activated1.card,
+        logBeforeAb1,
+        activated1.ability?.title || ''
+      );
+      if (!cont) return;
     }
 
     // 3.B: Bucle táctico de despliegue (Unidades, Gears, Programas de alto valor, Go Solo)
     let keepPlaying = true;
     let safetyCounter = 0;
-    while (keepPlaying && !gameState.isGameOver && safetyCounter < 12) {
+    while (keepPlaying && !aborted && !gameState.isGameOver && safetyCounter < 12) {
       safetyCounter++;
       const maxCapacity = getBotMaxCapacity(bot);
       if (maxCapacity <= 0) break;
@@ -725,7 +766,7 @@ export async function runBotTurn(gameState, updateCallback, delayMs = 700) {
           let score = 54 + pBonus * 5;
           if (hasKeyword(card, 'Blocker') && !hasKeyword(target, 'Blocker')) score += 12;
           if (['CP-030', 'CP-039', 'CP-114', 'CP-116', 'CP-151'].includes(resolveCardId(card))) score += 10;
-          actions.push({ kind: 'CARD', card, cost, score, targetId: target.instanceId });
+          actions.push({ kind: 'CARD', card, cost, score, targetId: target.instanceId, targetName: target.name });
         } else if (type === 'PROGRAM') {
           const score = evaluateProgramScore(card, bot, player, gameState);
           if (score > 0) {
@@ -755,42 +796,66 @@ export async function runBotTurn(gameState, updateCallback, delayMs = 700) {
       actions.sort((a, b) => b.score - a.score);
       const best = actions[0];
 
-      await wait(delayMs);
+      await wait(Math.min(delayMs, 450));
+      const logBefore = (gameState.actionLog || []).length;
       if (best.kind === 'GO_SOLO') {
         botPrepareEddies(bot, best.cost);
         const res = playLegendToField(gameState, 'bot', best.card.instanceId, true);
-        if (res.success) updateCallback({ ...gameState });
-        else keepPlaying = false;
+        if (res.success) {
+          const cont = await pauseAfterPlay('GO_SOLO', best.card, logBefore);
+          if (!cont) return;
+        } else {
+          keepPlaying = false;
+        }
       } else {
         botPrepareEddies(bot, best.cost);
+        const cardType = getCardType(best.card);
         const res =
-          getCardType(best.card) === 'GEAR'
+          cardType === 'GEAR'
             ? playGearCard(gameState, 'bot', best.card.instanceId, best.targetId)
             : playCard(gameState, 'bot', best.card.instanceId, best.targetId);
-        if (res.success) updateCallback({ ...gameState });
-        else keepPlaying = false;
+        if (res.success) {
+          const cont = await pauseAfterPlay(cardType || 'UNIT', best.card, logBefore, best.targetName || '');
+          if (!cont) return;
+        } else {
+          keepPlaying = false;
+        }
       }
     }
+
+    if (aborted || gameState.isGameOver) return;
 
     // 3.C: Llamar a 1 Leyenda boca arriba progresivamente si queda >= 1 €$ disponible
     if (!bot.hasCalledLegendThisTurn && getBotMaxCapacity(bot) >= 1 && !gameState.isGameOver) {
       const faceDownLegend = chooseBestLegendToCall(bot, player);
       if (faceDownLegend) {
-        await wait(delayMs);
+        await wait(Math.min(delayMs, 450));
+        const logBefore = (gameState.actionLog || []).length;
         botPrepareEddies(bot, 1, faceDownLegend.instanceId);
         callLegendFaceUp(gameState, 'bot', faceDownLegend.instanceId);
-        updateCallback({ ...gameState });
+        const cont = await pauseAfterPlay('CALL_LEGEND', faceDownLegend, logBefore);
+        if (!cont) return;
       }
     }
 
     // 3.D: Reintentar habilidades activadas (↷) de Leyendas recién llamadas o tras jugar cartas
-    if (!gameState.isGameOver && tryActivateBotAbilities(gameState, bot, player)) {
-      await wait(Math.floor(delayMs * 0.7));
-      updateCallback({ ...gameState });
+    if (!aborted && !gameState.isGameOver) {
+      const logBeforeAb2 = (gameState.actionLog || []).length;
+      const activated2 = tryActivateBotAbilities(gameState, bot, player);
+      if (activated2) {
+        await wait(Math.min(Math.floor(delayMs * 0.6), 400));
+        const cont = await pauseAfterPlay(
+          'ABILITY',
+          activated2.card,
+          logBeforeAb2,
+          activated2.ability?.title || ''
+        );
+        if (!cont) return;
+      }
     }
   }
 
-  if (gameState.isGameOver) return;
+  if (aborted || gameState.isGameOver) return;
 
   // -----------------------------------------------------------------------
   // PASO 4: FASE DE ATAQUES CON CONCIENCIA DE BLOCKERS, LETHAL Y JOHNNY
@@ -966,7 +1031,7 @@ export async function runBotTurn(gameState, updateCallback, delayMs = 700) {
  * Resuelve el combate pendiente tras la Fase de Respuesta del Jugador,
  * y continúa con los siguientes ataques del bot o finaliza el turno del bot.
  */
-export async function resolvePendingAttackAndContinueBot(gameState, updateCallback, delayMs = 700) {
+export async function resolvePendingAttackAndContinueBot(gameState, updateCallback, delayMs = 700, pauseForAck = null) {
   if (!gameState.pendingReaction) return;
 
   const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -1012,7 +1077,7 @@ export async function resolvePendingAttackAndContinueBot(gameState, updateCallba
   // Continuar con los siguientes ataques del bot si tiene más unidades listas que quieran atacar
   const remainingReadyUnits = (bot.field || []).filter((u) => canUnitAttack(u, bot, gameState));
   if (remainingReadyUnits.length > 0) {
-    return runBotTurn(gameState, updateCallback, delayMs);
+    return runBotTurn(gameState, updateCallback, delayMs, pauseForAck);
   } else {
     passTurn(gameState);
     updateCallback({ ...gameState });

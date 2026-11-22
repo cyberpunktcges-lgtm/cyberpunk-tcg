@@ -34,6 +34,7 @@ import {
 } from 'lucide-react';
 import CyberAuthModal from './CyberAuthModal.jsx';
 import CyberBugReportModal from './CyberBugReportModal.jsx';
+import CyberBotActionPopup from './CyberBotActionPopup.jsx';
 import { installGlobalErrorBuffer } from '../utils/betaDiagnostics.js';
 import CyberProfileModal from './CyberProfileModal.jsx';
 import CyberMyDecksModal from './CyberMyDecksModal.jsx';
@@ -927,6 +928,63 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
   const [showMyDecksModal, setShowMyDecksModal] = useState(false);
   const [showDeckSelectorModal, setShowDeckSelectorModal] = useState(false);
   const [showBugReportModal, setShowBugReportModal] = useState(false);
+
+  // Pausa paso a paso en las jugadas del Bot (OK para continuar) — activado por defecto en Beta
+  const [botStepPauseEnabled, setBotStepPauseEnabled] = useState(() => {
+    try {
+      if (typeof window !== 'undefined') {
+        const saved = localStorage.getItem('cyber_sim_bot_pause');
+        if (saved !== null) return saved === 'true';
+      }
+    } catch {}
+    return true;
+  });
+  const botStepPauseEnabledRef = useRef(botStepPauseEnabled);
+  useEffect(() => {
+    botStepPauseEnabledRef.current = botStepPauseEnabled;
+    try {
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('cyber_sim_bot_pause', String(botStepPauseEnabled));
+      }
+    } catch {}
+  }, [botStepPauseEnabled]);
+
+  const [pendingBotAck, setPendingBotAck] = useState(null);
+  const botAckResolverRef = useRef(null);
+
+  const waitForBotAck = (eventInfo) => {
+    if (!botStepPauseEnabledRef.current) return Promise.resolve({ ok: true });
+    return new Promise((resolve) => {
+      if (eventInfo?.card) setPreviewCard(eventInfo.card);
+      botAckResolverRef.current = resolve;
+      setPendingBotAck(eventInfo);
+    });
+  };
+
+  const handleConfirmBotAck = () => {
+    const resolver = botAckResolverRef.current;
+    botAckResolverRef.current = null;
+    setPendingBotAck(null);
+    if (resolver) resolver({ ok: true });
+  };
+
+  const handleCancelPendingBotAck = () => {
+    const resolver = botAckResolverRef.current;
+    botAckResolverRef.current = null;
+    setPendingBotAck(null);
+    if (resolver) resolver({ cancelled: true });
+  };
+
+  const handleToggleBotStepPause = () => {
+    setBotStepPauseEnabled((prev) => {
+      const next = !prev;
+      botStepPauseEnabledRef.current = next;
+      if (!next && botAckResolverRef.current) {
+        handleConfirmBotAck();
+      }
+      return next;
+    });
+  };
 
   // Instalar captura ligera de errores JS en segundo plano para los reportes Beta
   useEffect(() => {
@@ -2922,7 +2980,8 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
     await resolvePendingAttackAndContinueBot(
       gameState,
       (updated) => setGameState({ ...updated }),
-      750
+      650,
+      waitForBotAck
     );
     setIsBotThinking(false);
   };
@@ -3045,6 +3104,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
     setSelectedHandCard(null);
     setSelectedFieldUnit(null);
     setLegendMenuId(null);
+    handleCancelPendingBotAck();
     setHoveredCard(null);
     setPreviewCard(null);
     setHolocall(null);
@@ -3074,6 +3134,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
     startingPlayer = null,
     isRematch = false
   ) => {
+    handleCancelPendingBotAck();
     if (!forceNew) {
       const saved = loadSavedGame();
       if (saved && saved.gameState) {
@@ -3307,7 +3368,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
 
     if (gameState.activePlayer === 'bot' && !isBotThinking && !gameState.pendingReaction) {
       setIsBotThinking(true);
-      runBotTurn(gameState, (updated) => setGameState({ ...updated }), 750).then(() => {
+      runBotTurn(gameState, (updated) => setGameState({ ...updated }), 650, waitForBotAck).then(() => {
         setIsBotThinking(false);
       });
     }
@@ -3639,6 +3700,27 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
             >
               <Eye className="w-3.5 h-3.5" />
               <span className="hidden xl:inline">{isKiroshiCollapsed ? 'VER HUD' : 'HUD'}</span>
+            </button>
+
+            {/* Toggle Pausa Paso a Paso del Bot (OK por jugada) */}
+            <button
+              type="button"
+              onClick={handleToggleBotStepPause}
+              style={{ clipPath: CYBER_BUTTON }}
+              className={`px-2 py-1.5 font-bold uppercase flex items-center gap-1 cursor-pointer text-[11px] border transition-all whitespace-nowrap ${
+                botStepPauseEnabled
+                  ? 'bg-[#FCEE0A]/15 border-[#FCEE0A] text-[#FCEE0A] shadow-[0_0_10px_rgba(252,238,10,0.25)]'
+                  : 'bg-[#000000] border-gray-700 text-gray-400 hover:border-[#0dfceb] hover:text-[#0dfceb]'
+              }`}
+              title={
+                botStepPauseEnabled
+                  ? 'Pausa tras cada jugada del Bot ACTIVADA (pulsa OK para continuar). Clic para modo rápido.'
+                  : 'Modo rápido activo (el Bot juega sin pausar). Clic para pausar tras cada jugada del Bot.'
+              }
+            >
+              <Bot className="w-3.5 h-3.5" />
+              <span className="hidden xl:inline">{botStepPauseEnabled ? 'PAUSA BOT: ON' : 'BOT RÁPIDO'}</span>
+              <span className="xl:hidden">{botStepPauseEnabled ? 'OK' : '⚡'}</span>
             </button>
 
             {/* Botón Reportar Bug (Fase Beta cerrada) */}
@@ -9177,6 +9259,23 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
         onSelectDecks={({ playerDeck, botDeck, playerAvatar: pAv, botAvatar: bAv }) => {
           handleStartWithDecks(playerDeck, botDeck, pAv, bAv);
         }}
+      />
+
+      {/* Ventana Paso a Paso de Jugadas del Bot (OK para continuar) */}
+      <CyberBotActionPopup
+        event={pendingBotAck}
+        onConfirm={handleConfirmBotAck}
+        onDisablePauses={() => {
+          setBotStepPauseEnabled(false);
+          botStepPauseEnabledRef.current = false;
+          handleConfirmBotAck();
+        }}
+        onHoverCard={(c) => {
+          setHoveredCard(c);
+          setPreviewCard(c);
+        }}
+        onInspectCard={(c) => setInspectedCard(c)}
+        disabledHotkeys={showBugReportModal}
       />
 
       {/* Modal de Reporte de Fallos Beta con Caja Negra Automática */}
