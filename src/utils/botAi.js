@@ -398,33 +398,18 @@ function chooseCardToSellForBot(bot, player, gameState) {
 }
 
 /**
- * Elige la mejor Leyenda boca abajo para hacer Call (prioriza efectos útiles ahora).
+ * Elige qué Leyenda boca abajo revelar (Call) SIN hacer trampas:
+ * Las Leyendas boca abajo están ocultas para ambos jugadores, así que el Bot
+ * solo usa información pública (preferir una ya girada si existe) y elige al azar.
  */
-function chooseBestLegendToCall(bot, player) {
+function chooseBestLegendToCall(bot) {
   const faceDown = (bot.legends || []).filter((l) => !l.isFaceUp && !l.isRemovedFromGame && !l.isOnField);
   if (faceDown.length === 0) return null;
 
-  let best = faceDown[0];
-  let bestScore = -999;
-
-  for (const leg of faceDown) {
-    const cid = resolveCardId(leg);
-    let score = 10;
-    // Leyendas con habilidades pasivas o ↷ muy fuertes tempranas
-    if (['CP-026', 'CP-045', 'CP-051', 'CP-058', 'CP-082', 'CP-091', 'CP-143'].includes(cid)) score += 15;
-    // Si tiene CALL que interactúa con mesa rival y el rival está vacío, esperar un poco
-    if ((cid === 'CP-091' || cid === 'CP-143') && (player.field || []).length === 0) score -= 5;
-    // Si está enderezada y tiene Go Solo, vale la pena revelarla pronto
-    if (hasKeyword(leg, 'Go Solo') && !leg.isSpent) score += 8;
-    // Preferir llamar una leyenda que esté girada en Turno 1 para que ya quede boca arriba sin perder capacidad
-    if (leg.isSpent) score += 5;
-
-    if (score > bestScore) {
-      bestScore = score;
-      best = leg;
-    }
-  }
-  return best;
+  const spentFaceDown = faceDown.filter((l) => l.isSpent);
+  const pool = spentFaceDown.length > 0 ? spentFaceDown : faceDown;
+  const pickIdx = Math.floor(Math.random() * pool.length);
+  return pool[pickIdx];
 }
 
 /**

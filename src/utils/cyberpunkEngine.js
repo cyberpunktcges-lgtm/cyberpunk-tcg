@@ -408,12 +408,32 @@ export function parseCardPower(powerStr) {
 }
 
 /**
- * Baraja una lista de cartas (algoritmo Fisher-Yates)
+ * Entero aleatorio uniforme en [0, maxExclusive) usando crypto.getRandomValues (sin sesgo de módulo)
+ */
+function getSecureRandomInt(maxExclusive) {
+  if (maxExclusive <= 1) return 0;
+  try {
+    if (typeof globalThis !== 'undefined' && globalThis.crypto?.getRandomValues) {
+      const buf = new Uint32Array(1);
+      const limit = Math.floor(0x100000000 / maxExclusive) * maxExclusive;
+      let val = 0;
+      do {
+        globalThis.crypto.getRandomValues(buf);
+        val = buf[0];
+      } while (val >= limit);
+      return val % maxExclusive;
+    }
+  } catch {}
+  return Math.floor(Math.random() * maxExclusive);
+}
+
+/**
+ * Baraja una lista de cartas (algoritmo Fisher-Yates con entropía criptográfica uniforme)
  */
 export function shuffleDeck(cards) {
   const arr = [...cards];
   for (let i = arr.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
+    const j = getSecureRandomInt(i + 1);
     [arr[i], arr[j]] = [arr[j], arr[i]];
   }
   return arr;
@@ -490,12 +510,27 @@ export function createInitialGameState(playerDeckInput, botDeckInput, allCards =
     };
   };
 
-  // 1. Preparar mazo y leyendas del jugador (posicionadas aleatoriamente al inicio)
-  const shuffledRawPlayerLegends = shuffleDeck([...(playerDeckInput.legends || [])]).slice(0, 3);
+  const extractLegendsAndCards = (deckInput) => {
+    const rawList = deckInput?.deckList || deckInput?.cards || [];
+    const isLeg = (c) =>
+      String(c?.officialType || '').toUpperCase() === 'LEGEND' ||
+      String(c?.cardType || c?.type || '').toUpperCase().includes('LEGEND');
+    let legs = Array.isArray(deckInput?.legends) && deckInput.legends.length > 0
+      ? [...deckInput.legends]
+      : rawList.filter(isLeg);
+    let mainCards = Array.isArray(deckInput?.legends) && deckInput.legends.length > 0
+      ? rawList.filter((c) => !isLeg(c))
+      : rawList.filter((c) => !isLeg(c));
+    return { legs: legs.slice(0, 3), mainCards };
+  };
+
+  // 1. Preparar mazo y leyendas del jugador (posicionadas aleatoriamente al inicio de cada partida)
+  const playerSplit = extractLegendsAndCards(playerDeckInput);
+  const shuffledRawPlayerLegends = shuffleDeck(playerSplit.legs);
 
   // Expandir mazo del jugador por qty
   const rawPlayerCards = [];
-  (playerDeckInput.deckList || playerDeckInput.cards || []).forEach((c) => {
+  playerSplit.mainCards.forEach((c) => {
     const qty = c.qty || 1;
     for (let i = 0; i < qty; i++) {
       rawPlayerCards.push(enrichCard(c, 'p', rawPlayerCards.length));
@@ -503,11 +538,12 @@ export function createInitialGameState(playerDeckInput, botDeckInput, allCards =
   });
   const shuffledPlayerDeck = shuffleDeck(rawPlayerCards);
 
-  // 2. Preparar mazo y leyendas del Bot (posicionadas aleatoriamente al inicio)
-  const shuffledRawBotLegends = shuffleDeck([...(botDeckInput.legends || [])]).slice(0, 3);
+  // 2. Preparar mazo y leyendas del Bot (posicionadas aleatoriamente al inicio de cada partida)
+  const botSplit = extractLegendsAndCards(botDeckInput);
+  const shuffledRawBotLegends = shuffleDeck(botSplit.legs);
 
   const rawBotCards = [];
-  (botDeckInput.deckList || botDeckInput.cards || []).forEach((c) => {
+  botSplit.mainCards.forEach((c) => {
     const qty = c.qty || 1;
     for (let i = 0; i < qty; i++) {
       rawBotCards.push(enrichCard(c, 'b', rawBotCards.length));
@@ -918,11 +954,13 @@ export function toggleLegendSpent(state, playerKey, legendInstanceId) {
   }
 
   if (!leg.isSpent) {
-    // Girar leyenda para obtener 1 €$
+    // Girar leyenda para obtener 1 €$ (sin revelar el nombre si está boca abajo)
     leg.isSpent = true;
     p.floatingEddies = (p.floatingEddies || 0) + 1;
+    const slotNum = (p.legends || []).findIndex((l) => l.instanceId === legendInstanceId) + 1;
+    const legLabel = leg.isFaceUp ? `"${leg.name}"` : `Leyenda #${slotNum} (boca abajo)`;
     (state.actionLog = state.actionLog || []).unshift(
-      `👑 ${p.name} gira a su Leyenda "${leg.name}" (+1 €$). Total listos: ${p.floatingEddies} €$.`
+      `👑 ${p.name} gira su ${legLabel} (+1 €$). Total listos: ${p.floatingEddies} €$.`
     );
     executeCardSpentTriggers(state, playerKey, leg);
     return { success: true, isSpent: true, floatingEddies: p.floatingEddies };
