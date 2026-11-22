@@ -112,9 +112,22 @@ export default function CyberMyDecksModal({
       onClose();
     } else {
       try {
-        localStorage.setItem('cp_tcg_custom_deck', JSON.stringify(deck));
+        localStorage.setItem(
+          'cp_tcg_custom_deck',
+          JSON.stringify({
+            id: deck.id || null,
+            name: deck.name || 'Mazo Cargado',
+            faction: deck.faction || 'Neutral',
+            cards: Array.isArray(deck.cards)
+              ? deck.cards
+              : Array.isArray(deck.deckList)
+              ? deck.deckList
+              : [],
+            sideboard: Array.isArray(deck.sideboard) ? deck.sideboard : []
+          })
+        );
       } catch {}
-      window.location.href = '/cartas';
+      window.location.href = '/cartas?editDeck=1';
     }
   };
 

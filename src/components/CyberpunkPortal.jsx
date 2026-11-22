@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { splitAndSortTournaments } from '../utils/dateUtils.js';
 import ProxyPrintModal from './ProxyPrintModal.jsx';
@@ -286,7 +286,7 @@ export default function CyberpunkPortal({
     return () => unsubscribe();
   }, []);
 
-  // Guardar mazo actual en la cuenta de Firebase Firestore
+  // Guardar o actualizar mazo actual en la cuenta de Firebase Firestore
   const handleSaveDeckToCloud = async () => {
     if (!currentUser) {
       setAuthModalOpen(true);
@@ -298,13 +298,23 @@ export default function CyberpunkPortal({
     }
     setIsSavingDeck(true);
     try {
-      await saveUserDeck(currentUser.uid, {
+      const wasUpdating = Boolean(activeCloudDeckId);
+      const savedDeck = await saveUserDeck(currentUser.uid, {
+        id: activeCloudDeckId || undefined,
         name: customDeckName,
         faction: customDeckFaction,
         cards: customDeckList,
         sideboard: customSideboardList
       });
-      setDeckToast({ type: 'success', text: `¡Mazo "${customDeckName}" guardado en la nube!` });
+      if (savedDeck?.id) {
+        setActiveCloudDeckId(savedDeck.id);
+      }
+      setDeckToast({
+        type: 'success',
+        text: wasUpdating
+          ? `¡Cambios guardados en "${customDeckName}"!`
+          : `¡Mazo "${customDeckName}" guardado en la nube!`
+      });
       setTimeout(() => setDeckToast(null), 3500);
       const updated = await getUserDecks(currentUser.uid);
       setUserCloudDecks(updated);
@@ -315,15 +325,44 @@ export default function CyberpunkPortal({
     }
   };
 
-  // Cargar un mazo de la nube al constructor
+  // Cargar un mazo de la nube al constructor (y navegar a /cartas si estamos en otra página)
   const handleLoadCloudDeck = (cloudDeck) => {
     if (!cloudDeck) return;
-    setCustomDeckName(cloudDeck.name || 'Mazo Cargado');
-    setCustomDeckFaction(cloudDeck.faction || 'Arasaka');
-    setCustomDeckList(cloudDeck.cards || []);
-    setCustomSideboardList(cloudDeck.sideboard || []);
-    setDeckToast({ type: 'success', text: `Mazo "${cloudDeck.name}" cargado en el constructor` });
-    setTimeout(() => setDeckToast(null), 3000);
+    const deckCards = Array.isArray(cloudDeck.cards)
+      ? cloudDeck.cards
+      : Array.isArray(cloudDeck.deckList)
+      ? cloudDeck.deckList
+      : [];
+    const deckSideboard = Array.isArray(cloudDeck.sideboard) ? cloudDeck.sideboard : [];
+    const payload = {
+      id: cloudDeck.id || null,
+      name: cloudDeck.name || 'Mazo Cargado',
+      faction: cloudDeck.faction || 'Arasaka',
+      cards: deckCards,
+      sideboard: deckSideboard
+    };
+
+    try {
+      localStorage.setItem('cp_tcg_custom_deck', JSON.stringify(payload));
+    } catch {}
+
+    // Si el usuario pulsa "EDITAR" desde portada, noticias, mazos o torneos, abrir directamente el Deckbuilder en /cartas
+    if (currentPage !== 'cartas') {
+      window.location.href = '/cartas?editDeck=1';
+      return;
+    }
+
+    setActiveCloudDeckId(payload.id);
+    setCustomDeckName(payload.name);
+    setCustomDeckFaction(payload.faction);
+    setCustomDeckList(payload.cards);
+    setCustomSideboardList(payload.sideboard);
+    setDeckbuilderOpen(true);
+    setDeckToast({ type: 'success', text: `Editando mazo "${payload.name}" en el constructor` });
+    setTimeout(() => setDeckToast(null), 3500);
+    setTimeout(() => {
+      deckbuilderPanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 80);
   };
 
   // Probar mazo actual en el simulador
@@ -336,6 +375,7 @@ export default function CyberpunkPortal({
       localStorage.setItem(
         'cp_tcg_custom_deck',
         JSON.stringify({
+          id: activeCloudDeckId || null,
           name: customDeckName,
           faction: customDeckFaction,
           cards: customDeckList,
@@ -348,10 +388,13 @@ export default function CyberpunkPortal({
 
   // Estados del Constructor de Mazos (Deckbuilder en /cartas)
   const [deckbuilderOpen, setDeckbuilderOpen] = useState(true);
+  const [activeCloudDeckId, setActiveCloudDeckId] = useState(null);
   const [customDeckName, setCustomDeckName] = useState('Mi Mazo Edgerunner');
   const [customDeckFaction, setCustomDeckFaction] = useState('Arasaka');
   const [customDeckList, setCustomDeckList] = useState([]);
   const [customSideboardList, setCustomSideboardList] = useState([]);
+  const hasHydratedDeckRef = useRef(false);
+  const deckbuilderPanelRef = useRef(null);
   const [deckBuilderTarget, setDeckBuilderTarget] = useState('main'); // 'main' | 'sideboard'
   const [copiedDeck, setCopiedDeck] = useState(false);
   const [visualDeckModalOpen, setVisualDeckModalOpen] = useState(false);
@@ -379,25 +422,46 @@ export default function CyberpunkPortal({
     setProxyModalOpen(true);
   };
 
-  // Cargar y persistir borrador del Constructor de Mazos en localStorage
+  // Cargar y persistir borrador del Constructor de Mazos en localStorage (sin sobrescribir en el primer render)
   useEffect(() => {
     try {
       const saved = localStorage.getItem('cp_tcg_custom_deck');
       if (saved) {
         const parsed = JSON.parse(saved);
+        if (parsed.id) setActiveCloudDeckId(parsed.id);
         if (parsed.name) setCustomDeckName(parsed.name);
         if (parsed.faction) setCustomDeckFaction(parsed.faction);
-        if (Array.isArray(parsed.cards)) setCustomDeckList(parsed.cards);
+        const restoredCards = Array.isArray(parsed.cards)
+          ? parsed.cards
+          : Array.isArray(parsed.deckList)
+          ? parsed.deckList
+          : null;
+        if (restoredCards) setCustomDeckList(restoredCards);
         if (Array.isArray(parsed.sideboard)) setCustomSideboardList(parsed.sideboard);
+
+        if (typeof window !== 'undefined' && window.location.search.includes('editDeck=1')) {
+          setDeckbuilderOpen(true);
+          setDeckToast({
+            type: 'success',
+            text: `Editando mazo "${parsed.name || 'Mazo Cargado'}" en el constructor`
+          });
+          setTimeout(() => setDeckToast(null), 3500);
+          setTimeout(() => {
+            deckbuilderPanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }, 180);
+        }
       }
     } catch {}
+    hasHydratedDeckRef.current = true;
   }, []);
 
   useEffect(() => {
+    if (!hasHydratedDeckRef.current) return;
     try {
       localStorage.setItem(
         'cp_tcg_custom_deck',
         JSON.stringify({
+          id: activeCloudDeckId || null,
           name: customDeckName,
           faction: customDeckFaction,
           cards: customDeckList,
@@ -405,7 +469,7 @@ export default function CyberpunkPortal({
         })
       );
     } catch {}
-  }, [customDeckName, customDeckFaction, customDeckList, customSideboardList]);
+  }, [activeCloudDeckId, customDeckName, customDeckFaction, customDeckList, customSideboardList]);
 
   // Funciones del Constructor de Mazos (Baraja Principal + Banquillo)
   const totalDeckCards = customDeckList.reduce((acc, item) => acc + item.qty, 0);
@@ -4305,6 +4369,7 @@ export default function CyberpunkPortal({
               {/* Panel Lateral: Constructor de Mazos (Deckbuilder) */}
               {deckbuilderOpen && (
                 <aside
+                  ref={deckbuilderPanelRef}
                   style={{ clipPath: CYBER_CLIP }}
                   className="lg:col-span-4 bg-[#000000] border-2 border-[#FCEE0A] p-5 space-y-5 lg:sticky lg:top-24"
                 >
@@ -4336,21 +4401,36 @@ export default function CyberpunkPortal({
                           </span>
                         </div>
                         {userCloudDecks.length > 0 ? (
-                          <select
-                            onChange={(e) => {
-                              const found = userCloudDecks.find((d) => d.id === e.target.value);
-                              if (found) handleLoadCloudDeck(found);
-                            }}
-                            className="w-full bg-[#03060c] border border-gray-700 text-white text-[11px] px-2 py-1.5 focus:border-[#00F0FF] cursor-pointer"
-                            defaultValue=""
-                          >
-                            <option value="" disabled>-- Cargar mazo guardado ({userCloudDecks.length}) --</option>
-                            {userCloudDecks.map((d) => (
-                              <option key={d.id} value={d.id}>
-                                📁 {d.name} ({d.faction} • {d.cards?.reduce((acc, c) => acc + (c.qty || 1), 0) || 0} cartas)
-                              </option>
-                            ))}
-                          </select>
+                          <div className="space-y-1.5">
+                            <select
+                              value={activeCloudDeckId || ''}
+                              onChange={(e) => {
+                                const found = userCloudDecks.find((d) => d.id === e.target.value);
+                                if (found) handleLoadCloudDeck(found);
+                              }}
+                              className="w-full bg-[#03060c] border border-gray-700 text-white text-[11px] px-2 py-1.5 focus:border-[#00F0FF] cursor-pointer"
+                            >
+                              <option value="" disabled>-- Cargar mazo guardado ({userCloudDecks.length}) --</option>
+                              {userCloudDecks.map((d) => (
+                                <option key={d.id} value={d.id}>
+                                  📁 {d.name} ({d.faction} • {d.cards?.reduce((acc, c) => acc + (c.qty || 1), 0) || 0} cartas)
+                                </option>
+                              ))}
+                            </select>
+                            {activeCloudDeckId && (
+                              <div className="flex items-center justify-between text-[9px] text-[#FCEE0A] bg-[#FCEE0A]/10 border border-[#FCEE0A]/30 px-2 py-1">
+                                <span className="font-bold uppercase">✏️ Editando mazo guardado</span>
+                                <button
+                                  type="button"
+                                  onClick={() => setActiveCloudDeckId(null)}
+                                  className="text-[#00F0FF] hover:text-white underline cursor-pointer"
+                                  title="Desvincular para guardar como un mazo nuevo independiente"
+                                >
+                                  Guardar como nuevo
+                                </button>
+                              </div>
+                            )}
+                          </div>
                         ) : (
                           <p className="text-[10px] text-gray-500 italic">
                             No tienes mazos guardados aún. Guarda tu mazo para acceder desde cualquier dispositivo.
@@ -4590,7 +4670,11 @@ export default function CyberpunkPortal({
                         {customDeckList.length > 0 && (
                           <button
                             type="button"
-                            onClick={() => setCustomDeckList([])}
+                            onClick={() => {
+                        setCustomDeckList([]);
+                        setCustomSideboardList([]);
+                        setActiveCloudDeckId(null);
+                      }}
                             className="text-[10px] text-gray-500 hover:text-[#FF003C]"
                           >
                             Vaciar
@@ -4737,7 +4821,15 @@ export default function CyberpunkPortal({
                       className="w-full py-2.5 bg-[#070a10] border border-[#FCEE0A] text-[#FCEE0A] hover:bg-[#FCEE0A] hover:text-[#070a10] font-mono font-black text-xs uppercase flex items-center justify-center gap-2 cursor-pointer transition-all disabled:opacity-40"
                     >
                       <Save className="w-4 h-4" />
-                      <span>{isSavingDeck ? 'GUARDANDO EN CUENTA...' : (currentUser ? 'GUARDAR EN MI CUENTA' : 'GUARDAR EN MI CUENTA (CONECTAR)')}</span>
+                      <span>
+                        {isSavingDeck
+                          ? 'GUARDANDO EN CUENTA...'
+                          : currentUser
+                          ? activeCloudDeckId
+                            ? 'ACTUALIZAR MAZO EN MI CUENTA'
+                            : 'GUARDAR EN MI CUENTA'
+                          : 'GUARDAR EN MI CUENTA (CONECTAR)'}
+                      </span>
                     </button>
 
                     {deckToast && (
@@ -4795,7 +4887,11 @@ export default function CyberpunkPortal({
                   {customDeckList.length > 0 && (
                     <button
                       type="button"
-                      onClick={() => setCustomDeckList([])}
+                      onClick={() => {
+                        setCustomDeckList([]);
+                        setCustomSideboardList([]);
+                        setActiveCloudDeckId(null);
+                      }}
                       className="w-full py-1.5 text-[11px] font-mono text-[#FF003C] hover:underline flex items-center justify-center gap-1 cursor-pointer"
                     >
                       <Trash2 className="w-3.5 h-3.5" />

@@ -9102,8 +9102,24 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
           }
         }}
         onLoadDeckToBuilder={(deck) => {
+          try {
+            localStorage.setItem(
+              'cp_tcg_custom_deck',
+              JSON.stringify({
+                id: deck.id || null,
+                name: deck.name || 'Mazo Cargado',
+                faction: deck.faction || 'Neutral',
+                cards: Array.isArray(deck.cards)
+                  ? deck.cards
+                  : Array.isArray(deck.deckList)
+                  ? deck.deckList
+                  : [],
+                sideboard: Array.isArray(deck.sideboard) ? deck.sideboard : []
+              })
+            );
+          } catch {}
           setShowMyDecksModal(false);
-          handleStartWithDecks(deck, activeBotDeck || availableDecks[selectedBotDeckIdx]);
+          window.location.href = '/cartas?editDeck=1';
         }}
       />
 
