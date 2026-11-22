@@ -1524,16 +1524,16 @@
     "edition": "Uncommon"
   },
   "the-relic-experimental-biochip": {
-    "officialType": "UNIT",
-    "cardType": "UNIT // Merc • Netrunner",
-    "traits": "Merc, Netrunner",
-    "cost": "4 EDDIES",
-    "power": "4 FUERZA",
-    "ram": "x2",
+    "officialType": "GEAR",
+    "cardType": "GEAR // Arasaka • Cyberware",
+    "traits": "Arasaka, Cyberware",
+    "cost": "5 EDDIES",
+    "power": "+3 FUERZA",
+    "ram": "x4",
     "keywords": "Defeated",
     "aspect": "Yellow",
     "cardId": "β055",
-    "edition": "Uncommon"
+    "edition": "Iconic Rare"
   },
   "three-mouths-one-desire": {
     "officialType": "PROGRAM",

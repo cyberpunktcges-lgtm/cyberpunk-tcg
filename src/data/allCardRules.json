@@ -2727,10 +2727,10 @@
     "id": "CP-128",
     "name": "The Relic // Experimental Biochip",
     "slug": "the-relic-experimental-biochip",
-    "officialType": "UNIT",
+    "officialType": "GEAR",
     "aspect": "Yellow",
-    "costNum": 4,
-    "powerVal": "4",
+    "costNum": 5,
+    "powerVal": "+3",
     "rulesText": "DEFEATED Play another Unit with cost 9 or less from your trash for free. Then, bottom-deck this Unit.",
     "keywords": [],
     "classification": [

@@ -1976,13 +1976,17 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
       });
     } else if (choice.destination === 'FIELD') {
       selectedCards.forEach((c) => {
-        p.field.push({
+        const deployed = {
           ...c,
           isSpent: false,
           isLagging: true,
           currentPower: c.parsedPower || c.power || 1,
           gear: []
-        });
+        };
+        p.field.push(deployed);
+        if (choice.triggerPlayEffect) {
+          executeUnitPlayTrigger(gameState, 'player', deployed);
+        }
       });
     }
 

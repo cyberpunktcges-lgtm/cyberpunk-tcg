@@ -1561,6 +1561,7 @@ export function sendDefeatedUnitToGraveyardOrExile(playerState, unit, state = nu
   if (jackieCheck?.intercepted) return jackieCheck;
 
   const equippedGears = Array.isArray(unit.gear) ? [...unit.gear] : [];
+  unit.lastEquippedGear = equippedGears;
   unit.gear = [];
 
   const isGoSoloOrLegend = Boolean(unit.hasGoSolo || unit.isLegendUnit);
@@ -1607,6 +1608,7 @@ export function sendUnitToBottomDeck(playerState, unit, state = null) {
   if (!playerState.deck) playerState.deck = [];
 
   const equippedGears = Array.isArray(unit.gear) ? [...unit.gear] : [];
+  unit.lastEquippedGear = equippedGears;
   unit.gear = [];
 
   const isGoSoloOrLegend = Boolean(unit.hasGoSolo || unit.isLegendUnit);
@@ -3031,9 +3033,94 @@ export function executeUnitDefeatedTrigger(state, ownerKey, defeatedUnit) {
     }
   }
 
+  // Gears que estaban equipados a la unidad en el momento de ser derrotada
+  const priorGears =
+    Array.isArray(defeatedUnit.gear) && defeatedUnit.gear.length > 0
+      ? defeatedUnit.gear
+      : Array.isArray(defeatedUnit.lastEquippedGear)
+      ? defeatedUnit.lastEquippedGear
+      : [];
+
+  // CP-128: The Relic // Experimental Biochip (Gear)
+  // "DEFEATED Play another Unit with cost 9 or less from your trash for free. Then, bottom-deck this Unit."
+  const relicGear = priorGears.find(
+    (g) => resolveCardId(g) === 'CP-128' || String(g.slug || '').includes('the-relic')
+  );
+  if (relicGear) {
+    const isLegendOrGoSolo = Boolean(defeatedUnit.hasGoSolo || defeatedUnit.isLegendUnit);
+    if (!isLegendOrGoSolo && Array.isArray(p.trash)) {
+      const tIdx = p.trash.findIndex((c) => c.instanceId === defeatedUnit.instanceId);
+      if (tIdx !== -1) {
+        const [moved] = p.trash.splice(tIdx, 1);
+        if (!p.deck) p.deck = [];
+        p.deck.push(moved);
+      }
+    }
+
+    const allTrash = p.trash || [];
+    const eligibleUnits = allTrash.filter((c) => {
+      const isUnit =
+        c.officialType === 'UNIT' ||
+        String(c.type || c.cardType || '').toUpperCase().includes('UNIT');
+      const cost = getNumericCost(c);
+      return isUnit && cost <= 9 && c.instanceId !== defeatedUnit.instanceId;
+    });
+
+    if (ownerKey === 'player') {
+      if (eligibleUnits.length > 0) {
+        state.pendingCardChoice = {
+          type: 'CHOOSE_FROM_TRASH',
+          sourceZone: 'TRASH',
+          sourceCardId: 'CP-128',
+          sourceCardName: 'The Relic // Experimental Biochip',
+          sourceCardImage: relicGear.image || '',
+          title: '🧬 THE RELIC // BIOCHIP EXPERIMENTAL (DEFEATED)',
+          prompt: `Tu unidad "${defeatedUnit.name}" (equipada con The Relic) ha sido derrotada y enviada al fondo del mazo. Elige otra Unidad de coste 9 o menos de tu Basura para jugarla GRATIS:`,
+          cards: allTrash,
+          eligibleIds: eligibleUnits.map((c) => c.instanceId),
+          maxChoices: 1,
+          minChoices: 1,
+          filterDescription: 'Solo Unidades en tu Basura con coste ≤ 9 €$',
+          destination: 'FIELD',
+          triggerPlayEffect: true
+        };
+      }
+      state.actionLog.unshift(
+        `🧬 [The Relic // Experimental Biochip] "${defeatedUnit.name}" va al fondo del mazo${
+          eligibleUnits.length > 0
+            ? ' — elige otra Unidad (coste ≤ 9) de tu Basura para jugarla gratis.'
+            : ' (no hay otras Unidades de coste ≤ 9 en tu Basura).'
+        }`
+      );
+    } else if (eligibleUnits.length > 0) {
+      const best = [...eligibleUnits].sort(
+        (a, b) => (b.parsedPower || 0) - (a.parsedPower || 0)
+      )[0];
+      const bIdx = p.trash.findIndex((c) => c.instanceId === best.instanceId);
+      if (bIdx !== -1) p.trash.splice(bIdx, 1);
+      const revived = {
+        ...best,
+        isSpent: false,
+        isLagging: true,
+        currentPower: best.parsedPower || best.power || 1,
+        gear: []
+      };
+      if (!p.field) p.field = [];
+      p.field.push(revived);
+      executeUnitPlayTrigger(state, ownerKey, revived);
+      state.actionLog.unshift(
+        `🧬 [The Relic Rival] "${defeatedUnit.name}" va al fondo del mazo y despliega gratis a "${revived.name}" desde la Basura.`
+      );
+    } else {
+      state.actionLog.unshift(
+        `🧬 [The Relic Rival] "${defeatedUnit.name}" va al fondo del mazo (sin Unidades elegibles en Basura).`
+      );
+    }
+  }
+
   // CP-104: River Ward // Detective on the Hunt (Habilidad Pasiva)
   // "When a friendly equipped Unit is defeated, search the top 2 cards of your deck and trash 1."
-  const hasEquippedGear = defeatedUnit.gear && defeatedUnit.gear.length > 0;
+  const hasEquippedGear = priorGears.length > 0;
   if (hasEquippedGear) {
     const riverWard = (p.legends || []).find((l) => l.isFaceUp && (l.id === 'CP-104' || l.slug?.includes('river-ward')));
     if (riverWard) {

@@ -1560,6 +1560,7 @@ export function sendDefeatedUnitToGraveyardOrExile(playerState, unit, state = nu
   if (jackieCheck?.intercepted) return jackieCheck;
 
   const equippedGears = Array.isArray(unit.gear) ? [...unit.gear] : [];
+  unit.lastEquippedGear = equippedGears;
   unit.gear = [];
 
   const isGoSoloOrLegend = Boolean(unit.hasGoSolo || unit.isLegendUnit);
@@ -1607,6 +1608,7 @@ export function sendUnitToBottomDeck(playerState, unit, state = null) {
   if (!playerState.deck) playerState.deck = [];
 
   const equippedGears = Array.isArray(unit.gear) ? [...unit.gear] : [];
+  unit.lastEquippedGear = equippedGears;
   unit.gear = [];
 
   const isGoSoloOrLegend = Boolean(unit.hasGoSolo || unit.isLegendUnit);
