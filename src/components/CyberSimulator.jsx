@@ -5785,6 +5785,34 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                               );
                             })()}
 
+                            {/* Opción ACTIVAR GO SOLO (arriba, igual que las habilidades activadas de otras leyendas) */}
+                            {leg.isFaceUp && canDeploy && (
+                              <div className="mb-1.5 flex flex-col gap-1">
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setLegendMenuId(null);
+                                    handlePlayLegendToFieldAction(leg.instanceId, true);
+                                  }}
+                                  className="w-full py-1.5 px-2 text-left rounded text-[10px] font-black uppercase transition-all bg-gradient-to-r from-[#FF003C] to-[#FCEE0A] text-black shadow-[0_0_14px_rgba(255,0,60,0.5)] cursor-pointer hover:scale-[1.02] hover:brightness-110 flex flex-col gap-0.5 border border-[#FF003C]"
+                                >
+                                  <div className="flex items-center justify-between w-full">
+                                    <span className="flex items-center gap-1.5">
+                                      <span>🔥</span>
+                                      <span>ACTIVAR GO SOLO</span>
+                                    </span>
+                                    <span className="text-[9px] font-black px-1.5 py-0.2 rounded bg-black text-[#FCEE0A]">
+                                      {legCost} €$
+                                    </span>
+                                  </div>
+                                  <span className="text-[8px] font-sans text-black/90 font-bold lowercase tracking-tight">
+                                    entra lista y sin lag • ataca ya
+                                  </span>
+                                </button>
+                              </div>
+                            )}
+
                             {/* Opción 2: SACAR EDDIE (si está enderezada) */}
                             {!leg.isSpent && (
                               <button
@@ -5822,34 +5850,6 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                             {leg.isSpent && !isTurn1Penalty && (
                               <div className="text-[9px] text-gray-400 italic text-center py-1.5 px-2 bg-black/60 rounded border border-gray-800 mb-1 leading-tight">
                                 Girada. <span className="text-[#FCEE0A] not-italic font-bold">Usa DESHACER</span> si te has equivocado.
-                              </div>
-                            )}
-
-                            {/* Opción ACTIVAR GO SOLO si la leyenda está BOCA ARRIBA y puede desplegarse (Go Solo y coste > 0) */}
-                            {leg.isFaceUp && canDeploy && (
-                              <div className="pt-1 border-t border-[#0dfceb]/30 mb-1 flex flex-col gap-1">
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setLegendMenuId(null);
-                                    handlePlayLegendToFieldAction(leg.instanceId, true);
-                                  }}
-                                  className="w-full py-1.5 px-2 text-left rounded text-[10px] font-black uppercase transition-all bg-gradient-to-r from-[#FF003C] to-[#FCEE0A] text-black shadow-[0_0_14px_rgba(255,0,60,0.5)] cursor-pointer hover:scale-[1.02] hover:brightness-110 flex flex-col gap-0.5 border border-[#FF003C]"
-                                >
-                                  <div className="flex items-center justify-between w-full">
-                                    <span className="flex items-center gap-1.5">
-                                      <span>🔥</span>
-                                      <span>ACTIVAR GO SOLO</span>
-                                    </span>
-                                    <span className="text-[9px] font-black px-1.5 py-0.2 rounded bg-black text-[#FCEE0A]">
-                                      {legCost} €$
-                                    </span>
-                                  </div>
-                                  <span className="text-[8px] font-sans text-black/90 font-bold lowercase tracking-tight">
-                                    entra lista y sin lag • ataca ya
-                                  </span>
-                                </button>
                               </div>
                             )}
 
