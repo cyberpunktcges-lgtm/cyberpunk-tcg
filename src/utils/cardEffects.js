@@ -1089,15 +1089,19 @@ export function executeProgramEffect(state, playerKey, card) {
     if (hasMinD4) {
       state.actionLog.unshift(`🌊 [Pyramid Song] ¡Condición de dado d4 mínimo activa! Se ejecutan AMBOS efectos.`);
       if (hasRivalUnits) {
-        opp.field[0].currentPower = Math.max(0, (opp.field[0].currentPower || 0) - 4);
-        state.actionLog.unshift(`🌊 [Pyramid Song] Reduce el poder de "${opp.field[0].name}" en 4.`);
+        const target = [...opp.field].sort((a, b) => (b.currentPower || 0) - (a.currentPower || 0))[0];
+        const before = target.currentPower || 0;
+        target.currentPower = Math.max(0, before - 4);
+        state.actionLog.unshift(
+          `🌊 [Pyramid Song] Reduce el poder de "${target.name}" en -4 este turno (${before} ➔ ${target.currentPower}).`
+        );
       }
       for (let i = (opp.field?.length || 0) - 1; i >= 0; i--) {
         if ((opp.field[i].currentPower || 0) === 0) {
           const [dead] = opp.field.splice(i, 1);
-          if (!opp.deck) opp.deck = [];
-          opp.deck.push(dead);
+          sendUnitToBottomDeck(opp, dead, state);
           state.actionLog.unshift(`🌊 [Pyramid Song] Al tener 0 de poder, "${dead.name}" va al fondo del mazo.`);
+          break;
         }
       }
     } else if (playerKey === 'player') {
@@ -1125,8 +1129,22 @@ export function executeProgramEffect(state, playerKey, card) {
         ]
       };
     } else {
-      if (hasRivalUnits) {
-        opp.field[0].currentPower = Math.max(0, (opp.field[0].currentPower || 0) - 4);
+      if (hasZeroPowerRival) {
+        const zIdx = opp.field.findIndex((u) => (u.currentPower || 0) === 0);
+        if (zIdx !== -1) {
+          const [dead] = opp.field.splice(zIdx, 1);
+          sendUnitToBottomDeck(opp, dead, state);
+          state.actionLog.unshift(
+            `🌊 [Pyramid Song Rival] Envía a tu unidad con 0 de poder "${dead.name}" al fondo del mazo.`
+          );
+        }
+      } else if (hasRivalUnits) {
+        const target = [...opp.field].sort((a, b) => (b.currentPower || 0) - (a.currentPower || 0))[0];
+        const before = target.currentPower || 0;
+        target.currentPower = Math.max(0, before - 4);
+        state.actionLog.unshift(
+          `🌊 [Pyramid Song Rival] Reduce el poder de tu "${target.name}" en -4 este turno (${before} ➔ ${target.currentPower}).`
+        );
       }
     }
     return { executed: true };
@@ -1267,8 +1285,7 @@ export function executeProgramEffect(state, playerKey, card) {
       for (let i = (opp.field?.length || 0) - 1; i >= 0; i--) {
         if ((opp.field[i].currentPower || 0) === 0) {
           const [dead] = opp.field.splice(i, 1);
-          if (!opp.deck) opp.deck = [];
-          opp.deck.push(dead);
+          sendUnitToBottomDeck(opp, dead, state);
           state.actionLog.unshift(`🏢 [Towerfall] "${dead.name}" cae a 0 de poder y va al fondo del mazo.`);
         }
       }
@@ -1297,9 +1314,17 @@ export function executeProgramEffect(state, playerKey, card) {
         ]
       };
     } else {
-      (opp.field || []).forEach((u) => {
-        u.currentPower = Math.max(0, (u.currentPower || 0) - 5);
-      });
+      if (hasRivalUnits) {
+        const changes = [];
+        (opp.field || []).forEach((u) => {
+          const before = u.currentPower || 0;
+          u.currentPower = Math.max(0, before - 5);
+          changes.push(`${u.name} (${before} ➔ ${u.currentPower})`);
+        });
+        state.actionLog.unshift(
+          `🏢 [Towerfall Rival] Reduce el poder de todas tus unidades en -5 este turno: ${changes.join(', ')}.`
+        );
+      }
     }
     return { executed: true };
   }

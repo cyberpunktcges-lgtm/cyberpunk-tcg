@@ -104,7 +104,14 @@ function summarizeSide(side = {}) {
 
   return {
     gigsCount: gigs.length,
-    gigs: gigs.map((g) => `${g.sides ? `D${g.sides}` : 'D?'}:${g.value ?? g.currentValue ?? '?'}`),
+    gigs: gigs.map((g) => {
+      const dieLabel = g.die
+        ? String(g.die).toUpperCase()
+        : g.sides
+        ? `D${g.sides}`
+        : 'D?';
+      return `${dieLabel}:${g.value ?? g.currentValue ?? '?'}`;
+    }),
     eddiesTotal: eddies.length,
     eddiesReady: eddies.filter((e) => !e.isSpent).length,
     floatingEddies: Number(side.floatingEddies || 0),
