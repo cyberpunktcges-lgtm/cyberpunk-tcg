@@ -19,7 +19,7 @@ import {
   Save
 } from 'lucide-react';
 import { deleteUserDeck, saveUserDeck } from '../utils/firebase.js';
-import { parseImportedDeck } from '../utils/deckImportParser.js';
+import { parseImportedDeck, replaceDeckImportLine } from '../utils/deckImportParser.js';
 import allCardsData from '../data/cards.json';
 
 const CYBER_CLIP =
@@ -182,6 +182,29 @@ export default function CyberMyDecksModal({
         if (matchedFac) setImportFaction(matchedFac);
       }
     }
+  };
+
+  // Aplicar una sugerencia concreta sobre una línea del texto pegado
+  const handleApplySuggestion = (unmatchedItem, chosenCard) => {
+    if (!unmatchedItem?.lineNumber || !chosenCard) return;
+    setImportRawText((prev) => replaceDeckImportLine(prev, unmatchedItem, chosenCard));
+    setImportStatus(null);
+  };
+
+  // Autocorregir de golpe todas las líneas que tengan al menos una sugerencia
+  const handleAutoFixAllSuggestions = () => {
+    const fixable = parsedImport.unmatchedLines.filter(
+      (u) => u.lineNumber && u.suggestions && u.suggestions.length > 0
+    );
+    if (fixable.length === 0) return;
+    setImportRawText((prev) => {
+      let next = prev;
+      fixable.forEach((u) => {
+        next = replaceDeckImportLine(next, u, u.suggestions[0].card);
+      });
+      return next;
+    });
+    setImportStatus(null);
   };
 
   // Guardar mazo importado en Mis Mazos (Firebase del usuario) y opcionalmente abrirlo en el constructor
@@ -499,24 +522,111 @@ export default function CyberMyDecksModal({
               </div>
             </div>
 
-            {/* Aviso de líneas no reconocidas (si existen) */}
-            {parsedImport.unmatchedLines.length > 0 && (
-              <div className="bg-[#FF003C]/10 border border-[#FF003C]/50 rounded p-3 text-[11px] space-y-1">
-                <div className="flex items-center gap-1.5 text-[#FF003C] font-black uppercase">
-                  <AlertTriangle className="w-4 h-4 shrink-0" />
-                  <span>
-                    {parsedImport.unmatchedLines.length} línea(s) no reconocida(s) (se omitirán al guardar):
-                  </span>
-                </div>
-                <div className="max-h-20 overflow-y-auto cyber-scrollbar text-[10px] text-gray-300 space-y-0.5 pl-5">
-                  {parsedImport.unmatchedLines.map((u) => (
-                    <div key={`unm-${u.lineNumber}`}>
-                      Línea {u.lineNumber}: <span className="text-white">{u.text}</span>
+            {/* Aviso de líneas no reconocidas / ambiguas con autocompletado y sugerencias clicables */}
+            {parsedImport.unmatchedLines.length > 0 && (() => {
+              const fixableCount = parsedImport.unmatchedLines.filter(
+                (u) => u.lineNumber && u.suggestions && u.suggestions.length > 0
+              ).length;
+
+              return (
+                <div className="bg-[#FF003C]/10 border border-[#FF003C]/50 rounded p-3 text-[11px] space-y-2.5">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex items-center gap-1.5 text-[#FF003C] font-black uppercase">
+                      <AlertTriangle className="w-4 h-4 shrink-0" />
+                      <span>
+                        {parsedImport.unmatchedLines.length} línea(s) por revisar (haz clic en una sugerencia para autocompletarla):
+                      </span>
                     </div>
-                  ))}
+
+                    {fixableCount > 0 && (
+                      <button
+                        type="button"
+                        onClick={handleAutoFixAllSuggestions}
+                        style={{ clipPath: CYBER_BUTTON }}
+                        className="px-3 py-1 bg-[#FCEE0A] hover:bg-white text-black font-black text-[10px] uppercase flex items-center gap-1 cursor-pointer transition-colors shadow-[0_0_10px_rgba(252,238,10,0.4)]"
+                        title="Sustituye automáticamente cada línea por su mejor coincidencia sugerida"
+                      >
+                        <Sparkles className="w-3 h-3" />
+                        <span>AUTOCORREGIR TODAS ({fixableCount})</span>
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="max-h-52 overflow-y-auto cyber-scrollbar space-y-2 pr-1">
+                    {parsedImport.unmatchedLines.map((u, idx) => {
+                      const hasSuggestions = u.suggestions && u.suggestions.length > 0;
+                      const isAmbiguous = u.reason === 'ambiguous';
+
+                      return (
+                        <div
+                          key={`unm-${u.lineNumber ?? idx}-${u.text}`}
+                          className="bg-[#070a10] border border-gray-800 rounded p-2 space-y-1.5"
+                        >
+                          <div className="flex flex-wrap items-center justify-between gap-1.5 text-[10px]">
+                            <div className="text-gray-300">
+                              {u.lineNumber && (
+                                <span className="text-gray-500 mr-1">Línea {u.lineNumber}:</span>
+                              )}
+                              <span className="text-white font-bold">{u.text}</span>
+                            </div>
+                            <span
+                              className={`text-[8px] px-1.5 py-0.5 rounded font-black uppercase ${
+                                isAmbiguous
+                                  ? 'bg-[#FCEE0A]/20 text-[#FCEE0A] border border-[#FCEE0A]/40'
+                                  : hasSuggestions
+                                  ? 'bg-[#00F0FF]/15 text-[#00F0FF] border border-[#00F0FF]/40'
+                                  : 'bg-[#FF003C]/20 text-[#FF003C] border border-[#FF003C]/40'
+                              }`}
+                            >
+                              {isAmbiguous
+                                ? 'VARIAS COINCIDENCIAS — ELIGE CARTA'
+                                : hasSuggestions
+                                ? '¿QUISISTE DECIR...?'
+                                : 'NO ENCONTRADA (SE OMITIRÁ)'}
+                            </span>
+                          </div>
+
+                          {hasSuggestions && u.lineNumber && (
+                            <div className="flex flex-wrap gap-1.5 pt-0.5">
+                              {u.suggestions.map(({ card: sug }) => {
+                                const isLeg = sug.officialType === 'LEGEND';
+                                return (
+                                  <button
+                                    key={`sug-${u.lineNumber}-${sug.id}`}
+                                    type="button"
+                                    onClick={() => handleApplySuggestion(u, sug)}
+                                    className="flex items-center gap-1.5 bg-[#000000] hover:bg-[#FCEE0A] text-white hover:text-black border border-gray-700 hover:border-[#FCEE0A] px-2 py-1 rounded text-[10px] transition-colors cursor-pointer group"
+                                    title={`Reemplazar línea ${u.lineNumber} por "${u.hasSbPrefix ? 'SB: ' : ''}${u.qty}x ${sug.name}"`}
+                                  >
+                                    {sug.image && (
+                                      <img
+                                        src={sug.image}
+                                        alt={sug.name}
+                                        className="w-4 h-6 object-cover rounded-xs shrink-0"
+                                      />
+                                    )}
+                                    <span className="font-bold text-left">{sug.name}</span>
+                                    <span
+                                      className={`text-[8px] px-1 py-0.2 rounded font-black uppercase shrink-0 ${
+                                        isLeg
+                                          ? 'bg-[#FCEE0A]/25 text-[#FCEE0A] group-hover:bg-black group-hover:text-[#FCEE0A]'
+                                          : 'bg-[#00F0FF]/20 text-[#00F0FF] group-hover:bg-black group-hover:text-[#00F0FF]'
+                                      }`}
+                                    >
+                                      {sug.officialType || 'CARD'}
+                                    </span>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
-              </div>
-            )}
+              );
+            })()}
 
             {/* Mensaje de estado / éxito / error */}
             {importStatus && (
