@@ -43,6 +43,18 @@ const ACTION_STYLES = {
     border: 'border-[#0dfceb]',
     badge: 'bg-[#0dfceb] text-[#070a10]',
     glow: 'shadow-[0_0_35px_rgba(13,252,235,0.4)]'
+  },
+  COMBAT_RESULT: {
+    label: 'RESULTADO DEL COMBATE',
+    border: 'border-[#FF003C]',
+    badge: 'bg-[#FF003C] text-white',
+    glow: 'shadow-[0_0_35px_rgba(255,0,60,0.45)]'
+  },
+  END_BOT_TURN: {
+    label: 'FIN DEL TURNO DEL RIVAL',
+    border: 'border-[#0dfceb]',
+    badge: 'bg-[#0dfceb] text-[#070a10]',
+    glow: 'shadow-[0_0_38px_rgba(13,252,235,0.5)]'
   }
 };
 
@@ -155,11 +167,18 @@ export default function CyberBotActionPopup({
           </div>
         )}
 
+        {/* Mensaje explicativo cuando es pausa de fin de turno o combate sin carta principal */}
+        {!card && event.subtitle && (
+          <p className="text-[11px] text-gray-200 leading-relaxed font-sans">
+            {event.subtitle}
+          </p>
+        )}
+
         {/* Efectos exactos ocurridos en esta jugada */}
         {logs.length > 0 && (
-          <div className="bg-black/90 border border-gray-800 rounded p-2 space-y-1 max-h-32 overflow-y-auto cyber-scrollbar">
+          <div className="bg-black/90 border border-gray-800 rounded p-2 space-y-1 max-h-36 overflow-y-auto cyber-scrollbar">
             <span className="text-[9px] font-black text-[#0dfceb] uppercase block">
-              QUÉ HA OCURRIDO:
+              {event.actionType === 'END_BOT_TURN' ? 'RESUMEN ANTES DE TU TURNO:' : 'QUÉ HA OCURRIDO:'}
             </span>
             {logs.map((line, i) => (
               <div
@@ -188,10 +207,16 @@ export default function CyberBotActionPopup({
             type="button"
             onClick={onConfirm}
             style={{ clipPath: CYBER_BUTTON }}
-            className="px-5 py-2 bg-[#FCEE0A] hover:bg-white text-[#070a10] font-black text-xs uppercase tracking-wider flex items-center gap-1.5 cursor-pointer shadow-[0_0_18px_rgba(252,238,10,0.55)] transition-colors"
+            className={`px-5 py-2 font-black text-xs uppercase tracking-wider flex items-center gap-1.5 cursor-pointer transition-colors ${
+              event.actionType === 'END_BOT_TURN'
+                ? 'bg-[#0dfceb] hover:bg-white text-[#070a10] shadow-[0_0_20px_rgba(13,252,235,0.6)]'
+                : 'bg-[#FCEE0A] hover:bg-white text-[#070a10] shadow-[0_0_18px_rgba(252,238,10,0.55)]'
+            }`}
           >
             <Check className="w-4 h-4 stroke-[3]" />
-            <span>OK, CONTINUAR</span>
+            <span>
+              {event.actionType === 'END_BOT_TURN' ? 'EMPEZAR MI TURNO' : 'OK, CONTINUAR'}
+            </span>
           </button>
         </div>
       </motion.div>

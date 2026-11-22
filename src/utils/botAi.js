@@ -626,14 +626,15 @@ export async function runBotTurn(gameState, updateCallback, delayMs = 700, pause
   };
 
   let aborted = false;
-  const pauseAfterPlay = async (actionType, card, prevLogLen, targetName = '') => {
+  const pauseAfterPlay = async (actionType, card, prevLogLen, targetName = '', subtitle = '') => {
     updateCallback({ ...gameState });
     if (typeof pauseForAck === 'function' && !gameState.isGameOver) {
       const ack = await pauseForAck({
         actionType,
         card: card || null,
         targetName,
-        logs: captureLogsSince(prevLogLen)
+        subtitle,
+        logs: prevLogLen !== null ? captureLogsSince(prevLogLen) : []
       });
       if (ack?.cancelled || gameState.isGameOver || gameState.activePlayer !== 'bot') {
         aborted = true;
@@ -704,7 +705,14 @@ export async function runBotTurn(gameState, updateCallback, delayMs = 700, pause
         }
       }
       // Si la unidad jugada tuviera Adrenaline (no hubo) -> aquí no hay ataques posibles en Turno 1 sin unidades
-      await wait(Math.min(delayMs, 450));
+      const contEnd1 = await pauseAfterPlay(
+        'END_BOT_TURN',
+        null,
+        null,
+        '',
+        'El rival ha terminado su Turno 1. Revisa la mesa y pulsa «EMPEZAR MI TURNO» para robar carta y lanzar tu dado de Gig.'
+      );
+      if (!contEnd1) return;
       passTurn(gameState);
       updateCallback({ ...gameState });
       return;
@@ -1021,15 +1029,24 @@ export async function runBotTurn(gameState, updateCallback, delayMs = 700, pause
     }
   }
 
-  // Paso 5: Finalizar turno y devolver control al Jugador
-  await wait(delayMs);
-  passTurn(gameState);
-  updateCallback({ ...gameState });
+  // Paso 5: Pausa de fin de turno del rival antes de abrir la tirada de dado del Jugador
+  if (!gameState.isGameOver && gameState.activePlayer === 'bot') {
+    const contEnd = await pauseAfterPlay(
+      'END_BOT_TURN',
+      null,
+      null,
+      '',
+      'El rival ha terminado sus acciones. Revisa tranquilamente la mesa y pulsa «EMPEZAR MI TURNO» cuando estés listo para robar y tirar tu dado de Gig.'
+    );
+    if (!contEnd) return;
+    passTurn(gameState);
+    updateCallback({ ...gameState });
+  }
 }
 
 /**
  * Resuelve el combate pendiente tras la Fase de Respuesta del Jugador,
- * y continúa con los siguientes ataques del bot o finaliza el turno del bot.
+ * muestra el resultado antes de continuar, y sigue con los siguientes ataques o fin de turno del bot.
  */
 export async function resolvePendingAttackAndContinueBot(gameState, updateCallback, delayMs = 700, pauseForAck = null) {
   if (!gameState.pendingReaction) return;
@@ -1039,6 +1056,7 @@ export async function resolvePendingAttackAndContinueBot(gameState, updateCallba
   const bot = gameState.bot;
   const player = gameState.player;
   const attackerUnit = (bot.field || []).find((u) => u.instanceId === reaction.attackerUnitId);
+  const logLenBeforeCombat = (gameState.actionLog || []).length;
 
   if (attackerUnit) {
     if (reaction.targetType === 'GIGS') {
@@ -1072,13 +1090,40 @@ export async function resolvePendingAttackAndContinueBot(gameState, updateCallba
 
   if (gameState.isGameOver) return;
 
-  await wait(delayMs);
+  const combatLogs = (gameState.actionLog || [])
+    .slice(0, Math.max(0, (gameState.actionLog || []).length - logLenBeforeCombat))
+    .reverse();
 
   // Continuar con los siguientes ataques del bot si tiene más unidades listas que quieran atacar
   const remainingReadyUnits = (bot.field || []).filter((u) => canUnitAttack(u, bot, gameState));
   if (remainingReadyUnits.length > 0) {
+    if (typeof pauseForAck === 'function') {
+      const ack = await pauseForAck({
+        actionType: 'COMBAT_RESULT',
+        card: attackerUnit || null,
+        targetName: reaction.targetName || '',
+        subtitle: 'Combate resuelto. Revisa la mesa antes de la siguiente acción del rival.',
+        logs: combatLogs
+      });
+      if (ack?.cancelled || gameState.isGameOver || gameState.activePlayer !== 'bot') return;
+    } else {
+      await wait(delayMs);
+    }
     return runBotTurn(gameState, updateCallback, delayMs, pauseForAck);
   } else {
+    if (typeof pauseForAck === 'function') {
+      const ack = await pauseForAck({
+        actionType: 'END_BOT_TURN',
+        card: null,
+        targetName: '',
+        subtitle:
+          'Combate resuelto y fin del turno rival. Revisa la mesa tranquilamente y pulsa «EMPEZAR MI TURNO» para robar y tirar tu dado de Gig.',
+        logs: combatLogs
+      });
+      if (ack?.cancelled || gameState.isGameOver || gameState.activePlayer !== 'bot') return;
+    } else {
+      await wait(delayMs);
+    }
     passTurn(gameState);
     updateCallback({ ...gameState });
   }
