@@ -118,6 +118,35 @@ export function computeWinRate(wins = 0, losses = 0) {
 }
 
 /**
+ * Resuelve únicamente el NICK público de un jugador para el Ranking.
+ * NUNCA expone nombre real, apellidos ni correo de Google.
+ * Si el usuario aún no ha elegido un Nick en su perfil o en el Ranking, genera `Netrunner_XXXX`.
+ */
+export function resolvePublicNickname(userProfile = null, currentUser = null) {
+  const explicitNick = String(userProfile?.nickname || '').trim();
+  if (explicitNick) return explicitNick.slice(0, 28);
+
+  const profileAlias = String(userProfile?.displayName || '').trim();
+  const fullRealName = `${userProfile?.firstName || ''} ${userProfile?.lastName || ''}`.trim().toLowerCase();
+  const firstOnly = String(userProfile?.firstName || '').trim().toLowerCase();
+  const googleFullName = String(currentUser?.displayName || '').trim().toLowerCase();
+
+  if (
+    profileAlias &&
+    profileAlias.toLowerCase() !== fullRealName &&
+    profileAlias.toLowerCase() !== firstOnly &&
+    !(googleFullName.includes(' ') && profileAlias.toLowerCase() === googleFullName)
+  ) {
+    return profileAlias.slice(0, 28);
+  }
+
+  const uidSuffix = String(currentUser?.uid || userProfile?.userId || '0000')
+    .slice(-4)
+    .toUpperCase();
+  return `Netrunner_${uidSuffix}`;
+}
+
+/**
  * Calcula de forma pura la actualización del perfil de Ranking tras finalizar una serie Ranked BO3.
  * matchResult: {
  *   matchId: string,

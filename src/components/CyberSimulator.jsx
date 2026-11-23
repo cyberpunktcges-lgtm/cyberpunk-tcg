@@ -51,7 +51,7 @@ import {
   getUserRankingStats,
   recordLeaderboardMatch
 } from '../utils/firebase.js';
-import { getBotDifficultyMeta, getUnlockedBotDifficulty } from '../utils/rankingSystem.js';
+import { getBotDifficultyMeta, getUnlockedBotDifficulty, resolvePublicNickname } from '../utils/rankingSystem.js';
 import {
   createInitialGameState,
   applyStartingPlayer,
@@ -3500,11 +3500,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
 
     if (!seriesFinished || !currentUser?.uid) return;
 
-    const displayName =
-      userProfile?.displayName ||
-      currentUser.displayName ||
-      currentUser.email?.split('@')[0] ||
-      'Netrunner';
+    const publicNick = resolvePublicNickname(userProfile, currentUser);
     const deckName =
       activePlayerDeck?.name ||
       availableDecks[selectedPlayerDeckIdx]?.name ||
@@ -3513,10 +3509,10 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
     recordLeaderboardMatch(
       currentUser.uid,
       {
-        displayName,
+        nickname: publicNick,
+        displayName: publicNick,
         avatarId: userProfile?.avatarId || playerAvatar?.id || 'v-chico',
-        avatarImage: userProfile?.avatarImage || '',
-        city: userProfile?.city || ''
+        avatarImage: userProfile?.avatarImage || ''
       },
       {
         matchId: seriesState.seriesId || mId,
@@ -9761,7 +9757,11 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
         isOpen={showLeaderboardModal}
         onClose={() => setShowLeaderboardModal(false)}
         currentUser={currentUser}
+        userProfile={userProfile}
         userRankingStats={userRankingStats}
+        onNicknameUpdated={(nick) =>
+          setUserProfile((prev) => ({ ...(prev || {}), nickname: nick, displayName: nick }))
+        }
         selectedBotDifficulty={selectedBotDifficulty}
         onSelectBotDifficulty={(lvl) => {
           setSelectedBotDifficulty(lvl);

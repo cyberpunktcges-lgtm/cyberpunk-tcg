@@ -11,16 +11,19 @@ import {
   User,
   AlertTriangle,
   Sparkles,
-  Swords
+  Swords,
+  Edit3,
+  Check
 } from 'lucide-react';
-import { getLeaderboardTop } from '../utils/firebase.js';
+import { getLeaderboardTop, updateUserPublicNickname } from '../utils/firebase.js';
 import {
   CURRENT_RANKING_SEASON,
   BOT_DIFFICULTY_LEVELS,
   getRankForPoints,
   getUnlockedBotDifficulty,
   getBotDifficultyMeta,
-  computeWinRate
+  computeWinRate,
+  resolvePublicNickname
 } from '../utils/rankingSystem.js';
 import { AVATARS } from '../data/avatars.js';
 import { AvatarDisplay } from './CyberDeckSelectorModal.jsx';
@@ -34,15 +37,20 @@ export default function CyberLeaderboardModal({
   isOpen,
   onClose,
   currentUser,
+  userProfile = null,
   userRankingStats = null,
   selectedBotDifficulty = 1,
   onSelectBotDifficulty,
   onOpenAuthModal,
-  onStartRankedBO3
+  onStartRankedBO3,
+  onNicknameUpdated
 }) {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+  const [nickInput, setNickInput] = useState('');
+  const [savingNick, setSavingNick] = useState(false);
+  const [nickSaved, setNickSaved] = useState(false);
 
   const loadLeaderboard = async () => {
     setLoading(true);
@@ -60,8 +68,31 @@ export default function CyberLeaderboardModal({
   useEffect(() => {
     if (isOpen) {
       loadLeaderboard();
+      if (currentUser?.uid) {
+        setNickInput(resolvePublicNickname(userProfile, currentUser));
+        setNickSaved(false);
+      }
     }
-  }, [isOpen]);
+  }, [isOpen, currentUser?.uid, userProfile?.nickname, userProfile?.displayName]);
+
+  const handleSaveNick = async (e) => {
+    e.preventDefault();
+    if (!currentUser?.uid || !nickInput.trim()) return;
+    setSavingNick(true);
+    setNickSaved(false);
+    try {
+      const savedNick = await updateUserPublicNickname(currentUser.uid, nickInput.trim());
+      setNickInput(savedNick);
+      setNickSaved(true);
+      if (onNicknameUpdated) onNicknameUpdated(savedNick);
+      await loadLeaderboard();
+      setTimeout(() => setNickSaved(false), 2500);
+    } catch (err) {
+      alert(err?.message || 'No se pudo guardar el Nick.');
+    } finally {
+      setSavingNick(false);
+    }
+  };
 
   if (!isOpen) return null;
 
@@ -136,16 +167,45 @@ export default function CyberLeaderboardModal({
           </div>
         </div>
 
-        {/* Aviso de Reinicio de Temporada Beta */}
-        {CURRENT_RANKING_SEASON.isBeta && (
-          <div className="mt-2.5 px-3 py-1.5 bg-[#FF003C]/10 border border-[#FF003C]/40 rounded text-[10px] text-gray-200 flex items-center gap-2 shrink-0">
-            <AlertTriangle className="w-3.5 h-3.5 text-[#FF003C] shrink-0" />
-            <span>
-              <strong className="text-[#FCEE0A] uppercase">TEMPORADA BETA:</strong>{' '}
-              {CURRENT_RANKING_SEASON.resetNotice}
-            </span>
-          </div>
-        )}
+        {/* Aviso de Reinicio de Temporada Beta + Editor Rápido de Nick Público */}
+        <div className="mt-2.5 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 shrink-0">
+          {CURRENT_RANKING_SEASON.isBeta && (
+            <div className="flex-1 px-3 py-1.5 bg-[#FF003C]/10 border border-[#FF003C]/40 rounded text-[10px] text-gray-200 flex items-center gap-2">
+              <AlertTriangle className="w-3.5 h-3.5 text-[#FF003C] shrink-0" />
+              <span>
+                <strong className="text-[#FCEE0A] uppercase">TEMPORADA BETA:</strong>{' '}
+                {CURRENT_RANKING_SEASON.resetNotice}
+              </span>
+            </div>
+          )}
+
+          {currentUser && (
+            <form
+              onSubmit={handleSaveNick}
+              className="flex items-center gap-1.5 bg-black border border-[#0dfceb]/40 px-2.5 py-1 rounded shrink-0"
+              title="En el Ranking solo se muestra tu Nick público (nunca tu nombre real ni apellidos)"
+            >
+              <Edit3 className="w-3 h-3 text-[#0dfceb] shrink-0" />
+              <span className="text-[9px] text-gray-400 uppercase font-bold whitespace-nowrap">TU NICK:</span>
+              <input
+                type="text"
+                maxLength={28}
+                value={nickInput}
+                onChange={(e) => setNickInput(e.target.value)}
+                placeholder="Tu Nick..."
+                className="w-28 sm:w-32 bg-[#070a10] border border-gray-700 focus:border-[#FCEE0A] px-2 py-0.5 text-[11px] text-white font-bold outline-none"
+              />
+              <button
+                type="submit"
+                disabled={savingNick || nickInput.trim().length < 2}
+                className="px-2 py-0.5 bg-[#0dfceb] hover:bg-[#FCEE0A] text-black font-black text-[9px] uppercase cursor-pointer disabled:opacity-40 flex items-center gap-0.5"
+              >
+                {nickSaved ? <Check className="w-3 h-3" /> : null}
+                <span>{nickSaved ? 'OK' : savingNick ? '...' : 'GUARDAR'}</span>
+              </button>
+            </form>
+          )}
+        </div>
 
         {/* Bloque de Progreso de Dificultad del Bot + Puntuación */}
         <div className="py-3 border-b border-gray-800 space-y-2.5 shrink-0">
@@ -285,7 +345,7 @@ export default function CyberLeaderboardModal({
                       <div className="min-w-0">
                         <div className="flex items-center gap-1.5 flex-wrap">
                           <span className="text-xs sm:text-sm font-black text-white uppercase truncate max-w-[160px] sm:max-w-[220px]">
-                            {row.displayName || 'Netrunner'}
+                            {row.nickname || row.displayName || 'Netrunner'}
                           </span>
                           {isMe && (
                             <span className="px-1.5 py-0.2 bg-[#0dfceb] text-black text-[8px] font-black uppercase">
@@ -364,7 +424,7 @@ export default function CyberLeaderboardModal({
               </span>
               {myRow && aboveRow ? (
                 <span className="text-[#0dfceb] font-bold">
-                  • ¡A {Math.max(1, aboveRow.points - myRow.points + 1)} ⭐ de superar a {aboveRow.displayName}!
+                  • ¡A {Math.max(1, aboveRow.points - myRow.points + 1)} ⭐ de superar a {aboveRow.nickname || aboveRow.displayName}!
                 </span>
               ) : myRow && myRow.rank === 1 ? (
                 <span className="text-[#FCEE0A] font-bold">• 👑 ¡Lideras Night City!</span>

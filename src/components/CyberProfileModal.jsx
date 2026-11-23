@@ -49,16 +49,20 @@ export default function CyberProfileModal({
     setLoading(true);
     setSaveSuccess(false);
 
-    // Valores por defecto basados en currentUser
-    const defaultName = currentUser.displayName || currentUser.email?.split('@')[0] || '';
-    setDisplayName(defaultName);
+    // Valores por defecto: NO copiar nombre y apellidos reales de Google como Nick público
+    const googleName = String(currentUser.displayName || '').trim();
+    const defaultNick =
+      googleName && !googleName.includes(' ')
+        ? googleName
+        : `Netrunner_${String(currentUser.uid || '0000').slice(-4).toUpperCase()}`;
+    setDisplayName(defaultNick);
 
     getUserProfile(currentUser.uid)
       .then((data) => {
         if (data) {
           if (data.firstName) setFirstName(data.firstName);
           if (data.lastName) setLastName(data.lastName);
-          if (data.displayName) setDisplayName(data.displayName);
+          if (data.nickname || data.displayName) setDisplayName(data.nickname || data.displayName);
           if (data.avatarId) setSelectedAvatarId(data.avatarId);
           if (data.meleeUsername) setMeleeUsername(data.meleeUsername);
           if (data.city) setCity(data.city);
@@ -92,10 +96,14 @@ export default function CyberProfileModal({
     setSaveSuccess(false);
 
     try {
+      const safeNick =
+        displayName.trim() ||
+        `Netrunner_${String(currentUser.uid || '0000').slice(-4).toUpperCase()}`;
       const updated = await saveUserProfile(currentUser.uid, {
         firstName: firstName.trim(),
         lastName: lastName.trim(),
-        displayName: displayName.trim() || firstName.trim() || currentUser.email.split('@')[0],
+        nickname: safeNick,
+        displayName: safeNick,
         avatarId: selectedAvatarId,
         avatarImage: currentAvatar.image,
         meleeUsername: meleeUsername.trim(),
@@ -228,40 +236,41 @@ export default function CyberProfileModal({
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div>
               <label className="block text-[10px] text-gray-400 uppercase font-bold mb-1">
-                NOMBRE
+                NOMBRE (PRIVADO)
               </label>
               <input
                 type="text"
                 value={firstName}
                 onChange={(e) => setFirstName(e.target.value)}
-                placeholder="Ej. Valerie / Vincent"
+                placeholder="Solo visible para ti"
                 className="w-full bg-[#000000] border border-gray-800 focus:border-[#00F0FF] px-3 py-2 text-white text-xs outline-none"
               />
             </div>
 
             <div>
               <label className="block text-[10px] text-gray-400 uppercase font-bold mb-1">
-                APELLIDOS
+                APELLIDOS (PRIVADO)
               </label>
               <input
                 type="text"
                 value={lastName}
                 onChange={(e) => setLastName(e.target.value)}
-                placeholder="Ej. Silverhand / Welles"
+                placeholder="Solo visible para ti"
                 className="w-full bg-[#000000] border border-gray-800 focus:border-[#00F0FF] px-3 py-2 text-white text-xs outline-none"
               />
             </div>
 
             <div>
-              <label className="block text-[10px] text-[#00F0FF] uppercase font-bold mb-1">
-                ALIAS EN LA COMUNIDAD
+              <label className="block text-[10px] text-[#FCEE0A] uppercase font-bold mb-1">
+                NICK PÚBLICO (RANKING) *
               </label>
               <input
                 type="text"
+                maxLength={28}
                 value={displayName}
                 onChange={(e) => setDisplayName(e.target.value)}
                 placeholder="Ej. Choombatta_99"
-                className="w-full bg-[#000000] border border-[#00F0FF]/60 focus:border-[#FCEE0A] px-3 py-2 text-white text-xs font-bold outline-none"
+                className="w-full bg-[#000000] border border-[#FCEE0A]/70 focus:border-[#00F0FF] px-3 py-2 text-white text-xs font-bold outline-none"
               />
             </div>
           </div>

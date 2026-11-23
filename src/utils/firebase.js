@@ -186,6 +186,28 @@ export async function saveUserProfile(userId, profileData) {
     } catch {}
   }
 
+  // Si el usuario tiene entrada en el Ranking, sincronizar su Nick público y Avatar (sin nombre/apellidos)
+  const publicNick = String(profileData.nickname || profileData.displayName || '').trim();
+  if (publicNick) {
+    try {
+      const lbRef = doc(db, 'simulator_leaderboard', userId);
+      const lbSnap = await getDoc(lbRef);
+      if (lbSnap.exists()) {
+        await setDoc(
+          lbRef,
+          {
+            nickname: publicNick.slice(0, 28),
+            displayName: publicNick.slice(0, 28),
+            ...(profileData.avatarId ? { avatarId: profileData.avatarId } : {}),
+            ...(profileData.avatarImage ? { avatarImage: profileData.avatarImage } : {}),
+            updatedAt: serverTimestamp()
+          },
+          { merge: true }
+        );
+      }
+    } catch {}
+  }
+
   // Guardar en caché local
   try {
     localStorage.setItem(`cp_profile_${userId}`, JSON.stringify(payload));
@@ -376,13 +398,19 @@ export async function recordLeaderboardMatch(userId, profileMeta = {}, matchResu
     return calc;
   }
 
+  const safeNick = String(
+    profileMeta.nickname || profileMeta.displayName || existing?.nickname || existing?.displayName || `Netrunner_${String(userId).slice(-4).toUpperCase()}`
+  )
+    .trim()
+    .slice(0, 28);
+
   const payload = {
     userId,
     seasonId: currentSeasonId,
-    displayName: String(profileMeta.displayName || existing?.displayName || 'Netrunner').trim().slice(0, 40),
+    nickname: safeNick,
+    displayName: safeNick,
     avatarId: profileMeta.avatarId || existing?.avatarId || 'v-chico',
     avatarImage: profileMeta.avatarImage || existing?.avatarImage || '',
-    city: profileMeta.city || existing?.city || '',
     ...calc.updatedStats,
     updatedAtMs: Date.now(),
     updatedAt: serverTimestamp()
@@ -394,6 +422,35 @@ export async function recordLeaderboardMatch(userId, profileMeta = {}, matchResu
 
   await setDoc(ref, payload, { merge: true });
   return { ...calc, savedProfile: payload };
+}
+
+/**
+ * Actualiza únicamente el Nick público del usuario en su Perfil y en el Ranking (nunca expone nombre/apellidos).
+ */
+export async function updateUserPublicNickname(userId, rawNickname) {
+  if (!userId) throw new Error('Usuario no autenticado');
+  const cleanNick = String(rawNickname || '').trim().slice(0, 28);
+  if (cleanNick.length < 2) throw new Error('El Nick debe tener al menos 2 caracteres.');
+
+  // 1. Guardar en perfil de usuario
+  const profileRef = doc(db, 'users', userId, 'profile', 'info');
+  await setDoc(
+    profileRef,
+    { nickname: cleanNick, displayName: cleanNick, updatedAt: serverTimestamp() },
+    { merge: true }
+  );
+
+  // 2. Actualizar en simulator_leaderboard si ya existe fila del jugador
+  const lbRef = doc(db, 'simulator_leaderboard', userId);
+  const lbSnap = await getDoc(lbRef);
+  if (lbSnap.exists()) {
+    await setDoc(
+      lbRef,
+      { nickname: cleanNick, displayName: cleanNick, updatedAt: serverTimestamp() },
+      { merge: true }
+    );
+  }
+  return cleanNick;
 }
 
 /**
