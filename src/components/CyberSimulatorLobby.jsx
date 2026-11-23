@@ -94,9 +94,26 @@ export default function CyberSimulatorLobby({
 
   return (
     <div className="min-h-[100dvh] bg-[#070a10] text-white font-mono relative overflow-x-hidden flex flex-col justify-between select-none">
-      {/* Fondo Cyberpunk con cuadrícula y resplandores neón */}
+      {/* Fondo atmosférico sutil: Alt Cunningham // Soulkiller Architect */}
       <div
-        className="pointer-events-none fixed inset-0 opacity-20 z-0"
+        className="pointer-events-none fixed inset-0 z-0 bg-cover bg-[center_22%] opacity-[0.22] scale-[1.03] filter blur-[1px]"
+        style={{
+          backgroundImage:
+            "url('/images/pandart-studio-alt-cunningham-soulkiller-architect.webp')"
+        }}
+      />
+      <div className="pointer-events-none fixed inset-0 z-0 bg-gradient-to-b from-[#070a10]/80 via-[#070a10]/65 to-[#070a10]/95" />
+      <div
+        className="pointer-events-none fixed inset-0 z-0"
+        style={{
+          background:
+            'radial-gradient(circle at 50% 35%, transparent 15%, rgba(7, 10, 16, 0.85) 85%)'
+        }}
+      />
+
+      {/* Cuadrícula Cyberpunk y resplandores neón */}
+      <div
+        className="pointer-events-none fixed inset-0 opacity-15 z-0"
         style={{
           backgroundImage:
             'linear-gradient(to right, rgba(13, 252, 235, 0.16) 1px, transparent 1px), linear-gradient(to bottom, rgba(252, 238, 10, 0.1) 1px, transparent 1px)',
