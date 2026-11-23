@@ -7439,7 +7439,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                       className="w-full py-3.5 bg-[#FCEE0A] hover:bg-white text-black font-black text-xs uppercase tracking-widest cursor-pointer shadow-[0_0_20px_rgba(252,238,10,0.55)] flex items-center justify-center gap-2"
                     >
                       <Swords className="w-4 h-4" />
-                      <span>⚔️ NUEVA SERIE RANKED BO3 (RIVAL ALEATORIO)</span>
+                      <span>NUEVA SERIE RANKED BO3 (RIVAL ALEATORIO)</span>
                     </button>
                     <button
                       type="button"
@@ -7448,7 +7448,23 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                       className="w-full py-2.5 bg-[#0dfceb]/15 hover:bg-[#0dfceb] border border-[#0dfceb] text-[#0dfceb] hover:text-black font-black text-xs uppercase tracking-widest cursor-pointer transition-all flex items-center justify-center gap-2"
                     >
                       <Trophy className="w-4 h-4" />
-                      <span>🏆 VER RANKING NIGHT CITY</span>
+                      <span>VER RANKING NIGHT CITY</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        try {
+                          if (typeof window !== 'undefined') {
+                            localStorage.removeItem(CP_SIM_STORAGE_KEY);
+                          }
+                        } catch {}
+                        setSeriesState(null);
+                        handleResetGame('practice');
+                      }}
+                      style={{ clipPath: CYBER_BUTTON }}
+                      className="w-full py-2.5 bg-black/85 border border-gray-700 hover:border-[#FCEE0A] text-gray-300 hover:text-[#FCEE0A] font-black text-xs uppercase tracking-widest cursor-pointer transition-all"
+                    >
+                      🧪 MENÚ PRINCIPAL / JUGAR EN MODO PRÁCTICA
                     </button>
                   </div>
                 </>
