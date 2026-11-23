@@ -938,6 +938,8 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
   const [userRankingStats, setUserRankingStats] = useState(null);
   const [selectedBotDifficulty, setSelectedBotDifficulty] = useState(1);
   const [lastMatchRankingResult, setLastMatchRankingResult] = useState(null);
+  const [seriesState, setSeriesState] = useState(null); // null = Práctica | { mode: 'ranked_bo3', seriesId, playerScore, botScore, currentGame, isFinished, lastGameWinner, botChoseStarterForNext }
+  const [deckSelectorInitialMode, setDeckSelectorInitialMode] = useState('practice');
   const recordedMatchIdRef = useRef(null);
 
   // Pausa paso a paso en las jugadas del Bot (OK para continuar) — activado por defecto en Beta
@@ -3041,6 +3043,9 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
       if (Array.isArray(saved.history)) {
         setHistory(saved.history);
       }
+      if (saved.seriesState) {
+        setSeriesState(saved.seriesState);
+      }
     } else {
       const pDeck = availableDecks[0] || { deckList: [], legends: [] };
       const bDeck = availableDecks[1] || availableDecks[0] || { deckList: [], legends: [] };
@@ -3098,10 +3103,25 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
     chosenPlayerDeck,
     chosenBotDeck,
     chosenPlayerAvatar = null,
-    chosenBotAvatar = null
+    chosenBotAvatar = null,
+    matchMode = 'practice'
   ) => {
     const normPlayer = normalizeDeckInput(chosenPlayerDeck);
     const normBot = normalizeDeckInput(chosenBotDeck);
+    const nextSeries =
+      matchMode === 'ranked_bo3'
+        ? {
+            mode: 'ranked_bo3',
+            seriesId: `bo3_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+            playerScore: 0,
+            botScore: 0,
+            currentGame: 1,
+            isFinished: false,
+            lastGameWinner: null,
+            botChoseStarterForNext: null
+          }
+        : null;
+    setSeriesState(nextSeries);
 
     setActivePlayerDeck(normPlayer);
     setActiveBotDeck(normBot);
@@ -3145,6 +3165,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
             gameState: initial,
             activePlayerDeck: normPlayer,
             activeBotDeck: normBot,
+            seriesState: nextSeries,
             history: [],
             savedAt: Date.now()
           })
@@ -3244,6 +3265,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
             gameState: initial,
             activePlayerDeck: pDeck,
             activeBotDeck: bDeck,
+            seriesState,
             selectedPlayerDeckIdx: pDeckIdx,
             selectedBotDeckIdx: bDeckIdx,
             history: [],
@@ -3314,8 +3336,22 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
   };
 
   // Iniciar nueva partida: abre la sala de preparación de combate para elegir mazos y avatares
-  const handleResetGame = () => {
+  const handleResetGame = (initialMode = 'practice') => {
+    setDeckSelectorInitialMode(typeof initialMode === 'string' ? initialMode : 'practice');
     setShowDeckSelectorModal(true);
+  };
+
+  // Iniciar siguiente partida (Juego 2 o Juego 3) dentro de una serie Ranked BO3 con los mismos mazos
+  const handleStartNextBO3Game = (starterKey) => {
+    if (!seriesState || seriesState.mode !== 'ranked_bo3') return;
+    const nextGameNum = Math.min(3, (seriesState.currentGame || 1) + 1);
+    const updatedSeries = {
+      ...seriesState,
+      currentGame: nextGameNum,
+      botChoseStarterForNext: null
+    };
+    setSeriesState(updatedSeries);
+    handleStartGame(selectedPlayerDeckIdx, selectedBotDeckIdx, true, starterKey, true);
   };
 
   // Acción directa para llamar a una Leyenda boca arriba gastando 1 €$
@@ -3405,6 +3441,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
           gameState,
           activePlayerDeck,
           activeBotDeck,
+          seriesState,
           selectedPlayerDeckIdx,
           selectedBotDeckIdx,
           history: history.slice(-5),
@@ -3414,7 +3451,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
     } catch (err) {
       console.warn('Error al autoguardar en localStorage:', err);
     }
-  }, [gameState, activePlayerDeck, activeBotDeck, selectedPlayerDeckIdx, selectedBotDeckIdx, history]);
+  }, [gameState, activePlayerDeck, activeBotDeck, seriesState, selectedPlayerDeckIdx, selectedBotDeckIdx, history]);
 
   // Comprobar contraseña
   const handleLogin = (e) => {
@@ -3432,12 +3469,36 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
     }
   };
 
-  // Registrar resultado legal de partida en el Ranking Night City (1 sola vez por matchId)
+  // Procesar fin de partida en Modo Ranked BO3 (Suizo al mejor de 3):
+  // - En Modo Práctica NO puntúa en el Ranking.
+  // - En Ranked BO3 actualiza marcador (1-0, 0-1, 1-1) y solo puntúa al cerrar la serie (2-0, 2-1, 1-2, 0-2).
   useEffect(() => {
-    if (!gameState?.isGameOver || !gameState?.winner || !currentUser?.uid) return;
+    if (!gameState?.isGameOver || !gameState?.winner) return;
+    if (!seriesState || seriesState.mode !== 'ranked_bo3' || seriesState.isFinished) return;
+
     const mId = gameState.matchId || `m_${gameState.turnNumber}_${gameState.winner}`;
     if (recordedMatchIdRef.current === mId) return;
     recordedMatchIdRef.current = mId;
+
+    const playerWonGame = gameState.winner === 'player';
+    const nextPlayerScore = (seriesState.playerScore || 0) + (playerWonGame ? 1 : 0);
+    const nextBotScore = (seriesState.botScore || 0) + (playerWonGame ? 0 : 1);
+    const seriesFinished = nextPlayerScore >= 2 || nextBotScore >= 2;
+    const botChoseStarterForNext = !seriesFinished && playerWonGame
+      ? (Math.random() < 0.5 ? 'bot' : 'player')
+      : null;
+
+    const updatedSeries = {
+      ...seriesState,
+      playerScore: nextPlayerScore,
+      botScore: nextBotScore,
+      isFinished: seriesFinished,
+      lastGameWinner: gameState.winner,
+      botChoseStarterForNext
+    };
+    setSeriesState(updatedSeries);
+
+    if (!seriesFinished || !currentUser?.uid) return;
 
     const displayName =
       userProfile?.displayName ||
@@ -3458,8 +3519,11 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
         city: userProfile?.city || ''
       },
       {
-        matchId: mId,
-        won: gameState.winner === 'player',
+        matchId: seriesState.seriesId || mId,
+        isRanked: true,
+        won: nextPlayerScore >= 2,
+        playerGamesWon: nextPlayerScore,
+        botGamesWon: nextBotScore,
         botDifficulty: gameState.botDifficulty || selectedBotDifficulty || 1,
         deckName
       }
@@ -3474,7 +3538,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
         }
       })
       .catch((err) => {
-        console.warn('No se pudo guardar la puntuación en el Ranking:', err);
+        console.warn('No se pudo guardar la puntuación BO3 en el Ranking:', err);
       });
   }, [gameState?.isGameOver, gameState?.winner, gameState?.matchId, currentUser?.uid]);
 
@@ -3743,6 +3807,21 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
               >
                 {isMyTurn ? 'FASE PRINCIPAL' : 'TURNO RIVAL'}
               </span>
+              {seriesState?.mode === 'ranked_bo3' ? (
+                <span
+                  className="px-2 py-0.5 bg-[#FCEE0A]/20 border border-[#FCEE0A] text-[#FCEE0A] font-black text-[10px] uppercase whitespace-nowrap shadow-[0_0_10px_rgba(252,238,10,0.3)]"
+                  title="Serie Ranked BO3 (Sistema Suizo al Mejor de 3 — Mazo rival aleatorio)"
+                >
+                  🏆 BO3 J{seriesState.currentGame}/3 • {seriesState.playerScore}-{seriesState.botScore}
+                </span>
+              ) : (
+                <span
+                  className="hidden xl:inline-block px-1.5 py-0.5 bg-gray-900 border border-gray-700 text-gray-400 font-bold text-[9px] uppercase whitespace-nowrap"
+                  title="Modo Práctica / Testeo (no cuenta para el Ranking)"
+                >
+                  🧪 PRÁCTICA
+                </span>
+              )}
             </div>
           </div>
 
@@ -7182,130 +7261,261 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
         </div>
       )}
 
-      {/* 5. MODAL FLOTANTE DE FINAL DE PARTIDA (VICTORIA / DERROTA) */}
-      {gameState.isGameOver && (
-        <div className="fixed inset-0 z-50 bg-[#000000]/90 backdrop-blur-md flex items-center justify-center p-4 font-mono">
-          <div
-            style={{ clipPath: CYBER_CLIP }}
-            className={`max-w-md w-full bg-[#070a10]/95 border-2 p-8 text-center space-y-6 backdrop-blur-md ${
-              gameState.winner === 'player'
-                ? 'border-[#FCEE0A] shadow-[0_0_60px_rgba(252,238,10,0.5)]'
-                : 'border-[#FF003C] shadow-[0_0_60px_rgba(255,0,60,0.5)]'
-            }`}
-          >
-            <div className="space-y-2">
-              <span className="text-4xl block">
-                {gameState.winner === 'player' ? '🏆' : '💀'}
-              </span>
-              <h2
-                className={`text-2xl font-black uppercase ${
-                  gameState.winner === 'player' ? 'text-[#FCEE0A]' : 'text-[#FF003C]'
-                }`}
-              >
-                {gameState.winner === 'player' ? '¡VICTORIA EN NIGHT CITY!' : 'DERROTA // PLANO PLANO'}
-              </h2>
-              <p className="text-xs text-gray-300 leading-relaxed">
-                {gameState.winner === 'player'
-                  ? `Has alcanzado el control de ${p.gigs.length} Gigs activos. ¡Eres una leyenda viva de Night City!`
-                  : `El bot ha alcanzado ${bot.gigs.length} Gigs activos antes que tú. El contrato ha sido cancelado.`}
-              </p>
-            </div>
+      {/* 5. MODAL FLOTANTE DE FINAL DE PARTIDA (SOPORTA RANKED BO3 SUIZO Y MODO PRÁCTICA) */}
+      {gameState.isGameOver && (() => {
+        const isBO3 = seriesState?.mode === 'ranked_bo3';
+        const isBO3InProgress = isBO3 && !seriesState.isFinished;
+        const isBO3Finished = isBO3 && seriesState.isFinished;
+        const playerWonSeries = isBO3Finished && seriesState.playerScore >= 2;
+        const nextGameNumber = Math.min(3, (seriesState?.currentGame || 1) + 1);
+        const playerWonThisGame = gameState.winner === 'player';
 
-            {/* Resumen de Puntos de Ranking Street Cred y Subida de Nivel del Bot */}
-            {currentUser ? (
-              lastMatchRankingResult && (
-                <div className="bg-black/90 border border-[#FCEE0A]/50 p-3.5 rounded space-y-2 text-left">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-[10px] font-black uppercase text-[#0dfceb]">
-                      🏆 RANKING STREET CRED
-                    </span>
-                    <span
-                      className={`text-sm font-black ${
-                        lastMatchRankingResult.pointsDelta >= 0 ? 'text-[#00FF9C]' : 'text-[#FF003C]'
-                      }`}
-                    >
-                      {lastMatchRankingResult.pointsDelta >= 0
-                        ? `+${lastMatchRankingResult.pointsDelta} ⭐`
-                        : `${lastMatchRankingResult.pointsDelta} ⭐`}
-                    </span>
-                  </div>
-                  <div className="flex flex-wrap items-center justify-between gap-1 text-[10px] text-gray-300">
-                    <span>
-                      Total: <strong className="text-[#FCEE0A]">{lastMatchRankingResult.updatedStats?.points ?? 0} ⭐</strong>
-                      {lastMatchRankingResult.rankAfter ? ` (${lastMatchRankingResult.rankAfter.emoji} ${lastMatchRankingResult.rankAfter.name})` : ''}
-                    </span>
-                    {lastMatchRankingResult.streakBonus > 0 && (
-                      <span className="text-[#FF003C] font-black">
-                        🔥 +{lastMatchRankingResult.streakBonus} BONUS RACHA
+        return (
+          <div className="fixed inset-0 z-50 bg-[#000000]/90 backdrop-blur-md flex items-center justify-center p-4 font-mono">
+            <div
+              style={{ clipPath: CYBER_CLIP }}
+              className={`max-w-md w-full bg-[#070a10]/95 border-2 p-6 sm:p-8 text-center space-y-5 backdrop-blur-md ${
+                (isBO3Finished ? playerWonSeries : playerWonThisGame)
+                  ? 'border-[#FCEE0A] shadow-[0_0_60px_rgba(252,238,10,0.5)]'
+                  : 'border-[#FF003C] shadow-[0_0_60px_rgba(255,0,60,0.5)]'
+              }`}
+            >
+              {/* Marcador BO3 si es Ranked */}
+              {isBO3 && (
+                <div className="bg-black border border-[#FCEE0A]/60 px-4 py-2.5 rounded flex items-center justify-between">
+                  <span className="text-[10px] font-black text-[#FCEE0A] uppercase">
+                    🏆 SERIE RANKED BO3
+                  </span>
+                  <span className="text-lg font-black tracking-widest text-white">
+                    <span className="text-[#0dfceb]">TÚ {seriesState.playerScore}</span>
+                    {' — '}
+                    <span className="text-[#FF003C]">{seriesState.botScore} BOT</span>
+                  </span>
+                </div>
+              )}
+
+              <div className="space-y-2">
+                <span className="text-4xl block">
+                  {isBO3Finished
+                    ? playerWonSeries ? '🏆' : '💀'
+                    : playerWonThisGame ? '⚡' : '💀'}
+                </span>
+                <h2
+                  className={`text-xl sm:text-2xl font-black uppercase ${
+                    (isBO3Finished ? playerWonSeries : playerWonThisGame) ? 'text-[#FCEE0A]' : 'text-[#FF003C]'
+                  }`}
+                >
+                  {isBO3Finished
+                    ? playerWonSeries
+                      ? `¡SERIE BO3 GANADA (${seriesState.playerScore}-${seriesState.botScore})!`
+                      : `SERIE BO3 PERDIDA (${seriesState.playerScore}-${seriesState.botScore})`
+                    : isBO3InProgress
+                    ? playerWonThisGame
+                      ? `¡GANASTE LA PARTIDA ${seriesState.currentGame}!`
+                      : `PERDISTE LA PARTIDA ${seriesState.currentGame}`
+                    : playerWonThisGame
+                    ? '¡VICTORIA EN NIGHT CITY!'
+                    : 'DERROTA // PLANO PLANO'}
+                </h2>
+                <p className="text-xs text-gray-300 leading-relaxed">
+                  {isBO3InProgress
+                    ? seriesState.playerScore === 1 && seriesState.botScore === 1
+                      ? 'Empate 1-1 en la serie. ¡Todo se decide en la Partida 3 con los mismos mazos!'
+                      : `Primero en llegar a 2 victorias gana la serie Ranked. Continúa a la Partida ${nextGameNumber}/3 con los mismos mazos.`
+                    : playerWonThisGame
+                    ? `Has alcanzado el control de ${p.gigs.length} Gigs activos.`
+                    : `El rival ha alcanzado ${bot.gigs.length} Gigs activos antes que tú.`}
+                </p>
+              </div>
+
+              {/* CASO A: ENTRE PARTIDAS DE UNA SERIE BO3 (EL PERDEDOR ELIGE QUIÉN SALE PRIMERO) */}
+              {isBO3InProgress && (
+                <div className="space-y-3 pt-1">
+                  {!playerWonThisGame ? (
+                    <div className="bg-black/90 border border-[#0dfceb]/50 p-3.5 rounded space-y-2.5">
+                      <span className="text-[10px] font-black text-[#0dfceb] uppercase block">
+                        REGLA SUIZA BO3 // AL PERDER, TÚ ELIGES QUIÉN SALE EN LA PARTIDA {nextGameNumber}/3:
                       </span>
-                    )}
-                  </div>
-                  {lastMatchRankingResult.leveledUpBotTo && (
-                    <div className="p-2 bg-[#FF003C]/20 border border-[#FF003C] rounded text-[10px] text-white font-bold">
-                      ⚠️ ¡NIVEL DE AMENAZA AUMENTADO! Has desbloqueado al Bot en modo {' '}
-                      <span className="text-[#FCEE0A] uppercase">{lastMatchRankingResult.leveledUpBotTo.shortLabel}</span> {' '}
-                      (+{lastMatchRankingResult.leveledUpBotTo.winPoints} ⭐ por victoria).
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => handleStartNextBO3Game('player')}
+                          style={{ clipPath: CYBER_BUTTON }}
+                          className="py-3 px-3 bg-[#FCEE0A] hover:bg-white text-black font-black text-xs uppercase cursor-pointer shadow-[0_0_15px_rgba(252,238,10,0.5)]"
+                        >
+                          ⚡ SALIR YO PRIMERO
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleStartNextBO3Game('bot')}
+                          style={{ clipPath: CYBER_BUTTON }}
+                          className="py-3 px-3 bg-[#0dfceb] hover:bg-white text-black font-black text-xs uppercase cursor-pointer shadow-[0_0_15px_rgba(13,252,235,0.45)]"
+                        >
+                          🛡️ QUE SALGA EL BOT
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-2.5">
+                      <div className="bg-black/90 border border-[#FCEE0A]/50 p-3 rounded text-xs text-gray-200">
+                        <span className="text-[10px] font-black text-[#FCEE0A] uppercase block mb-1">
+                          DECISIÓN DEL RIVAL PARA LA PARTIDA {nextGameNumber}/3:
+                        </span>
+                        {seriesState.botChoseStarterForNext === 'bot'
+                          ? '🤖 El rival ha elegido salir ÉL primero en la siguiente partida.'
+                          : '🤝 El rival te cede el turno: sales TÚ primero en la siguiente partida.'}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleStartNextBO3Game(seriesState.botChoseStarterForNext || 'bot')}
+                        style={{ clipPath: CYBER_BUTTON }}
+                        className="w-full py-3.5 bg-[#0dfceb] hover:bg-white text-black font-black text-xs uppercase tracking-widest cursor-pointer shadow-[0_0_20px_rgba(13,252,235,0.65)]"
+                      >
+                        ▶ CONTINUAR A PARTIDA {nextGameNumber}/3
+                      </button>
                     </div>
                   )}
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!window.confirm('¿Abandonar esta serie Ranked BO3 sin completarla?')) return;
+                      setSeriesState(null);
+                      handleResetGame('practice');
+                    }}
+                    className="w-full py-1.5 text-[10px] text-gray-500 hover:text-[#FF003C] uppercase cursor-pointer"
+                  >
+                    Abandonar serie (no puntúa)
+                  </button>
                 </div>
-              )
-            ) : (
-              <div className="bg-black/80 border border-gray-800 p-2.5 rounded text-[10px] text-gray-400">
-                Inicia sesión con tu cuenta gratis para sumar puntos en el {' '}
-                <strong className="text-[#FCEE0A]">Ranking Night City</strong> y desbloquear niveles de Bot.
-              </div>
-            )}
+              )}
 
-            <div className="space-y-3 pt-2">
-              <button
-                type="button"
-                onClick={() => setShowLeaderboardModal(true)}
-                style={{ clipPath: CYBER_BUTTON }}
-                className="w-full py-2.5 bg-[#FCEE0A]/15 hover:bg-[#FCEE0A] border border-[#FCEE0A] text-[#FCEE0A] hover:text-black font-black text-xs uppercase tracking-widest cursor-pointer transition-all flex items-center justify-center gap-2"
-              >
-                <Trophy className="w-4 h-4" />
-                <span>🏆 VER RANKING NIGHT CITY</span>
-              </button>
+              {/* CASO B: FIN DE SERIE RANKED BO3 (2-0, 2-1, 1-2, 0-2) */}
+              {isBO3Finished && (
+                <>
+                  {lastMatchRankingResult && (
+                    <div className="bg-black/90 border border-[#FCEE0A]/60 p-3.5 rounded space-y-2 text-left">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-[10px] font-black uppercase text-[#0dfceb]">
+                          🏆 PUNTOS STREET CRED ({lastMatchRankingResult.seriesScore || `${seriesState.playerScore}-${seriesState.botScore}`})
+                        </span>
+                        <span
+                          className={`text-sm font-black ${
+                            lastMatchRankingResult.pointsDelta >= 0 ? 'text-[#00FF9C]' : 'text-[#FF003C]'
+                          }`}
+                        >
+                          {lastMatchRankingResult.pointsDelta >= 0
+                            ? `+${lastMatchRankingResult.pointsDelta} ⭐`
+                            : `${lastMatchRankingResult.pointsDelta} ⭐`}
+                        </span>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2 text-[10px] text-gray-300">
+                        <span>
+                          Total: <strong className="text-[#FCEE0A]">{lastMatchRankingResult.updatedStats?.points ?? 0} ⭐</strong>
+                          {lastMatchRankingResult.rankAfter ? ` (${lastMatchRankingResult.rankAfter.emoji} ${lastMatchRankingResult.rankAfter.name})` : ''}
+                        </span>
+                        {lastMatchRankingResult.cleanSweepBonus > 0 && (
+                          <span className="text-[#00FF9C] font-black">
+                            ⚡ +{lastMatchRankingResult.cleanSweepBonus} BONUS 2-0
+                          </span>
+                        )}
+                        {lastMatchRankingResult.streakBonus > 0 && (
+                          <span className="text-[#FF003C] font-black">
+                            🔥 +{lastMatchRankingResult.streakBonus} BONUS RACHA
+                          </span>
+                        )}
+                      </div>
+                      {lastMatchRankingResult.leveledUpBotTo && (
+                        <div className="p-2 bg-[#FF003C]/20 border border-[#FF003C] rounded text-[10px] text-white font-bold">
+                          ⚠️ ¡NIVEL DE AMENAZA AUMENTADO! Has desbloqueado al Bot en modo {' '}
+                          <span className="text-[#FCEE0A] uppercase">{lastMatchRankingResult.leveledUpBotTo.shortLabel}</span> {' '}
+                          (2-0: +{lastMatchRankingResult.leveledUpBotTo.sweepPoints} ⭐).
+                        </div>
+                      )}
+                    </div>
+                  )}
 
-              <button
-                type="button"
-                onClick={() => {
-                  // El oponente acepta la revancha y la IA elige quién sale (randomizado)
-                  const botWantsToGoFirst = Math.random() < 0.5;
-                  const starter = botWantsToGoFirst ? 'bot' : 'player';
-                  setRematchModal({
-                    isOpen: true,
-                    botWantsToGoFirst,
-                    starter
-                  });
-                }}
-                style={{ clipPath: CYBER_BUTTON }}
-                className="w-full py-3.5 bg-[#0dfceb] hover:bg-white text-black font-black text-xs uppercase tracking-widest cursor-pointer transition-all shadow-[0_0_20px_rgba(13,252,235,0.7)] flex items-center justify-center gap-2"
-              >
-                <Swords className="w-4 h-4" />
-                <span>⚔️ SOLICITAR REVANCHA AL RIVAL</span>
-              </button>
+                  <div className="space-y-2.5 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => handleResetGame('ranked_bo3')}
+                      style={{ clipPath: CYBER_BUTTON }}
+                      className="w-full py-3.5 bg-[#FCEE0A] hover:bg-white text-black font-black text-xs uppercase tracking-widest cursor-pointer shadow-[0_0_20px_rgba(252,238,10,0.55)] flex items-center justify-center gap-2"
+                    >
+                      <Swords className="w-4 h-4" />
+                      <span>⚔️ NUEVA SERIE RANKED BO3 (RIVAL ALEATORIO)</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowLeaderboardModal(true)}
+                      style={{ clipPath: CYBER_BUTTON }}
+                      className="w-full py-2.5 bg-[#0dfceb]/15 hover:bg-[#0dfceb] border border-[#0dfceb] text-[#0dfceb] hover:text-black font-black text-xs uppercase tracking-widest cursor-pointer transition-all flex items-center justify-center gap-2"
+                    >
+                      <Trophy className="w-4 h-4" />
+                      <span>🏆 VER RANKING NIGHT CITY</span>
+                    </button>
+                  </div>
+                </>
+              )}
 
-              <button
-                type="button"
-                onClick={() => {
-                  try {
-                    if (typeof window !== 'undefined') {
-                      localStorage.removeItem(CP_SIM_STORAGE_KEY);
-                    }
-                  } catch {}
-                  setRematchModal(null);
-                  setShowDeckSelectorModal(true);
-                }}
-                style={{ clipPath: CYBER_BUTTON }}
-                className="w-full py-2.5 bg-black/80 border border-gray-700 hover:border-[#FCEE0A] text-gray-400 hover:text-[#FCEE0A] font-black text-xs uppercase tracking-widest cursor-pointer transition-all"
-              >
-                🔄 NUEVA PARTIDA (ELEGIR MAZO Y AVATAR)
-              </button>
+              {/* CASO C: MODO PRÁCTICA / TESTEO (NO PUNTÚA EN RANKING) */}
+              {!isBO3 && (
+                <>
+                  <div className="bg-black/85 border border-gray-800 p-2.5 rounded text-[10px] text-gray-400">
+                    🧪 <strong className="text-[#0dfceb]">MODO PRÁCTICA / TESTEO</strong> — Esta partida no cuenta para el Ranking. Para puntuar, inicia una serie <strong className="text-[#FCEE0A]">Ranked BO3</strong>.
+                  </div>
+                  <div className="space-y-2.5 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => handleResetGame('ranked_bo3')}
+                      style={{ clipPath: CYBER_BUTTON }}
+                      className="w-full py-2.5 bg-[#FCEE0A]/15 hover:bg-[#FCEE0A] border border-[#FCEE0A] text-[#FCEE0A] hover:text-black font-black text-xs uppercase tracking-widest cursor-pointer transition-all flex items-center justify-center gap-2"
+                    >
+                      <Trophy className="w-4 h-4" />
+                      <span>🏆 JUGAR SERIE RANKED BO3 (PUNTÚA)</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const botWantsToGoFirst = Math.random() < 0.5;
+                        const starter = botWantsToGoFirst ? 'bot' : 'player';
+                        setRematchModal({
+                          isOpen: true,
+                          botWantsToGoFirst,
+                          starter
+                        });
+                      }}
+                      style={{ clipPath: CYBER_BUTTON }}
+                      className="w-full py-3 bg-[#0dfceb] hover:bg-white text-black font-black text-xs uppercase tracking-widest cursor-pointer transition-all shadow-[0_0_20px_rgba(13,252,235,0.65)] flex items-center justify-center gap-2"
+                    >
+                      <Swords className="w-4 h-4" />
+                      <span>⚔️ SOLICITAR REVANCHA (MISMOS MAZOS)</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        try {
+                          if (typeof window !== 'undefined') {
+                            localStorage.removeItem(CP_SIM_STORAGE_KEY);
+                          }
+                        } catch {}
+                        setRematchModal(null);
+                        handleResetGame('practice');
+                      }}
+                      style={{ clipPath: CYBER_BUTTON }}
+                      className="w-full py-2.5 bg-black/80 border border-gray-700 hover:border-[#FCEE0A] text-gray-400 hover:text-[#FCEE0A] font-black text-xs uppercase tracking-widest cursor-pointer transition-all"
+                    >
+                      🔄 NUEVA PARTIDA (ELEGIR MODO Y MAZOS)
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* 5.1. MODAL DE REVANCHA ACEPTADA POR EL RIVAL (LA IA ELIGE QUIÉN SALE) */}
       {rematchModal?.isOpen && (
@@ -9522,8 +9732,10 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
           setShowDeckSelectorModal(false);
           setShowAuthModal(true);
         }}
-        onSelectDecks={({ playerDeck, botDeck, playerAvatar: pAv, botAvatar: bAv }) => {
-          handleStartWithDecks(playerDeck, botDeck, pAv, bAv);
+        initialMatchMode={deckSelectorInitialMode}
+        botDifficulty={selectedBotDifficulty}
+        onSelectDecks={({ playerDeck, botDeck, playerAvatar: pAv, botAvatar: bAv, matchMode }) => {
+          handleStartWithDecks(playerDeck, botDeck, pAv, bAv, matchMode);
         }}
       />
 
@@ -9559,6 +9771,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
           }
         }}
         onOpenAuthModal={() => setShowAuthModal(true)}
+        onStartRankedBO3={() => handleResetGame('ranked_bo3')}
       />
 
       {/* Modal de Reporte de Fallos Beta con Caja Negra Automática */}

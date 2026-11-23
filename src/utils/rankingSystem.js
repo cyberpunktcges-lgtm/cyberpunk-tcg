@@ -1,7 +1,17 @@
 /**
  * rankingSystem.js
- * Sistema oficial de Ranking (Night City Leaderboard) y Dificultad Progresiva del Bot
- * para el Simulador de Cyberpunk TCG.
+ * Sistema oficial de Ranking (Night City Leaderboard — Formato Suizo BO3 al Mejor de 3)
+ * y Dificultad Progresiva del Bot para el Simulador de Cyberpunk TCG.
+ *
+ * Reglas de Puntuación BO3 (solo en Modo Ranked con mazo rival aleatorio):
+ * - Victoria 2-0 (Impecable): puntos base del nivel + 10 ⭐ bonus 2-0
+ *     · Nivel 1 Choom:        +35 ⭐ (25 + 10)
+ *     · Nivel 2 Edgerunner:   +45 ⭐ (35 + 10)
+ *     · Nivel 3 Adam Smasher: +60 ⭐ (50 + 10)
+ * - Victoria 2-1: puntos base del nivel (+25 / +35 / +50 ⭐)
+ * - Bonus de Racha (3+ series BO3 ganadas seguidas): +10 ⭐ extra
+ * - Derrota ajustada 1-2: -5 ⭐ (mínimo 0)
+ * - Derrota 0-2: -15 ⭐ (mínimo 0)
  */
 
 export const STREET_CRED_RANKS = [
@@ -20,8 +30,9 @@ export const BOT_DIFFICULTY_LEVELS = [
     shortLabel: 'NV.1 CHOOM',
     minWins: 0,
     winPoints: 25,
+    sweepPoints: 35,
     color: '#0dfceb',
-    description: 'IA táctica equilibrada. Ideal para aprender el simulador y probar mazos.'
+    description: 'IA táctica equilibrada. Ideal para iniciarse en Ranked BO3.'
   },
   {
     level: 2,
@@ -30,8 +41,9 @@ export const BOT_DIFFICULTY_LEVELS = [
     shortLabel: 'NV.2 EDGERUNNER',
     minWins: 3,
     winPoints: 35,
+    sweepPoints: 45,
     color: '#FCEE0A',
-    description: 'Desbloqueado con 3 victorias. Optimiza bloqueos, Gears, removal y guarda Quick.'
+    description: 'Desbloqueado con 3 series BO3 ganadas. Optimiza bloqueos, Gears, removal y guarda Quick.'
   },
   {
     level: 3,
@@ -40,14 +52,17 @@ export const BOT_DIFFICULTY_LEVELS = [
     shortLabel: 'NV.3 ADAM SMASHER',
     minWins: 8,
     winPoints: 50,
+    sweepPoints: 60,
     color: '#FF003C',
-    description: 'Desbloqueado con 8 victorias. Modo competitivo sin piedad: busca letal exacto y castiga cada error.'
+    description: 'Desbloqueado con 8 series BO3 ganadas. Modo competitivo sin piedad: busca letal exacto.'
   }
 ];
 
-export const LOSS_POINTS_PENALTY = 10;
+export const CLEAN_SWEEP_BONUS = 10; // Bonus por ganar 2-0 en BO3
+export const CLOSE_LOSS_PENALTY = 5; // Derrota 1-2
+export const SWEEP_LOSS_PENALTY = 15; // Derrota 0-2
 export const STREAK_BONUS_THRESHOLD = 3;
-export const STREAK_BONUS_POINTS = 5;
+export const STREAK_BONUS_POINTS = 10;
 
 export function getRankForPoints(points = 0) {
   const safePts = Math.max(0, Number(points) || 0);
@@ -95,51 +110,95 @@ export function computeWinRate(wins = 0, losses = 0) {
 }
 
 /**
- * Calcula de forma pura la actualización del perfil de Ranking tras finalizar una partida legal.
+ * Calcula de forma pura la actualización del perfil de Ranking tras finalizar una serie Ranked BO3.
+ * matchResult: {
+ *   matchId: string,
+ *   isRanked: boolean,
+ *   won: boolean,
+ *   playerGamesWon: number, // 0, 1, or 2
+ *   botGamesWon: number,    // 0, 1, or 2
+ *   botDifficulty: 1|2|3,
+ *   deckName: string
+ * }
  */
 export function computeMatchRankingUpdate(existingStats = null, matchResult = {}) {
   const prev = existingStats || {};
+
+  // Las partidas de práctica/testeo nunca modifican el ranking
+  if (matchResult.isRanked === false) {
+    return {
+      alreadyRecorded: false,
+      skippedUnranked: true,
+      updatedStats: prev,
+      pointsDelta: 0,
+      cleanSweepBonus: 0,
+      streakBonus: 0,
+      leveledUpBotTo: null
+    };
+  }
+
   const matchId = String(matchResult.matchId || '');
   if (matchId && prev.lastMatchId && prev.lastMatchId === matchId) {
-    return { alreadyRecorded: true, updatedStats: prev, pointsDelta: 0, streakBonus: 0, leveledUpBotTo: null };
+    return {
+      alreadyRecorded: true,
+      updatedStats: prev,
+      pointsDelta: 0,
+      cleanSweepBonus: 0,
+      streakBonus: 0,
+      leveledUpBotTo: null
+    };
   }
 
   const prevPoints = Math.max(0, Number(prev.points) || 0);
   const prevWins = Math.max(0, Number(prev.wins) || 0);
   const prevLosses = Math.max(0, Number(prev.losses) || 0);
+  const prevCleanSweeps = Math.max(0, Number(prev.cleanSweeps) || 0);
   const prevStreak = Math.max(0, Number(prev.currentStreak) || 0);
   const prevBestStreak = Math.max(0, Number(prev.bestStreak) || 0);
   const prevUnlocked = getUnlockedBotDifficulty(prevWins).level;
 
-  const isWin = Boolean(matchResult.won);
+  const pGames = Number(matchResult.playerGamesWon ?? (matchResult.won ? 2 : 0));
+  const bGames = Number(matchResult.botGamesWon ?? (matchResult.won ? 0 : 2));
+  const isWin = matchResult.won !== undefined ? Boolean(matchResult.won) : pGames > bGames;
+  const isCleanSweep = isWin && pGames === 2 && bGames === 0;
+  const isCloseLoss = !isWin && pGames === 1 && bGames === 2;
+  const seriesScore = `${pGames}-${bGames}`;
+
   const diffMeta = getBotDifficultyMeta(matchResult.botDifficulty || 1);
 
   let nextWins = prevWins;
   let nextLosses = prevLosses;
+  let nextCleanSweeps = prevCleanSweeps;
   let nextStreak = prevStreak;
   let nextBestStreak = prevBestStreak;
+  let cleanSweepBonus = 0;
   let streakBonus = 0;
   let pointsDelta = 0;
   let nextPoints = prevPoints;
 
   if (isWin) {
     nextWins = prevWins + 1;
+    if (isCleanSweep) {
+      nextCleanSweeps = prevCleanSweeps + 1;
+      cleanSweepBonus = CLEAN_SWEEP_BONUS;
+    }
     nextStreak = prevStreak + 1;
     nextBestStreak = Math.max(prevBestStreak, nextStreak);
     streakBonus = nextStreak >= STREAK_BONUS_THRESHOLD ? STREAK_BONUS_POINTS : 0;
-    pointsDelta = diffMeta.winPoints + streakBonus;
+    pointsDelta = diffMeta.winPoints + cleanSweepBonus + streakBonus;
     nextPoints = prevPoints + pointsDelta;
   } else {
     nextLosses = prevLosses + 1;
     nextStreak = 0;
-    nextPoints = Math.max(0, prevPoints - LOSS_POINTS_PENALTY);
-    pointsDelta = nextPoints - prevPoints; // ej: -10 o 0 si ya estaba en 0
+    const penalty = isCloseLoss ? CLOSE_LOSS_PENALTY : SWEEP_LOSS_PENALTY;
+    nextPoints = Math.max(0, prevPoints - penalty);
+    pointsDelta = nextPoints - prevPoints; // -5 en 1-2, -15 en 0-2 (nunca baja de 0)
   }
 
   const nextUnlocked = getUnlockedBotDifficulty(nextWins).level;
   const leveledUpBotTo = nextUnlocked > prevUnlocked ? getBotDifficultyMeta(nextUnlocked) : null;
 
-  // Seguimiento compacto de mazo más jugado
+  // Seguimiento compacto de mazo más jugado en Ranked
   const deckCounts = { ...(prev.deckCounts && typeof prev.deckCounts === 'object' ? prev.deckCounts : {}) };
   const deckName = String(matchResult.deckName || '').trim().slice(0, 60);
   if (deckName) {
@@ -160,8 +219,13 @@ export function computeMatchRankingUpdate(existingStats = null, matchResult = {}
 
   return {
     alreadyRecorded: false,
-    pointsDelta,
+    skippedUnranked: false,
+    seriesScore,
+    isCleanSweep,
+    isCloseLoss,
+    cleanSweepBonus,
     streakBonus,
+    pointsDelta,
     leveledUpBotTo,
     rankUp: rankAfter.minPoints > rankBefore.minPoints ? rankAfter : null,
     rankBefore,
@@ -170,6 +234,7 @@ export function computeMatchRankingUpdate(existingStats = null, matchResult = {}
       points: nextPoints,
       wins: nextWins,
       losses: nextLosses,
+      cleanSweeps: nextCleanSweeps,
       currentStreak: nextStreak,
       bestStreak: nextBestStreak,
       unlockedBotLevel: nextUnlocked,
@@ -178,7 +243,7 @@ export function computeMatchRankingUpdate(existingStats = null, matchResult = {}
         : Number(prev.highestBotDefeated) || 0,
       favoriteDeck,
       deckCounts,
-      lastMatchId: matchId || `m_${Date.now()}`
+      lastMatchId: matchId || `bo3_${Date.now()}`
     }
   };
 }

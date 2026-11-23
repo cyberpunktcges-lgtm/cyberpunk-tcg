@@ -10,7 +10,8 @@ import {
   Lock,
   User,
   AlertTriangle,
-  Sparkles
+  Sparkles,
+  Swords
 } from 'lucide-react';
 import { getLeaderboardTop } from '../utils/firebase.js';
 import {
@@ -35,7 +36,8 @@ export default function CyberLeaderboardModal({
   userRankingStats = null,
   selectedBotDifficulty = 1,
   onSelectBotDifficulty,
-  onOpenAuthModal
+  onOpenAuthModal,
+  onStartRankedBO3
 }) {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -101,7 +103,7 @@ export default function CyberLeaderboardModal({
                 // NIGHT CITY // <span className="text-[#FCEE0A]">RANKING STREET CRED</span>
               </h2>
               <span className="text-[10px] text-gray-400 block truncate">
-                GANA PARTIDAS AL BOT PARA SUBIR PUNTOS, DESBLOQUEAR NIVELES DE IA Y CONQUISTAR EL TOP
+                FORMATO SUIZO AL MEJOR DE 3 (BO3) CON MAZO RIVAL ALEATORIO • 2-0 (+10 BONUS) • 1-2 (-5) • 0-2 (-15)
               </span>
             </div>
           </div>
@@ -173,7 +175,7 @@ export default function CyberLeaderboardModal({
                       {unlocked ? tier.shortLabel : `🔒 ${tier.shortLabel}`}
                     </span>
                     <span className="text-[10px] font-black px-1.5 py-0.5 bg-black border border-gray-800 text-[#FCEE0A]">
-                      +{tier.winPoints} ⭐
+                      2-0: +{tier.sweepPoints} ⭐ | 2-1: +{tier.winPoints} ⭐
                     </span>
                   </div>
                   <p className="text-[9px] text-gray-400 mt-1 leading-tight font-sans">
@@ -311,7 +313,9 @@ export default function CyberLeaderboardModal({
                           <span className="text-[#FF003C]">{row.losses}D</span>
                         </div>
                         <div className="text-[9px] text-gray-400">
-                          {row.winRate}% WR{row.bestStreak >= 2 ? ` • 🔥${row.bestStreak}` : ''}
+                          {row.winRate}% WR
+                          {row.cleanSweeps > 0 ? ` • ⚡${row.cleanSweeps} (2-0)` : ''}
+                          {row.bestStreak >= 2 ? ` • 🔥${row.bestStreak}` : ''}
                         </div>
                       </div>
 
@@ -370,13 +374,29 @@ export default function CyberLeaderboardModal({
             </div>
           )}
 
-          <button
-            type="button"
-            onClick={onClose}
-            className="px-4 py-1.5 bg-black border border-gray-700 hover:border-white text-gray-300 font-bold text-xs uppercase cursor-pointer ml-auto"
-          >
-            CERRAR
-          </button>
+          <div className="flex items-center gap-2 ml-auto">
+            {onStartRankedBO3 && (
+              <button
+                type="button"
+                onClick={() => {
+                  onClose();
+                  onStartRankedBO3();
+                }}
+                style={{ clipPath: CYBER_BUTTON }}
+                className="px-4 py-1.5 bg-[#FCEE0A] hover:bg-white text-black font-black text-xs uppercase flex items-center gap-1.5 cursor-pointer shadow-[0_0_12px_rgba(252,238,10,0.4)]"
+              >
+                <Swords className="w-3.5 h-3.5" />
+                <span>JUGAR RANKED BO3</span>
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-1.5 bg-black border border-gray-700 hover:border-white text-gray-300 font-bold text-xs uppercase cursor-pointer"
+            >
+              CERRAR
+            </button>
+          </div>
         </div>
       </motion.div>
     </div>

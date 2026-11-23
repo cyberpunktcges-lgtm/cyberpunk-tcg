@@ -17,8 +17,13 @@ import {
   ChevronRight,
   Flame,
   Zap,
-  RotateCcw
+  RotateCcw,
+  Trophy,
+  Shuffle,
+  FlaskConical,
+  Lock
 } from 'lucide-react';
+import { getBotDifficultyMeta } from '../utils/rankingSystem.js';
 import { getUserDecks, deleteUserDeck } from '../utils/firebase.js';
 import {
   AVATARS,
@@ -73,13 +78,16 @@ export default function CyberDeckSelectorModal({
   onClose,
   currentUser = null,
   metaDecks = [],
-  onSelectDecks, // ({ playerDeck, botDeck, playerAvatar, botAvatar })
+  onSelectDecks, // ({ playerDeck, botDeck, playerAvatar, botAvatar, matchMode })
   onOpenAuthModal = null,
   currentSelectedPlayerDeck = null,
   currentSelectedBotDeck = null,
   currentSelectedPlayerAvatar = null,
-  currentSelectedBotAvatar = null
+  currentSelectedBotAvatar = null,
+  initialMatchMode = 'practice',
+  botDifficulty = 1
 }) {
+  const [matchMode, setMatchMode] = useState(initialMatchMode || 'practice'); // 'ranked_bo3' | 'practice'
   const [activeTab, setActiveTab] = useState('meta'); // 'cloud' | 'meta' | 'local'
   const [userDecks, setUserDecks] = useState([]);
   const [loadingDecks, setLoadingDecks] = useState(false);
@@ -108,6 +116,10 @@ export default function CyberDeckSelectorModal({
   // Sincronizar selecciones iniciales cuando se abre el modal
   useEffect(() => {
     if (!isOpen) return;
+
+    setMatchMode(
+      initialMatchMode === 'ranked_bo3' && currentUser?.uid ? 'ranked_bo3' : (initialMatchMode || 'practice')
+    );
 
     if (currentSelectedPlayerDeck) setSelectedPlayerDeck(currentSelectedPlayerDeck);
     else if (!selectedPlayerDeck && metaDecks.length > 0) setSelectedPlayerDeck(metaDecks[0]);
@@ -171,12 +183,35 @@ export default function CyberDeckSelectorModal({
       alert('Por favor selecciona un mazo para jugar.');
       return;
     }
+    if (matchMode === 'ranked_bo3' && !currentUser?.uid) {
+      if (onOpenAuthModal) onOpenAuthModal('login');
+      return;
+    }
+
+    let finalBotDeck = selectedBotDeck || metaDecks[1] || metaDecks[0];
+    let finalBotAvatar = selectedBotAvatar || DEFAULT_BOT_AVATAR;
+
+    // En Modo Ranked BO3, el mazo del Bot es SIEMPRE aleatorio entre los mazos del Meta
+    if (matchMode === 'ranked_bo3' && metaDecks.length > 0) {
+      let randIdx = Math.floor(Math.random() * metaDecks.length);
+      try {
+        if (typeof window !== 'undefined' && window.crypto?.getRandomValues) {
+          const buf = new Uint32Array(1);
+          window.crypto.getRandomValues(buf);
+          randIdx = buf[0] % metaDecks.length;
+        }
+      } catch {}
+      finalBotDeck = metaDecks[randIdx];
+      finalBotAvatar = getRandomBotAvatar(selectedPlayerAvatar?.id || 'v-chico');
+    }
+
     if (onSelectDecks) {
       onSelectDecks({
         playerDeck: selectedPlayerDeck,
-        botDeck: selectedBotDeck || metaDecks[1] || metaDecks[0],
+        botDeck: finalBotDeck,
         playerAvatar: selectedPlayerAvatar || DEFAULT_PLAYER_AVATAR,
-        botAvatar: selectedBotAvatar || DEFAULT_BOT_AVATAR
+        botAvatar: finalBotAvatar,
+        matchMode
       });
     }
     onClose();
@@ -237,6 +272,67 @@ export default function CyberDeckSelectorModal({
             <X className="w-5 h-5" />
           </button>
         </div>
+
+        {/* Selector de Modo de Juego: RANKED BO3 (Suizo) vs PRÁCTICA / TESTEO */}
+        {(() => {
+          const diffMeta = getBotDifficultyMeta(botDifficulty);
+          return (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-3 shrink-0">
+              <button
+                type="button"
+                onClick={() => setMatchMode('ranked_bo3')}
+                className={`p-2.5 sm:p-3 rounded border-2 text-left transition-all cursor-pointer ${
+                  matchMode === 'ranked_bo3'
+                    ? 'bg-[#FCEE0A]/15 border-[#FCEE0A] shadow-[0_0_20px_rgba(252,238,10,0.28)]'
+                    : 'bg-black/80 border-gray-800 hover:border-[#FCEE0A]/60'
+                }`}
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-xs font-black uppercase text-[#FCEE0A] flex items-center gap-1.5">
+                    <Trophy className="w-4 h-4" />
+                    <span>MODO RANKED BO3 (SUIZO)</span>
+                  </span>
+                  <span className="px-1.5 py-0.5 bg-[#FCEE0A] text-black text-[9px] font-black uppercase">
+                    PUNTÚA ⭐
+                  </span>
+                </div>
+                <p className="text-[10px] text-gray-300 mt-1 font-sans leading-snug">
+                  Al mejor de 3 partidas (<strong>2-0</strong>: +{diffMeta.sweepPoints} ⭐ · <strong>2-1</strong>: +{diffMeta.winPoints} ⭐ · <strong>1-2</strong>: -5 ⭐ · <strong>0-2</strong>: -15 ⭐).{' '}
+                  <strong className="text-[#0dfceb]">Mazo rival aleatorio</strong> ({diffMeta.shortLabel}).
+                </p>
+                {!currentUser && (
+                  <span className="text-[9px] text-[#FF003C] font-bold flex items-center gap-1 mt-1">
+                    <Lock className="w-3 h-3" />
+                    Requiere iniciar sesión con tu cuenta
+                  </span>
+                )}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setMatchMode('practice')}
+                className={`p-2.5 sm:p-3 rounded border-2 text-left transition-all cursor-pointer ${
+                  matchMode === 'practice'
+                    ? 'bg-[#0dfceb]/15 border-[#0dfceb] shadow-[0_0_20px_rgba(13,252,235,0.25)]'
+                    : 'bg-black/80 border-gray-800 hover:border-[#0dfceb]/60'
+                }`}
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-xs font-black uppercase text-[#0dfceb] flex items-center gap-1.5">
+                    <FlaskConical className="w-4 h-4" />
+                    <span>MODO PRÁCTICA / TESTEO</span>
+                  </span>
+                  <span className="px-1.5 py-0.5 bg-gray-900 border border-gray-700 text-gray-300 text-[9px] font-black uppercase">
+                    LIBRE • NO PUNTÚA
+                  </span>
+                </div>
+                <p className="text-[10px] text-gray-300 mt-1 font-sans leading-snug">
+                  Elige libremente tu mazo y el mazo exacto del Bot para probar emparejamientos o cartas nuevas sin afectar a tu Ranking.
+                </p>
+              </button>
+            </div>
+          );
+        })()}
 
         {/* Contenido dividido en 2 columnas: Tu Personaje & Mazo (Izquierda) / Rival & Mazo (Derecha) */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 py-3 overflow-y-auto cyber-scrollbar flex-1 pr-1 my-1">
@@ -621,6 +717,25 @@ export default function CyberDeckSelectorModal({
             </div>
 
             {/* SELECCIÓN DE MAZO DEL RIVAL */}
+            {matchMode === 'ranked_bo3' ? (
+              <div className="flex-1 flex flex-col justify-center bg-[#070a10] border-2 border-dashed border-[#FCEE0A]/60 rounded p-4 text-center space-y-2.5 my-1">
+                <div className="w-12 h-12 rounded-full bg-[#FCEE0A]/15 border border-[#FCEE0A] flex items-center justify-center mx-auto text-[#FCEE0A]">
+                  <Shuffle className="w-6 h-6" />
+                </div>
+                <h3 className="text-xs sm:text-sm font-black uppercase text-[#FCEE0A] tracking-wider">
+                  MAZO RIVAL ALEATORIO (META OFICIAL)
+                </h3>
+                <p className="text-[11px] text-gray-300 font-sans leading-relaxed">
+                  En <strong className="text-white">Ranked BO3</strong> el simulador sortea automáticamente uno de los{' '}
+                  <strong>{metaDecks.length} mazos oficiales del meta</strong> para el Bot al iniciar la serie.
+                </p>
+                <div className="bg-black/80 border border-gray-800 rounded p-2.5 text-[10px] text-gray-400 space-y-1 text-left">
+                  <div>• <strong className="text-[#0dfceb]">Formato Suizo BO3:</strong> gana 2 partidas (2-0 o 2-1) para llevarte la serie.</div>
+                  <div>• <strong className="text-[#FCEE0A]">Mismos mazos toda la serie:</strong> el perdedor de cada partida elige quién sale primero en la siguiente.</div>
+                  <div>• <strong className="text-[#FF003C]">Sin farmeo:</strong> el rival es secreto hasta que empieza la partida 1.</div>
+                </div>
+              </div>
+            ) : (
             <div className="space-y-2 pt-1">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-black uppercase text-[#FF003C] flex items-center gap-1">
@@ -676,19 +791,24 @@ export default function CyberDeckSelectorModal({
                 })}
               </div>
             </div>
+            )}
           </div>
         </div>
 
         {/* Barra Inferior de Confirmación e Inicio de Combate */}
         <div className="flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-[#0dfceb]/30 pt-3 mt-1">
           <div className="text-[11px] text-gray-300 font-mono text-center sm:text-left flex flex-wrap items-center gap-1.5">
-            <span className="text-gray-500 uppercase">Duelo configurado:</span>
+            <span className="text-gray-500 uppercase">
+              {matchMode === 'ranked_bo3' ? 'Serie Ranked BO3:' : 'Práctica libre:'}
+            </span>
             <span className="text-[#0dfceb] font-bold">
               {selectedPlayerAvatar.name.split('//')[0].trim()} ({selectedPlayerDeck?.name || 'Mazo'})
             </span>
             <span className="text-[#FCEE0A] font-black">VS</span>
             <span className="text-[#FF003C] font-bold">
-              {selectedBotAvatar.name.split('//')[0].trim()} ({selectedBotDeck?.name || 'Mazo'})
+              {matchMode === 'ranked_bo3'
+                ? '🎲 Rival Aleatorio (Meta Oficial)'
+                : `${selectedBotAvatar.name.split('//')[0].trim()} (${selectedBotDeck?.name || 'Mazo'})`}
             </span>
           </div>
 
@@ -707,8 +827,14 @@ export default function CyberDeckSelectorModal({
               style={{ clipPath: CYBER_BUTTON }}
               className="flex-1 sm:flex-none px-6 py-2.5 bg-[#FCEE0A] hover:bg-[#0dfceb] text-black font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(252,238,10,0.5)] cursor-pointer transition-all"
             >
-              <Swords className="w-4 h-4" />
-              <span>ENTRAR EN COMBATE ➔</span>
+              {matchMode === 'ranked_bo3' ? <Trophy className="w-4 h-4" /> : <Swords className="w-4 h-4" />}
+              <span>
+                {matchMode === 'ranked_bo3'
+                  ? currentUser
+                    ? 'INICIAR RANKED BO3 ➔'
+                    : 'ENTRAR PARA RANKED ➔'
+                  : 'ENTRAR EN PRÁCTICA ➔'}
+              </span>
             </button>
           </div>
         </div>
