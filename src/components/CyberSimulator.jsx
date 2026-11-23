@@ -31,12 +31,14 @@ import {
   Menu,
   LogOut,
   Bug,
-  Trophy
+  Trophy,
+  Home
 } from 'lucide-react';
 import CyberAuthModal from './CyberAuthModal.jsx';
 import CyberBugReportModal from './CyberBugReportModal.jsx';
 import CyberBotActionPopup from './CyberBotActionPopup.jsx';
 import CyberLeaderboardModal from './CyberLeaderboardModal.jsx';
+import CyberSimulatorLobby from './CyberSimulatorLobby.jsx';
 import { installGlobalErrorBuffer } from '../utils/betaDiagnostics.js';
 import CyberProfileModal from './CyberProfileModal.jsx';
 import CyberMyDecksModal from './CyberMyDecksModal.jsx';
@@ -934,6 +936,8 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
   const [showMyDecksModal, setShowMyDecksModal] = useState(false);
   const [showDeckSelectorModal, setShowDeckSelectorModal] = useState(false);
   const [showBugReportModal, setShowBugReportModal] = useState(false);
+  const [showLobby, setShowLobby] = useState(true);
+  const [hasResumableMatch, setHasResumableMatch] = useState(false);
   const [showLeaderboardModal, setShowLeaderboardModal] = useState(false);
   const [userRankingStats, setUserRankingStats] = useState(null);
   const [selectedBotDifficulty, setSelectedBotDifficulty] = useState(1);
@@ -3028,6 +3032,9 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
     const saved = loadSavedGame();
     if (saved && saved.gameState) {
       setGameState(saved.gameState);
+      if (!saved.gameState.isGameOver) {
+        setHasResumableMatch(true);
+      }
       if (typeof saved.selectedPlayerDeckIdx === 'number') {
         setSelectedPlayerDeckIdx(saved.selectedPlayerDeckIdx);
       }
@@ -3055,7 +3062,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
       setActiveBotDeck(bDeck);
     }
 
-    // Comprobar parámetros de URL (?deck=custom o ?metaDeckId=...)
+    // Comprobar parámetros de URL (?deck=custom o ?metaDeckId=...): preseleccionar mazo y abrir Sala de Combate sobre el Lobby
     if (typeof window !== 'undefined') {
       try {
         const params = new URLSearchParams(window.location.search);
@@ -3063,15 +3070,19 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
           const rawCustom = localStorage.getItem('cp_tcg_custom_deck');
           if (rawCustom) {
             const parsed = JSON.parse(rawCustom);
-            if (parsed.cards && parsed.cards.length > 0) {
-              handleStartWithDecks(parsed, availableDecks[1] || availableDecks[0]);
+            if ((parsed.cards && parsed.cards.length > 0) || (parsed.deckList && parsed.deckList.length > 0)) {
+              setActivePlayerDeck(normalizeDeckInput(parsed));
+              setDeckSelectorInitialMode('practice');
+              setShowDeckSelectorModal(true);
             }
           }
         } else if (params.get('metaDeckId')) {
           const mId = params.get('metaDeckId');
           const found = availableDecks.find((d) => d.id === mId || String(d.id) === mId);
           if (found) {
-            handleStartWithDecks(found, availableDecks[1] || availableDecks[0]);
+            setActivePlayerDeck(normalizeDeckInput(found));
+            setDeckSelectorInitialMode('practice');
+            setShowDeckSelectorModal(true);
           }
         }
       } catch (err) {
@@ -3146,6 +3157,8 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
     });
 
     setLastMatchRankingResult(null);
+    setShowLobby(false);
+    setHasResumableMatch(true);
     setGameState(initial);
     setHistory([]);
     setSelectedHandCard(null);
@@ -3252,6 +3265,8 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
       botDifficulty: selectedBotDifficulty
     });
     setLastMatchRankingResult(null);
+    setShowLobby(false);
+    setHasResumableMatch(true);
     setGameState(initial);
     setHistory([]);
     setSelectedHandCard(null);
@@ -3431,9 +3446,9 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
     setGameState(JSON.parse(JSON.stringify(gameState)));
   };
 
-  // Autoguardado continuo de la partida en localStorage ante cualquier cambio
+  // Autoguardado continuo de la partida en localStorage ante cualquier cambio (solo cuando hay partida activa)
   useEffect(() => {
-    if (!gameState || typeof window === 'undefined') return;
+    if (!gameState || !hasResumableMatch || typeof window === 'undefined') return;
     try {
       localStorage.setItem(
         CP_SIM_STORAGE_KEY,
@@ -3463,7 +3478,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
         sessionStorage.setItem(CP_SIM_AUTH_KEY, 'true');
         localStorage.setItem(CP_SIM_AUTH_KEY, 'true');
       } catch {}
-      handleStartGame();
+      setShowLobby(true);
     } else {
       setAuthError(true);
     }
@@ -3541,7 +3556,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
   // Turno del bot automático cuando le toque y el jugador ya haya decidido el Mulligan
   // (Pausa durante la Fase de Respuesta si pendingReaction está activo)
   useEffect(() => {
-    if (!gameState || gameState.isGameOver || !gameState.mulliganDecided) return;
+    if (showLobby || !gameState || gameState.isGameOver || !gameState.mulliganDecided) return;
 
     if (gameState.activePlayer === 'bot' && !isBotThinking && !gameState.pendingReaction) {
       setIsBotThinking(true);
@@ -3554,7 +3569,8 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
     gameState?.turnNumber,
     gameState?.isGameOver,
     gameState?.mulliganDecided,
-    gameState?.pendingReaction
+    gameState?.pendingReaction,
+    showLobby
   ]);
 
   // Pantalla de carga mientras se hidrata en el cliente o se inicializa el estado
@@ -3598,7 +3614,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                 TERMINAL NETWATCH // NODO PRIVADO
               </span>
               <h1 className="text-xl font-black text-white uppercase">
-                SIMULADOR <span className="text-[#FCEE0A]">ALPHA 1.0</span>
+                SIMULADOR <span className="text-[#FCEE0A]">BETA</span>
               </h1>
             </div>
           </div>
@@ -3671,7 +3687,60 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
     bot.gigs.length > 0;
   const gigsToSteal = canAttackGigs ? calculateGigsToSteal(selectedFieldUnit.currentPower) : 0;
 
+  const handleDiscardSavedMatch = () => {
+    try {
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem(CP_SIM_STORAGE_KEY);
+      }
+    } catch {}
+    setHasResumableMatch(false);
+    setSeriesState(null);
+    setLastMatchRankingResult(null);
+  };
+
   return (
+    <>
+      {showLobby ? (
+        <CyberSimulatorLobby
+          currentUser={currentUser}
+          userProfile={userProfile}
+          userCloudDecks={userCloudDecks}
+          userRankingStats={userRankingStats}
+          playerAvatar={playerAvatar}
+          activePlayerDeck={activePlayerDeck}
+          activeBotDeck={activeBotDeck}
+          selectedBotDifficulty={selectedBotDifficulty}
+          onSelectBotDifficulty={(lvl) => {
+            setSelectedBotDifficulty(lvl);
+            if (gameState && !gameState.isGameOver) {
+              gameState.botDifficulty = lvl;
+              setGameState({ ...gameState });
+            }
+          }}
+          resumableMatch={
+            hasResumableMatch && gameState && !gameState.isGameOver
+              ? {
+                  gameState,
+                  seriesState,
+                  playerDeckName: activePlayerDeck?.name || availableDecks[selectedPlayerDeckIdx]?.name || 'Tu Mazo',
+                  botDeckName: activeBotDeck?.name || availableDecks[selectedBotDeckIdx]?.name || 'Rival IA'
+                }
+              : null
+          }
+          onResumeMatch={() => setShowLobby(false)}
+          onDiscardSavedMatch={handleDiscardSavedMatch}
+          onOpenDeckSelector={(mode) => handleResetGame(mode)}
+          onOpenLeaderboard={() => setShowLeaderboardModal(true)}
+          onOpenMyDecks={() => setShowMyDecksModal(true)}
+          onOpenProfile={() => setShowProfileModal(true)}
+          onOpenAuthModal={() => setShowAuthModal(true)}
+          onOpenRules={() => {
+            setHelpModalTab('turn');
+            setShowRulesModal(true);
+          }}
+          onOpenBugReport={() => setShowBugReportModal(true)}
+        />
+      ) : (
     <div className="min-h-[100dvh] max-h-[100dvh] h-[100dvh] bg-[#070a10] text-white font-sans select-none flex flex-col justify-between relative overflow-hidden">
       {/* =====================================================================
           1. ESTRUCTURA DEL TABLERO: FONDO OSCURO SÓLIDO Y LÍNEAS DE CUADRÍCULA NEÓN
@@ -3692,8 +3761,19 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
       <header className="relative z-30 bg-[#070a10]/95 border-b border-[#0dfceb]/30 px-2.5 sm:px-3 py-1.5 font-mono text-xs shrink-0 shadow-lg backdrop-blur-md">
         {/* ================= BARRA SUPERIOR MÓVIL / TABLET (< lg) ================= */}
         <div className="flex lg:hidden items-center justify-between gap-1.5 w-full min-w-0">
-          {/* Izquierda: Turno y Estado compacto */}
+          {/* Izquierda: Botón Lobby + Turno y Estado compacto */}
           <div className="flex items-center gap-1.5 min-w-0">
+            <button
+              type="button"
+              onClick={() => {
+                handleCancelPendingBotAck();
+                setShowLobby(true);
+              }}
+              className="p-1 bg-[#000000] border border-gray-700 hover:border-[#FCEE0A] text-gray-300 hover:text-[#FCEE0A] cursor-pointer shrink-0"
+              title="Volver al Menú Principal del Simulador"
+            >
+              <Home className="w-3.5 h-3.5" />
+            </button>
             <span className="w-2 h-2 rounded-full bg-[#0dfceb] animate-pulse shrink-0" />
             <span className="text-[#0dfceb] font-black text-[11px] whitespace-nowrap">
               T{gameState.turnNumber}
@@ -3783,6 +3863,19 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
         {/* ================= BARRA SUPERIOR DESKTOP (>= lg) ================= */}
         <div className="hidden lg:flex items-center justify-between gap-2 w-full">
           <div className="flex items-center gap-2 sm:gap-2.5 min-w-0">
+            <button
+              type="button"
+              onClick={() => {
+                handleCancelPendingBotAck();
+                setShowLobby(true);
+              }}
+              style={{ clipPath: CYBER_BUTTON }}
+              className="px-2 py-1 bg-[#000000] border border-gray-700 hover:border-[#FCEE0A] text-gray-300 hover:text-[#FCEE0A] font-bold text-[10px] uppercase flex items-center gap-1 cursor-pointer shrink-0 transition-colors"
+              title="Volver a la página inicial del Simulador (tu partida queda guardada)"
+            >
+              <Home className="w-3.5 h-3.5" />
+              <span>INICIO</span>
+            </button>
             <div className="flex items-center gap-1.5 shrink-0">
               <span className="w-2 h-2 rounded-full bg-[#0dfceb] animate-pulse shrink-0" />
               <span className="font-black text-white uppercase tracking-wider text-xs whitespace-nowrap flex items-center gap-1.5">
@@ -7065,198 +7158,6 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
         </div>
       )}
 
-      {/* 4. MODAL FLOTANTE DE REGLAS RÁPIDAS (REGLAMENTO OFICIAL) */}
-      {showRulesModal && (
-        <div
-          className="fixed inset-0 z-50 bg-[#000000]/85 backdrop-blur-md flex items-center justify-center p-4 font-mono text-xs"
-          onClick={() => setShowRulesModal(false)}
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            style={{ clipPath: CYBER_CLIP }}
-            className="max-w-2xl w-full bg-[#070a10]/95 border-2 border-[#FCEE0A] p-6 space-y-4 max-h-[85vh] flex flex-col backdrop-blur-md shadow-[0_0_50px_rgba(252,238,10,0.4)]"
-          >
-            <div className="flex items-center justify-between border-b border-[#FCEE0A]/30 pb-3">
-              <span className="font-bold text-[#FCEE0A] uppercase flex items-center gap-2">
-                <HelpCircle className="w-4 h-4 text-[#0dfceb]" />
-                <span>AYUDA // CYBERPUNK TCG</span>
-              </span>
-              <button
-                type="button"
-                onClick={() => setShowRulesModal(false)}
-                className="text-gray-400 hover:text-white cursor-pointer px-1"
-              >
-                ✕
-              </button>
-            </div>
-
-            {/* Pestañas fusionadas: Cómo funciona un turno + Reglas oficiales */}
-            <div className="grid grid-cols-2 gap-2 shrink-0">
-              <button
-                type="button"
-                onClick={() => setHelpModalTab('turn')}
-                style={{ clipPath: CYBER_BUTTON }}
-                className={`py-2 px-3 text-xs font-black uppercase transition-all cursor-pointer border ${
-                  helpModalTab === 'turn'
-                    ? 'bg-[#0dfceb] text-[#070a10] border-[#0dfceb] shadow-[0_0_15px_rgba(13,252,235,0.5)]'
-                    : 'bg-black text-gray-400 border-gray-800 hover:text-white hover:border-[#0dfceb]/50'
-                }`}
-              >
-                ⚡ CÓMO FUNCIONA UN TURNO
-              </button>
-              <button
-                type="button"
-                onClick={() => setHelpModalTab('rules')}
-                style={{ clipPath: CYBER_BUTTON }}
-                className={`py-2 px-3 text-xs font-black uppercase transition-all cursor-pointer border ${
-                  helpModalTab === 'rules'
-                    ? 'bg-[#FCEE0A] text-[#070a10] border-[#FCEE0A] shadow-[0_0_15px_rgba(252,238,10,0.5)]'
-                    : 'bg-black text-gray-400 border-gray-800 hover:text-white hover:border-[#FCEE0A]/50'
-                }`}
-              >
-                📖 REGLAS OFICIALES
-              </button>
-            </div>
-
-            {helpModalTab === 'turn' ? (
-              <div className="flex-1 overflow-y-auto space-y-4 pr-1 cyber-scrollbar">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {/* COLUMNA 1: 1. START PHASE */}
-                  <div className="bg-[#05070e] border border-[#FCEE0A]/60 rounded-lg p-3.5 space-y-2.5">
-                    <div className="flex items-center justify-between border-b border-[#FCEE0A]/30 pb-1.5">
-                      <span className="text-xs font-black text-[#FCEE0A] uppercase">1. START PHASE</span>
-                      <span className="text-[9px] text-black font-black uppercase bg-[#FCEE0A] px-1.5 py-0.5 rounded">EN ORDEN (1-5)</span>
-                    </div>
-                    <ol className="space-y-2 text-[11px] text-gray-200">
-                      <li className="flex items-start gap-2 bg-black/40 p-1.5 rounded border border-gray-900">
-                        <span className="w-4 h-4 rounded-full bg-[#FCEE0A] text-black font-black text-[10px] flex items-center justify-center shrink-0 mt-0.5">1</span>
-                        <div><strong className="text-white block">Comprobar victoria (7+ Gigs)</strong><span className="text-[10px] text-gray-400 font-sans">Ganas automáticamente si empiezas el turno con 7+ dados de Gig.</span></div>
-                      </li>
-                      <li className="flex items-start gap-2 bg-black/40 p-1.5 rounded border border-gray-900">
-                        <span className="w-4 h-4 rounded-full bg-[#FCEE0A] text-black font-black text-[10px] flex items-center justify-center shrink-0 mt-0.5">2</span>
-                        <div><strong className="text-white block">Efectos de Inicio de Turno</strong><span className="text-[10px] text-gray-400 font-sans">Se disparan habilidades automáticas de inicio (ej. Hanako Arasaka).</span></div>
-                      </li>
-                      <li className="flex items-start gap-2 bg-black/40 p-1.5 rounded border border-gray-900">
-                        <span className="w-4 h-4 rounded-full bg-[#FCEE0A] text-black font-black text-[10px] flex items-center justify-center shrink-0 mt-0.5">3</span>
-                        <div><strong className="text-white block">Enderezar todas tus cartas</strong><span className="text-[10px] text-gray-400 font-sans">Se enderezan Eddies, Leyendas y Unidades y pierden el Lag.</span></div>
-                      </li>
-                      <li className="flex items-start gap-2 bg-black/40 p-1.5 rounded border border-gray-900">
-                        <span className="w-4 h-4 rounded-full bg-[#FCEE0A] text-black font-black text-[10px] flex items-center justify-center shrink-0 mt-0.5">4</span>
-                        <div><strong className="text-white block">Robar 1 carta del mazo</strong><span className="text-[10px] text-gray-400 font-sans">Si no te quedan cartas para robar, pierdes la partida (Deck Out).</span></div>
-                      </li>
-                      <li className="flex items-start gap-2 bg-black/40 p-1.5 rounded border border-gray-900">
-                        <span className="w-4 h-4 rounded-full bg-[#FCEE0A] text-black font-black text-[10px] flex items-center justify-center shrink-0 mt-0.5">5</span>
-                        <div><strong className="text-white block">Rodar 1 Gig del Fixer</strong><span className="text-[10px] text-gray-400 font-sans">Elige un dado de tu Fixer y ruédalo (el D20 siempre es el último).</span></div>
-                      </li>
-                    </ol>
-                  </div>
-
-                  {/* COLUMNA 2: 2. MAIN PHASE */}
-                  <div className="bg-[#05070e] border border-[#0dfceb]/60 rounded-lg p-3.5 space-y-2.5">
-                    <div className="flex items-center justify-between border-b border-[#0dfceb]/30 pb-1.5">
-                      <span className="text-xs font-black text-[#0dfceb] uppercase">2. FASE PRINCIPAL</span>
-                      <span className="text-[9px] text-black font-black uppercase bg-[#0dfceb] px-1.5 py-0.5 rounded">CUALQUIER ORDEN</span>
-                    </div>
-                    <div className="space-y-2 text-[11px]">
-                      <div className="flex items-center justify-between bg-black/50 p-1.5 rounded border border-gray-800">
-                        <div><strong className="text-[#FCEE0A] block">VENDER CARTA (SELL)</strong><span className="text-[10px] text-gray-400 font-sans">Coloca 1 carta con Sell Tag boca abajo en Eddies.</span></div>
-                        <span className="text-[9px] font-black text-[#FCEE0A] bg-[#FCEE0A]/10 px-1.5 py-0.5 rounded shrink-0">1/turno</span>
-                      </div>
-                      <div className="flex items-center justify-between bg-black/50 p-1.5 rounded border border-gray-800">
-                        <div><strong className="text-[#0dfceb] block">LLAMAR LEYENDA (CALL)</strong><span className="text-[10px] text-gray-400 font-sans">Paga 1 €$ para revelar una Leyenda boca abajo.</span></div>
-                        <span className="text-[9px] font-black text-[#0dfceb] bg-[#0dfceb]/10 px-1.5 py-0.5 rounded shrink-0">1/turno</span>
-                      </div>
-                      <div className="flex items-center justify-between bg-black/50 p-1.5 rounded border border-gray-800">
-                        <div><strong className="text-white block">JUGAR CARTAS / GO SOLO</strong><span className="text-[10px] text-gray-400 font-sans">Unidades, Programas, Gears o Leyendas con Go Solo.</span></div>
-                        <span className="text-[9px] font-black text-gray-300 bg-gray-900 px-1.5 py-0.5 rounded shrink-0">∞</span>
-                      </div>
-                      <div className="flex items-center justify-between bg-black/50 p-1.5 rounded border border-gray-800">
-                        <div><strong className="text-white block">ACTIVAR HABILIDADES (↷)</strong><span className="text-[10px] text-gray-400 font-sans">Habilidades de giro de Leyendas, Unidades o Gears.</span></div>
-                        <span className="text-[9px] font-black text-gray-300 bg-gray-900 px-1.5 py-0.5 rounded shrink-0">∞</span>
-                      </div>
-                      <div className="flex items-center justify-between bg-black/50 p-1.5 rounded border border-gray-800">
-                        <div><strong className="text-[#FF003C] block">ATACAR (1 A LA VEZ)</strong><span className="text-[10px] text-gray-400 font-sans">Gira una unidad lista sin Lag para asaltar Gigs o pelear con una unidad rival gastada.</span></div>
-                        <span className="text-[9px] font-black text-[#FF003C] bg-[#FF003C]/10 px-1.5 py-0.5 rounded shrink-0">1 a 1</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-                <div className="p-2.5 bg-black/80 border border-gray-800 rounded text-center text-[10px] text-gray-300 font-sans">
-                  <strong className="text-white">Fin de turno:</strong> Terminan los efectos de este turno, se limpia el Lag y comienza el turno del Rival.
-                </div>
-              </div>
-            ) : (
-            <div className="flex-1 overflow-y-auto space-y-3 pr-2 text-gray-300 leading-relaxed text-[11px] cyber-scrollbar">
-              <div>
-                <strong className="text-[#0dfceb] block uppercase">1. Preparación de Partida:</strong>
-                Ambos jugadores tiran un D20; quien saque más alto decide si va primero o segundo. Se baraja el mazo (40-50 cartas) y las 3 Leyendas van boca abajo.
-                <br />
-                <span className="text-[#FCEE0A]">Penalización del Jugador 1:</span> El jugador que empieza gira (spends) sus dos leyendas más a la izquierda y <em>NO se enderezan en el Turno 1</em> (tiene menos Eddies para equilibrar el turno inicial).
-                <br />
-                Ambos colocan sus 6 dados de Gig en el Fixer (D4 abajo hasta D20 arriba) y roban una mano de <strong>6 cartas</strong>. Cada jugador puede hacer 1 Mulligan (barajar las 6 y robar 6 nuevas).
-              </div>
-
-              <div>
-                <strong className="text-[#0dfceb] block uppercase">2. Estructura de Turno:</strong>
-                Cada turno consta de <strong>Fase de Inicio (Start Phase)</strong> y <strong>Fase Principal (Main Phase)</strong>.
-                <ul className="list-disc pl-4 mt-1 space-y-0.5 text-gray-400">
-                  <li><strong className="text-white">Start Phase (Obligatoria):</strong> Comprobar victoria (7+ Gigs) ➔ Efectos de inicio ➔ Enderezar todas las cartas (Eddies, Leyendas y Campo) ➔ Robar 1 carta ➔ Rodar un Gig del Fixer a la zona de Gigs (el D20 siempre el último).</li>
-                  <li><strong className="text-white">Main Phase (Opcional y en cualquier orden):</strong>
-                    <br />• <em>Vender por Turno (1/turno):</em> Coloca 1 carta boca abajo en Eddies (+1 €$ recurrente).
-                    <br />• <em>Llamar una Leyenda (1/turno):</em> Paga <strong>1 €$</strong> para poner una Leyenda boca arriba.
-                    <br />• <em>Jugar cartas:</em> Paga el coste en Eddies. Las unidades entran con <strong>Lag</strong> (no pueden atacar este turno) a menos que tengan <strong>Adrenaline</strong>.
-                    <br />• <em>Atacar:</em> Con unidades listas una a una a unidades enemigas gastadas o a los Gigs rivales.
-                  </li>
-                </ul>
-              </div>
-
-              <div>
-                <strong className="text-[#0dfceb] block uppercase">3. Tabla Oficial de Robo de Gigs (por Poder):</strong>
-                Al asaltar la zona de Gigs rival, la cantidad de dados que robas depende del Poder de tu atacante:
-                <table className="w-full text-left border border-gray-800 mt-1 mb-1 text-[10px]">
-                  <thead>
-                    <tr className="bg-[#000000] text-[#0dfceb]">
-                      <th className="p-1 border border-gray-800">Poder de la Unidad</th>
-                      <th className="p-1 border border-gray-800">Gigs Robados</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr><td className="p-1 border border-gray-800">0 Poder</td><td className="p-1 border border-gray-800">0 Gigs (no puede robar)</td></tr>
-                    <tr><td className="p-1 border border-gray-800">1 – 9 Poder</td><td className="p-1 border border-gray-800">1 Gig</td></tr>
-                    <tr><td className="p-1 border border-gray-800">10 – 19 Poder</td><td className="p-1 border border-gray-800">2 Gigs</td></tr>
-                    <tr><td className="p-1 border border-gray-800">20 – 29 Poder</td><td className="p-1 border border-gray-800">3 Gigs</td></tr>
-                  </tbody>
-                </table>
-                El atacante elige qué dados robar de la zona rival (se roban los de mayor valor).
-              </div>
-
-              <div>
-                <strong className="text-[#0dfceb] block uppercase">4. Combate entre Unidades y Regla de Empate:</strong>
-                El mayor poder gana y derrota a la otra unidad enviándola a la Basura.
-                <br />
-                <span className="text-[#FF003C] font-bold">REGLA DE EMPATE:</span> Si ambas unidades tienen el mismo poder (&gt;0), <strong>AMBAS unidades pierden el combate y AMBAS van a la Basura</strong>. Una unidad con 0 de poder no puede derrotar nada.
-              </div>
-
-              <div>
-                <strong className="text-[#0dfceb] block uppercase">5. Palabras Clave Oficiales:</strong>
-                <ul className="list-disc pl-4 mt-1 space-y-1 text-gray-400">
-                  <li><strong className="text-[#0dfceb]">Blocker:</strong> Cuando una unidad rival ataca, puedes girar esta unidad para redirigir el ataque hacia ella. Si protege tus Gigs, se convierte en pelea contra el Blocker y <strong>no se roba ningún Gig</strong> aunque el atacante gane.</li>
-                  <li><strong className="text-[#FCEE0A]">Adrenaline:</strong> Esta unidad ignora el Lag y puede atacar en el mismo turno en que es jugada.</li>
-                  <li><strong className="text-[#FF003C]">Go Solo:</strong> Paga el coste de esta Leyenda para jugarla como una Unidad lista en el campo capaz de atacar este turno.</li>
-                  <li><strong className="text-white">Quick:</strong> Puedes activar este efecto o jugar este Programa en respuesta durante el ataque de un rival.</li>
-                </ul>
-              </div>
-
-              <div>
-                <strong className="text-[#0dfceb] block uppercase">6. Street Cred (⭐) y Overtime:</strong>
-                La suma de los valores de tus dados de Gig activos es tu Credibilidad en la Calle. Si ambos jugadores vacían sus Fixers, entra el Overtime: el primero que llegue a 7 Gigs gana la partida inmediatamente.
-              </div>
-            </div>
-            )}
-          </div>
-        </div>
-      )}
-
       {/* 5. MODAL FLOTANTE DE FINAL DE PARTIDA (SOPORTA RANKED BO3 SUIZO Y MODO PRÁCTICA) */}
       {gameState.isGameOver && (() => {
         const isBO3 = seriesState?.mode === 'ranked_bo3';
@@ -7459,12 +7360,13 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                           }
                         } catch {}
                         setSeriesState(null);
-                        handleResetGame('practice');
+                        setHasResumableMatch(false);
+                        setShowLobby(true);
                       }}
                       style={{ clipPath: CYBER_BUTTON }}
                       className="w-full py-2.5 bg-black/85 border border-gray-700 hover:border-[#FCEE0A] text-gray-300 hover:text-[#FCEE0A] font-black text-xs uppercase tracking-widest cursor-pointer transition-all"
                     >
-                      🧪 MENÚ PRINCIPAL / JUGAR EN MODO PRÁCTICA
+                      🏠 VOLVER AL MENÚ PRINCIPAL DEL SIMULADOR
                     </button>
                   </div>
                 </>
@@ -7520,6 +7422,22 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                       className="w-full py-2.5 bg-black/80 border border-gray-700 hover:border-[#FCEE0A] text-gray-400 hover:text-[#FCEE0A] font-black text-xs uppercase tracking-widest cursor-pointer transition-all"
                     >
                       🔄 NUEVA PARTIDA (ELEGIR MODO Y MAZOS)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        try {
+                          if (typeof window !== 'undefined') {
+                            localStorage.removeItem(CP_SIM_STORAGE_KEY);
+                          }
+                        } catch {}
+                        setRematchModal(null);
+                        setHasResumableMatch(false);
+                        setShowLobby(true);
+                      }}
+                      className="w-full py-2 text-[11px] text-gray-400 hover:text-[#0dfceb] font-bold uppercase cursor-pointer transition-colors"
+                    >
+                      🏠 VOLVER AL MENÚ PRINCIPAL DEL SIMULADOR
                     </button>
                   </div>
                 </>
@@ -9661,6 +9579,201 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
         )}
       </AnimatePresence>
 
+    </div>
+      )}
+
+      {/* 4. MODAL FLOTANTE DE REGLAS RÁPIDAS (REGLAMENTO OFICIAL) */}
+      {showRulesModal && (
+        <div
+          className="fixed inset-0 z-50 bg-[#000000]/85 backdrop-blur-md flex items-center justify-center p-4 font-mono text-xs"
+          onClick={() => setShowRulesModal(false)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{ clipPath: CYBER_CLIP }}
+            className="max-w-2xl w-full bg-[#070a10]/95 border-2 border-[#FCEE0A] p-6 space-y-4 max-h-[85vh] flex flex-col backdrop-blur-md shadow-[0_0_50px_rgba(252,238,10,0.4)]"
+          >
+            <div className="flex items-center justify-between border-b border-[#FCEE0A]/30 pb-3">
+              <span className="font-bold text-[#FCEE0A] uppercase flex items-center gap-2">
+                <HelpCircle className="w-4 h-4 text-[#0dfceb]" />
+                <span>AYUDA // CYBERPUNK TCG</span>
+              </span>
+              <button
+                type="button"
+                onClick={() => setShowRulesModal(false)}
+                className="text-gray-400 hover:text-white cursor-pointer px-1"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Pestañas fusionadas: Cómo funciona un turno + Reglas oficiales */}
+            <div className="grid grid-cols-2 gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={() => setHelpModalTab('turn')}
+                style={{ clipPath: CYBER_BUTTON }}
+                className={`py-2 px-3 text-xs font-black uppercase transition-all cursor-pointer border ${
+                  helpModalTab === 'turn'
+                    ? 'bg-[#0dfceb] text-[#070a10] border-[#0dfceb] shadow-[0_0_15px_rgba(13,252,235,0.5)]'
+                    : 'bg-black text-gray-400 border-gray-800 hover:text-white hover:border-[#0dfceb]/50'
+                }`}
+              >
+                ⚡ CÓMO FUNCIONA UN TURNO
+              </button>
+              <button
+                type="button"
+                onClick={() => setHelpModalTab('rules')}
+                style={{ clipPath: CYBER_BUTTON }}
+                className={`py-2 px-3 text-xs font-black uppercase transition-all cursor-pointer border ${
+                  helpModalTab === 'rules'
+                    ? 'bg-[#FCEE0A] text-[#070a10] border-[#FCEE0A] shadow-[0_0_15px_rgba(252,238,10,0.5)]'
+                    : 'bg-black text-gray-400 border-gray-800 hover:text-white hover:border-[#FCEE0A]/50'
+                }`}
+              >
+                📖 REGLAS OFICIALES
+              </button>
+            </div>
+
+            {helpModalTab === 'turn' ? (
+              <div className="flex-1 overflow-y-auto space-y-4 pr-1 cyber-scrollbar">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {/* COLUMNA 1: 1. START PHASE */}
+                  <div className="bg-[#05070e] border border-[#FCEE0A]/60 rounded-lg p-3.5 space-y-2.5">
+                    <div className="flex items-center justify-between border-b border-[#FCEE0A]/30 pb-1.5">
+                      <span className="text-xs font-black text-[#FCEE0A] uppercase">1. START PHASE</span>
+                      <span className="text-[9px] text-black font-black uppercase bg-[#FCEE0A] px-1.5 py-0.5 rounded">EN ORDEN (1-5)</span>
+                    </div>
+                    <ol className="space-y-2 text-[11px] text-gray-200">
+                      <li className="flex items-start gap-2 bg-black/40 p-1.5 rounded border border-gray-900">
+                        <span className="w-4 h-4 rounded-full bg-[#FCEE0A] text-black font-black text-[10px] flex items-center justify-center shrink-0 mt-0.5">1</span>
+                        <div><strong className="text-white block">Comprobar victoria (7+ Gigs)</strong><span className="text-[10px] text-gray-400 font-sans">Ganas automáticamente si empiezas el turno con 7+ dados de Gig.</span></div>
+                      </li>
+                      <li className="flex items-start gap-2 bg-black/40 p-1.5 rounded border border-gray-900">
+                        <span className="w-4 h-4 rounded-full bg-[#FCEE0A] text-black font-black text-[10px] flex items-center justify-center shrink-0 mt-0.5">2</span>
+                        <div><strong className="text-white block">Efectos de Inicio de Turno</strong><span className="text-[10px] text-gray-400 font-sans">Se disparan habilidades automáticas de inicio (ej. Hanako Arasaka).</span></div>
+                      </li>
+                      <li className="flex items-start gap-2 bg-black/40 p-1.5 rounded border border-gray-900">
+                        <span className="w-4 h-4 rounded-full bg-[#FCEE0A] text-black font-black text-[10px] flex items-center justify-center shrink-0 mt-0.5">3</span>
+                        <div><strong className="text-white block">Enderezar todas tus cartas</strong><span className="text-[10px] text-gray-400 font-sans">Se enderezan Eddies, Leyendas y Unidades y pierden el Lag.</span></div>
+                      </li>
+                      <li className="flex items-start gap-2 bg-black/40 p-1.5 rounded border border-gray-900">
+                        <span className="w-4 h-4 rounded-full bg-[#FCEE0A] text-black font-black text-[10px] flex items-center justify-center shrink-0 mt-0.5">4</span>
+                        <div><strong className="text-white block">Robar 1 carta del mazo</strong><span className="text-[10px] text-gray-400 font-sans">Si no te quedan cartas para robar, pierdes la partida (Deck Out).</span></div>
+                      </li>
+                      <li className="flex items-start gap-2 bg-black/40 p-1.5 rounded border border-gray-900">
+                        <span className="w-4 h-4 rounded-full bg-[#FCEE0A] text-black font-black text-[10px] flex items-center justify-center shrink-0 mt-0.5">5</span>
+                        <div><strong className="text-white block">Rodar 1 Gig del Fixer</strong><span className="text-[10px] text-gray-400 font-sans">Elige un dado de tu Fixer y ruédalo (el D20 siempre es el último).</span></div>
+                      </li>
+                    </ol>
+                  </div>
+
+                  {/* COLUMNA 2: 2. MAIN PHASE */}
+                  <div className="bg-[#05070e] border border-[#0dfceb]/60 rounded-lg p-3.5 space-y-2.5">
+                    <div className="flex items-center justify-between border-b border-[#0dfceb]/30 pb-1.5">
+                      <span className="text-xs font-black text-[#0dfceb] uppercase">2. FASE PRINCIPAL</span>
+                      <span className="text-[9px] text-black font-black uppercase bg-[#0dfceb] px-1.5 py-0.5 rounded">CUALQUIER ORDEN</span>
+                    </div>
+                    <div className="space-y-2 text-[11px]">
+                      <div className="flex items-center justify-between bg-black/50 p-1.5 rounded border border-gray-800">
+                        <div><strong className="text-[#FCEE0A] block">VENDER CARTA (SELL)</strong><span className="text-[10px] text-gray-400 font-sans">Coloca 1 carta con Sell Tag boca abajo en Eddies.</span></div>
+                        <span className="text-[9px] font-black text-[#FCEE0A] bg-[#FCEE0A]/10 px-1.5 py-0.5 rounded shrink-0">1/turno</span>
+                      </div>
+                      <div className="flex items-center justify-between bg-black/50 p-1.5 rounded border border-gray-800">
+                        <div><strong className="text-[#0dfceb] block">LLAMAR LEYENDA (CALL)</strong><span className="text-[10px] text-gray-400 font-sans">Paga 1 €$ para revelar una Leyenda boca abajo.</span></div>
+                        <span className="text-[9px] font-black text-[#0dfceb] bg-[#0dfceb]/10 px-1.5 py-0.5 rounded shrink-0">1/turno</span>
+                      </div>
+                      <div className="flex items-center justify-between bg-black/50 p-1.5 rounded border border-gray-800">
+                        <div><strong className="text-white block">JUGAR CARTAS / GO SOLO</strong><span className="text-[10px] text-gray-400 font-sans">Unidades, Programas, Gears o Leyendas con Go Solo.</span></div>
+                        <span className="text-[9px] font-black text-gray-300 bg-gray-900 px-1.5 py-0.5 rounded shrink-0">∞</span>
+                      </div>
+                      <div className="flex items-center justify-between bg-black/50 p-1.5 rounded border border-gray-800">
+                        <div><strong className="text-white block">ACTIVAR HABILIDADES (↷)</strong><span className="text-[10px] text-gray-400 font-sans">Habilidades de giro de Leyendas, Unidades o Gears.</span></div>
+                        <span className="text-[9px] font-black text-gray-300 bg-gray-900 px-1.5 py-0.5 rounded shrink-0">∞</span>
+                      </div>
+                      <div className="flex items-center justify-between bg-black/50 p-1.5 rounded border border-gray-800">
+                        <div><strong className="text-[#FF003C] block">ATACAR (1 A LA VEZ)</strong><span className="text-[10px] text-gray-400 font-sans">Gira una unidad lista sin Lag para asaltar Gigs o pelear con una unidad rival gastada.</span></div>
+                        <span className="text-[9px] font-black text-[#FF003C] bg-[#FF003C]/10 px-1.5 py-0.5 rounded shrink-0">1 a 1</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div className="p-2.5 bg-black/80 border border-gray-800 rounded text-center text-[10px] text-gray-300 font-sans">
+                  <strong className="text-white">Fin de turno:</strong> Terminan los efectos de este turno, se limpia el Lag y comienza el turno del Rival.
+                </div>
+              </div>
+            ) : (
+            <div className="flex-1 overflow-y-auto space-y-3 pr-2 text-gray-300 leading-relaxed text-[11px] cyber-scrollbar">
+              <div>
+                <strong className="text-[#0dfceb] block uppercase">1. Preparación de Partida:</strong>
+                Ambos jugadores tiran un D20; quien saque más alto decide si va primero o segundo. Se baraja el mazo (40-50 cartas) y las 3 Leyendas van boca abajo.
+                <br />
+                <span className="text-[#FCEE0A]">Penalización del Jugador 1:</span> El jugador que empieza gira (spends) sus dos leyendas más a la izquierda y <em>NO se enderezan en el Turno 1</em> (tiene menos Eddies para equilibrar el turno inicial).
+                <br />
+                Ambos colocan sus 6 dados de Gig en el Fixer (D4 abajo hasta D20 arriba) y roban una mano de <strong>6 cartas</strong>. Cada jugador puede hacer 1 Mulligan (barajar las 6 y robar 6 nuevas).
+              </div>
+
+              <div>
+                <strong className="text-[#0dfceb] block uppercase">2. Estructura de Turno:</strong>
+                Cada turno consta de <strong>Fase de Inicio (Start Phase)</strong> y <strong>Fase Principal (Main Phase)</strong>.
+                <ul className="list-disc pl-4 mt-1 space-y-0.5 text-gray-400">
+                  <li><strong className="text-white">Start Phase (Obligatoria):</strong> Comprobar victoria (7+ Gigs) ➔ Efectos de inicio ➔ Enderezar todas las cartas (Eddies, Leyendas y Campo) ➔ Robar 1 carta ➔ Rodar un Gig del Fixer a la zona de Gigs (el D20 siempre el último).</li>
+                  <li><strong className="text-white">Main Phase (Opcional y en cualquier orden):</strong>
+                    <br />• <em>Vender por Turno (1/turno):</em> Coloca 1 carta boca abajo en Eddies (+1 €$ recurrente).
+                    <br />• <em>Llamar una Leyenda (1/turno):</em> Paga <strong>1 €$</strong> para poner una Leyenda boca arriba.
+                    <br />• <em>Jugar cartas:</em> Paga el coste en Eddies. Las unidades entran con <strong>Lag</strong> (no pueden atacar este turno) a menos que tengan <strong>Adrenaline</strong>.
+                    <br />• <em>Atacar:</em> Con unidades listas una a una a unidades enemigas gastadas o a los Gigs rivales.
+                  </li>
+                </ul>
+              </div>
+
+              <div>
+                <strong className="text-[#0dfceb] block uppercase">3. Tabla Oficial de Robo de Gigs (por Poder):</strong>
+                Al asaltar la zona de Gigs rival, la cantidad de dados que robas depende del Poder de tu atacante:
+                <table className="w-full text-left border border-gray-800 mt-1 mb-1 text-[10px]">
+                  <thead>
+                    <tr className="bg-[#000000] text-[#0dfceb]">
+                      <th className="p-1 border border-gray-800">Poder de la Unidad</th>
+                      <th className="p-1 border border-gray-800">Gigs Robados</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr><td className="p-1 border border-gray-800">0 Poder</td><td className="p-1 border border-gray-800">0 Gigs (no puede robar)</td></tr>
+                    <tr><td className="p-1 border border-gray-800">1 – 9 Poder</td><td className="p-1 border border-gray-800">1 Gig</td></tr>
+                    <tr><td className="p-1 border border-gray-800">10 – 19 Poder</td><td className="p-1 border border-gray-800">2 Gigs</td></tr>
+                    <tr><td className="p-1 border border-gray-800">20 – 29 Poder</td><td className="p-1 border border-gray-800">3 Gigs</td></tr>
+                  </tbody>
+                </table>
+                El atacante elige qué dados robar de la zona rival (se roban los de mayor valor).
+              </div>
+
+              <div>
+                <strong className="text-[#0dfceb] block uppercase">4. Combate entre Unidades y Regla de Empate:</strong>
+                El mayor poder gana y derrota a la otra unidad enviándola a la Basura.
+                <br />
+                <span className="text-[#FF003C] font-bold">REGLA DE EMPATE:</span> Si ambas unidades tienen el mismo poder (&gt;0), <strong>AMBAS unidades pierden el combate y AMBAS van a la Basura</strong>. Una unidad con 0 de poder no puede derrotar nada.
+              </div>
+
+              <div>
+                <strong className="text-[#0dfceb] block uppercase">5. Palabras Clave Oficiales:</strong>
+                <ul className="list-disc pl-4 mt-1 space-y-1 text-gray-400">
+                  <li><strong className="text-[#0dfceb]">Blocker:</strong> Cuando una unidad rival ataca, puedes girar esta unidad para redirigir el ataque hacia ella. Si protege tus Gigs, se convierte en pelea contra el Blocker y <strong>no se roba ningún Gig</strong> aunque el atacante gane.</li>
+                  <li><strong className="text-[#FCEE0A]">Adrenaline:</strong> Esta unidad ignora el Lag y puede atacar en el mismo turno en que es jugada.</li>
+                  <li><strong className="text-[#FF003C]">Go Solo:</strong> Paga el coste de esta Leyenda para jugarla como una Unidad lista en el campo capaz de atacar este turno.</li>
+                  <li><strong className="text-white">Quick:</strong> Puedes activar este efecto o jugar este Programa en respuesta durante el ataque de un rival.</li>
+                </ul>
+              </div>
+
+              <div>
+                <strong className="text-[#0dfceb] block uppercase">6. Street Cred (⭐) y Overtime:</strong>
+                La suma de los valores de tus dados de Gig activos es tu Credibilidad en la Calle. Si ambos jugadores vacían sus Fixers, entra el Overtime: el primero que llegue a 7 Gigs gana la partida inmediatamente.
+              </div>
+            </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Modal de Autenticación Cyberpunk (Firebase Auth) */}
       <CyberAuthModal
         isOpen={showAuthModal}
@@ -9800,6 +9913,6 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
         playerDeckName={activePlayerDeck?.name || availableDecks[selectedPlayerDeckIdx]?.name || ''}
         botDeckName={activeBotDeck?.name || availableDecks[selectedBotDeckIdx]?.name || ''}
       />
-    </div>
+    </>
   );
 }
