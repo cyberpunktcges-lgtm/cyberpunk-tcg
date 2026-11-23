@@ -22,6 +22,7 @@ import {
   orderBy,
   serverTimestamp
 } from 'firebase/firestore';
+import { computeMatchRankingUpdate, computeWinRate } from './rankingSystem.js';
 
 // Configuración oficial de Firebase del proyecto Cyberpunk TCG
 export const firebaseConfig = {
@@ -298,4 +299,104 @@ export async function deleteBetaBugReport(reportId) {
   const reportRef = doc(db, 'beta_bug_reports', reportId);
   await deleteDoc(reportRef);
   return true;
+}
+
+// =========================================================================
+// RANKING NIGHT CITY LEADERBOARD EN FIRESTORE (`simulator_leaderboard`)
+// =========================================================================
+
+/**
+ * Obtiene las estadísticas de ranking de un usuario (con fallback a caché local).
+ */
+export async function getUserRankingStats(userId) {
+  if (!userId) return null;
+  try {
+    const ref = doc(db, 'simulator_leaderboard', userId);
+    const snap = await getDoc(ref);
+    if (snap.exists()) {
+      const data = { userId, ...snap.data() };
+      try {
+        localStorage.setItem(`cp_ranking_${userId}`, JSON.stringify(data));
+      } catch {}
+      return data;
+    }
+  } catch (err) {
+    console.warn('Error leyendo ranking del usuario en Firestore:', err);
+  }
+
+  try {
+    const cached = localStorage.getItem(`cp_ranking_${userId}`);
+    if (cached) return JSON.parse(cached);
+  } catch {}
+  return null;
+}
+
+/**
+ * Registra una partida finalizada en `simulator_leaderboard` y devuelve el delta de puntos y desbloqueos.
+ */
+export async function recordLeaderboardMatch(userId, profileMeta = {}, matchResult = {}) {
+  if (!userId) throw new Error('Inicia sesión para puntuar en el Ranking');
+
+  const ref = doc(db, 'simulator_leaderboard', userId);
+  let existing = null;
+  try {
+    const snap = await getDoc(ref);
+    if (snap.exists()) existing = snap.data();
+  } catch {
+    try {
+      const cached = localStorage.getItem(`cp_ranking_${userId}`);
+      if (cached) existing = JSON.parse(cached);
+    } catch {}
+  }
+
+  const calc = computeMatchRankingUpdate(existing, matchResult);
+  if (calc.alreadyRecorded) {
+    return calc;
+  }
+
+  const payload = {
+    userId,
+    displayName: String(profileMeta.displayName || existing?.displayName || 'Netrunner').trim().slice(0, 40),
+    avatarId: profileMeta.avatarId || existing?.avatarId || 'v-chico',
+    avatarImage: profileMeta.avatarImage || existing?.avatarImage || '',
+    city: profileMeta.city || existing?.city || '',
+    ...calc.updatedStats,
+    updatedAtMs: Date.now(),
+    updatedAt: serverTimestamp()
+  };
+
+  try {
+    localStorage.setItem(`cp_ranking_${userId}`, JSON.stringify(payload));
+  } catch {}
+
+  await setDoc(ref, payload, { merge: true });
+  return { ...calc, savedProfile: payload };
+}
+
+/**
+ * Obtiene el Top global del Ranking Night City ordenado por puntos, victorias y winrate.
+ */
+export async function getLeaderboardTop(limitCount = 25) {
+  const colRef = collection(db, 'simulator_leaderboard');
+  const snapshot = await getDocs(colRef);
+  const rows = [];
+  snapshot.forEach((docSnap) => {
+    const data = docSnap.data();
+    rows.push({
+      userId: docSnap.id,
+      ...data,
+      points: Number(data.points) || 0,
+      wins: Number(data.wins) || 0,
+      losses: Number(data.losses) || 0,
+      winRate: computeWinRate(data.wins, data.losses)
+    });
+  });
+
+  rows.sort((a, b) => {
+    if (b.points !== a.points) return b.points - a.points;
+    if (b.wins !== a.wins) return b.wins - a.wins;
+    return b.winRate - a.winRate;
+  });
+
+  return rows.map((row, idx) => ({ ...row, rank: idx + 1 })).slice(0, limitCount);
 }

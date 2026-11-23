@@ -408,6 +408,67 @@ export function parseCardPower(powerStr) {
 }
 
 /**
+ * Calcula el desglose visual de fuerza de una unidad en mesa (Fase 2: Buffs / Debuffs):
+ * - basePower: fuerza impresa base de la carta
+ * - gearBonus: suma de bonificadores de Gears equipados
+ * - tempDelta: modificadores temporales de este turno (ej. -4 de Pyramid Song, +2 de Dexter)
+ * - status: 'debuffed' | 'buffed' | 'normal'
+ */
+export function getUnitPowerBreakdown(unit) {
+  if (!unit) {
+    return {
+      basePower: 0,
+      gearBonus: 0,
+      tempDelta: 0,
+      totalDelta: 0,
+      currentPower: 0,
+      status: 'normal',
+      deltaBadge: '',
+      tooltip: ''
+    };
+  }
+  const basePower =
+    unit.parsedPower !== undefined && unit.parsedPower !== null
+      ? Number(unit.parsedPower)
+      : parseCardPower(unit.powerVal ?? unit.power);
+  const gearBonus = (unit.gear || []).reduce(
+    (sum, g) => sum + (Number(g.parsedPower) || parseCardPower(g.powerVal ?? g.power) || 0),
+    0
+  );
+  const normalExpected = Math.max(0, basePower + gearBonus);
+  const currentPower =
+    unit.currentPower !== undefined && unit.currentPower !== null
+      ? Number(unit.currentPower)
+      : normalExpected;
+  const tempDelta = currentPower - normalExpected;
+  const totalDelta = currentPower - basePower;
+
+  let status = 'normal';
+  if (tempDelta < 0 || totalDelta < 0) status = 'debuffed';
+  else if (tempDelta > 0 || gearBonus > 0) status = 'buffed';
+
+  const parts = [`Base ${basePower}`];
+  if (gearBonus > 0) parts.push(`Gear +${gearBonus}`);
+  if (tempDelta > 0) parts.push(`Buff +${tempDelta} (turno)`);
+  if (tempDelta < 0) parts.push(`Debuff ${tempDelta} (turno)`);
+
+  let deltaBadge = '';
+  if (tempDelta < 0) deltaBadge = `${tempDelta}`;
+  else if (totalDelta > 0) deltaBadge = `+${totalDelta}`;
+
+  return {
+    basePower,
+    gearBonus,
+    tempDelta,
+    totalDelta,
+    currentPower,
+    status,
+    deltaBadge,
+    tooltip: `${parts.join(' · ')} = ${currentPower} Fuerza`
+  };
+}
+
+/**
  * Entero aleatorio uniforme en [0, maxExclusive) usando crypto.getRandomValues (sin sesgo de módulo)
  */
 function getSecureRandomInt(maxExclusive) {
@@ -613,7 +674,12 @@ export function createInitialGameState(playerDeckInput, botDeckInput, allCards =
     enrichLegend(l, 'b', idx, isBotFirst ? idx < 2 : false)
   );
 
+  const botDifficulty = Math.max(1, Math.min(3, Number(options.botDifficulty) || 1));
+  const matchId = `match_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+
   const state = {
+    matchId,
+    botDifficulty,
     turnNumber: 1,
     activePlayer: initialActivePlayer, // 'player' | 'bot'
     phase: 'START', // 'START' | 'MAIN' | 'END'

@@ -728,27 +728,59 @@ export async function runBotTurn(gameState, updateCallback, delayMs = 700, pause
     }
 
     // 3.B: Bucle táctico de despliegue (Unidades, Gears, Programas de alto valor, Go Solo)
+    const botDifficulty = Math.max(1, Math.min(3, Number(gameState?.botDifficulty || 1)));
     let keepPlaying = true;
     let safetyCounter = 0;
     while (keepPlaying && !aborted && !gameState.isGameOver && safetyCounter < 12) {
       safetyCounter++;
-      const maxCapacity = getBotMaxCapacity(bot);
-      if (maxCapacity <= 0) break;
+      const rawMaxCapacity = getBotMaxCapacity(bot);
+      if (rawMaxCapacity <= 0) break;
+
+      // Nivel 2+ (Edgerunner / Adam Smasher): reservar Eddies para 1 carta Quick defensiva si el jugador amenaza mesa
+      let reservedQuickCost = 0;
+      if (botDifficulty >= 2 && (player.field || []).length > 0 && !gameState.overtime) {
+        const defensiveQuick = (bot.hand || [])
+          .filter(
+            (c) =>
+              hasKeyword(c, 'Quick') &&
+              getCardType(c) === 'PROGRAM' &&
+              getEffectiveCardCost(c, bot, gameState) <= Math.max(2, rawMaxCapacity - 2)
+          )
+          .sort((a, b) => getEffectiveCardCost(a, bot, gameState) - getEffectiveCardCost(b, bot, gameState))[0];
+        if (defensiveQuick) {
+          reservedQuickCost = getEffectiveCardCost(defensiveQuick, bot, gameState);
+        }
+      }
+      const maxCapacity = Math.max(0, rawMaxCapacity - reservedQuickCost);
 
       const actions = [];
+      const playerMaxBlockerPower = Math.max(
+        0,
+        ...(player.field || [])
+          .filter((u) => !u.isSpent && hasKeyword(u, 'Blocker'))
+          .map((u) => u.currentPower || 0)
+      );
 
       // Evaluar cartas en mano
       for (const card of bot.hand || []) {
         const cost = getEffectiveCardCost(card, bot, gameState);
-        if (cost > maxCapacity) continue;
         const type = getCardType(card);
+        // En Nivel 3 (Adam Smasher), permitir romper la reserva Quick si es Go Solo / Adrenaline / removal crítico
+        const effectiveCap =
+          botDifficulty >= 3 && (hasKeyword(card, 'Adrenaline') || type === 'PROGRAM')
+            ? rawMaxCapacity
+            : maxCapacity;
+        if (cost > effectiveCap) continue;
 
         if (type === 'UNIT') {
           const power = card.parsedPower || parseCardPower(card.power) || 0;
           let score = 62 + power * 4 + cost * 2.5;
-          if (hasKeyword(card, 'Adrenaline')) score += 14;
-          if (hasKeyword(card, 'Blocker') && (player.field || []).length > (bot.field || []).length) score += 10;
-          if (isJohnnyUnit(card) && (player.field || []).some(isCorpoUnit)) score += 16;
+          if (hasKeyword(card, 'Adrenaline')) score += botDifficulty >= 3 ? 24 : 14;
+          if (hasKeyword(card, 'Blocker') && (player.field || []).length > (bot.field || []).length) {
+            score += botDifficulty >= 2 ? 18 : 10;
+          }
+          if (isJohnnyUnit(card) && (player.field || []).some(isCorpoUnit)) score += botDifficulty >= 2 ? 24 : 16;
+          if (botDifficulty >= 2 && power >= 5 && (bot.gigs?.length || 0) >= 4) score += 8;
           // En Turno 1 saliendo segundo, priorizar aún más desplegar Unidades fuertes en curva
           if (isBotTurn1GoingSecond) score += 15;
           actions.push({ kind: 'CARD', card, cost, score, targetId: null });
@@ -759,10 +791,23 @@ export async function runBotTurn(gameState, updateCallback, delayMs = 700, pause
           let score = 54 + pBonus * 5;
           if (hasKeyword(card, 'Blocker') && !hasKeyword(target, 'Blocker')) score += 12;
           if (['CP-030', 'CP-039', 'CP-114', 'CP-116', 'CP-151'].includes(resolveCardId(card))) score += 10;
+          // Nivel 2+: priorizar equipar Gear si permite superar al Blocker rival o alcanzar el umbral de 2 Gigs (>= 5 fuerza)
+          if (botDifficulty >= 2 && !target.isSpent && !target.isLagging) {
+            const curPow = target.currentPower || 0;
+            const newPow = curPow + pBonus;
+            if (curPow < 5 && newPow >= 5) score += 14;
+            if (playerMaxBlockerPower > 0 && curPow <= playerMaxBlockerPower && newPow > playerMaxBlockerPower) {
+              score += botDifficulty >= 3 ? 20 : 12;
+            }
+          }
           actions.push({ kind: 'CARD', card, cost, score, targetId: target.instanceId, targetName: target.name });
         } else if (type === 'PROGRAM') {
-          const score = evaluateProgramScore(card, bot, player, gameState);
+          let score = evaluateProgramScore(card, bot, player, gameState);
           if (score > 0) {
+            // En Nivel 2+, valorar aún más removal/debuff contra amenazas grandes o Blockers del jugador
+            if (botDifficulty >= 2 && score >= 65 && (playerMaxBlockerPower >= 3 || (player.field || []).some((u) => (u.currentPower || 0) >= 5))) {
+              score += botDifficulty >= 3 ? 16 : 10;
+            }
             // En Turno 1 saliendo segundo, solo jugar Programas si son robo o removal real (>= 60)
             if (isBotTurn1GoingSecond && score < 60) continue;
             actions.push({ kind: 'CARD', card, cost, score, targetId: null });
@@ -774,10 +819,12 @@ export async function runBotTurn(gameState, updateCallback, delayMs = 700, pause
       for (const leg of bot.legends || []) {
         if (leg.isOnField || leg.isRemovedFromGame || !leg.isFaceUp || !hasKeyword(leg, 'Go Solo')) continue;
         const cost = getEffectiveCardCost(leg, bot, gameState);
-        if (cost <= 0 || cost > maxCapacity) continue;
+        if (cost <= 0 || cost > rawMaxCapacity) continue;
         const power = leg.parsedPower || parseCardPower(leg.power) || 0;
         let score = 66 + power * 4;
         if (gameState.overtime && (bot.gigs?.length || 0) >= 5) score += 25;
+        if (botDifficulty >= 2 && (bot.gigs?.length || 0) >= 4) score += 10;
+        if (botDifficulty >= 3 && (power > playerMaxBlockerPower || (player.field || []).length === 0)) score += 16;
         actions.push({ kind: 'GO_SOLO', card: leg, cost, score });
       }
 
@@ -853,18 +900,29 @@ export async function runBotTurn(gameState, updateCallback, delayMs = 700, pause
   // -----------------------------------------------------------------------
   // PASO 4: FASE DE ATAQUES CON CONCIENCIA DE BLOCKERS, LETHAL Y JOHNNY
   // -----------------------------------------------------------------------
-  const readyUnits = (bot.field || [])
-    .filter((u) => canUnitAttack(u, bot, gameState))
-    .sort((a, b) => {
-      // Obligadas a atacar primero; luego ordenar para atravesar Blockers de forma inteligente
-      if (a.mustAttackNextTurn !== b.mustAttackNextTurn) return (b.mustAttackNextTurn ? 1 : 0) - (a.mustAttackNextTurn ? 1 : 0);
-      return (b.currentPower || 0) - (a.currentPower || 0);
-    });
-
+  const attackDifficulty = Math.max(1, Math.min(3, Number(gameState?.botDifficulty || 1)));
   const playerReadyBlockers = (player.field || []).filter(
     (u) => !u.isSpent && hasKeyword(u, 'Blocker')
   );
   const maxPlayerBlockerPower = Math.max(0, ...playerReadyBlockers.map((b) => b.currentPower || 0));
+
+  const readyUnits = (bot.field || [])
+    .filter((u) => canUnitAttack(u, bot, gameState))
+    .sort((a, b) => {
+      // Obligadas a atacar primero
+      if (a.mustAttackNextTurn !== b.mustAttackNextTurn) {
+        return (b.mustAttackNextTurn ? 1 : 0) - (a.mustAttackNextTurn ? 1 : 0);
+      }
+      // Nivel 3 (Adam Smasher): si el jugador tiene Blocker y el Bot tiene varios atacantes,
+      // atacar primero con Johnny anti-Corpo o el atacante capaz de baitear al Blocker para dejar pasar al grande
+      if (attackDifficulty >= 3 && playerReadyBlockers.length > 0 && (bot.field || []).length >= 2) {
+        const aJohnnyEdge = isJohnnyUnit(a) && playerReadyBlockers.some(isCorpoUnit) ? 1 : 0;
+        const bJohnnyEdge = isJohnnyUnit(b) && playerReadyBlockers.some(isCorpoUnit) ? 1 : 0;
+        if (aJohnnyEdge !== bJohnnyEdge) return bJohnnyEdge - aJohnnyEdge;
+        return (a.currentPower || 0) - (b.currentPower || 0);
+      }
+      return (b.currentPower || 0) - (a.currentPower || 0);
+    });
 
   for (const unit of readyUnits) {
     if (gameState.isGameOver) break;

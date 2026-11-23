@@ -30,11 +30,13 @@ import {
   Layers,
   Menu,
   LogOut,
-  Bug
+  Bug,
+  Trophy
 } from 'lucide-react';
 import CyberAuthModal from './CyberAuthModal.jsx';
 import CyberBugReportModal from './CyberBugReportModal.jsx';
 import CyberBotActionPopup from './CyberBotActionPopup.jsx';
+import CyberLeaderboardModal from './CyberLeaderboardModal.jsx';
 import { installGlobalErrorBuffer } from '../utils/betaDiagnostics.js';
 import CyberProfileModal from './CyberProfileModal.jsx';
 import CyberMyDecksModal from './CyberMyDecksModal.jsx';
@@ -45,8 +47,11 @@ import {
   subscribeToAuth,
   logoutUser,
   getUserDecks,
-  getUserProfile
+  getUserProfile,
+  getUserRankingStats,
+  recordLeaderboardMatch
 } from '../utils/firebase.js';
+import { getBotDifficultyMeta, getUnlockedBotDifficulty } from '../utils/rankingSystem.js';
 import {
   createInitialGameState,
   applyStartingPlayer,
@@ -76,6 +81,7 @@ import {
   rollSecureD20,
   parseCardPower,
   parseCardCost,
+  getUnitPowerBreakdown,
   isCardVendible,
   toggleEddieSpent,
   toggleLegendSpent,
@@ -928,6 +934,11 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
   const [showMyDecksModal, setShowMyDecksModal] = useState(false);
   const [showDeckSelectorModal, setShowDeckSelectorModal] = useState(false);
   const [showBugReportModal, setShowBugReportModal] = useState(false);
+  const [showLeaderboardModal, setShowLeaderboardModal] = useState(false);
+  const [userRankingStats, setUserRankingStats] = useState(null);
+  const [selectedBotDifficulty, setSelectedBotDifficulty] = useState(1);
+  const [lastMatchRankingResult, setLastMatchRankingResult] = useState(null);
+  const recordedMatchIdRef = useRef(null);
 
   // Pausa paso a paso en las jugadas del Bot (OK para continuar) — activado por defecto en Beta
   const [botStepPauseEnabled, setBotStepPauseEnabled] = useState(() => {
@@ -1045,9 +1056,23 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
             }
           })
           .catch(() => {});
+        getUserRankingStats(user.uid)
+          .then((stats) => {
+            if (stats) {
+              setUserRankingStats(stats);
+              const prog = getUnlockedBotDifficulty(stats.wins || 0);
+              setSelectedBotDifficulty(prog.level);
+            } else {
+              setUserRankingStats(null);
+              setSelectedBotDifficulty(1);
+            }
+          })
+          .catch(() => {});
       } else {
         setUserCloudDecks([]);
         setUserProfile(null);
+        setUserRankingStats(null);
+        setSelectedBotDifficulty(1);
       }
     });
     return () => unsubscribe();
@@ -3096,9 +3121,11 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
 
     const initial = createInitialGameState(normPlayer, normBot, initialCards, {
       startingPlayer: null,
-      isRematch: false
+      isRematch: false,
+      botDifficulty: selectedBotDifficulty
     });
 
+    setLastMatchRankingResult(null);
     setGameState(initial);
     setHistory([]);
     setSelectedHandCard(null);
@@ -3200,8 +3227,10 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
 
     const initial = createInitialGameState(pDeck, bDeck, initialCards, {
       startingPlayer,
-      isRematch
+      isRematch,
+      botDifficulty: selectedBotDifficulty
     });
+    setLastMatchRankingResult(null);
     setGameState(initial);
     setHistory([]);
     setSelectedHandCard(null);
@@ -3402,6 +3431,52 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
       setAuthError(true);
     }
   };
+
+  // Registrar resultado legal de partida en el Ranking Night City (1 sola vez por matchId)
+  useEffect(() => {
+    if (!gameState?.isGameOver || !gameState?.winner || !currentUser?.uid) return;
+    const mId = gameState.matchId || `m_${gameState.turnNumber}_${gameState.winner}`;
+    if (recordedMatchIdRef.current === mId) return;
+    recordedMatchIdRef.current = mId;
+
+    const displayName =
+      userProfile?.displayName ||
+      currentUser.displayName ||
+      currentUser.email?.split('@')[0] ||
+      'Netrunner';
+    const deckName =
+      activePlayerDeck?.name ||
+      availableDecks[selectedPlayerDeckIdx]?.name ||
+      'Mazo Edgerunner';
+
+    recordLeaderboardMatch(
+      currentUser.uid,
+      {
+        displayName,
+        avatarId: userProfile?.avatarId || playerAvatar?.id || 'v-chico',
+        avatarImage: userProfile?.avatarImage || '',
+        city: userProfile?.city || ''
+      },
+      {
+        matchId: mId,
+        won: gameState.winner === 'player',
+        botDifficulty: gameState.botDifficulty || selectedBotDifficulty || 1,
+        deckName
+      }
+    )
+      .then((res) => {
+        if (res && !res.alreadyRecorded) {
+          setUserRankingStats(res.savedProfile || res.updatedStats);
+          setLastMatchRankingResult(res);
+          if (res.leveledUpBotTo?.level) {
+            setSelectedBotDifficulty(res.leveledUpBotTo.level);
+          }
+        }
+      })
+      .catch((err) => {
+        console.warn('No se pudo guardar la puntuación en el Ranking:', err);
+      });
+  }, [gameState?.isGameOver, gameState?.winner, gameState?.matchId, currentUser?.uid]);
 
   // Turno del bot automático cuando le toque y el jugador ya haya decidido el Mulligan
   // (Pausa durante la Fase de Respuesta si pendingReaction está activo)
@@ -3604,6 +3679,16 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
 
             <button
               type="button"
+              onClick={() => setShowLeaderboardModal(true)}
+              style={{ clipPath: CYBER_BUTTON }}
+              className="p-1.5 bg-[#FCEE0A]/15 border border-[#FCEE0A] text-[#FCEE0A] hover:bg-[#FCEE0A] hover:text-black cursor-pointer"
+              title="Ver Ranking Night City y nivel de dificultad del Bot"
+            >
+              <Trophy className="w-4 h-4" />
+            </button>
+
+            <button
+              type="button"
               onClick={() => setShowBugReportModal(true)}
               style={{ clipPath: CYBER_BUTTON }}
               className="p-1.5 bg-[#FF003C]/20 border border-[#FF003C] text-[#FF003C] hover:bg-[#FF003C] hover:text-white cursor-pointer"
@@ -3743,6 +3828,26 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
               <Eye className="w-3.5 h-3.5" />
               <span className="hidden xl:inline">{isKiroshiCollapsed ? 'VER HUD' : 'HUD'}</span>
             </button>
+
+            {/* Botón Ranking Night City + Dificultad Progresiva del Bot */}
+            {(() => {
+              const diffMeta = getBotDifficultyMeta(gameState?.botDifficulty || selectedBotDifficulty);
+              return (
+                <button
+                  type="button"
+                  onClick={() => setShowLeaderboardModal(true)}
+                  style={{ clipPath: CYBER_BUTTON }}
+                  className="px-2.5 py-1.5 bg-[#FCEE0A]/15 hover:bg-[#FCEE0A] border border-[#FCEE0A] text-[#FCEE0A] hover:text-[#070a10] font-black uppercase flex items-center gap-1.5 cursor-pointer text-xs transition-all shadow-[0_0_12px_rgba(252,238,10,0.25)] whitespace-nowrap"
+                  title={`Ver Ranking Night City // Bot actual: ${diffMeta.shortLabel} (+${diffMeta.winPoints} ⭐ por victoria)`}
+                >
+                  <Trophy className="w-3.5 h-3.5" />
+                  <span className="hidden xl:inline">RANKING</span>
+                  <span className="text-[9px] px-1 py-0.2 bg-black/70 text-white rounded font-bold">
+                    NV.{diffMeta.level}
+                  </span>
+                </button>
+              );
+            })()}
 
             {/* Toggle Pausa Paso a Paso del Bot (OK por jugada) */}
             <button
@@ -4920,10 +5025,27 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                             )}
                           </div>
 
-                          {/* Insignia de Poder */}
-                          <div className="absolute bottom-0.5 right-0.5 px-1.5 py-0.2 bg-[#FF003C] text-white font-mono font-black text-[9px] sm:text-[10px] shadow-md">
-                            {unit.currentPower}
-                          </div>
+                          {/* Insignia de Poder con indicador visual de Buff / Debuff (Fase 2) */}
+                          {(() => {
+                            const pb = getUnitPowerBreakdown(unit);
+                            const badgeClass =
+                              pb.status === 'debuffed'
+                                ? 'bg-[#FF003C] text-white border border-white animate-pulse shadow-[0_0_12px_#FF003C]'
+                                : pb.status === 'buffed'
+                                ? 'bg-[#00FF9C] text-[#070a10] border border-white shadow-[0_0_10px_rgba(0,255,156,0.7)]'
+                                : 'bg-[#FF003C] text-white shadow-md';
+                            return (
+                              <div
+                                title={pb.tooltip}
+                                className={`absolute bottom-0.5 right-0.5 px-1.5 py-0.2 font-mono font-black text-[9px] sm:text-[10px] z-20 flex items-center gap-0.5 ${badgeClass}`}
+                              >
+                                <span>⚡{pb.currentPower}</span>
+                                {pb.deltaBadge && (
+                                  <span className="text-[7.5px] opacity-90">({pb.deltaBadge})</span>
+                                )}
+                              </div>
+                            );
+                          })()}
 
                           {/* Estado: GASTADA / OBJETIVO DE ATAQUE */}
                           {unit.isSpent && (
@@ -5414,7 +5536,27 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                             </div>
                           )}
 
-
+                          {/* Insignia de Poder en vivo del Jugador con indicador visual de Buff / Debuff (Fase 2) */}
+                          {(() => {
+                            const pb = getUnitPowerBreakdown(unit);
+                            const badgeClass =
+                              pb.status === 'debuffed'
+                                ? 'bg-[#FF003C] text-white border border-white animate-pulse shadow-[0_0_12px_#FF003C]'
+                                : pb.status === 'buffed'
+                                ? 'bg-[#00FF9C] text-[#070a10] border border-white shadow-[0_0_10px_rgba(0,255,156,0.7)]'
+                                : 'bg-[#070a10]/90 text-[#0dfceb] border border-[#0dfceb]/70 shadow-md';
+                            return (
+                              <div
+                                title={pb.tooltip}
+                                className={`absolute bottom-0.5 right-0.5 px-1.5 py-0.2 font-mono font-black text-[9px] sm:text-[10px] z-20 flex items-center gap-0.5 ${badgeClass}`}
+                              >
+                                <span>⚡{pb.currentPower}</span>
+                                {pb.deltaBadge && (
+                                  <span className="text-[7.5px] opacity-90">({pb.deltaBadge})</span>
+                                )}
+                              </div>
+                            );
+                          })()}
 
                           {/* Estado: GASTADA */}
                           {unit.isSpent && (
@@ -7069,7 +7211,62 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
               </p>
             </div>
 
+            {/* Resumen de Puntos de Ranking Street Cred y Subida de Nivel del Bot */}
+            {currentUser ? (
+              lastMatchRankingResult && (
+                <div className="bg-black/90 border border-[#FCEE0A]/50 p-3.5 rounded space-y-2 text-left">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-[10px] font-black uppercase text-[#0dfceb]">
+                      🏆 RANKING STREET CRED
+                    </span>
+                    <span
+                      className={`text-sm font-black ${
+                        lastMatchRankingResult.pointsDelta >= 0 ? 'text-[#00FF9C]' : 'text-[#FF003C]'
+                      }`}
+                    >
+                      {lastMatchRankingResult.pointsDelta >= 0
+                        ? `+${lastMatchRankingResult.pointsDelta} ⭐`
+                        : `${lastMatchRankingResult.pointsDelta} ⭐`}
+                    </span>
+                  </div>
+                  <div className="flex flex-wrap items-center justify-between gap-1 text-[10px] text-gray-300">
+                    <span>
+                      Total: <strong className="text-[#FCEE0A]">{lastMatchRankingResult.updatedStats?.points ?? 0} ⭐</strong>
+                      {lastMatchRankingResult.rankAfter ? ` (${lastMatchRankingResult.rankAfter.emoji} ${lastMatchRankingResult.rankAfter.name})` : ''}
+                    </span>
+                    {lastMatchRankingResult.streakBonus > 0 && (
+                      <span className="text-[#FF003C] font-black">
+                        🔥 +{lastMatchRankingResult.streakBonus} BONUS RACHA
+                      </span>
+                    )}
+                  </div>
+                  {lastMatchRankingResult.leveledUpBotTo && (
+                    <div className="p-2 bg-[#FF003C]/20 border border-[#FF003C] rounded text-[10px] text-white font-bold">
+                      ⚠️ ¡NIVEL DE AMENAZA AUMENTADO! Has desbloqueado al Bot en modo {' '}
+                      <span className="text-[#FCEE0A] uppercase">{lastMatchRankingResult.leveledUpBotTo.shortLabel}</span> {' '}
+                      (+{lastMatchRankingResult.leveledUpBotTo.winPoints} ⭐ por victoria).
+                    </div>
+                  )}
+                </div>
+              )
+            ) : (
+              <div className="bg-black/80 border border-gray-800 p-2.5 rounded text-[10px] text-gray-400">
+                Inicia sesión con tu cuenta gratis para sumar puntos en el {' '}
+                <strong className="text-[#FCEE0A]">Ranking Night City</strong> y desbloquear niveles de Bot.
+              </div>
+            )}
+
             <div className="space-y-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setShowLeaderboardModal(true)}
+                style={{ clipPath: CYBER_BUTTON }}
+                className="w-full py-2.5 bg-[#FCEE0A]/15 hover:bg-[#FCEE0A] border border-[#FCEE0A] text-[#FCEE0A] hover:text-black font-black text-xs uppercase tracking-widest cursor-pointer transition-all flex items-center justify-center gap-2"
+              >
+                <Trophy className="w-4 h-4" />
+                <span>🏆 VER RANKING NIGHT CITY</span>
+              </button>
+
               <button
                 type="button"
                 onClick={() => {
@@ -7254,13 +7451,33 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                   <span className={`text-sm sm:text-base font-black uppercase block ${currentBlocker ? 'text-[#0dfceb]' : 'text-white'}`}>
                     {currentBlocker ? currentBlocker.name : reaction.targetName}
                   </span>
-                  <span className="text-xs font-mono font-bold text-gray-300 block">
-                    {currentBlocker
-                      ? `⚡ FUERZA: ${currentBlocker.currentPower}`
-                      : reaction.targetType === 'GIGS'
-                      ? `⚠️ Robará ${calculateGigsToSteal(reaction.attackerPower)} Gig(s)`
-                      : `⚡ FUERZA: ${reaction.targetPower}`}
-                  </span>
+                  {(() => {
+                    if (currentBlocker) {
+                      const pb = getUnitPowerBreakdown(currentBlocker);
+                      return (
+                        <span
+                          title={pb.tooltip}
+                          className={`text-xs font-mono font-black block ${
+                            pb.status === 'debuffed'
+                              ? 'text-[#FF003C] animate-pulse'
+                              : pb.status === 'buffed'
+                              ? 'text-[#00FF9C]'
+                              : 'text-gray-300'
+                          }`}
+                        >
+                          ⚡ FUERZA: {pb.currentPower}
+                          {pb.deltaBadge ? ` (${pb.deltaBadge} · Base ${pb.basePower})` : ''}
+                        </span>
+                      );
+                    }
+                    return (
+                      <span className="text-xs font-mono font-bold text-gray-300 block">
+                        {reaction.targetType === 'GIGS'
+                          ? `⚠️ Robará ${calculateGigsToSteal(reaction.attackerPower)} Gig(s)`
+                          : `⚡ FUERZA: ${reaction.targetPower}`}
+                      </span>
+                    );
+                  })()}
                 </div>
               </div>
 
@@ -7289,20 +7506,27 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                     <div className="flex flex-wrap gap-2">
                       {readyBlockers.map((b) => {
                         const isAssigned = reaction.blockerUnitId === b.instanceId;
+                        const pb = getUnitPowerBreakdown(b);
                         return (
                           <button
                             key={b.instanceId}
                             type="button"
+                            title={pb.tooltip}
                             onClick={() => handleSelectBlocker(b.instanceId)}
                             style={{ clipPath: CYBER_BUTTON }}
                             className={`px-3 py-1.5 text-xs font-black uppercase transition-all flex items-center gap-2 cursor-pointer ${
                               isAssigned
                                 ? 'bg-[#0dfceb] text-black shadow-[0_0_15px_#0dfceb]'
+                                : pb.status === 'debuffed'
+                                ? 'bg-[#070a10] border border-[#FF003C] text-[#FF003C] hover:bg-[#FF003C]/15'
                                 : 'bg-[#070a10] border border-[#0dfceb]/50 text-[#0dfceb] hover:border-[#0dfceb]'
                             }`}
                           >
                             <Shield className="w-3.5 h-3.5" />
-                            <span>{b.name} (⚡{b.currentPower})</span>
+                            <span>
+                              {b.name} (⚡{pb.currentPower}
+                              {pb.deltaBadge ? ` ${pb.deltaBadge}` : ''})
+                            </span>
                             <span className="text-[9px] underline">
                               {isAssigned ? '[DESASIGNAR]' : '[BLOQUEAR]'}
                             </span>
@@ -9318,6 +9542,23 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
         }}
         onInspectCard={(c) => setInspectedCard(c)}
         disabledHotkeys={showBugReportModal}
+      />
+
+      {/* Modal de Ranking Night City + Selector de Dificultad Progresiva del Bot */}
+      <CyberLeaderboardModal
+        isOpen={showLeaderboardModal}
+        onClose={() => setShowLeaderboardModal(false)}
+        currentUser={currentUser}
+        userRankingStats={userRankingStats}
+        selectedBotDifficulty={selectedBotDifficulty}
+        onSelectBotDifficulty={(lvl) => {
+          setSelectedBotDifficulty(lvl);
+          if (gameState && !gameState.isGameOver) {
+            gameState.botDifficulty = lvl;
+            setGameState({ ...gameState });
+          }
+        }}
+        onOpenAuthModal={() => setShowAuthModal(true)}
       />
 
       {/* Modal de Reporte de Fallos Beta con Caja Negra Automática */}
