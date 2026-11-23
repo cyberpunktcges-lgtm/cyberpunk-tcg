@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { getLeaderboardTop } from '../utils/firebase.js';
 import {
+  CURRENT_RANKING_SEASON,
   BOT_DIFFICULTY_LEVELS,
   getRankForPoints,
   getUnlockedBotDifficulty,
@@ -99,9 +100,14 @@ export default function CyberLeaderboardModal({
               <Trophy className="w-5 h-5" />
             </div>
             <div className="min-w-0">
-              <h2 className="font-black text-sm sm:text-lg uppercase tracking-wider text-white truncate">
-                // NIGHT CITY // <span className="text-[#FCEE0A]">RANKING STREET CRED</span>
-              </h2>
+              <div className="flex items-center gap-2 flex-wrap">
+                <h2 className="font-black text-sm sm:text-lg uppercase tracking-wider text-white truncate">
+                  // NIGHT CITY // <span className="text-[#FCEE0A]">RANKING STREET CRED</span>
+                </h2>
+                <span className="px-2 py-0.5 bg-[#FF003C] text-white text-[9px] font-black uppercase tracking-widest shrink-0">
+                  {CURRENT_RANKING_SEASON.label}
+                </span>
+              </div>
               <span className="text-[10px] text-gray-400 block truncate">
                 FORMATO SUIZO AL MEJOR DE 3 (BO3) CON MAZO RIVAL ALEATORIO • 2-0 (+10 BONUS) • 1-2 (-5) • 0-2 (-15)
               </span>
@@ -129,6 +135,17 @@ export default function CyberLeaderboardModal({
             </button>
           </div>
         </div>
+
+        {/* Aviso de Reinicio de Temporada Beta */}
+        {CURRENT_RANKING_SEASON.isBeta && (
+          <div className="mt-2.5 px-3 py-1.5 bg-[#FF003C]/10 border border-[#FF003C]/40 rounded text-[10px] text-gray-200 flex items-center gap-2 shrink-0">
+            <AlertTriangle className="w-3.5 h-3.5 text-[#FF003C] shrink-0" />
+            <span>
+              <strong className="text-[#FCEE0A] uppercase">TEMPORADA BETA:</strong>{' '}
+              {CURRENT_RANKING_SEASON.resetNotice}
+            </span>
+          </div>
+        )}
 
         {/* Bloque de Progreso de Dificultad del Bot + Puntuación */}
         <div className="py-3 border-b border-gray-800 space-y-2.5 shrink-0">

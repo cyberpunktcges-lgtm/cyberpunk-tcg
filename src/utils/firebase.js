@@ -22,7 +22,11 @@ import {
   orderBy,
   serverTimestamp
 } from 'firebase/firestore';
-import { computeMatchRankingUpdate, computeWinRate } from './rankingSystem.js';
+import {
+  computeMatchRankingUpdate,
+  computeWinRate,
+  CURRENT_RANKING_SEASON
+} from './rankingSystem.js';
 
 // Configuración oficial de Firebase del proyecto Cyberpunk TCG
 export const firebaseConfig = {
@@ -310,13 +314,18 @@ export async function deleteBetaBugReport(reportId) {
  */
 export async function getUserRankingStats(userId) {
   if (!userId) return null;
+  const currentSeasonId = CURRENT_RANKING_SEASON.id;
+  const matchesSeason = (d) =>
+    d && (d.seasonId === currentSeasonId || (!d.seasonId && currentSeasonId === 'beta-0'));
+
   try {
     const ref = doc(db, 'simulator_leaderboard', userId);
     const snap = await getDoc(ref);
     if (snap.exists()) {
       const data = { userId, ...snap.data() };
+      if (!matchesSeason(data)) return null;
       try {
-        localStorage.setItem(`cp_ranking_${userId}`, JSON.stringify(data));
+        localStorage.setItem(`cp_ranking_${userId}_${currentSeasonId}`, JSON.stringify(data));
       } catch {}
       return data;
     }
@@ -325,8 +334,11 @@ export async function getUserRankingStats(userId) {
   }
 
   try {
-    const cached = localStorage.getItem(`cp_ranking_${userId}`);
-    if (cached) return JSON.parse(cached);
+    const cached = localStorage.getItem(`cp_ranking_${userId}_${currentSeasonId}`);
+    if (cached) {
+      const parsed = JSON.parse(cached);
+      if (matchesSeason(parsed)) return parsed;
+    }
   } catch {}
   return null;
 }
@@ -337,25 +349,36 @@ export async function getUserRankingStats(userId) {
 export async function recordLeaderboardMatch(userId, profileMeta = {}, matchResult = {}) {
   if (!userId) throw new Error('Inicia sesión para puntuar en el Ranking');
 
+  const currentSeasonId = CURRENT_RANKING_SEASON.id;
+  const matchesSeason = (d) =>
+    d && (d.seasonId === currentSeasonId || (!d.seasonId && currentSeasonId === 'beta-0'));
+
   const ref = doc(db, 'simulator_leaderboard', userId);
   let existing = null;
   try {
     const snap = await getDoc(ref);
-    if (snap.exists()) existing = snap.data();
+    if (snap.exists()) {
+      const data = snap.data();
+      if (matchesSeason(data)) existing = data;
+    }
   } catch {
     try {
-      const cached = localStorage.getItem(`cp_ranking_${userId}`);
-      if (cached) existing = JSON.parse(cached);
+      const cached = localStorage.getItem(`cp_ranking_${userId}_${currentSeasonId}`);
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (matchesSeason(parsed)) existing = parsed;
+      }
     } catch {}
   }
 
   const calc = computeMatchRankingUpdate(existing, matchResult);
-  if (calc.alreadyRecorded) {
+  if (calc.alreadyRecorded || calc.skippedUnranked) {
     return calc;
   }
 
   const payload = {
     userId,
+    seasonId: currentSeasonId,
     displayName: String(profileMeta.displayName || existing?.displayName || 'Netrunner').trim().slice(0, 40),
     avatarId: profileMeta.avatarId || existing?.avatarId || 'v-chico',
     avatarImage: profileMeta.avatarImage || existing?.avatarImage || '',
@@ -366,7 +389,7 @@ export async function recordLeaderboardMatch(userId, profileMeta = {}, matchResu
   };
 
   try {
-    localStorage.setItem(`cp_ranking_${userId}`, JSON.stringify(payload));
+    localStorage.setItem(`cp_ranking_${userId}_${currentSeasonId}`, JSON.stringify(payload));
   } catch {}
 
   await setDoc(ref, payload, { merge: true });
@@ -374,14 +397,18 @@ export async function recordLeaderboardMatch(userId, profileMeta = {}, matchResu
 }
 
 /**
- * Obtiene el Top global del Ranking Night City ordenado por puntos, victorias y winrate.
+ * Obtiene el Top global del Ranking Night City de la temporada activa ordenado por puntos, victorias y winrate.
  */
 export async function getLeaderboardTop(limitCount = 25) {
+  const currentSeasonId = CURRENT_RANKING_SEASON.id;
   const colRef = collection(db, 'simulator_leaderboard');
   const snapshot = await getDocs(colRef);
   const rows = [];
   snapshot.forEach((docSnap) => {
     const data = docSnap.data();
+    const isCurrentSeason =
+      data.seasonId === currentSeasonId || (!data.seasonId && currentSeasonId === 'beta-0');
+    if (!isCurrentSeason) return;
     rows.push({
       userId: docSnap.id,
       ...data,

@@ -14,6 +14,14 @@
  * - Derrota 0-2: -15 ⭐ (mínimo 0)
  */
 
+export const CURRENT_RANKING_SEASON = {
+  id: 'beta-0',
+  label: 'TEMPORADA BETA',
+  isBeta: true,
+  resetNotice:
+    'Fase Beta abierta de pruebas: la clasificación y puntos de esta temporada se reiniciarán al lanzamiento oficial (Temporada 1).'
+};
+
 export const STREET_CRED_RANKS = [
   { id: 'street_kid', name: 'Street Kid', minPoints: 0, color: '#9ca3af', emoji: '🕶️' },
   { id: 'merc', name: 'Merc', minPoints: 100, color: '#0dfceb', emoji: '🔫' },
