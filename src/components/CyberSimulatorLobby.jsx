@@ -94,20 +94,20 @@ export default function CyberSimulatorLobby({
 
   return (
     <div className="min-h-[100dvh] bg-[#070a10] text-white font-mono relative overflow-x-hidden flex flex-col justify-between select-none">
-      {/* Fondo atmosférico sutil: Alt Cunningham // Soulkiller Architect */}
+      {/* Fondo atmosférico: Alt Cunningham // Soulkiller Architect */}
       <div
-        className="pointer-events-none fixed inset-0 z-0 bg-cover bg-[center_22%] opacity-[0.22] scale-[1.03] filter blur-[1px]"
+        className="pointer-events-none fixed inset-0 z-0 bg-cover bg-[center_20%] opacity-[0.38] scale-[1.02]"
         style={{
           backgroundImage:
             "url('/images/pandart-studio-alt-cunningham-soulkiller-architect.webp')"
         }}
       />
-      <div className="pointer-events-none fixed inset-0 z-0 bg-gradient-to-b from-[#070a10]/80 via-[#070a10]/65 to-[#070a10]/95" />
+      <div className="pointer-events-none fixed inset-0 z-0 bg-gradient-to-b from-[#070a10]/65 via-[#070a10]/35 to-[#070a10]/88" />
       <div
         className="pointer-events-none fixed inset-0 z-0"
         style={{
           background:
-            'radial-gradient(circle at 50% 35%, transparent 15%, rgba(7, 10, 16, 0.85) 85%)'
+            'radial-gradient(circle at 50% 32%, transparent 25%, rgba(7, 10, 16, 0.72) 92%)'
         }}
       />
 
@@ -497,11 +497,12 @@ export default function CyberSimulatorLobby({
             </div>
           </div>
 
-          {/* COLUMNA DERECHA (5 cols): RANKING NIGHT CITY EN DIRECTO (TOP 5) */}
-          <aside
-            style={{ clipPath: CYBER_CLIP }}
-            className="lg:col-span-5 bg-[#000000]/95 border-2 border-[#FCEE0A]/70 p-4 sm:p-5 shadow-[0_0_35px_rgba(252,238,10,0.16)] space-y-4"
-          >
+          {/* COLUMNA DERECHA (5 cols): RANKING NIGHT CITY EN DIRECTO (TOP 5) + VISUAL NIGHT CITY */}
+          <aside className="lg:col-span-5 flex flex-col gap-5">
+            <div
+              style={{ clipPath: CYBER_CLIP }}
+              className="w-full bg-[#000000]/88 backdrop-blur-sm border-2 border-[#FCEE0A]/70 p-4 sm:p-5 shadow-[0_0_35px_rgba(252,238,10,0.16)] space-y-4"
+            >
             <div className="flex items-center justify-between gap-2 border-b border-gray-800 pb-3">
               <div>
                 <div className="flex items-center gap-2">
@@ -619,6 +620,29 @@ export default function CyberSimulatorLobby({
               <Trophy className="w-4 h-4" />
               <span>VER RANKING COMPLETO Y CAMBIAR MI NICK</span>
             </button>
+            </div>
+
+            {/* Banner visual encuadrado al tamaño del recuadro del Ranking */}
+            <div
+              style={{ clipPath: CYBER_CLIP }}
+              className="w-full relative overflow-hidden border-2 border-[#0dfceb]/45 bg-[#000000] shadow-[0_0_30px_rgba(13,252,235,0.14)] group"
+            >
+              <img
+                src="/images/wallpapers/2917197433_preview_1141084.jpg"
+                alt="Night City Edgerunner"
+                className="w-full aspect-[16/10] object-cover object-[50%_22%] transition-transform duration-700 group-hover:scale-[1.03]"
+                loading="lazy"
+              />
+              <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#070a10]/85 via-transparent to-[#070a10]/25" />
+              <div className="pointer-events-none absolute bottom-2.5 left-3.5 right-3.5 flex items-center justify-between gap-2">
+                <span className="text-[9px] font-black uppercase tracking-widest text-[#0dfceb] drop-shadow">
+                  NIGHT CITY // ARENA DE COMBATE
+                </span>
+                <span className="px-1.5 py-0.5 bg-[#FF003C]/90 text-white text-[8px] font-black uppercase tracking-wider">
+                  SET 01
+                </span>
+              </div>
+            </div>
           </aside>
         </div>
       </main>
