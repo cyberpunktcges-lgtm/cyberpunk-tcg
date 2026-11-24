@@ -43,9 +43,9 @@ import {
   getRivalById,
   getRivalByStage,
   getRivalAsBotAvatar,
-  pickRankedTowerRival,
-  loadLocalTowerWins,
-  saveLocalTowerWins,
+  pickTowerAdventureRival,
+  recordTowerFloorWin,
+  resetTowerRun,
   TOTAL_TOWER_STAGES
 } from '../data/rankedTower.js';
 import { installGlobalErrorBuffer } from '../utils/betaDiagnostics.js';
@@ -947,6 +947,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
   const [showBugReportModal, setShowBugReportModal] = useState(false);
   const [showLobby, setShowLobby] = useState(true);
   const [hasResumableMatch, setHasResumableMatch] = useState(false);
+  const [towerProgressVersion, setTowerProgressVersion] = useState(0);
   const [showLeaderboardModal, setShowLeaderboardModal] = useState(false);
   const [userRankingStats, setUserRankingStats] = useState(null);
   const [selectedBotDifficulty, setSelectedBotDifficulty] = useState(1);
@@ -3130,26 +3131,37 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
     const normPlayer = normalizeDeckInput(chosenPlayerDeck);
     const normBot = normalizeDeckInput(chosenBotDeck);
     const towerMatchup =
-      matchMode === 'ranked_bo3'
+      matchMode === 'arasaka_tower'
         ? chosenTowerRival
           ? {
               rival: chosenTowerRival,
-              isChampionRematch: (userRankingStats?.wins || 0) >= TOTAL_TOWER_STAGES
+              isChampionRematch: pickTowerAdventureRival(currentUser?.uid || null).isChampionRematch
             }
-          : pickRankedTowerRival(userRankingStats)
+          : pickTowerAdventureRival(currentUser?.uid || null)
         : null;
     const activeTowerRival = towerMatchup?.rival || null;
     const effectiveBotDifficulty =
-      matchMode === 'ranked_bo3' && activeTowerRival?.botDifficulty
+      matchMode === 'arasaka_tower' && activeTowerRival?.botDifficulty
         ? activeTowerRival.botDifficulty
         : selectedBotDifficulty;
     const resolvedBotAvatar =
-      matchMode === 'ranked_bo3' && activeTowerRival
+      matchMode === 'arasaka_tower' && activeTowerRival
         ? getRivalAsBotAvatar(activeTowerRival)
         : chosenBotAvatar;
 
     const nextSeries =
-      matchMode === 'ranked_bo3'
+      matchMode === 'arasaka_tower'
+        ? {
+            mode: 'arasaka_tower',
+            seriesId: `tower_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+            towerRivalId: activeTowerRival?.id || null,
+            towerStage: activeTowerRival?.stage || 1,
+            towerRivalName: activeTowerRival?.name || null,
+            towerBotDifficulty: effectiveBotDifficulty,
+            wasChampionRun: Boolean(towerMatchup?.isChampionRematch),
+            isFinished: false
+          }
+        : matchMode === 'ranked_bo3'
         ? {
             mode: 'ranked_bo3',
             seriesId: `bo3_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
@@ -3158,12 +3170,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
             currentGame: 1,
             isFinished: false,
             lastGameWinner: null,
-            botChoseStarterForNext: null,
-            towerRivalId: activeTowerRival?.id || null,
-            towerStage: activeTowerRival?.stage || 1,
-            towerRivalName: activeTowerRival?.name || null,
-            towerBotDifficulty: effectiveBotDifficulty,
-            wasChampionRun: Boolean(towerMatchup?.isChampionRematch)
+            botChoseStarterForNext: null
           }
         : null;
     setSeriesState(nextSeries);
@@ -3294,7 +3301,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
     setActiveBotDeck(bDeck);
 
     const effectiveBotDiff =
-      seriesState?.mode === 'ranked_bo3' && seriesState?.towerBotDifficulty
+      seriesState?.mode === 'arasaka_tower' && seriesState?.towerBotDifficulty
         ? seriesState.towerBotDifficulty
         : selectedBotDifficulty;
     const initial = createInitialGameState(pDeck, bDeck, initialCards, {
@@ -3527,11 +3534,29 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
   // - En Ranked BO3 actualiza marcador (1-0, 0-1, 1-1) y solo puntúa al cerrar la serie (2-0, 2-1, 1-2, 0-2).
   useEffect(() => {
     if (!gameState?.isGameOver || !gameState?.winner) return;
-    if (!seriesState || seriesState.mode !== 'ranked_bo3' || seriesState.isFinished) return;
+    if (!seriesState || seriesState.isFinished) return;
 
     const mId = gameState.matchId || `m_${gameState.turnNumber}_${gameState.winner}`;
     if (recordedMatchIdRef.current === mId) return;
     recordedMatchIdRef.current = mId;
+
+    // A) MODO AVENTURA: CONQUISTA LA TORRE ARASAKA (progreso independiente, no toca el Ranking)
+    if (seriesState.mode === 'arasaka_tower') {
+      const playerWonFloor = gameState.winner === 'player';
+      if (playerWonFloor) {
+        recordTowerFloorWin(currentUser?.uid || null, seriesState.towerStage || 1);
+        setTowerProgressVersion((v) => v + 1);
+      }
+      setSeriesState({
+        ...seriesState,
+        isFinished: true,
+        lastGameWinner: gameState.winner
+      });
+      return;
+    }
+
+    // B) MODO RANKED BO3 (SUIZO)
+    if (seriesState.mode !== 'ranked_bo3') return;
 
     const playerWonGame = gameState.winner === 'player';
     const nextPlayerScore = (seriesState.playerScore || 0) + (playerWonGame ? 1 : 0);
@@ -3550,11 +3575,6 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
       botChoseStarterForNext
     };
     setSeriesState(updatedSeries);
-
-    if (seriesFinished && nextPlayerScore >= 2) {
-      const nextWinsEstimate = Math.max(loadLocalTowerWins() + 1, (userRankingStats?.wins || 0) + 1);
-      saveLocalTowerWins(nextWinsEstimate);
-    }
 
     if (!seriesFinished || !currentUser?.uid) return;
 
@@ -3781,6 +3801,8 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
           onResumeMatch={() => setShowLobby(false)}
           onDiscardSavedMatch={handleDiscardSavedMatch}
           onOpenDeckSelector={(mode) => handleResetGame(mode)}
+          towerProgressVersion={towerProgressVersion}
+          onTowerProgressReset={() => setTowerProgressVersion((v) => v + 1)}
           onOpenLeaderboard={() => setShowLeaderboardModal(true)}
           onOpenMyDecks={() => setShowMyDecksModal(true)}
           onOpenProfile={() => setShowProfileModal(true)}
@@ -3955,21 +3977,26 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
               >
                 {isMyTurn ? 'FASE PRINCIPAL' : 'TURNO RIVAL'}
               </span>
-              {seriesState?.mode === 'ranked_bo3' ? (
+              {seriesState?.mode === 'arasaka_tower' ? (
+                <span
+                  className="px-2 py-0.5 bg-[#FF003C]/20 border border-[#FF003C] text-[#FF003C] font-black text-[10px] uppercase whitespace-nowrap shadow-[0_0_10px_rgba(255,0,60,0.35)]"
+                  title="Modo Aventura: Conquista la Torre Arasaka (11 Pisos)"
+                >
+                  🗼 TORRE P{seriesState.towerStage || 1}/{TOTAL_TOWER_STAGES} • {(getRivalById(seriesState.towerRivalId)?.shortName || seriesState.towerRivalName || "RIVAL").toUpperCase()}
+                </span>
+              ) : seriesState?.mode === 'ranked_bo3' ? (
                 <span
                   className="px-2 py-0.5 bg-[#FCEE0A]/20 border border-[#FCEE0A] text-[#FCEE0A] font-black text-[10px] uppercase whitespace-nowrap shadow-[0_0_10px_rgba(252,238,10,0.3)]"
-                  title="Torre Arasaka Ranked BO3 (Sistema Suizo al Mejor de 3 — Mazo rival aleatorio)"
+                  title="Serie Ranked BO3 (Sistema Suizo al Mejor de 3 — Mazo rival aleatorio)"
                 >
-                  {seriesState.towerStage
-                    ? `🗼 P${seriesState.towerStage}/${TOTAL_TOWER_STAGES} ${(getRivalById(seriesState.towerRivalId)?.shortName || seriesState.towerRivalName || "BOT").toUpperCase()} • J${seriesState.currentGame}/3 (${seriesState.playerScore}-${seriesState.botScore})`
-                    : `🏆 BO3 J${seriesState.currentGame}/3 • ${seriesState.playerScore}-${seriesState.botScore}`}
+                  🏆 BO3 J{seriesState.currentGame}/3 • {seriesState.playerScore}-{seriesState.botScore}
                 </span>
               ) : (
                 <span
                   className="hidden xl:inline-block px-1.5 py-0.5 bg-gray-900 border border-gray-700 text-gray-400 font-bold text-[9px] uppercase whitespace-nowrap"
-                  title="Modo Práctica / Testeo (no cuenta para el Ranking)"
+                  title="Modo Testeo / Práctica (no cuenta para el Ranking)"
                 >
-                  🧪 PRÁCTICA
+                  🧪 TESTEO
                 </span>
               )}
             </div>
@@ -7219,23 +7246,24 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
         </div>
       )}
 
-      {/* 5. MODAL FLOTANTE DE FINAL DE PARTIDA (SOPORTA TORRE ARASAKA RANKED BO3 ESTILO STREET FIGHTER II Y PRÁCTICA) */}
+      {/* 5. MODAL FLOTANTE DE FINAL DE PARTIDA (SOPORTA AVENTURA TORRE ARASAKA, RANKED BO3 Y TESTEO) */}
       {gameState.isGameOver && (() => {
+        const isTowerAdventure = seriesState?.mode === 'arasaka_tower';
         const isBO3 = seriesState?.mode === 'ranked_bo3';
         const isBO3InProgress = isBO3 && !seriesState.isFinished;
         const isBO3Finished = isBO3 && seriesState.isFinished;
         const playerWonSeries = isBO3Finished && seriesState.playerScore >= 2;
         const nextGameNumber = Math.min(3, (seriesState?.currentGame || 1) + 1);
         const playerWonThisGame = gameState.winner === 'player';
-        const towerRival = isBO3
+        const towerRival = isTowerAdventure
           ? getRivalById(seriesState?.towerRivalId) || getRivalByStage(seriesState?.towerStage || 1)
           : null;
         const nextTowerRival =
-          isBO3Finished && playerWonSeries && towerRival && !seriesState?.wasChampionRun && towerRival.stage < TOTAL_TOWER_STAGES
+          isTowerAdventure && playerWonThisGame && towerRival && !seriesState?.wasChampionRun && towerRival.stage < TOTAL_TOWER_STAGES
             ? getRivalByStage(towerRival.stage + 1)
             : null;
         const justConqueredTower =
-          isBO3Finished && playerWonSeries && towerRival && !seriesState?.wasChampionRun && towerRival.stage === TOTAL_TOWER_STAGES;
+          isTowerAdventure && playerWonThisGame && towerRival && !seriesState?.wasChampionRun && towerRival.stage === TOTAL_TOWER_STAGES;
 
         return (
           <div className="fixed inset-0 z-50 bg-[#000000]/92 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 font-mono overflow-y-auto">
@@ -7244,43 +7272,51 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
               animate={{ scale: 1, opacity: 1, y: 0 }}
               transition={{ duration: 0.25 }}
               style={{ clipPath: CYBER_CLIP }}
-              className={`${isBO3Finished && towerRival ? 'max-w-lg' : 'max-w-md'} w-full max-h-[94vh] overflow-y-auto cyber-scrollbar bg-[#070a10]/98 border-2 p-5 sm:p-6 text-center space-y-4 backdrop-blur-md ${
+              className={`${isTowerAdventure && towerRival ? 'max-w-lg' : 'max-w-md'} w-full max-h-[94vh] overflow-y-auto cyber-scrollbar bg-[#070a10]/98 border-2 p-5 sm:p-6 text-center space-y-4 backdrop-blur-md ${
                 (isBO3Finished ? playerWonSeries : playerWonThisGame)
                   ? 'border-[#FCEE0A] shadow-[0_0_65px_rgba(252,238,10,0.5)]'
                   : 'border-[#FF003C] shadow-[0_0_65px_rgba(255,0,60,0.5)]'
               }`}
             >
-              {/* Marcador BO3 si es Ranked */}
-              {isBO3 && (
-                <div className="bg-black border border-[#FCEE0A]/60 px-3.5 py-2 rounded flex items-center justify-between gap-2">
-                  <span className="text-[10px] font-black text-[#FCEE0A] uppercase truncate">
-                    {towerRival
-                      ? `🗼 TORRE ARASAKA • PISO ${towerRival.stage}/${TOTAL_TOWER_STAGES}`
-                      : '🏆 SERIE RANKED BO3'}
+              {/* Cabecera Torre Arasaka si es Modo Aventura */}
+              {isTowerAdventure && towerRival && (
+                <div className="bg-black border border-[#FF003C]/70 px-3.5 py-2 rounded flex items-center justify-between gap-2">
+                  <span className="text-[10px] font-black text-[#FF003C] uppercase truncate">
+                    🗼 CONQUISTA LA TORRE ARASAKA
                   </span>
-                  <span className="text-base sm:text-lg font-black tracking-widest text-white shrink-0">
-                    <span className="text-[#0dfceb]">TÚ {seriesState.playerScore}</span>
-                    {' — '}
-                    <span className="text-[#FF003C]">
-                      {seriesState.botScore} {towerRival ? towerRival.shortName.toUpperCase() : 'BOT'}
-                    </span>
+                  <span className="text-xs font-black tracking-wider text-[#FCEE0A] shrink-0">
+                    PISO {towerRival.stage}/{TOTAL_TOWER_STAGES} • {towerRival.shortName.toUpperCase()}
                   </span>
                 </div>
               )}
 
-              {/* PANTALLA ARCADE STREET FIGHTER II (SOLO AL TERMINAR LA SERIE RANKED BO3) */}
-              {isBO3Finished && towerRival ? (
+              {/* Marcador BO3 si es Ranked */}
+              {isBO3 && (
+                <div className="bg-black border border-[#FCEE0A]/60 px-3.5 py-2 rounded flex items-center justify-between gap-2">
+                  <span className="text-[10px] font-black text-[#FCEE0A] uppercase truncate">
+                    🏆 SERIE RANKED BO3
+                  </span>
+                  <span className="text-base sm:text-lg font-black tracking-widest text-white shrink-0">
+                    <span className="text-[#0dfceb]">TÚ {seriesState.playerScore}</span>
+                    {' — '}
+                    <span className="text-[#FF003C]">{seriesState.botScore} BOT</span>
+                  </span>
+                </div>
+              )}
+
+              {/* PANTALLA ARCADE STREET FIGHTER II (MODO AVENTURA TORRE ARASAKA) */}
+              {isTowerAdventure && towerRival ? (
                 <div className="space-y-3">
                   <div className="relative mx-auto w-48 h-48 sm:w-56 sm:h-56">
                     <div
                       className={`w-full h-full overflow-hidden border-4 relative bg-black ${
-                        playerWonSeries
+                        playerWonThisGame
                           ? 'border-[#FCEE0A] shadow-[0_0_35px_rgba(252,238,10,0.45)]'
                           : 'border-[#FF003C] shadow-[0_0_35px_rgba(255,0,60,0.55)]'
                       }`}
                     >
                       <img
-                        src={playerWonSeries ? towerRival.defeatedImage : towerRival.okImage}
+                        src={playerWonThisGame ? towerRival.defeatedImage : towerRival.okImage}
                         alt={towerRival.name}
                         className="w-full h-full object-cover object-top"
                       />
@@ -7295,8 +7331,8 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                       <div className="pointer-events-none absolute inset-x-0 bottom-0 h-14 bg-gradient-to-t from-black/95 via-black/40 to-transparent" />
                       <div className="absolute bottom-1.5 inset-x-2 flex items-center justify-between text-[9px] font-black uppercase">
                         <span className="text-white truncate">{towerRival.name}</span>
-                        <span className={playerWonSeries ? 'text-[#FF003C]' : 'text-[#00FF9C]'}>
-                          {playerWonSeries ? 'K.O.' : 'VICTORIOSO'}
+                        <span className={playerWonThisGame ? 'text-[#FF003C]' : 'text-[#00FF9C]'}>
+                          {playerWonThisGame ? 'K.O.' : 'VICTORIOSO'}
                         </span>
                       </div>
                     </div>
@@ -7307,24 +7343,22 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                       animate={{ scale: 1, rotate: -4, opacity: 1 }}
                       transition={{ delay: 0.12, type: 'spring', stiffness: 260, damping: 16 }}
                       className={`absolute -top-3 -right-4 sm:-right-7 px-3.5 py-1 border-2 font-black text-lg sm:text-2xl tracking-widest uppercase shadow-2xl ${
-                        playerWonSeries
+                        playerWonThisGame
                           ? 'bg-[#FCEE0A] text-[#070a10] border-white shadow-[0_0_25px_rgba(252,238,10,0.9)]'
                           : 'bg-[#FF003C] text-white border-[#FCEE0A] shadow-[0_0_25px_rgba(255,0,60,0.9)]'
                       }`}
                     >
-                      {playerWonSeries ? 'YOU WIN!' : 'YOU LOSE'}
+                      {playerWonThisGame ? 'YOU WIN!' : 'YOU LOSE'}
                     </motion.div>
                   </div>
 
                   <div>
                     <h2
                       className={`text-xl sm:text-2xl font-black uppercase tracking-wider ${
-                        playerWonSeries ? 'text-[#FCEE0A]' : 'text-[#FF003C]'
+                        playerWonThisGame ? 'text-[#FCEE0A]' : 'text-[#FF003C]'
                       }`}
                     >
-                      {playerWonSeries
-                        ? `¡YOU WIN! (${seriesState.playerScore}-${seriesState.botScore})`
-                        : `YOU LOSE (${seriesState.playerScore}-${seriesState.botScore})`}
+                      {playerWonThisGame ? '¡YOU WIN!' : 'YOU LOSE'}
                     </h2>
                     <p className="text-[11px] text-gray-400 uppercase mt-0.5">
                       {towerRival.name} // {towerRival.title}
@@ -7334,19 +7368,19 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                   {/* Frase estilo Street Fighter II del personaje */}
                   <div
                     className={`p-3 rounded border text-left text-xs leading-relaxed italic ${
-                      playerWonSeries
+                      playerWonThisGame
                         ? 'bg-black/90 border-[#0dfceb]/50 text-gray-200'
                         : 'bg-[#FF003C]/10 border-[#FF003C]/60 text-gray-100'
                     }`}
                   >
                     <span
                       className={`not-italic text-[9px] font-black uppercase block mb-1 ${
-                        playerWonSeries ? 'text-[#0dfceb]' : 'text-[#FF003C]'
+                        playerWonThisGame ? 'text-[#0dfceb]' : 'text-[#FF003C]'
                       }`}
                     >
                       {towerRival.name} DICE:
                     </span>
-                    {playerWonSeries ? towerRival.defeatQuote : towerRival.winQuote}
+                    {playerWonThisGame ? towerRival.defeatQuote : towerRival.winQuote}
                   </div>
 
                   {/* Desbloqueo del Siguiente Piso o Conquista Total de la Torre Arasaka */}
@@ -7356,7 +7390,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                         👑 ¡HAS CONQUISTADO LA TORRE ARASAKA (11/11)!
                       </span>
                       <p className="text-[11px] text-gray-200 font-sans">
-                        Has derrotado a todos los rivales de Night City, incluida V en la azotea. A partir de ahora tus Ranked BO3 te emparejarán con rivales élite aleatorios.
+                        Has derrotado a los 11 iconos de Night City, incluida V en la azotea. ¡Eres una Leyenda de la Torre Arasaka!
                       </p>
                     </div>
                   )}
@@ -7383,6 +7417,56 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                       </div>
                     </div>
                   )}
+
+                  {/* Botones de Acción de la Torre Arasaka */}
+                  <div className="space-y-2.5 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => handleResetGame('arasaka_tower')}
+                      style={{ clipPath: CYBER_BUTTON }}
+                      className="w-full py-3.5 bg-[#FF003C] hover:bg-[#FCEE0A] text-white hover:text-black font-black text-xs uppercase tracking-widest cursor-pointer shadow-[0_0_22px_rgba(255,0,60,0.55)] flex items-center justify-center gap-2 transition-colors"
+                    >
+                      <Swords className="w-4 h-4" />
+                      <span>
+                        {nextTowerRival
+                          ? `🗼 SUBIR AL PISO ${nextTowerRival.stage}/11: ${nextTowerRival.shortName.toUpperCase()} ➔`
+                          : !playerWonThisGame
+                          ? `⚔️ REVANCHA CONTRA ${towerRival.shortName.toUpperCase()} (PISO ${towerRival.stage}/11) ➔`
+                          : '🗼 NUEVO RETO EN LA TORRE ARASAKA ➔'}
+                      </span>
+                    </button>
+                    {justConqueredTower && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          resetTowerRun(currentUser?.uid || null);
+                          setTowerProgressVersion((v) => v + 1);
+                          handleResetGame('arasaka_tower');
+                        }}
+                        style={{ clipPath: CYBER_BUTTON }}
+                        className="w-full py-2.5 bg-[#FCEE0A]/15 hover:bg-[#FCEE0A] border border-[#FCEE0A] text-[#FCEE0A] hover:text-black font-black text-xs uppercase tracking-widest cursor-pointer transition-all"
+                      >
+                        🔄 REINICIAR TORRE DESDE PISO 1 (PEPE NAJARRO)
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        try {
+                          if (typeof window !== 'undefined') {
+                            localStorage.removeItem(CP_SIM_STORAGE_KEY);
+                          }
+                        } catch {}
+                        setSeriesState(null);
+                        setHasResumableMatch(false);
+                        setShowLobby(true);
+                      }}
+                      style={{ clipPath: CYBER_BUTTON }}
+                      className="w-full py-2.5 bg-black/85 border border-gray-700 hover:border-[#FCEE0A] text-gray-300 hover:text-[#FCEE0A] font-black text-xs uppercase tracking-widest cursor-pointer transition-all"
+                    >
+                      🏠 VOLVER AL MENÚ PRINCIPAL DEL SIMULADOR
+                    </button>
+                  </div>
                 </div>
               ) : (
                 <div className="space-y-2">
@@ -7535,13 +7619,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                       className="w-full py-3.5 bg-[#FCEE0A] hover:bg-white text-black font-black text-xs uppercase tracking-widest cursor-pointer shadow-[0_0_20px_rgba(252,238,10,0.55)] flex items-center justify-center gap-2"
                     >
                       <Swords className="w-4 h-4" />
-                      <span>
-                        {nextTowerRival
-                          ? `SUBIR AL PISO ${nextTowerRival.stage}/11: ${nextTowerRival.shortName.toUpperCase()} ➔`
-                          : !playerWonSeries && towerRival
-                          ? `REVANCHA CONTRA ${towerRival.shortName.toUpperCase()} (PISO ${towerRival.stage}/11) ➔`
-                          : 'NUEVA SERIE TORRE ARASAKA BO3 ➔'}
-                      </span>
+                      <span>NUEVA SERIE RANKED BO3 (RIVAL ALEATORIO)</span>
                     </button>
                     <button
                       type="button"
@@ -7573,8 +7651,8 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                 </>
               )}
 
-              {/* CASO C: MODO PRÁCTICA / TESTEO (NO PUNTÚA EN RANKING) */}
-              {!isBO3 && (
+              {/* CASO C: MODO TESTEO / PRÁCTICA (NO PUNTÚA EN RANKING) */}
+              {!isBO3 && !isTowerAdventure && (
                 <>
                   <div className="bg-black/85 border border-gray-800 p-2.5 rounded text-[10px] text-gray-400">
                     🧪 <strong className="text-[#0dfceb]">MODO PRÁCTICA / TESTEO</strong> — Esta partida no cuenta para el Ranking. Para puntuar, inicia una serie <strong className="text-[#FCEE0A]">Ranked BO3</strong>.
@@ -10060,7 +10138,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
         }}
         initialMatchMode={deckSelectorInitialMode}
         botDifficulty={selectedBotDifficulty}
-        userRankingStats={userRankingStats}
+        towerProgressVersion={towerProgressVersion}
         onSelectDecks={({ playerDeck, botDeck, playerAvatar: pAv, botAvatar: bAv, matchMode, towerRival }) => {
           handleStartWithDecks(playerDeck, botDeck, pAv, bAv, matchMode, towerRival);
         }}

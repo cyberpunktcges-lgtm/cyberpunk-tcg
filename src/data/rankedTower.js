@@ -1,10 +1,11 @@
 /**
  * rankedTower.js
- * Torre Arasaka Ranked (11 Rivales estilo Street Fighter II Arcade)
- * Progresión automática en Modo Ranked BO3 del Simulador de Cyberpunk TCG.
+ * Modo Aventura: «Conquista la Torre Arasaka» (11 Rivales estilo Street Fighter II Arcade).
+ * Progreso propio e independiente del Modo Ranked BO3 y del Modo Testeo.
  */
 
-export const ARASAKA_TOWER_STORAGE_KEY = 'cp_sim_arasaka_tower_wins';
+export const ARASAKA_TOWER_STORAGE_PREFIX = 'cp_sim_arasaka_tower_v2_';
+const LEGACY_TOWER_STORAGE_KEY = 'cp_sim_arasaka_tower_wins';
 
 export const ARASAKA_TOWER_RIVALS = [
   {
@@ -186,42 +187,99 @@ export function getRivalByStage(stage = 1) {
   return ARASAKA_TOWER_RIVALS[idx];
 }
 
-export function loadLocalTowerWins() {
-  if (typeof window === 'undefined') return 0;
-  try {
-    const raw = localStorage.getItem(ARASAKA_TOWER_STORAGE_KEY);
-    return Math.max(0, parseInt(raw || '0', 10) || 0);
-  } catch {
-    return 0;
-  }
+function getStorageKey(uid = null) {
+  return `${ARASAKA_TOWER_STORAGE_PREFIX}${uid || 'guest'}`;
 }
 
-export function saveLocalTowerWins(wins) {
+export function loadTowerSave(uid = null) {
+  if (typeof window === 'undefined') return { defeatedCount: 0, completions: 0 };
+  try {
+    const raw = localStorage.getItem(getStorageKey(uid));
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      return {
+        defeatedCount: Math.max(0, Math.min(TOTAL_TOWER_STAGES, Number(parsed.defeatedCount) || 0)),
+        completions: Math.max(0, Number(parsed.completions) || 0)
+      };
+    }
+    // Migración suave si había progreso previo en la clave antigua
+    const legacy = parseInt(localStorage.getItem(LEGACY_TOWER_STORAGE_KEY) || '0', 10) || 0;
+    if (legacy > 0) {
+      return {
+        defeatedCount: Math.min(TOTAL_TOWER_STAGES, legacy),
+        completions: legacy >= TOTAL_TOWER_STAGES ? 1 : 0
+      };
+    }
+  } catch {}
+  return { defeatedCount: 0, completions: 0 };
+}
+
+export function saveTowerSave(uid = null, data = { defeatedCount: 0, completions: 0 }) {
   if (typeof window === 'undefined') return;
   try {
-    localStorage.setItem(ARASAKA_TOWER_STORAGE_KEY, String(Math.max(0, Number(wins) || 0)));
+    localStorage.setItem(
+      getStorageKey(uid),
+      JSON.stringify({
+        defeatedCount: Math.max(0, Math.min(TOTAL_TOWER_STAGES, Number(data.defeatedCount) || 0)),
+        completions: Math.max(0, Number(data.completions) || 0),
+        updatedAt: Date.now()
+      })
+    );
   } catch {}
 }
 
 /**
- * Calcula el progreso actual del jugador en la Torre Arasaka.
- * Usa las victorias Ranked de Firebase (userRankingStats.wins) o, si no hay sesión, el respaldo local.
+ * Registra la victoria de un piso en el Modo Aventura «Conquista la Torre Arasaka».
  */
-export function getTowerProgress(userRankingStats = null) {
-  const cloudWins = userRankingStats ? Math.max(0, Number(userRankingStats.wins) || 0) : null;
-  const localWins = loadLocalTowerWins();
-  const totalWins = cloudWins !== null ? Math.max(cloudWins, 0) : localWins;
+export function recordTowerFloorWin(uid = null, stageWon = 1) {
+  const prev = loadTowerSave(uid);
+  const expectedStage = prev.defeatedCount + 1;
+  let nextDefeated = prev.defeatedCount;
+  let nextCompletions = prev.completions;
 
-  const isChampion = totalWins >= TOTAL_TOWER_STAGES;
-  const defeatedCount = Math.min(TOTAL_TOWER_STAGES, totalWins);
+  if (prev.defeatedCount < TOTAL_TOWER_STAGES && Number(stageWon) >= expectedStage) {
+    nextDefeated = Math.min(TOTAL_TOWER_STAGES, Number(stageWon));
+    if (nextDefeated >= TOTAL_TOWER_STAGES) {
+      nextCompletions = prev.completions + 1;
+    }
+  }
+
+  const nextData = { defeatedCount: nextDefeated, completions: nextCompletions };
+  saveTowerSave(uid, nextData);
+  return getTowerProgress(uid, nextData);
+}
+
+/**
+ * Reinicia la escalada desde el Piso 1 (Pepe Najarro) conservando las conquistas previas.
+ */
+export function resetTowerRun(uid = null) {
+  const prev = loadTowerSave(uid);
+  const nextData = { defeatedCount: 0, completions: prev.completions };
+  saveTowerSave(uid, nextData);
+  try {
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem(LEGACY_TOWER_STORAGE_KEY);
+    }
+  } catch {}
+  return getTowerProgress(uid, nextData);
+}
+
+/**
+ * Devuelve el progreso actual del Modo Aventura «Conquista la Torre Arasaka».
+ */
+export function getTowerProgress(uid = null, overrideSave = null) {
+  const save = overrideSave || loadTowerSave(uid);
+  const defeatedCount = Math.max(0, Math.min(TOTAL_TOWER_STAGES, Number(save.defeatedCount) || 0));
+  const completions = Math.max(0, Number(save.completions) || 0);
+  const isChampion = defeatedCount >= TOTAL_TOWER_STAGES;
   const currentStage = isChampion ? TOTAL_TOWER_STAGES : defeatedCount + 1;
   const currentRival = getRivalByStage(currentStage);
   const nextRivalAfterWin =
     !isChampion && currentStage < TOTAL_TOWER_STAGES ? getRivalByStage(currentStage + 1) : null;
 
   return {
-    totalWins,
     defeatedCount,
+    completions,
     totalStages: TOTAL_TOWER_STAGES,
     currentStage,
     isChampion,
@@ -231,12 +289,10 @@ export function getTowerProgress(userRankingStats = null) {
 }
 
 /**
- * Devuelve el rival activo para una nueva serie Ranked BO3.
- * - Mientras no hayas completado la Torre (pisos 1..11): te toca exactamente el rival de tu piso actual.
- * - Cuando ya eres Campeón (>=11 victorias): te empareja contra un rival aleatorio de la Torre (con IA NV.3).
+ * Elige el rival activo para una partida del Modo Aventura «Conquista la Torre Arasaka».
  */
-export function pickRankedTowerRival(userRankingStats = null) {
-  const progress = getTowerProgress(userRankingStats);
+export function pickTowerAdventureRival(uid = null, overrideSave = null) {
+  const progress = getTowerProgress(uid, overrideSave);
   if (!progress.isChampion) {
     return {
       rival: progress.currentRival,
