@@ -2,7 +2,10 @@
  * rankedTower.js
  * Modo Aventura: «Conquista la Torre Arasaka» (11 Rivales estilo Street Fighter II Arcade).
  * Progreso propio e independiente del Modo Ranked BO3 y del Modo Testeo.
+ * Cada rival tiene asignado su propio mazo exclusivo en `towerDecks.json`.
  */
+
+import TOWER_DECKS from './towerDecks.json';
 
 export const ARASAKA_TOWER_STORAGE_PREFIX = 'cp_sim_arasaka_tower_v2_';
 const LEGACY_TOWER_STORAGE_KEY = 'cp_sim_arasaka_tower_wins';
@@ -180,6 +183,11 @@ export const TOTAL_TOWER_STAGES = ARASAKA_TOWER_RIVALS.length;
 export function getRivalById(id) {
   if (!id) return null;
   return ARASAKA_TOWER_RIVALS.find((r) => r.id === id) || null;
+}
+
+export function getTowerRivalDeck(rivalId) {
+  if (!rivalId) return null;
+  return TOWER_DECKS[rivalId] || null;
 }
 
 export function getRivalByStage(stage = 1) {

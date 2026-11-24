@@ -1,0 +1,1224 @@
+{
+  "pepe-najarro": {
+    "id": "tower_deck_pepe-najarro",
+    "name": "Mazo de Pepe Najarro (El Coyote Cojo)",
+    "faction": "MERCENARIO / CORPO",
+    "legends": [
+      {
+        "id": "CP-091",
+        "name": "Padre // Man of the Cross",
+        "type": "LEGEND",
+        "qty": 1
+      },
+      {
+        "id": "CP-050",
+        "name": "Jackie Welles // Mama's Favorite",
+        "type": "LEGEND",
+        "qty": 1
+      },
+      {
+        "id": "CP-040",
+        "name": "Goro Takemura // Hands Unclean",
+        "type": "LEGEND",
+        "qty": 1
+      }
+    ],
+    "deckList": [
+      {
+        "id": "CP-123",
+        "name": "Synapse Burnout",
+        "qty": 2
+      },
+      {
+        "id": "CP-114",
+        "name": "Sandevistan",
+        "qty": 3
+      },
+      {
+        "id": "CP-101",
+        "name": "Riding Nomad",
+        "qty": 3
+      },
+      {
+        "id": "CP-019",
+        "name": "Corpo Security",
+        "qty": 3
+      },
+      {
+        "id": "CP-102",
+        "name": "Riot Shield",
+        "qty": 2
+      },
+      {
+        "id": "CP-125",
+        "name": "Take Control",
+        "qty": 3
+      },
+      {
+        "id": "CP-020",
+        "name": "Corporate Surveillance",
+        "qty": 3
+      },
+      {
+        "id": "CP-139",
+        "name": "Valentino Street Racer",
+        "qty": 2
+      },
+      {
+        "id": "CP-146",
+        "name": "Wild in the Streets",
+        "qty": 3
+      },
+      {
+        "id": "CP-083",
+        "name": "Nadia // Fighting Through Grief",
+        "qty": 2
+      },
+      {
+        "id": "CP-074",
+        "name": "Memory Relapse",
+        "qty": 2
+      },
+      {
+        "id": "CP-041",
+        "name": "Goro Takemura // Losing His Way",
+        "qty": 3
+      },
+      {
+        "id": "CP-113",
+        "name": "Sandayu Oda // Hanako's Guardian",
+        "qty": 2
+      },
+      {
+        "id": "CP-037",
+        "name": "Fool on the Hill",
+        "qty": 3
+      },
+      {
+        "id": "CP-071",
+        "name": "MaxTac Heavy",
+        "qty": 2
+      },
+      {
+        "id": "CP-032",
+        "name": "Emergency Atlus",
+        "qty": 2
+      }
+    ]
+  },
+  "muamar": {
+    "id": "tower_deck_muamar",
+    "name": "Mazo de Muamar «El Capitán» Reyes",
+    "faction": "MERCENARIO / CORPO",
+    "legends": [
+      {
+        "id": "CP-082",
+        "name": "Muamar Reyes // El Capitán",
+        "type": "LEGEND",
+        "qty": 1
+      },
+      {
+        "id": "CP-137",
+        "name": "V // Streetkid",
+        "type": "LEGEND",
+        "qty": 1
+      },
+      {
+        "id": "CP-002",
+        "name": "Adam Smasher // Ender of Legends",
+        "type": "LEGEND",
+        "qty": 1
+      }
+    ],
+    "deckList": [
+      {
+        "id": "CP-012",
+        "name": "Augmented Negotiators",
+        "qty": 3
+      },
+      {
+        "id": "CP-001",
+        "name": "6th Street Recruits",
+        "qty": 3
+      },
+      {
+        "id": "CP-073",
+        "name": "MaxTac Suppression Team",
+        "qty": 3
+      },
+      {
+        "id": "CP-009",
+        "name": "Animals Wrecker",
+        "qty": 3
+      },
+      {
+        "id": "CP-149",
+        "name": "Yorinobu Arasaka // Steel Dragon",
+        "qty": 3
+      },
+      {
+        "id": "CP-069",
+        "name": "Mantis Blades",
+        "qty": 3
+      },
+      {
+        "id": "CP-116",
+        "name": "Satori // Sword of Saburo",
+        "qty": 3
+      },
+      {
+        "id": "CP-151",
+        "name": "Zetatech Faceplate",
+        "qty": 3
+      },
+      {
+        "id": "CP-006",
+        "name": "All Is Lost",
+        "qty": 2
+      },
+      {
+        "id": "CP-025",
+        "name": "Detonate",
+        "qty": 2
+      },
+      {
+        "id": "CP-048",
+        "name": "Industrial Assembly",
+        "qty": 3
+      },
+      {
+        "id": "CP-013",
+        "name": "Bonnie and Clyde",
+        "qty": 3
+      },
+      {
+        "id": "CP-088",
+        "name": "Over the Edge",
+        "qty": 3
+      },
+      {
+        "id": "CP-016",
+        "name": "Carnage at the Colosseum",
+        "qty": 3
+      }
+    ]
+  },
+  "dexter": {
+    "id": "tower_deck_dexter",
+    "name": "Mazo de Dexter DeShawn (Afterlife)",
+    "faction": "MERCENARIO / CORPO",
+    "legends": [
+      {
+        "id": "CP-026",
+        "name": "Dexter DeShawn // Off the Grid",
+        "type": "LEGEND",
+        "qty": 1
+      },
+      {
+        "id": "CP-111",
+        "name": "Saburo Arasaka // Stubborn Patriarch",
+        "type": "LEGEND",
+        "qty": 1
+      },
+      {
+        "id": "CP-002",
+        "name": "Adam Smasher // Ender of Legends",
+        "type": "LEGEND",
+        "qty": 1
+      }
+    ],
+    "deckList": [
+      {
+        "id": "CP-001",
+        "name": "6th Street Recruits",
+        "qty": 2
+      },
+      {
+        "id": "CP-066",
+        "name": "Maelstrom Zealots",
+        "qty": 2
+      },
+      {
+        "id": "CP-075",
+        "name": "Meredith Stout // Stone-Cold Corpo",
+        "qty": 2
+      },
+      {
+        "id": "CP-095",
+        "name": "Pepe Najarro // Working Doubles",
+        "qty": 3
+      },
+      {
+        "id": "CP-009",
+        "name": "Animals Wrecker",
+        "qty": 3
+      },
+      {
+        "id": "CP-076",
+        "name": "Minotaur",
+        "qty": 1
+      },
+      {
+        "id": "CP-149",
+        "name": "Yorinobu Arasaka // Steel Dragon",
+        "qty": 2
+      },
+      {
+        "id": "CP-069",
+        "name": "Mantis Blades",
+        "qty": 3
+      },
+      {
+        "id": "CP-102",
+        "name": "Riot Shield",
+        "qty": 2
+      },
+      {
+        "id": "CP-116",
+        "name": "Satori // Sword of Saburo",
+        "qty": 3
+      },
+      {
+        "id": "CP-025",
+        "name": "Detonate",
+        "qty": 2
+      },
+      {
+        "id": "CP-094",
+        "name": "Peace Offering",
+        "qty": 3
+      },
+      {
+        "id": "CP-123",
+        "name": "Synapse Burnout",
+        "qty": 2
+      },
+      {
+        "id": "CP-013",
+        "name": "Bonnie and Clyde",
+        "qty": 3
+      },
+      {
+        "id": "CP-074",
+        "name": "Memory Relapse",
+        "qty": 3
+      },
+      {
+        "id": "CP-016",
+        "name": "Carnage at the Colosseum",
+        "qty": 3
+      },
+      {
+        "id": "CP-108",
+        "name": "Royce // Don't Call Me Simon",
+        "qty": 1
+      }
+    ]
+  },
+  "viktor": {
+    "id": "tower_deck_viktor",
+    "name": "Mazo de Viktor Vektor (Ripperdoc)",
+    "faction": "CORPO / MERCENARIO",
+    "legends": [
+      {
+        "id": "CP-002",
+        "name": "Adam Smasher // Ender of Legends",
+        "type": "LEGEND",
+        "qty": 1
+      },
+      {
+        "id": "CP-104",
+        "name": "River Ward // Detective on the Hunt",
+        "type": "LEGEND",
+        "qty": 1
+      },
+      {
+        "id": "CP-141",
+        "name": "Viktor Vektor // Sit Down and Relax",
+        "type": "LEGEND",
+        "qty": 1
+      }
+    ],
+    "deckList": [
+      {
+        "id": "CP-119",
+        "name": "Secondhand Bombus",
+        "qty": 2
+      },
+      {
+        "id": "CP-121",
+        "name": "Sketchy Ripper",
+        "qty": 3
+      },
+      {
+        "id": "CP-001",
+        "name": "6th Street Recruits",
+        "qty": 3
+      },
+      {
+        "id": "CP-075",
+        "name": "Meredith Stout // Stone-Cold Corpo",
+        "qty": 2
+      },
+      {
+        "id": "CP-105",
+        "name": "Rockin' Rockerboy",
+        "qty": 2
+      },
+      {
+        "id": "CP-047",
+        "name": "Heywood Ripperdoc",
+        "qty": 1
+      },
+      {
+        "id": "CP-054",
+        "name": "Johnny Silverhand // Never Stop Fighting",
+        "qty": 3
+      },
+      {
+        "id": "CP-068",
+        "name": "Mandibular Upgrade",
+        "qty": 3
+      },
+      {
+        "id": "CP-069",
+        "name": "Mantis Blades",
+        "qty": 3
+      },
+      {
+        "id": "CP-004",
+        "name": "Adrenaline Converter",
+        "qty": 3
+      },
+      {
+        "id": "CP-116",
+        "name": "Satori // Sword of Saburo",
+        "qty": 3
+      },
+      {
+        "id": "CP-151",
+        "name": "Zetatech Faceplate",
+        "qty": 3
+      },
+      {
+        "id": "CP-039",
+        "name": "Gorilla Arms",
+        "qty": 1
+      },
+      {
+        "id": "CP-025",
+        "name": "Detonate",
+        "qty": 2
+      },
+      {
+        "id": "CP-063",
+        "name": "Live With the Aftermath",
+        "qty": 3
+      },
+      {
+        "id": "CP-014",
+        "name": "Bootleg Black Sapphire Show",
+        "qty": 3
+      }
+    ]
+  },
+  "royce": {
+    "id": "tower_deck_royce",
+    "name": "Mazo de Royce (Maelstrom)",
+    "faction": "BANDAS / MERCENARIO",
+    "legends": [
+      {
+        "id": "CP-109",
+        "name": "Royce // Psycho on the Edge",
+        "type": "LEGEND",
+        "qty": 1
+      },
+      {
+        "id": "CP-104",
+        "name": "River Ward // Detective on the Hunt",
+        "type": "LEGEND",
+        "qty": 1
+      },
+      {
+        "id": "CP-029",
+        "name": "Dum Dum // Maelstrom Triggerman",
+        "type": "LEGEND",
+        "qty": 1
+      }
+    ],
+    "deckList": [
+      {
+        "id": "CP-069",
+        "name": "Mantis Blades",
+        "qty": 3
+      },
+      {
+        "id": "CP-014",
+        "name": "Bootleg Black Sapphire Show",
+        "qty": 2
+      },
+      {
+        "id": "CP-119",
+        "name": "Secondhand Bombus",
+        "qty": 3
+      },
+      {
+        "id": "CP-039",
+        "name": "Gorilla Arms",
+        "qty": 2
+      },
+      {
+        "id": "CP-068",
+        "name": "Mandibular Upgrade",
+        "qty": 2
+      },
+      {
+        "id": "CP-021",
+        "name": "Cyberpsychosis",
+        "qty": 2
+      },
+      {
+        "id": "CP-065",
+        "name": "Maelstrom Goons",
+        "qty": 2
+      },
+      {
+        "id": "CP-060",
+        "name": "Kiroshi Optics",
+        "qty": 2
+      },
+      {
+        "id": "CP-012",
+        "name": "Augmented Negotiators",
+        "qty": 2
+      },
+      {
+        "id": "CP-151",
+        "name": "Zetatech Faceplate",
+        "qty": 3
+      },
+      {
+        "id": "CP-127",
+        "name": "The Heist",
+        "qty": 2
+      },
+      {
+        "id": "CP-128",
+        "name": "The Relic // Experimental Biochip",
+        "qty": 1
+      },
+      {
+        "id": "CP-122",
+        "name": "Swordwise Huscle",
+        "qty": 2
+      },
+      {
+        "id": "CP-142",
+        "name": "Viktor Vektor // You Might Feel a Little Pinch",
+        "qty": 1
+      },
+      {
+        "id": "CP-116",
+        "name": "Satori // Sword of Saburo",
+        "qty": 3
+      },
+      {
+        "id": "CP-007",
+        "name": "Alt Cunningham // Mother of Daemons",
+        "qty": 1
+      },
+      {
+        "id": "CP-005",
+        "name": "Afterparty at Lizzie's",
+        "qty": 2
+      },
+      {
+        "id": "CP-004",
+        "name": "Adrenaline Converter",
+        "qty": 1
+      },
+      {
+        "id": "CP-121",
+        "name": "Sketchy Ripper",
+        "qty": 2
+      },
+      {
+        "id": "CP-112",
+        "name": "Safety Override",
+        "qty": 2
+      }
+    ]
+  },
+  "placide": {
+    "id": "tower_deck_placide",
+    "name": "Mazo de Placide (Voodoo Boys)",
+    "faction": "MERCENARIO / BANDAS",
+    "legends": [
+      {
+        "id": "CP-026",
+        "name": "Dexter DeShawn // Off the Grid",
+        "type": "LEGEND",
+        "qty": 1
+      },
+      {
+        "id": "CP-082",
+        "name": "Muamar Reyes // El Capitán",
+        "type": "LEGEND",
+        "qty": 1
+      },
+      {
+        "id": "CP-143",
+        "name": "Wakako Okada // Peace and Harmony",
+        "type": "LEGEND",
+        "qty": 1
+      }
+    ],
+    "deckList": [
+      {
+        "id": "CP-119",
+        "name": "Secondhand Bombus",
+        "qty": 1
+      },
+      {
+        "id": "CP-012",
+        "name": "Augmented Negotiators",
+        "qty": 1
+      },
+      {
+        "id": "CP-001",
+        "name": "6th Street Recruits",
+        "qty": 2
+      },
+      {
+        "id": "CP-075",
+        "name": "Meredith Stout // Stone-Cold Corpo",
+        "qty": 2
+      },
+      {
+        "id": "CP-087",
+        "name": "Off-Duty Malfini",
+        "qty": 2
+      },
+      {
+        "id": "CP-097",
+        "name": "Psycho Squad",
+        "qty": 2
+      },
+      {
+        "id": "CP-073",
+        "name": "MaxTac Suppression Team",
+        "qty": 3
+      },
+      {
+        "id": "CP-054",
+        "name": "Johnny Silverhand // Never Stop Fighting",
+        "qty": 2
+      },
+      {
+        "id": "CP-096",
+        "name": "Placide // Voodoo Sentinel",
+        "qty": 1
+      },
+      {
+        "id": "CP-068",
+        "name": "Mandibular Upgrade",
+        "qty": 1
+      },
+      {
+        "id": "CP-069",
+        "name": "Mantis Blades",
+        "qty": 2
+      },
+      {
+        "id": "CP-116",
+        "name": "Satori // Sword of Saburo",
+        "qty": 3
+      },
+      {
+        "id": "CP-151",
+        "name": "Zetatech Faceplate",
+        "qty": 3
+      },
+      {
+        "id": "CP-084",
+        "name": "NetWatch Netdriver",
+        "qty": 3
+      },
+      {
+        "id": "CP-025",
+        "name": "Detonate",
+        "qty": 3
+      },
+      {
+        "id": "CP-018",
+        "name": "Chrome Reverie",
+        "qty": 3
+      },
+      {
+        "id": "CP-085",
+        "name": "Nocturne Op55N1",
+        "qty": 3
+      },
+      {
+        "id": "CP-134",
+        "name": "Unlikely Bond",
+        "qty": 3
+      }
+    ]
+  },
+  "jackie": {
+    "id": "tower_deck_jackie",
+    "name": "Mazo de Jackie Welles (Grandes Ligas)",
+    "faction": "CORPO / MERCENARIO",
+    "legends": [
+      {
+        "id": "CP-045",
+        "name": "Hanako Arasaka // Daughter of the Emperor",
+        "type": "LEGEND",
+        "qty": 1
+      },
+      {
+        "id": "CP-050",
+        "name": "Jackie Welles // Mama's Favorite",
+        "type": "LEGEND",
+        "qty": 1
+      },
+      {
+        "id": "CP-137",
+        "name": "V // Streetkid",
+        "type": "LEGEND",
+        "qty": 1
+      }
+    ],
+    "deckList": [
+      {
+        "id": "CP-123",
+        "name": "Synapse Burnout",
+        "qty": 2
+      },
+      {
+        "id": "CP-114",
+        "name": "Sandevistan",
+        "qty": 3
+      },
+      {
+        "id": "CP-075",
+        "name": "Meredith Stout // Stone-Cold Corpo",
+        "qty": 2
+      },
+      {
+        "id": "CP-102",
+        "name": "Riot Shield",
+        "qty": 2
+      },
+      {
+        "id": "CP-019",
+        "name": "Corpo Security",
+        "qty": 2
+      },
+      {
+        "id": "CP-070",
+        "name": "MaxTac AV",
+        "qty": 3
+      },
+      {
+        "id": "CP-072",
+        "name": "MaxTac Squadron",
+        "qty": 3
+      },
+      {
+        "id": "CP-069",
+        "name": "Mantis Blades",
+        "qty": 3
+      },
+      {
+        "id": "CP-089",
+        "name": "Overwatch // Panam's Gift",
+        "qty": 3
+      },
+      {
+        "id": "CP-095",
+        "name": "Pepe Najarro // Working Doubles",
+        "qty": 3
+      },
+      {
+        "id": "CP-146",
+        "name": "Wild in the Streets",
+        "qty": 2
+      },
+      {
+        "id": "CP-054",
+        "name": "Johnny Silverhand // Never Stop Fighting",
+        "qty": 3
+      },
+      {
+        "id": "CP-074",
+        "name": "Memory Relapse",
+        "qty": 3
+      },
+      {
+        "id": "CP-048",
+        "name": "Industrial Assembly",
+        "qty": 2
+      },
+      {
+        "id": "CP-028",
+        "name": "(Don't Fear) The Reaper",
+        "qty": 3
+      },
+      {
+        "id": "CP-094",
+        "name": "Peace Offering",
+        "qty": 2
+      }
+    ]
+  },
+  "goro": {
+    "id": "tower_deck_goro",
+    "name": "Mazo de Goro Takemura (Honor Arasaka)",
+    "faction": "CORPO",
+    "legends": [
+      {
+        "id": "CP-040",
+        "name": "Goro Takemura // Hands Unclean",
+        "type": "LEGEND",
+        "qty": 1
+      },
+      {
+        "id": "CP-111",
+        "name": "Saburo Arasaka // Stubborn Patriarch",
+        "type": "LEGEND",
+        "qty": 1
+      },
+      {
+        "id": "CP-148",
+        "name": "Yorinobu Arasaka // Embracing Destruction",
+        "type": "LEGEND",
+        "qty": 1
+      }
+    ],
+    "deckList": [
+      {
+        "id": "CP-028",
+        "name": "(Don't Fear) The Reaper",
+        "qty": 2
+      },
+      {
+        "id": "CP-001",
+        "name": "6th Street Recruits",
+        "qty": 3
+      },
+      {
+        "id": "CP-011",
+        "name": "Arasaka Emergency Radioport",
+        "qty": 2
+      },
+      {
+        "id": "CP-019",
+        "name": "Corpo Security",
+        "qty": 2
+      },
+      {
+        "id": "CP-020",
+        "name": "Corporate Surveillance",
+        "qty": 3
+      },
+      {
+        "id": "CP-025",
+        "name": "Detonate",
+        "qty": 2
+      },
+      {
+        "id": "CP-035",
+        "name": "Field Operator",
+        "qty": 2
+      },
+      {
+        "id": "CP-041",
+        "name": "Goro Takemura // Losing His Way",
+        "qty": 2
+      },
+      {
+        "id": "CP-069",
+        "name": "Mantis Blades",
+        "qty": 3
+      },
+      {
+        "id": "CP-075",
+        "name": "Meredith Stout // Stone-Cold Corpo",
+        "qty": 3
+      },
+      {
+        "id": "CP-076",
+        "name": "Minotaur",
+        "qty": 2
+      },
+      {
+        "id": "CP-094",
+        "name": "Peace Offering",
+        "qty": 3
+      },
+      {
+        "id": "CP-095",
+        "name": "Pepe Najarro // Working Doubles",
+        "qty": 2
+      },
+      {
+        "id": "CP-114",
+        "name": "Sandevistan",
+        "qty": 3
+      },
+      {
+        "id": "CP-116",
+        "name": "Satori // Sword of Saburo",
+        "qty": 3
+      },
+      {
+        "id": "CP-123",
+        "name": "Synapse Burnout",
+        "qty": 3
+      }
+    ]
+  },
+  "adam-smasher": {
+    "id": "tower_deck_adam-smasher",
+    "name": "Mazo de Adam Smasher (Full Chrome)",
+    "faction": "BANDAS / CORPO",
+    "legends": [
+      {
+        "id": "CP-029",
+        "name": "Dum Dum // Maelstrom Triggerman",
+        "type": "LEGEND",
+        "qty": 1
+      },
+      {
+        "id": "CP-109",
+        "name": "Royce // Psycho on the Edge",
+        "type": "LEGEND",
+        "qty": 1
+      },
+      {
+        "id": "CP-002",
+        "name": "Adam Smasher // Ender of Legends",
+        "type": "LEGEND",
+        "qty": 1
+      }
+    ],
+    "deckList": [
+      {
+        "id": "CP-110",
+        "name": "Ruthless Lowlife",
+        "qty": 2
+      },
+      {
+        "id": "CP-121",
+        "name": "Sketchy Ripper",
+        "qty": 2
+      },
+      {
+        "id": "CP-012",
+        "name": "Augmented Negotiators",
+        "qty": 2
+      },
+      {
+        "id": "CP-065",
+        "name": "Maelstrom Goons",
+        "qty": 2
+      },
+      {
+        "id": "CP-122",
+        "name": "Swordwise Huscle",
+        "qty": 2
+      },
+      {
+        "id": "CP-138",
+        "name": "Valentino Guerrera",
+        "qty": 3
+      },
+      {
+        "id": "CP-001",
+        "name": "6th Street Recruits",
+        "qty": 2
+      },
+      {
+        "id": "CP-075",
+        "name": "Meredith Stout // Stone-Cold Corpo",
+        "qty": 2
+      },
+      {
+        "id": "CP-031",
+        "name": "El Sombrerón // La Venganza Lenta",
+        "qty": 1
+      },
+      {
+        "id": "CP-118",
+        "name": "Screw // Lovelorn Fool",
+        "qty": 2
+      },
+      {
+        "id": "CP-054",
+        "name": "Johnny Silverhand // Never Stop Fighting",
+        "qty": 2
+      },
+      {
+        "id": "CP-068",
+        "name": "Mandibular Upgrade",
+        "qty": 2
+      },
+      {
+        "id": "CP-069",
+        "name": "Mantis Blades",
+        "qty": 3
+      },
+      {
+        "id": "CP-011",
+        "name": "Arasaka Emergency Radioport",
+        "qty": 2
+      },
+      {
+        "id": "CP-151",
+        "name": "Zetatech Faceplate",
+        "qty": 2
+      },
+      {
+        "id": "CP-006",
+        "name": "All Is Lost",
+        "qty": 2
+      },
+      {
+        "id": "CP-025",
+        "name": "Detonate",
+        "qty": 3
+      },
+      {
+        "id": "CP-010",
+        "name": "Appetite for Destruction",
+        "qty": 2
+      },
+      {
+        "id": "CP-013",
+        "name": "Bonnie and Clyde",
+        "qty": 2
+      },
+      {
+        "id": "CP-021",
+        "name": "Cyberpsychosis",
+        "qty": 2
+      },
+      {
+        "id": "CP-088",
+        "name": "Over the Edge",
+        "qty": 3
+      },
+      {
+        "id": "CP-043",
+        "name": "Gunpoint Diplomacy",
+        "qty": 2
+      },
+      {
+        "id": "CP-016",
+        "name": "Carnage at the Colosseum",
+        "qty": 3
+      }
+    ]
+  },
+  "johnny": {
+    "id": "tower_deck_johnny",
+    "name": "Mazo de Johnny Silverhand (Samurai)",
+    "faction": "MERCENARIO / CORPO",
+    "legends": [
+      {
+        "id": "CP-082",
+        "name": "Muamar Reyes // El Capitán",
+        "type": "LEGEND",
+        "qty": 1
+      },
+      {
+        "id": "CP-002",
+        "name": "Adam Smasher // Ender of Legends",
+        "type": "LEGEND",
+        "qty": 1
+      },
+      {
+        "id": "CP-104",
+        "name": "River Ward // Detective on the Hunt",
+        "type": "LEGEND",
+        "qty": 1
+      }
+    ],
+    "deckList": [
+      {
+        "id": "CP-039",
+        "name": "Gorilla Arms",
+        "qty": 3
+      },
+      {
+        "id": "CP-069",
+        "name": "Mantis Blades",
+        "qty": 3
+      },
+      {
+        "id": "CP-151",
+        "name": "Zetatech Faceplate",
+        "qty": 3
+      },
+      {
+        "id": "CP-116",
+        "name": "Satori // Sword of Saburo",
+        "qty": 3
+      },
+      {
+        "id": "CP-004",
+        "name": "Adrenaline Converter",
+        "qty": 3
+      },
+      {
+        "id": "CP-014",
+        "name": "Bootleg Black Sapphire Show",
+        "qty": 3
+      },
+      {
+        "id": "CP-025",
+        "name": "Detonate",
+        "qty": 2
+      },
+      {
+        "id": "CP-063",
+        "name": "Live With the Aftermath",
+        "qty": 3
+      },
+      {
+        "id": "CP-112",
+        "name": "Safety Override",
+        "qty": 2
+      },
+      {
+        "id": "CP-121",
+        "name": "Sketchy Ripper",
+        "qty": 3
+      },
+      {
+        "id": "CP-105",
+        "name": "Rockin' Rockerboy",
+        "qty": 3
+      },
+      {
+        "id": "CP-075",
+        "name": "Meredith Stout // Stone-Cold Corpo",
+        "qty": 3
+      },
+      {
+        "id": "CP-001",
+        "name": "6th Street Recruits",
+        "qty": 3
+      },
+      {
+        "id": "CP-054",
+        "name": "Johnny Silverhand // Never Stop Fighting",
+        "qty": 3
+      }
+    ]
+  },
+  "v": {
+    "id": "tower_deck_v",
+    "name": "Mazo de V (Leyenda de Night City)",
+    "faction": "CORPO / MERCENARIO",
+    "legends": [
+      {
+        "id": "CP-135",
+        "name": "V // Corporate Exile",
+        "type": "LEGEND",
+        "qty": 1
+      },
+      {
+        "id": "CP-050",
+        "name": "Jackie Welles // Mama's Favorite",
+        "type": "LEGEND",
+        "qty": 1
+      },
+      {
+        "id": "CP-106",
+        "name": "Rogue Amendiares // Preem Solo",
+        "type": "LEGEND",
+        "qty": 1
+      }
+    ],
+    "deckList": [
+      {
+        "id": "CP-119",
+        "name": "Secondhand Bombus",
+        "qty": 2
+      },
+      {
+        "id": "CP-012",
+        "name": "Augmented Negotiators",
+        "qty": 2
+      },
+      {
+        "id": "CP-032",
+        "name": "Emergency Atlus",
+        "qty": 2
+      },
+      {
+        "id": "CP-095",
+        "name": "Pepe Najarro // Working Doubles",
+        "qty": 3
+      },
+      {
+        "id": "CP-070",
+        "name": "MaxTac AV",
+        "qty": 3
+      },
+      {
+        "id": "CP-113",
+        "name": "Sandayu Oda // Hanako's Guardian",
+        "qty": 2
+      },
+      {
+        "id": "CP-060",
+        "name": "Kiroshi Optics",
+        "qty": 3
+      },
+      {
+        "id": "CP-030",
+        "name": "Dying Night // V's Pistol",
+        "qty": 3
+      },
+      {
+        "id": "CP-102",
+        "name": "Riot Shield",
+        "qty": 2
+      },
+      {
+        "id": "CP-151",
+        "name": "Zetatech Faceplate",
+        "qty": 3
+      },
+      {
+        "id": "CP-084",
+        "name": "NetWatch Netdriver",
+        "qty": 3
+      },
+      {
+        "id": "CP-094",
+        "name": "Peace Offering",
+        "qty": 3
+      },
+      {
+        "id": "CP-021",
+        "name": "Cyberpsychosis",
+        "qty": 3
+      },
+      {
+        "id": "CP-085",
+        "name": "Nocturne Op55N1",
+        "qty": 3
+      },
+      {
+        "id": "CP-074",
+        "name": "Memory Relapse",
+        "qty": 3
+      }
+    ]
+  }
+}

@@ -376,10 +376,9 @@ export default function CyberSimulatorLobby({
                     </div>
 
                     <p className="text-xs text-gray-300 font-sans leading-relaxed">
-                      Enfréntate uno a uno a los <strong className="text-white">11 iconos de Night City</strong> desde{' '}
+                      Enfréntate uno a uno a los <strong className="text-white">11 iconos de Night City</strong> (cada uno con <strong className="text-[#0dfceb]">su propio mazo exclusivo</strong>) desde{' '}
                       <strong className="text-[#FCEE0A]">Pepe Najarro</strong> hasta{' '}
-                      <strong className="text-[#FF003C]">Adam Smasher, Johnny Silverhand y V</strong> con pantallas finales{' '}
-                      <strong className="text-[#0dfceb]">YOU WIN / YOU LOSE</strong>.
+                      <strong className="text-[#FF003C]">Adam Smasher, Johnny Silverhand y V</strong>.
                     </p>
 
                     {/* Tarjeta del Próximo Rival del Piso Actual */}

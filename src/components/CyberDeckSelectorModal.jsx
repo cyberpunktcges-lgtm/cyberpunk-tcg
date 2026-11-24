@@ -34,6 +34,7 @@ import {
 import {
   pickTowerAdventureRival,
   getRivalAsBotAvatar,
+  getTowerRivalDeck,
   TOTAL_TOWER_STAGES
 } from '../data/rankedTower.js';
 
@@ -219,9 +220,9 @@ export default function CyberDeckSelectorModal({
     };
 
     if (matchMode === 'arasaka_tower') {
-      finalBotDeck = pickRandomMetaDeck();
       finalTowerRival =
         activeTowerMatchup?.rival || pickTowerAdventureRival(currentUser?.uid || null).rival;
+      finalBotDeck = getTowerRivalDeck(finalTowerRival?.id) || pickRandomMetaDeck();
       finalBotAvatar =
         getRivalAsBotAvatar(finalTowerRival) || getRandomBotAvatar(selectedPlayerAvatar?.id || 'v-chico');
     } else if (matchMode === 'ranked_bo3') {
@@ -323,7 +324,7 @@ export default function CyberDeckSelectorModal({
                   </span>
                 </div>
                 <p className="text-[10px] text-gray-300 mt-1 font-sans leading-snug">
-                  Escala los <strong>11 pisos Arcade</strong> ({towerRivalPreview ? `Piso ${towerRivalPreview.stage}/11: ${towerRivalPreview.shortName}` : 'Pepe → V'}). Mazo Meta aleatorio.
+                  Escala los <strong>11 pisos Arcade</strong> ({towerRivalPreview ? `Piso ${towerRivalPreview.stage}/11: ${towerRivalPreview.shortName}` : 'Pepe → V'}). Cada jefe juega <strong>su mazo exclusivo</strong>.
                 </p>
               </button>
 
@@ -807,25 +808,41 @@ export default function CyberDeckSelectorModal({
             )}
 
             {/* SELECCIÓN DE MAZO DEL RIVAL */}
-            {matchMode === 'arasaka_tower' ? (
-              <div className="flex-1 flex flex-col justify-center bg-[#070a10] border-2 border-dashed border-[#FF003C]/65 rounded p-4 text-center space-y-2.5 my-1">
-                <div className="w-12 h-12 rounded-full bg-[#FF003C]/15 border border-[#FF003C] flex items-center justify-center mx-auto text-[#FF003C]">
-                  <Shuffle className="w-6 h-6" />
+            {matchMode === 'arasaka_tower' ? (() => {
+              const bossDeck = getTowerRivalDeck(activeTowerMatchup?.rival?.id);
+              const bossMainCount = bossDeck
+                ? (bossDeck.deckList || []).reduce((s, c) => s + (c.qty || 1), 0)
+                : 40;
+              return (
+                <div className="flex-1 flex flex-col justify-center bg-[#070a10] border-2 border-dashed border-[#FF003C]/65 rounded p-4 text-center space-y-2.5 my-1">
+                  <div className="w-12 h-12 rounded-full bg-[#FF003C]/15 border border-[#FF003C] flex items-center justify-center mx-auto text-[#FF003C]">
+                    <Layers className="w-6 h-6" />
+                  </div>
+                  <h3 className="text-xs sm:text-sm font-black uppercase text-[#FF003C] tracking-wider">
+                    MAZO EXCLUSIVO DEL JEFE DE PISO
+                  </h3>
+                  {bossDeck ? (
+                    <div className="bg-black/85 border border-[#FF003C]/50 rounded p-2.5 space-y-1">
+                      <span className="text-xs font-black uppercase text-[#FCEE0A] block">
+                        🃏 {bossDeck.name}
+                      </span>
+                      <span className="text-[10px] text-[#0dfceb] font-bold uppercase block">
+                        {bossDeck.faction} • 3 Leyendas + {bossMainCount} Cartas
+                      </span>
+                    </div>
+                  ) : (
+                    <p className="text-[11px] text-gray-300 font-sans leading-relaxed">
+                      Este jefe defiende su piso con un mazo del Meta Oficial.
+                    </p>
+                  )}
+                  <div className="bg-black/80 border border-gray-800 rounded p-2.5 text-[10px] text-gray-400 space-y-1 text-left">
+                    <div>• <strong className="text-[#FCEE0A]">11 Pisos Arcade:</strong> cada personaje combate con su baraja personalizada hasta llegar a <strong>V</strong>.</div>
+                    <div>• <strong className="text-[#0dfceb]">Pantallas YOU WIN / YOU LOSE:</strong> cada jefe reacciona con su ilustración exclusiva al terminar.</div>
+                    <div>• <strong className="text-[#00FF9C]">Sin riesgo de Ranking:</strong> juega a tu ritmo sin perder puntos de Street Cred.</div>
+                  </div>
                 </div>
-                <h3 className="text-xs sm:text-sm font-black uppercase text-[#FF003C] tracking-wider">
-                  COMBATE DE PISO • MAZO META SECRETO
-                </h3>
-                <p className="text-[11px] text-gray-300 font-sans leading-relaxed">
-                  En <strong className="text-white">Conquista la Torre Arasaka</strong> cada jefe defiende su piso con uno de los{' '}
-                  <strong>{metaDecks.length} mazos oficiales del meta</strong> elegido al azar.
-                </p>
-                <div className="bg-black/80 border border-gray-800 rounded p-2.5 text-[10px] text-gray-400 space-y-1 text-left">
-                  <div>• <strong className="text-[#FCEE0A]">11 Pisos Arcade:</strong> derrota al jefe para desbloquear el siguiente piso hasta llegar a <strong>V</strong>.</div>
-                  <div>• <strong className="text-[#0dfceb]">Pantallas YOU WIN / YOU LOSE:</strong> cada jefe reacciona con su ilustración exclusiva al terminar.</div>
-                  <div>• <strong className="text-[#00FF9C]">Sin riesgo de Ranking:</strong> juega a tu ritmo sin perder puntos de Street Cred.</div>
-                </div>
-              </div>
-            ) : matchMode === 'ranked_bo3' ? (
+              );
+            })() : matchMode === 'ranked_bo3' ? (
               <div className="flex-1 flex flex-col justify-center bg-[#070a10] border-2 border-dashed border-[#FCEE0A]/60 rounded p-4 text-center space-y-2.5 my-1">
                 <div className="w-12 h-12 rounded-full bg-[#FCEE0A]/15 border border-[#FCEE0A] flex items-center justify-center mx-auto text-[#FCEE0A]">
                   <Shuffle className="w-6 h-6" />
@@ -919,7 +936,7 @@ export default function CyberDeckSelectorModal({
             <span className="text-[#FCEE0A] font-black">VS</span>
             <span className="text-[#FF003C] font-bold">
               {matchMode === 'arasaka_tower' && activeTowerMatchup?.rival
-                ? `🗼 Piso ${activeTowerMatchup.rival.stage}/11: ${activeTowerMatchup.rival.name} (Mazo Meta Aleatorio)`
+                ? `🗼 Piso ${activeTowerMatchup.rival.stage}/11: ${activeTowerMatchup.rival.name} (${getTowerRivalDeck(activeTowerMatchup.rival.id)?.name || 'Mazo Exclusivo'})`
                 : matchMode === 'ranked_bo3'
                 ? '🎲 Rival Aleatorio (Meta Oficial)'
                 : `${selectedBotAvatar.name.split('//')[0].trim()} (${selectedBotDeck?.name || 'Mazo'})`}

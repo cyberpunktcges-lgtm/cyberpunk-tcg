@@ -43,6 +43,7 @@ import {
   getRivalById,
   getRivalByStage,
   getRivalAsBotAvatar,
+  getTowerRivalDeck,
   pickTowerAdventureRival,
   recordTowerFloorWin,
   resetTowerRun,
@@ -3129,7 +3130,6 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
     chosenTowerRival = null
   ) => {
     const normPlayer = normalizeDeckInput(chosenPlayerDeck);
-    const normBot = normalizeDeckInput(chosenBotDeck);
     const towerMatchup =
       matchMode === 'arasaka_tower'
         ? chosenTowerRival
@@ -3140,6 +3140,11 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
           : pickTowerAdventureRival(currentUser?.uid || null)
         : null;
     const activeTowerRival = towerMatchup?.rival || null;
+    const resolvedTowerDeck =
+      matchMode === 'arasaka_tower' && activeTowerRival?.id
+        ? getTowerRivalDeck(activeTowerRival.id)
+        : null;
+    const normBot = normalizeDeckInput(resolvedTowerDeck || chosenBotDeck);
     const effectiveBotDifficulty =
       matchMode === 'arasaka_tower' && activeTowerRival?.botDifficulty
         ? activeTowerRival.botDifficulty
