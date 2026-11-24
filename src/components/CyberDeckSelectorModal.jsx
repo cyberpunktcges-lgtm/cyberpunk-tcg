@@ -122,6 +122,12 @@ export default function CyberDeckSelectorModal({
   const [isChangingPlayerAvatar, setIsChangingPlayerAvatar] = useState(false);
   const [isChangingBotAvatar, setIsChangingBotAvatar] = useState(false);
 
+  // Mantener sincronizado el rival de la Torre Arasaka cuando cambia el progreso del usuario
+  useEffect(() => {
+    if (!isOpen) return;
+    setActiveTowerMatchup(pickRankedTowerRival(userRankingStats));
+  }, [isOpen, userRankingStats?.wins]);
+
   // Sincronizar selecciones iniciales cuando se abre el modal
   useEffect(() => {
     if (!isOpen) return;
@@ -129,7 +135,6 @@ export default function CyberDeckSelectorModal({
     setMatchMode(
       initialMatchMode === 'ranked_bo3' && currentUser?.uid ? 'ranked_bo3' : (initialMatchMode || 'practice')
     );
-    setActiveTowerMatchup(pickRankedTowerRival(userRankingStats));
 
     if (currentSelectedPlayerDeck) setSelectedPlayerDeck(currentSelectedPlayerDeck);
     else if (!selectedPlayerDeck && metaDecks.length > 0) setSelectedPlayerDeck(metaDecks[0]);
