@@ -32,6 +32,7 @@ import {
   resolvePublicNickname
 } from '../utils/rankingSystem.js';
 import { AVATARS } from '../data/avatars.js';
+import { ARASAKA_TOWER_RIVALS, getTowerProgress } from '../data/rankedTower.js';
 
 const CYBER_CLIP =
   'polygon(0 0, calc(100% - 16px) 0, 100% 16px, 100% 100%, 16px 100%, 0 calc(100% - 16px))';
@@ -84,6 +85,9 @@ export default function CyberSimulatorLobby({
   const myStreak = userRankingStats?.currentStreak || 0;
   const myRank = getRankForPoints(myPoints);
   const myBotProg = getUnlockedBotDifficulty(myWins);
+  const towerProgress = getTowerProgress(userRankingStats);
+  const nextTowerRival = towerProgress.currentRival;
+  const towerRivalDiffMeta = getBotDifficultyMeta(nextTowerRival?.botDifficulty || selectedBotDifficulty);
   const activeDiffMeta = getBotDifficultyMeta(selectedBotDifficulty);
   const publicNick = currentUser ? resolvePublicNickname(userProfile, currentUser) : 'Invitado';
 
@@ -290,11 +294,11 @@ export default function CyberSimulatorLobby({
           <div className="lg:col-span-7 space-y-5">
             {/* 2 Tarjetas Grandes: RANKED BO3 vs PRÁCTICA / TESTEO */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {/* TARJETA 1: RANKED BO3 (SUIZO) */}
+              {/* TARJETA 1: RANKED BO3 — TORRE ARASAKA (11 RIVALES) */}
               <motion.div
                 whileHover={{ y: -3 }}
                 style={{ clipPath: CYBER_CLIP }}
-                className="bg-[#000000]/95 border-2 border-[#FCEE0A] p-5 shadow-[0_0_35px_rgba(252,238,10,0.2)] flex flex-col justify-between gap-4 relative overflow-hidden"
+                className="bg-[#000000]/92 backdrop-blur-sm border-2 border-[#FCEE0A] p-5 shadow-[0_0_35px_rgba(252,238,10,0.2)] flex flex-col justify-between gap-4 relative overflow-hidden"
               >
                 <div className="space-y-3">
                   <div className="flex items-center justify-between gap-2">
@@ -302,7 +306,7 @@ export default function CyberSimulatorLobby({
                       <Trophy className="w-5 h-5" />
                     </div>
                     <span className="px-2 py-0.5 bg-[#FCEE0A] text-black text-[9px] font-black uppercase tracking-wider">
-                      PUNTÚA ⭐ • BO3 SUIZO
+                      TORRE ARASAKA • BO3
                     </span>
                   </div>
 
@@ -311,27 +315,76 @@ export default function CyberSimulatorLobby({
                       MODO RANKED BO3
                     </h3>
                     <p className="text-xs text-gray-300 font-sans mt-1 leading-relaxed">
-                      Serie competitiva <strong>al mejor de 3 partidas</strong>. Eliges tu mazo y el rival usa un{' '}
-                      <strong className="text-white">mazo aleatorio del meta oficial</strong>.
+                      Escala los <strong className="text-white">11 pisos de la Torre Arasaka</strong> al mejor de 3 partidas contra rivales clásicos con mazo Meta aleatorio.
                     </p>
                   </div>
 
-                  <div className="bg-[#070a10] border border-gray-800 p-2.5 rounded space-y-1 text-[10px] text-gray-300">
-                    <div className="flex justify-between">
-                      <span className="text-gray-400">Victoria limpia 2-0:</span>
-                      <strong className="text-[#00FF9C]">+{activeDiffMeta.sweepPoints} ⭐</strong>
+                  {/* Tarjeta del Próximo Rival de la Torre Arasaka */}
+                  <div className="bg-[#070a10] border border-[#FCEE0A]/45 p-2.5 rounded space-y-2">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-13 h-13 rounded border-2 border-[#FCEE0A]/80 overflow-hidden bg-black shrink-0 shadow-[0_0_12px_rgba(252,238,10,0.25)]">
+                        <img
+                          src={nextTowerRival.okImage}
+                          alt={nextTowerRival.name}
+                          className="w-full h-full object-cover object-top"
+                        />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center justify-between gap-1">
+                          <span className="text-[9px] font-black uppercase text-[#0dfceb] tracking-wider">
+                            {towerProgress.isChampion
+                              ? '👑 CAMPEÓN TORRE (11/11)'
+                              : `🗼 PISO ${towerProgress.currentStage}/${towerProgress.totalStages}`}
+                          </span>
+                          <span
+                            className="text-[8px] font-black uppercase px-1.5 py-0.5 rounded bg-black border"
+                            style={{
+                              color: towerRivalDiffMeta.color,
+                              borderColor: `${towerRivalDiffMeta.color}66`
+                            }}
+                          >
+                            {towerRivalDiffMeta.shortLabel}
+                          </span>
+                        </div>
+                        <span className="text-xs font-black text-white uppercase truncate block mt-0.5">
+                          {towerProgress.isChampion ? 'Rival Aleatorio Élite' : nextTowerRival.name}
+                        </span>
+                        <span className="text-[9px] text-gray-400 block truncate font-sans">
+                          {towerProgress.isChampion
+                            ? 'Has vencido a los 11 rivales — modo Leyenda'
+                            : nextTowerRival.title}
+                        </span>
+                      </div>
                     </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-400">Victoria 2-1:</span>
-                      <strong className="text-[#FCEE0A]">+{activeDiffMeta.winPoints} ⭐</strong>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-400">Derrota 1-2 / 0-2:</span>
-                      <strong className="text-[#FF003C]">-5 ⭐ / -15 ⭐</strong>
-                    </div>
-                    <div className="flex items-center gap-1 pt-1 border-t border-gray-800 text-[9px] text-[#0dfceb]">
-                      <Shuffle className="w-3 h-3 shrink-0" />
-                      <span>Bot actual: {activeDiffMeta.shortLabel}</span>
+
+                    {/* Barra de progreso de los 11 pisos de la Torre Arasaka */}
+                    <div className="space-y-1">
+                      <div className="grid grid-cols-11 gap-1">
+                        {ARASAKA_TOWER_RIVALS.map((rv) => {
+                          const isDefeated = rv.stage <= towerProgress.defeatedCount;
+                          const isCurrent = !towerProgress.isChampion && rv.stage === towerProgress.currentStage;
+                          return (
+                            <div
+                              key={rv.id}
+                              title={`Piso ${rv.stage}/11: ${rv.name} (${rv.tier})`}
+                              className={`h-1.5 rounded-sm transition-all ${
+                                isDefeated
+                                  ? 'bg-[#00FF9C]'
+                                  : isCurrent
+                                  ? 'bg-[#FCEE0A] animate-pulse shadow-[0_0_6px_#FCEE0A]'
+                                  : 'bg-gray-800'
+                              }`}
+                            />
+                          );
+                        })}
+                      </div>
+                      <div className="flex items-center justify-between text-[9px] text-gray-400">
+                        <span>
+                          2-0: <strong className="text-[#00FF9C]">+{towerRivalDiffMeta.sweepPoints}⭐</strong> • 2-1:{' '}
+                          <strong className="text-[#FCEE0A]">+{towerRivalDiffMeta.winPoints}⭐</strong>
+                        </span>
+                        <span className="text-[#FF003C]">-5/-15⭐</span>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -343,7 +396,11 @@ export default function CyberSimulatorLobby({
                   className="w-full py-3 px-4 bg-[#FCEE0A] hover:bg-white text-[#070a10] font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 cursor-pointer shadow-[0_0_20px_rgba(252,238,10,0.45)] transition-colors"
                 >
                   <Swords className="w-4 h-4" />
-                  <span>ELEGIR MAZO Y JUGAR RANKED ➔</span>
+                  <span>
+                    {towerProgress.isChampion
+                      ? 'NUEVO RETO EN LA TORRE ➔'
+                      : `DESAFIAR A ${nextTowerRival.shortName.toUpperCase()} (PISO ${towerProgress.currentStage}/11) ➔`}
+                  </span>
                 </button>
               </motion.div>
 

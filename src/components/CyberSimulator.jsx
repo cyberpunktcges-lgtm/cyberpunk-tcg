@@ -39,6 +39,15 @@ import CyberBugReportModal from './CyberBugReportModal.jsx';
 import CyberBotActionPopup from './CyberBotActionPopup.jsx';
 import CyberLeaderboardModal from './CyberLeaderboardModal.jsx';
 import CyberSimulatorLobby from './CyberSimulatorLobby.jsx';
+import {
+  getRivalById,
+  getRivalByStage,
+  getRivalAsBotAvatar,
+  pickRankedTowerRival,
+  loadLocalTowerWins,
+  saveLocalTowerWins,
+  TOTAL_TOWER_STAGES
+} from '../data/rankedTower.js';
 import { installGlobalErrorBuffer } from '../utils/betaDiagnostics.js';
 import CyberProfileModal from './CyberProfileModal.jsx';
 import CyberMyDecksModal from './CyberMyDecksModal.jsx';
@@ -3115,10 +3124,30 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
     chosenBotDeck,
     chosenPlayerAvatar = null,
     chosenBotAvatar = null,
-    matchMode = 'practice'
+    matchMode = 'practice',
+    chosenTowerRival = null
   ) => {
     const normPlayer = normalizeDeckInput(chosenPlayerDeck);
     const normBot = normalizeDeckInput(chosenBotDeck);
+    const towerMatchup =
+      matchMode === 'ranked_bo3'
+        ? chosenTowerRival
+          ? {
+              rival: chosenTowerRival,
+              isChampionRematch: (userRankingStats?.wins || 0) >= TOTAL_TOWER_STAGES
+            }
+          : pickRankedTowerRival(userRankingStats)
+        : null;
+    const activeTowerRival = towerMatchup?.rival || null;
+    const effectiveBotDifficulty =
+      matchMode === 'ranked_bo3' && activeTowerRival?.botDifficulty
+        ? activeTowerRival.botDifficulty
+        : selectedBotDifficulty;
+    const resolvedBotAvatar =
+      matchMode === 'ranked_bo3' && activeTowerRival
+        ? getRivalAsBotAvatar(activeTowerRival)
+        : chosenBotAvatar;
+
     const nextSeries =
       matchMode === 'ranked_bo3'
         ? {
@@ -3129,7 +3158,12 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
             currentGame: 1,
             isFinished: false,
             lastGameWinner: null,
-            botChoseStarterForNext: null
+            botChoseStarterForNext: null,
+            towerRivalId: activeTowerRival?.id || null,
+            towerStage: activeTowerRival?.stage || 1,
+            towerRivalName: activeTowerRival?.name || null,
+            towerBotDifficulty: effectiveBotDifficulty,
+            wasChampionRun: Boolean(towerMatchup?.isChampionRematch)
           }
         : null;
     setSeriesState(nextSeries);
@@ -3143,17 +3177,17 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
         localStorage.setItem('cyber_sim_player_avatar', JSON.stringify(chosenPlayerAvatar));
       } catch {}
     }
-    if (chosenBotAvatar) {
-      setBotAvatar(chosenBotAvatar);
+    if (resolvedBotAvatar) {
+      setBotAvatar(resolvedBotAvatar);
       try {
-        localStorage.setItem('cyber_sim_bot_avatar', JSON.stringify(chosenBotAvatar));
+        localStorage.setItem('cyber_sim_bot_avatar', JSON.stringify(resolvedBotAvatar));
       } catch {}
     }
 
     const initial = createInitialGameState(normPlayer, normBot, initialCards, {
       startingPlayer: null,
       isRematch: false,
-      botDifficulty: selectedBotDifficulty
+      botDifficulty: effectiveBotDifficulty
     });
 
     setLastMatchRankingResult(null);
@@ -3259,10 +3293,14 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
     setActivePlayerDeck(pDeck);
     setActiveBotDeck(bDeck);
 
+    const effectiveBotDiff =
+      seriesState?.mode === 'ranked_bo3' && seriesState?.towerBotDifficulty
+        ? seriesState.towerBotDifficulty
+        : selectedBotDifficulty;
     const initial = createInitialGameState(pDeck, bDeck, initialCards, {
       startingPlayer,
       isRematch,
-      botDifficulty: selectedBotDifficulty
+      botDifficulty: effectiveBotDiff
     });
     setLastMatchRankingResult(null);
     setShowLobby(false);
@@ -3512,6 +3550,11 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
       botChoseStarterForNext
     };
     setSeriesState(updatedSeries);
+
+    if (seriesFinished && nextPlayerScore >= 2) {
+      const nextWinsEstimate = Math.max(loadLocalTowerWins() + 1, (userRankingStats?.wins || 0) + 1);
+      saveLocalTowerWins(nextWinsEstimate);
+    }
 
     if (!seriesFinished || !currentUser?.uid) return;
 
@@ -3915,9 +3958,11 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
               {seriesState?.mode === 'ranked_bo3' ? (
                 <span
                   className="px-2 py-0.5 bg-[#FCEE0A]/20 border border-[#FCEE0A] text-[#FCEE0A] font-black text-[10px] uppercase whitespace-nowrap shadow-[0_0_10px_rgba(252,238,10,0.3)]"
-                  title="Serie Ranked BO3 (Sistema Suizo al Mejor de 3 — Mazo rival aleatorio)"
+                  title="Torre Arasaka Ranked BO3 (Sistema Suizo al Mejor de 3 — Mazo rival aleatorio)"
                 >
-                  🏆 BO3 J{seriesState.currentGame}/3 • {seriesState.playerScore}-{seriesState.botScore}
+                  {seriesState.towerStage
+                    ? `🗼 P${seriesState.towerStage}/${TOTAL_TOWER_STAGES} ${(getRivalById(seriesState.towerRivalId)?.shortName || seriesState.towerRivalName || "BOT").toUpperCase()} • J${seriesState.currentGame}/3 (${seriesState.playerScore}-${seriesState.botScore})`
+                    : `🏆 BO3 J${seriesState.currentGame}/3 • ${seriesState.playerScore}-${seriesState.botScore}`}
                 </span>
               ) : (
                 <span
@@ -7174,7 +7219,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
         </div>
       )}
 
-      {/* 5. MODAL FLOTANTE DE FINAL DE PARTIDA (SOPORTA RANKED BO3 SUIZO Y MODO PRÁCTICA) */}
+      {/* 5. MODAL FLOTANTE DE FINAL DE PARTIDA (SOPORTA TORRE ARASAKA RANKED BO3 ESTILO STREET FIGHTER II Y PRÁCTICA) */}
       {gameState.isGameOver && (() => {
         const isBO3 = seriesState?.mode === 'ranked_bo3';
         const isBO3InProgress = isBO3 && !seriesState.isFinished;
@@ -7182,64 +7227,198 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
         const playerWonSeries = isBO3Finished && seriesState.playerScore >= 2;
         const nextGameNumber = Math.min(3, (seriesState?.currentGame || 1) + 1);
         const playerWonThisGame = gameState.winner === 'player';
+        const towerRival = isBO3
+          ? getRivalById(seriesState?.towerRivalId) || getRivalByStage(seriesState?.towerStage || 1)
+          : null;
+        const nextTowerRival =
+          isBO3Finished && playerWonSeries && towerRival && !seriesState?.wasChampionRun && towerRival.stage < TOTAL_TOWER_STAGES
+            ? getRivalByStage(towerRival.stage + 1)
+            : null;
+        const justConqueredTower =
+          isBO3Finished && playerWonSeries && towerRival && !seriesState?.wasChampionRun && towerRival.stage === TOTAL_TOWER_STAGES;
 
         return (
-          <div className="fixed inset-0 z-50 bg-[#000000]/90 backdrop-blur-md flex items-center justify-center p-4 font-mono">
-            <div
+          <div className="fixed inset-0 z-50 bg-[#000000]/92 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 font-mono overflow-y-auto">
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0, y: 12 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              transition={{ duration: 0.25 }}
               style={{ clipPath: CYBER_CLIP }}
-              className={`max-w-md w-full bg-[#070a10]/95 border-2 p-6 sm:p-8 text-center space-y-5 backdrop-blur-md ${
+              className={`${isBO3Finished && towerRival ? 'max-w-lg' : 'max-w-md'} w-full max-h-[94vh] overflow-y-auto cyber-scrollbar bg-[#070a10]/98 border-2 p-5 sm:p-6 text-center space-y-4 backdrop-blur-md ${
                 (isBO3Finished ? playerWonSeries : playerWonThisGame)
-                  ? 'border-[#FCEE0A] shadow-[0_0_60px_rgba(252,238,10,0.5)]'
-                  : 'border-[#FF003C] shadow-[0_0_60px_rgba(255,0,60,0.5)]'
+                  ? 'border-[#FCEE0A] shadow-[0_0_65px_rgba(252,238,10,0.5)]'
+                  : 'border-[#FF003C] shadow-[0_0_65px_rgba(255,0,60,0.5)]'
               }`}
             >
               {/* Marcador BO3 si es Ranked */}
               {isBO3 && (
-                <div className="bg-black border border-[#FCEE0A]/60 px-4 py-2.5 rounded flex items-center justify-between">
-                  <span className="text-[10px] font-black text-[#FCEE0A] uppercase">
-                    🏆 SERIE RANKED BO3
+                <div className="bg-black border border-[#FCEE0A]/60 px-3.5 py-2 rounded flex items-center justify-between gap-2">
+                  <span className="text-[10px] font-black text-[#FCEE0A] uppercase truncate">
+                    {towerRival
+                      ? `🗼 TORRE ARASAKA • PISO ${towerRival.stage}/${TOTAL_TOWER_STAGES}`
+                      : '🏆 SERIE RANKED BO3'}
                   </span>
-                  <span className="text-lg font-black tracking-widest text-white">
+                  <span className="text-base sm:text-lg font-black tracking-widest text-white shrink-0">
                     <span className="text-[#0dfceb]">TÚ {seriesState.playerScore}</span>
                     {' — '}
-                    <span className="text-[#FF003C]">{seriesState.botScore} BOT</span>
+                    <span className="text-[#FF003C]">
+                      {seriesState.botScore} {towerRival ? towerRival.shortName.toUpperCase() : 'BOT'}
+                    </span>
                   </span>
                 </div>
               )}
 
-              <div className="space-y-2">
-                <span className="text-4xl block">
-                  {isBO3Finished
-                    ? playerWonSeries ? '🏆' : '💀'
-                    : playerWonThisGame ? '⚡' : '💀'}
-                </span>
-                <h2
-                  className={`text-xl sm:text-2xl font-black uppercase ${
-                    (isBO3Finished ? playerWonSeries : playerWonThisGame) ? 'text-[#FCEE0A]' : 'text-[#FF003C]'
-                  }`}
-                >
-                  {isBO3Finished
-                    ? playerWonSeries
-                      ? `¡SERIE BO3 GANADA (${seriesState.playerScore}-${seriesState.botScore})!`
-                      : `SERIE BO3 PERDIDA (${seriesState.playerScore}-${seriesState.botScore})`
-                    : isBO3InProgress
-                    ? playerWonThisGame
-                      ? `¡GANASTE LA PARTIDA ${seriesState.currentGame}!`
-                      : `PERDISTE LA PARTIDA ${seriesState.currentGame}`
-                    : playerWonThisGame
-                    ? '¡VICTORIA EN NIGHT CITY!'
-                    : 'DERROTA // PLANO PLANO'}
-                </h2>
-                <p className="text-xs text-gray-300 leading-relaxed">
-                  {isBO3InProgress
-                    ? seriesState.playerScore === 1 && seriesState.botScore === 1
-                      ? 'Empate 1-1 en la serie. ¡Todo se decide en la Partida 3 con los mismos mazos!'
-                      : `Primero en llegar a 2 victorias gana la serie Ranked. Continúa a la Partida ${nextGameNumber}/3 con los mismos mazos.`
-                    : playerWonThisGame
-                    ? `Has alcanzado el control de ${p.gigs.length} Gigs activos.`
-                    : `El rival ha alcanzado ${bot.gigs.length} Gigs activos antes que tú.`}
-                </p>
-              </div>
+              {/* PANTALLA ARCADE STREET FIGHTER II (SOLO AL TERMINAR LA SERIE RANKED BO3) */}
+              {isBO3Finished && towerRival ? (
+                <div className="space-y-3">
+                  <div className="relative mx-auto w-48 h-48 sm:w-56 sm:h-56">
+                    <div
+                      className={`w-full h-full overflow-hidden border-4 relative bg-black ${
+                        playerWonSeries
+                          ? 'border-[#FCEE0A] shadow-[0_0_35px_rgba(252,238,10,0.45)]'
+                          : 'border-[#FF003C] shadow-[0_0_35px_rgba(255,0,60,0.55)]'
+                      }`}
+                    >
+                      <img
+                        src={playerWonSeries ? towerRival.defeatedImage : towerRival.okImage}
+                        alt={towerRival.name}
+                        className="w-full h-full object-cover object-top"
+                      />
+                      {/* Scanlines arcade sutiles */}
+                      <div
+                        className="pointer-events-none absolute inset-0 opacity-20"
+                        style={{
+                          backgroundImage:
+                            'repeating-linear-gradient(0deg, rgba(0,0,0,0.45) 0px, rgba(0,0,0,0.45) 1px, transparent 1px, transparent 3px)'
+                        }}
+                      />
+                      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-14 bg-gradient-to-t from-black/95 via-black/40 to-transparent" />
+                      <div className="absolute bottom-1.5 inset-x-2 flex items-center justify-between text-[9px] font-black uppercase">
+                        <span className="text-white truncate">{towerRival.name}</span>
+                        <span className={playerWonSeries ? 'text-[#FF003C]' : 'text-[#00FF9C]'}>
+                          {playerWonSeries ? 'K.O.' : 'VICTORIOSO'}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Sello Arcade YOU WIN! / YOU LOSE */}
+                    <motion.div
+                      initial={{ scale: 1.5, rotate: -10, opacity: 0 }}
+                      animate={{ scale: 1, rotate: -4, opacity: 1 }}
+                      transition={{ delay: 0.12, type: 'spring', stiffness: 260, damping: 16 }}
+                      className={`absolute -top-3 -right-4 sm:-right-7 px-3.5 py-1 border-2 font-black text-lg sm:text-2xl tracking-widest uppercase shadow-2xl ${
+                        playerWonSeries
+                          ? 'bg-[#FCEE0A] text-[#070a10] border-white shadow-[0_0_25px_rgba(252,238,10,0.9)]'
+                          : 'bg-[#FF003C] text-white border-[#FCEE0A] shadow-[0_0_25px_rgba(255,0,60,0.9)]'
+                      }`}
+                    >
+                      {playerWonSeries ? 'YOU WIN!' : 'YOU LOSE'}
+                    </motion.div>
+                  </div>
+
+                  <div>
+                    <h2
+                      className={`text-xl sm:text-2xl font-black uppercase tracking-wider ${
+                        playerWonSeries ? 'text-[#FCEE0A]' : 'text-[#FF003C]'
+                      }`}
+                    >
+                      {playerWonSeries
+                        ? `¡YOU WIN! (${seriesState.playerScore}-${seriesState.botScore})`
+                        : `YOU LOSE (${seriesState.playerScore}-${seriesState.botScore})`}
+                    </h2>
+                    <p className="text-[11px] text-gray-400 uppercase mt-0.5">
+                      {towerRival.name} // {towerRival.title}
+                    </p>
+                  </div>
+
+                  {/* Frase estilo Street Fighter II del personaje */}
+                  <div
+                    className={`p-3 rounded border text-left text-xs leading-relaxed italic ${
+                      playerWonSeries
+                        ? 'bg-black/90 border-[#0dfceb]/50 text-gray-200'
+                        : 'bg-[#FF003C]/10 border-[#FF003C]/60 text-gray-100'
+                    }`}
+                  >
+                    <span
+                      className={`not-italic text-[9px] font-black uppercase block mb-1 ${
+                        playerWonSeries ? 'text-[#0dfceb]' : 'text-[#FF003C]'
+                      }`}
+                    >
+                      {towerRival.name} DICE:
+                    </span>
+                    {playerWonSeries ? towerRival.defeatQuote : towerRival.winQuote}
+                  </div>
+
+                  {/* Desbloqueo del Siguiente Piso o Conquista Total de la Torre Arasaka */}
+                  {justConqueredTower && (
+                    <div className="p-3 bg-[#FCEE0A]/15 border-2 border-[#FCEE0A] rounded space-y-1 shadow-[0_0_25px_rgba(252,238,10,0.3)]">
+                      <span className="text-xs font-black uppercase text-[#FCEE0A] block">
+                        👑 ¡HAS CONQUISTADO LA TORRE ARASAKA (11/11)!
+                      </span>
+                      <p className="text-[11px] text-gray-200 font-sans">
+                        Has derrotado a todos los rivales de Night City, incluida V en la azotea. A partir de ahora tus Ranked BO3 te emparejarán con rivales élite aleatorios.
+                      </p>
+                    </div>
+                  )}
+
+                  {nextTowerRival && (
+                    <div className="p-2.5 bg-black/90 border border-[#00FF9C]/60 rounded flex items-center gap-3 text-left">
+                      <div className="w-11 h-11 rounded border border-[#00FF9C] overflow-hidden bg-black shrink-0">
+                        <img
+                          src={nextTowerRival.okImage}
+                          alt={nextTowerRival.name}
+                          className="w-full h-full object-cover object-top"
+                        />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <span className="text-[9px] font-black uppercase text-[#00FF9C] block">
+                          ⚡ ¡PISO SUPERADO! SIGUIENTE RIVAL DESBLOQUEADO:
+                        </span>
+                        <span className="text-xs font-black uppercase text-white block truncate">
+                          PISO {nextTowerRival.stage}/{TOTAL_TOWER_STAGES}: {nextTowerRival.name}
+                        </span>
+                        <span className="text-[10px] text-gray-400 block truncate font-sans">
+                          {nextTowerRival.title}
+                        </span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <span className="text-4xl block">
+                    {isBO3Finished
+                      ? playerWonSeries ? '🏆' : '💀'
+                      : playerWonThisGame ? '⚡' : '💀'}
+                  </span>
+                  <h2
+                    className={`text-xl sm:text-2xl font-black uppercase ${
+                      (isBO3Finished ? playerWonSeries : playerWonThisGame) ? 'text-[#FCEE0A]' : 'text-[#FF003C]'
+                    }`}
+                  >
+                    {isBO3Finished
+                      ? playerWonSeries
+                        ? `¡SERIE BO3 GANADA (${seriesState.playerScore}-${seriesState.botScore})!`
+                        : `SERIE BO3 PERDIDA (${seriesState.playerScore}-${seriesState.botScore})`
+                      : isBO3InProgress
+                      ? playerWonThisGame
+                        ? `¡GANASTE LA PARTIDA ${seriesState.currentGame}!`
+                        : `PERDISTE LA PARTIDA ${seriesState.currentGame}`
+                      : playerWonThisGame
+                      ? '¡VICTORIA EN NIGHT CITY!'
+                      : 'DERROTA // PLANO PLANO'}
+                  </h2>
+                  <p className="text-xs text-gray-300 leading-relaxed">
+                    {isBO3InProgress
+                      ? seriesState.playerScore === 1 && seriesState.botScore === 1
+                        ? 'Empate 1-1 en la serie. ¡Todo se decide en la Partida 3 con los mismos mazos!'
+                        : `Primero en llegar a 2 victorias gana la serie Ranked. Continúa a la Partida ${nextGameNumber}/3 con los mismos mazos.`
+                      : playerWonThisGame
+                      ? `Has alcanzado el control de ${p.gigs.length} Gigs activos.`
+                      : `El rival ha alcanzado ${bot.gigs.length} Gigs activos antes que tú.`}
+                  </p>
+                </div>
+              )}
 
               {/* CASO A: ENTRE PARTIDAS DE UNA SERIE BO3 (EL PERDEDOR ELIGE QUIÉN SALE PRIMERO) */}
               {isBO3InProgress && (
@@ -7356,7 +7535,13 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                       className="w-full py-3.5 bg-[#FCEE0A] hover:bg-white text-black font-black text-xs uppercase tracking-widest cursor-pointer shadow-[0_0_20px_rgba(252,238,10,0.55)] flex items-center justify-center gap-2"
                     >
                       <Swords className="w-4 h-4" />
-                      <span>NUEVA SERIE RANKED BO3 (RIVAL ALEATORIO)</span>
+                      <span>
+                        {nextTowerRival
+                          ? `SUBIR AL PISO ${nextTowerRival.stage}/11: ${nextTowerRival.shortName.toUpperCase()} ➔`
+                          : !playerWonSeries && towerRival
+                          ? `REVANCHA CONTRA ${towerRival.shortName.toUpperCase()} (PISO ${towerRival.stage}/11) ➔`
+                          : 'NUEVA SERIE TORRE ARASAKA BO3 ➔'}
+                      </span>
                     </button>
                     <button
                       type="button"
@@ -7458,7 +7643,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                   </div>
                 </>
               )}
-            </div>
+            </motion.div>
           </div>
         );
       })()}
@@ -9875,8 +10060,9 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
         }}
         initialMatchMode={deckSelectorInitialMode}
         botDifficulty={selectedBotDifficulty}
-        onSelectDecks={({ playerDeck, botDeck, playerAvatar: pAv, botAvatar: bAv, matchMode }) => {
-          handleStartWithDecks(playerDeck, botDeck, pAv, bAv, matchMode);
+        userRankingStats={userRankingStats}
+        onSelectDecks={({ playerDeck, botDeck, playerAvatar: pAv, botAvatar: bAv, matchMode, towerRival }) => {
+          handleStartWithDecks(playerDeck, botDeck, pAv, bAv, matchMode, towerRival);
         }}
       />
 

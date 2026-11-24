@@ -31,6 +31,11 @@ import {
   DEFAULT_BOT_AVATAR,
   getRandomBotAvatar
 } from '../data/avatars.js';
+import {
+  pickRankedTowerRival,
+  getRivalAsBotAvatar,
+  TOTAL_TOWER_STAGES
+} from '../data/rankedTower.js';
 
 const CYBER_CLIP =
   'polygon(0 0, calc(100% - 14px) 0, 100% 14px, 100% 100%, 14px 100%, 0 calc(100% - 14px))';
@@ -85,9 +90,13 @@ export default function CyberDeckSelectorModal({
   currentSelectedPlayerAvatar = null,
   currentSelectedBotAvatar = null,
   initialMatchMode = 'practice',
-  botDifficulty = 1
+  botDifficulty = 1,
+  userRankingStats = null
 }) {
   const [matchMode, setMatchMode] = useState(initialMatchMode || 'practice'); // 'ranked_bo3' | 'practice'
+  const [activeTowerMatchup, setActiveTowerMatchup] = useState(() =>
+    pickRankedTowerRival(userRankingStats)
+  );
   const [activeTab, setActiveTab] = useState('meta'); // 'cloud' | 'meta' | 'local'
   const [userDecks, setUserDecks] = useState([]);
   const [loadingDecks, setLoadingDecks] = useState(false);
@@ -120,6 +129,7 @@ export default function CyberDeckSelectorModal({
     setMatchMode(
       initialMatchMode === 'ranked_bo3' && currentUser?.uid ? 'ranked_bo3' : (initialMatchMode || 'practice')
     );
+    setActiveTowerMatchup(pickRankedTowerRival(userRankingStats));
 
     if (currentSelectedPlayerDeck) setSelectedPlayerDeck(currentSelectedPlayerDeck);
     else if (!selectedPlayerDeck && metaDecks.length > 0) setSelectedPlayerDeck(metaDecks[0]);
@@ -190,8 +200,9 @@ export default function CyberDeckSelectorModal({
 
     let finalBotDeck = selectedBotDeck || metaDecks[1] || metaDecks[0];
     let finalBotAvatar = selectedBotAvatar || DEFAULT_BOT_AVATAR;
+    let finalTowerRival = null;
 
-    // En Modo Ranked BO3, el mazo del Bot es SIEMPRE aleatorio entre los mazos del Meta
+    // En Modo Ranked BO3 (Torre Arasaka), el rival es el jefe del piso actual y su mazo es SIEMPRE aleatorio del Meta
     if (matchMode === 'ranked_bo3' && metaDecks.length > 0) {
       let randIdx = Math.floor(Math.random() * metaDecks.length);
       try {
@@ -202,7 +213,9 @@ export default function CyberDeckSelectorModal({
         }
       } catch {}
       finalBotDeck = metaDecks[randIdx];
-      finalBotAvatar = getRandomBotAvatar(selectedPlayerAvatar?.id || 'v-chico');
+      finalTowerRival = activeTowerMatchup?.rival || pickRankedTowerRival(userRankingStats).rival;
+      finalBotAvatar =
+        getRivalAsBotAvatar(finalTowerRival) || getRandomBotAvatar(selectedPlayerAvatar?.id || 'v-chico');
     }
 
     if (onSelectDecks) {
@@ -211,7 +224,8 @@ export default function CyberDeckSelectorModal({
         botDeck: finalBotDeck,
         playerAvatar: selectedPlayerAvatar || DEFAULT_PLAYER_AVATAR,
         botAvatar: finalBotAvatar,
-        matchMode
+        matchMode,
+        towerRival: finalTowerRival
       });
     }
     onClose();
@@ -652,7 +666,48 @@ export default function CyberDeckSelectorModal({
               </span>
             </div>
 
-            {/* Ficha del Avatar Seleccionado del Rival */}
+            {/* Ficha del Avatar Seleccionado del Rival (en Ranked BO3 muestra el jefe de piso de la Torre Arasaka) */}
+            {matchMode === 'ranked_bo3' && activeTowerMatchup?.rival ? (() => {
+              const rival = activeTowerMatchup.rival;
+              const rivalDiff = getBotDifficultyMeta(rival.botDifficulty);
+              return (
+                <div className="bg-[#070a10] border-2 border-[#FCEE0A]/75 p-3 rounded relative space-y-2 shadow-[0_0_20px_rgba(252,238,10,0.16)]">
+                  <div className="flex items-center gap-3">
+                    <div className="w-16 h-16 bg-black border-2 border-[#FCEE0A] shrink-0 overflow-hidden shadow-[0_0_12px_rgba(252,238,10,0.45)]">
+                      <img
+                        src={rival.okImage}
+                        alt={rival.name}
+                        className="w-full h-full object-cover object-top"
+                      />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center justify-between gap-1.5 flex-wrap">
+                        <span className="px-1.5 py-0.5 bg-[#FCEE0A] text-black text-[9px] font-black uppercase tracking-wider">
+                          {activeTowerMatchup.isChampionRematch
+                            ? `👑 RETO CAMPEÓN • PISO ${rival.stage}/${TOTAL_TOWER_STAGES}`
+                            : `🗼 TORRE ARASAKA • PISO ${rival.stage}/${TOTAL_TOWER_STAGES}`}
+                        </span>
+                        <span
+                          className="px-1.5 py-0.5 bg-black border text-[9px] font-black uppercase"
+                          style={{ color: rivalDiff.color, borderColor: `${rivalDiff.color}88` }}
+                        >
+                          {rivalDiff.shortLabel}
+                        </span>
+                      </div>
+                      <span className="text-sm font-black text-white uppercase tracking-wider truncate block mt-1">
+                        {rival.name}
+                      </span>
+                      <span className="text-[10px] text-[#0dfceb] block truncate font-mono">
+                        {rival.title}
+                      </span>
+                      <span className="text-[10px] text-gray-300 italic block mt-0.5 leading-snug">
+                        {rival.tauntQuote}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })() : (
             <div className="bg-[#070a10] border border-[#FF003C]/50 p-2.5 rounded relative space-y-2">
               <div className="flex items-center gap-3">
                 <div className="w-12 h-12 bg-black border-2 border-[#FF003C] shrink-0 overflow-hidden shadow-[0_0_10px_rgba(255,0,60,0.4)]">
@@ -715,6 +770,7 @@ export default function CyberDeckSelectorModal({
                 </div>
               )}
             </div>
+            )}
 
             {/* SELECCIÓN DE MAZO DEL RIVAL */}
             {matchMode === 'ranked_bo3' ? (
@@ -806,7 +862,9 @@ export default function CyberDeckSelectorModal({
             </span>
             <span className="text-[#FCEE0A] font-black">VS</span>
             <span className="text-[#FF003C] font-bold">
-              {matchMode === 'ranked_bo3'
+              {matchMode === 'ranked_bo3' && activeTowerMatchup?.rival
+                ? `🗼 Piso ${activeTowerMatchup.rival.stage}/11: ${activeTowerMatchup.rival.name} (Mazo Meta Aleatorio)`
+                : matchMode === 'ranked_bo3'
                 ? '🎲 Rival Aleatorio (Meta Oficial)'
                 : `${selectedBotAvatar.name.split('//')[0].trim()} (${selectedBotDeck?.name || 'Mazo'})`}
             </span>
