@@ -4798,16 +4798,29 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                     {bot.hand.length}
                   </span>
                 </div>
-                <div className="flex items-center justify-center -space-x-1 sm:-space-x-1.5 lg:-space-x-2 py-0.5 lg:py-0">
-                  {bot.hand.map((_, hIdx) => (
-                    <div
-                      key={hIdx}
-                      className="w-5 sm:w-6 lg:w-10 h-7 sm:h-9 lg:h-11 bg-black border border-[#FCEE0A]/70 rounded-sm shadow-md shrink-0 relative select-none overflow-hidden"
-                      title={`Carta #${hIdx + 1} de la mano del rival`}
-                    >
-                      <img src="/images/back_normal.png" alt="Carta rival" className="w-full h-full object-cover" />
-                    </div>
-                  ))}
+                <div className="flex items-start justify-center py-0.5 lg:py-0 overflow-visible">
+                  {bot.hand.map((_, hIdx) => {
+                    const totalBot = bot.hand.length;
+                    const midBot = (totalBot - 1) / 2;
+                    const offsetBot = hIdx - midBot;
+                    const botAngle = -offsetBot * (totalBot > 7 ? 3.5 : 5);
+                    const botArcY = -Math.abs(offsetBot) * Math.abs(offsetBot) * 1.4;
+                    return (
+                      <div
+                        key={hIdx}
+                        style={{
+                          transform: `translateY(${botArcY.toFixed(1)}px) rotate(${botAngle.toFixed(1)}deg)`,
+                          transformOrigin: 'top center'
+                        }}
+                        className={`w-5 sm:w-6 lg:w-11 h-7 sm:h-9 lg:h-12 bg-black border border-[#FCEE0A]/80 rounded-sm shadow-lg shrink-0 relative select-none overflow-hidden transition-transform duration-200 ${
+                          hIdx > 0 ? '-ml-1.5 lg:-ml-2.5' : ''
+                        }`}
+                        title={`Carta #${hIdx + 1} de la mano del rival`}
+                      >
+                        <img src="/images/back_normal.png" alt="Carta rival" className="w-full h-full object-cover" />
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
 
@@ -6890,15 +6903,26 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
           {/* Fila Principal del Dock Inferior:
               [CARRUSEL DE MANO IZQUIERDA/CENTRO] [PILAS DE MAZO Y TRASH A LA DERECHA] [BOTÓN TERMINAR TURNO DERECHA] */}
           <div className="flex items-center justify-between gap-3">
-            {/* IZQUIERDA/CENTRO: Carrusel de cartas de la mano con Framer Motion (hover lift) */}
-            <div className="flex-1 flex items-center justify-start sm:justify-center gap-1.5 sm:gap-2 overflow-x-auto overflow-y-visible pt-1.5 pb-0.5 px-1 sm:px-2">
-              {p.hand.map((card) => {
+            {/* MANO EN ABANICO CURVO (ESTILO TCG PROFESIONAL) */}
+            <div className="flex-1 flex items-end justify-start sm:justify-center overflow-x-auto lg:overflow-visible pt-4 pb-1 px-2 sm:px-4">
+              {p.hand.map((card, cardIdx) => {
                 const isSelected = selectedHandCard?.instanceId === card.instanceId;
                 const handPool = autoPayEddies ? getTotalAvailableEddies(p) : availableEddies;
                 const handEffCost = getEffectiveCardCost(card, p, gameState);
                 const canAfford = handPool >= handEffCost;
                 const isJustDrawn = Boolean(card.isJustDrawn);
                 const handCardType = getCardType(card);
+                const totalHand = p.hand.length;
+                const midHand = (totalHand - 1) / 2;
+                const offset = cardIdx - midHand;
+                const fanAngle = offset * (totalHand > 7 ? 3.2 : 4.6);
+                const fanArcY = Math.abs(offset) * Math.abs(offset) * (totalHand > 7 ? 1.8 : 2.8);
+                const overlapClass =
+                  cardIdx === 0
+                    ? ''
+                    : totalHand > 7
+                    ? '-ml-3 sm:-ml-4 lg:-ml-6'
+                    : '-ml-2 sm:-ml-2.5 lg:-ml-4';
 
                 return (
                   <motion.div
@@ -6909,8 +6933,14 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                       e.dataTransfer.setData('text/plain', card.instanceId);
                       setSelectedHandCard(card);
                     }}
-                    whileHover={{ y: -12, scale: 1.12, zIndex: 40 }}
-                    whileTap={{ scale: 0.95 }}
+                    animate={{
+                      rotate: isSelected ? 0 : fanAngle,
+                      y: isSelected ? -24 : fanArcY,
+                      scale: isSelected ? 1.12 : 1
+                    }}
+                    whileHover={{ rotate: 0, y: -28, scale: 1.16, zIndex: 50 }}
+                    whileTap={{ scale: 0.96 }}
+                    transition={{ type: 'spring', stiffness: 320, damping: 24 }}
                     onMouseEnter={() => {
                       setHoveredCard(card);
                       setPreviewCard(card);
@@ -6929,17 +6959,21 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                       }
                     }}
                     onContextMenu={(e) => handleCardRightClick(e, card)}
-                    style={{ clipPath: CYBER_CARD_CLIP }}
-                    className={`w-15 sm:w-18 md:w-20 lg:w-24 xl:w-28 h-21 sm:h-25 md:h-28 lg:h-34 xl:h-39 bg-black rounded-md border transition-all duration-150 cursor-grab active:cursor-grabbing shrink-0 relative shadow-2xl overflow-hidden ${
+                    style={{
+                      clipPath: CYBER_CARD_CLIP,
+                      transformOrigin: 'bottom center',
+                      zIndex: isSelected ? 45 : cardIdx + 1
+                    }}
+                    className={`w-15 sm:w-18 md:w-20 lg:w-24 xl:w-28 h-21 sm:h-25 md:h-28 lg:h-34 xl:h-39 bg-black rounded-md border cursor-grab active:cursor-grabbing shrink-0 relative shadow-2xl overflow-hidden ${overlapClass} ${
                       isSelected
-                        ? 'border-[#FCEE0A] shadow-[0_0_25px_rgba(252,238,10,0.85)] -translate-y-4 scale-110 z-30'
+                        ? 'border-2 border-[#FCEE0A] shadow-[0_0_28px_rgba(252,238,10,0.9)]'
                         : isJustDrawn
-                        ? 'border-2 border-[#0dfceb] shadow-[0_0_22px_rgba(13,252,235,0.95)] animate-pulse z-20'
+                        ? 'border-2 border-[#0dfceb] shadow-[0_0_22px_rgba(13,252,235,0.95)] animate-pulse'
                         : canAfford && isMyTurn
                         ? handCardType === 'UNIT'
-                          ? 'border-2 border-[#0dfceb] shadow-[0_0_14px_rgba(13,252,235,0.45)] hover:border-white'
-                          : 'border-2 border-[#FCEE0A] shadow-[0_0_14px_rgba(252,238,10,0.4)] hover:border-white'
-                        : 'border-gray-800 opacity-65'
+                          ? 'border-2 border-[#0dfceb] shadow-[0_0_16px_rgba(13,252,235,0.5)] hover:border-white'
+                          : 'border-2 border-[#FCEE0A] shadow-[0_0_16px_rgba(252,238,10,0.45)] hover:border-white'
+                        : 'border-gray-800 opacity-70'
                     }`}
                     title="Arrastra esta carta al campo para jugarla, o haz clic para seleccionarla"
                   >
