@@ -1474,12 +1474,14 @@ export async function resolvePendingAttackAndContinueBot(gameState, updateCallba
       if (reaction.blockerUnitId) {
         const blocker = (player.field || []).find((u) => u.instanceId === reaction.blockerUnitId);
         if (blocker) {
-          blocker.isSpent = true;
-          gameState.actionLog.unshift(
-            `🛡️ ¡BLOCKER! "${blocker.name}" intercepta el ataque a tus Gigs. ¡No se roba ningún Gig!`
-          );
-          executeCardSpentTriggers(gameState, 'player', blocker);
-          executeBlockerUsedTrigger(gameState, 'player', blocker);
+          if (!reaction.blockerAlreadyCommitted) {
+            blocker.isSpent = true;
+            gameState.actionLog.unshift(
+              `🛡️ ¡BLOCKER! "${blocker.name}" intercepta el ataque a tus Gigs. ¡No se roba ningún Gig!`
+            );
+            executeCardSpentTriggers(gameState, 'player', blocker);
+            executeBlockerUsedTrigger(gameState, 'player', blocker);
+          }
           resolveFight(gameState, 'bot', attackerUnit, 'player', blocker);
         }
       } else {
@@ -1491,7 +1493,8 @@ export async function resolvePendingAttackAndContinueBot(gameState, updateCallba
         'bot',
         attackerUnit.instanceId,
         reaction.targetUnitId,
-        reaction.blockerUnitId
+        reaction.blockerUnitId,
+        Boolean(reaction.blockerAlreadyCommitted)
       );
     }
     recordBotActionArrows(snapBeforeCombat, gameState, {

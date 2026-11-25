@@ -49,9 +49,11 @@ function classifyLogEntry(entry = '') {
 export default function CyberRightSidebar({
   modeTitle = 'SINGLE GAME',
   modeBadge = 'NIGHT CITY ARENA',
+  botLegends = [],
   actionLog = [],
   hoveredCard = null,
   displayCard = null,
+  onHoverCard,
   onInspectCard,
   autoPayEddies = true,
   onToggleAutoPay,
@@ -207,6 +209,47 @@ export default function CyberRightSidebar({
             </div>
           )}
         </div>
+
+        {/* Mini-tira de RIVAL'S LEGENDS (exacto al vídeo de referencia) */}
+        {Array.isArray(botLegends) && botLegends.length > 0 && (
+          <div className="px-4 py-2 border-b border-white/10 bg-[#050810] flex items-center justify-between gap-2 shrink-0">
+            <span className="text-[9px] font-black uppercase tracking-widest text-[#FF003C]/85">
+              RIVAL&apos;S LEGENDS
+            </span>
+            <div className="flex items-center gap-1.5">
+              {botLegends.map((leg, idx) => (
+                <button
+                  key={leg.instanceId || idx}
+                  type="button"
+                  onMouseEnter={() => {
+                    if (leg.isFaceUp && onHoverCard) onHoverCard(leg);
+                  }}
+                  onMouseLeave={() => onHoverCard && onHoverCard(null)}
+                  onClick={() => {
+                    if (leg.isFaceUp && onInspectCard) onInspectCard(leg);
+                  }}
+                  className={`w-6 h-8 rounded-sm overflow-hidden border transition-all ${
+                    leg.isRemovedFromGame
+                      ? 'border-gray-800 opacity-30 grayscale'
+                      : leg.isFaceUp
+                      ? 'border-[#FF003C] hover:border-[#FCEE0A] cursor-pointer hover:scale-110'
+                      : 'border-white/20 opacity-80 cursor-default'
+                  }`}
+                  title={leg.isFaceUp ? leg.name : 'Leyenda Rival boca abajo'}
+                >
+                  <img
+                    src={leg.isFaceUp && leg.image ? leg.image : '/images/back_legend.png'}
+                    alt={leg.isFaceUp ? leg.name : 'Leyenda Rival'}
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      e.currentTarget.src = '/images/back_normal.png';
+                    }}
+                  />
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Pestañas GAME LOG | CARDS */}
         <div className="flex border-b border-white/10 bg-[#05080f] shrink-0">

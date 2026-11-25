@@ -1961,7 +1961,14 @@ export function resolveFight(state, attPlayerKey, attUnit, defPlayerKey, defUnit
 /**
  * Pelea directa de una unidad contra una unidad enemiga girada (Spent)
  */
-export function fightRivalUnit(state, attackerPlayerKey, attackerUnitId, targetUnitId, blockerUnitId = null) {
+export function fightRivalUnit(
+  state,
+  attackerPlayerKey,
+  attackerUnitId,
+  targetUnitId,
+  blockerUnitId = null,
+  blockerAlreadyCommitted = false
+) {
   const attacker = state[attackerPlayerKey];
   const defenderKey = attackerPlayerKey === 'player' ? 'bot' : 'player';
   const defender = state[defenderKey];
@@ -2004,13 +2011,15 @@ export function fightRivalUnit(state, attackerPlayerKey, attackerUnitId, targetU
   // Intercepción por Blocker
   if (blockerUnitId) {
     const blocker = defender.field.find((u) => u.instanceId === blockerUnitId);
-    if (blocker && hasKeyword(blocker, 'Blocker')) {
-      blocker.isSpent = true;
-      state.actionLog.unshift(
-        `🛡️ [FASE 2: REACCIÓN] ¡BLOCKER! "${blocker.name}" se interpone para proteger a "${defUnit.name}".`
-      );
-      executeCardSpentTriggers(state, defenderKey, blocker);
-      executeBlockerUsedTrigger(state, defenderKey, blocker);
+    if (blocker && (blockerAlreadyCommitted || hasKeyword(blocker, 'Blocker'))) {
+      if (!blockerAlreadyCommitted) {
+        blocker.isSpent = true;
+        state.actionLog.unshift(
+          `🛡️ [FASE 2: REACCIÓN] ¡BLOCKER! "${blocker.name}" se interpone para proteger a "${defUnit.name}".`
+        );
+        executeCardSpentTriggers(state, defenderKey, blocker);
+        executeBlockerUsedTrigger(state, defenderKey, blocker);
+      }
       const fightRes = resolveFight(state, attackerPlayerKey, attUnit, defenderKey, blocker);
       delete attUnit.hasTriggeredAttackThisDeclaration;
       return fightRes;

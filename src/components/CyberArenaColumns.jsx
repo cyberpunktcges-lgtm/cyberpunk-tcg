@@ -358,9 +358,7 @@ export function CyberRightGigsRail({
         }`}
       >
         {hasPendingReaction
-          ? hasBlockerAssigned
-            ? 'RESOLVE BLOCK'
-            : 'PASS'
+          ? 'PASS'
           : isBotThinking || !isMyTurn
           ? 'RESOLVING •••'
           : 'END TURN'}

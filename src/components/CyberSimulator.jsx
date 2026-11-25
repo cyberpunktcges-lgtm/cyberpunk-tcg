@@ -970,6 +970,21 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
   const prevBoardSnapshotRef = useRef(null);
   const [transientBotArrows, setTransientBotArrows] = useState([]);
   const lastBotArrowBatchRef = useRef(null);
+  const [turnBanner, setTurnBanner] = useState(null); // { isPlayer: bool, turnNumber: number }
+  const prevTurnBannerKeyRef = useRef(null);
+
+  useEffect(() => {
+    if (showLobby || !gameState || gameState.isGameOver || !gameState.mulliganDecided) return;
+    const key = `${gameState.matchId}-${gameState.turnNumber}-${gameState.activePlayer}`;
+    if (prevTurnBannerKeyRef.current === key) return;
+    prevTurnBannerKeyRef.current = key;
+    setTurnBanner({
+      isPlayer: gameState.activePlayer === 'player',
+      turnNumber: gameState.turnNumber || 1
+    });
+    const t = window.setTimeout(() => setTurnBanner(null), 1150);
+    return () => window.clearTimeout(t);
+  }, [gameState?.matchId, gameState?.turnNumber, gameState?.activePlayer, gameState?.mulliganDecided, gameState?.isGameOver, showLobby]);
   const [stagedTarget, setStagedTarget] = useState(null);
   const [pendingGigNumberPick, setPendingGigNumberPick] = useState(null);
   const [pendingManualPayment, setPendingManualPayment] = useState(null);
@@ -1392,9 +1407,16 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
 
   // Jugar carta arrastrada o clicada (Unidad -> Campo, Programa -> Trash, Gear -> Equipa)
   const handlePlayCard = (cardInstanceId, targetId = null) => {
-    if (!gameState || gameState.activePlayer !== 'player' || gameState.isGameOver) return;
-    pushHistory();
+    if (!gameState || gameState.isGameOver) return;
     const handCard = (gameState.player?.hand || []).find((c) => c.instanceId === cardInstanceId);
+    const isReactionQuickPlay = Boolean(
+      gameState.pendingReaction &&
+      gameState.pendingReaction.attackerPlayerKey === 'bot' &&
+      handCard &&
+      hasKeyword(handCard, 'Quick')
+    );
+    if (gameState.activePlayer !== 'player' && !isReactionQuickPlay) return;
+    pushHistory();
     if (handCard) {
       const effCost = getEffectiveCardCost(handCard, gameState.player, gameState);
       if (getCardType(handCard) === 'GEAR' && !targetId) {
@@ -1517,7 +1539,8 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
   // Activar habilidad de Leyenda boca arriba (↷ / Quick)
   const handleActivateLegendAbility = (legendInstanceId, abilityId = null, isReactionQuick = false) => {
     if (!gameState || gameState.isGameOver) return;
-    if (gameState.activePlayer !== 'player' && !isReactionQuick) return;
+    const inReactionWin = Boolean(gameState.pendingReaction && gameState.pendingReaction.attackerPlayerKey === 'bot');
+    if (gameState.activePlayer !== 'player' && !isReactionQuick && !inReactionWin) return;
     const leg = (gameState.player.legends || []).find((l) => l.instanceId === legendInstanceId);
     if (!leg) return;
 
@@ -1560,7 +1583,8 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
   // Activar habilidad de Unidad o Gear con giro (↷ / Quick)
   const handleExecuteActivatedAbility = (cardInstanceId, abilityId = null, isReactionQuick = false) => {
     if (!gameState || gameState.isGameOver) return;
-    if (gameState.activePlayer !== 'player' && !isReactionQuick) return;
+    const inReactionWin = Boolean(gameState.pendingReaction && gameState.pendingReaction.attackerPlayerKey === 'bot');
+    if (gameState.activePlayer !== 'player' && !isReactionQuick && !inReactionWin) return;
     const res = executeCardActivatedAbility(gameState, 'player', cardInstanceId, abilityId);
     if (!res.success) {
       setHolocall({
@@ -3120,16 +3144,31 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
     }
   };
 
-  // Asignar o desasignar Blocker durante la Fase de Respuesta del Jugador
+  // Declarar Blocker inmediatamente durante la Fase de Respuesta del Jugador:
+  // Gira al Blocker, redirige el ataque hacia él, dispara su trigger BLOCKER al instante
+  // y mantiene abierta la ventana de Reacción para encadenar Call, Quick o Habilidades antes de pulsar PASS.
   const handleSelectBlocker = (blockerUnitId) => {
     if (!gameState?.pendingReaction) return;
-    setGameState((prev) => ({
-      ...prev,
-      pendingReaction: {
-        ...prev.pendingReaction,
-        blockerUnitId: prev.pendingReaction.blockerUnitId === blockerUnitId ? null : blockerUnitId
-      }
-    }));
+    const reaction = gameState.pendingReaction;
+    if (reaction.blockerUnitId) return; // Ya hay un Blocker asignado para este ataque
+
+    const blocker = (gameState.player?.field || []).find((u) => u.instanceId === blockerUnitId);
+    if (!blocker || blocker.isSpent || !hasKeyword(blocker, 'Blocker')) return;
+
+    pushHistory();
+    blocker.isSpent = true;
+    gameState.pendingReaction = {
+      ...reaction,
+      blockerUnitId: blocker.instanceId,
+      blockerName: blocker.name,
+      blockerAlreadyCommitted: true
+    };
+    (gameState.actionLog = gameState.actionLog || []).unshift(
+      `🛡️ [BLOCKER] "${blocker.name}" bloquea a "${reaction.attackerName}" (¡puedes seguir respondiendo con Call / Quick / Habilidades antes de pulsar PASS!).`
+    );
+    executeCardSpentTriggers(gameState, 'player', blocker);
+    executeBlockerUsedTrigger(gameState, 'player', blocker);
+    setGameState({ ...gameState });
   };
 
   // Llamar a Leyenda durante la Fase de Respuesta del Jugador (cuesta 1 €$, máx 1 por turno)
@@ -3204,6 +3243,18 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
   // Resolver el combate pendiente tras la Fase de Respuesta del Jugador
   const handleResolveReactionCombat = async () => {
     if (!gameState?.pendingReaction) return;
+    if (
+      gameState.pendingModalChoice ||
+      gameState.pendingCardChoice ||
+      gameState.pendingTargetSelection ||
+      pendingManualPayment ||
+      pendingGearEquip
+    ) {
+      return;
+    }
+    setUnitActionMenuId(null);
+    setLegendMenuId(null);
+    setSelectedHandCard(null);
     setIsBotThinking(true);
     await resolvePendingAttackAndContinueBot(
       gameState,
@@ -3213,6 +3264,40 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
     );
     setIsBotThinking(false);
   };
+
+  useEffect(() => {
+    const inReaction = Boolean(gameState?.pendingReaction && gameState.pendingReaction.attackerPlayerKey === 'bot');
+    if (!inReaction || showFullReactionModal || showBugReportModal) return;
+    const onKey = (e) => {
+      if (e.code !== 'Space') return;
+      const tag = (e.target?.tagName || '').toLowerCase();
+      if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
+      if (
+        gameState?.pendingModalChoice ||
+        gameState?.pendingCardChoice ||
+        gameState?.pendingTargetSelection ||
+        pendingManualPayment ||
+        pendingGearEquip ||
+        pendingBotAck
+      ) {
+        return;
+      }
+      e.preventDefault();
+      handleResolveReactionCombat();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [
+    gameState?.pendingReaction,
+    gameState?.pendingModalChoice,
+    gameState?.pendingCardChoice,
+    gameState?.pendingTargetSelection,
+    pendingManualPayment,
+    pendingGearEquip,
+    pendingBotAck,
+    showFullReactionModal,
+    showBugReportModal
+  ]);
 
   // Inicialización segura en el cliente (evita hydration mismatch y render-loop en React 19)
   useEffect(() => {
@@ -6035,6 +6120,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                     const isEligibleBlocker = Boolean(
                       gameState.pendingReaction &&
                       gameState.pendingReaction.attackerPlayerKey === 'bot' &&
+                      !gameState.pendingReaction.blockerUnitId &&
                       !unit.isSpent &&
                       hasKeyword(unit, 'Blocker')
                     );
@@ -6177,7 +6263,10 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                             );
                             const hasAnyUnitAbility = ownUnitAbilities.length + ownGearAbilities.length > 0;
 
-                            if (isMyTurn && (hasAnyUnitAbility || !canAttack)) {
+                            const inReactionWin = Boolean(
+                              gameState.pendingReaction && gameState.pendingReaction.attackerPlayerKey === 'bot'
+                            );
+                            if ((isMyTurn && (hasAnyUnitAbility || !canAttack)) || (inReactionWin && hasAnyUnitAbility)) {
                               setSelectedFieldUnit(null);
                               setUnitActionMenuId((prev) => (prev === unit.instanceId ? null : unit.instanceId));
                             } else if (canAttack) {
@@ -6259,6 +6348,15 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                             <div className="pointer-events-none absolute inset-0 bg-[#070a10]/50 flex items-center justify-center z-15">
                               <span className="px-1.5 py-0.5 bg-[#070a10]/90 border border-[#0dfceb]/70 text-[#0dfceb] font-mono font-black text-[9px] tracking-widest uppercase shadow-[0_0_10px_rgba(13,252,235,0.45)]">
                                 zZ LAG
+                              </span>
+                            </div>
+                          )}
+
+                          {/* Sello visual NO ATTACK centrado sobre unidades que no pueden atacar (exacto al vídeo) */}
+                          {attackRestriction && !unit.isSpent && !unit.isLagging && (
+                            <div className="pointer-events-none absolute inset-0 bg-[#070a10]/45 flex items-center justify-center z-15">
+                              <span className="px-1.5 py-0.5 bg-[#070a10]/92 border border-[#FF003C]/80 text-white font-mono font-black text-[8.5px] tracking-wider uppercase shadow-[0_0_12px_rgba(255,0,60,0.45)]">
+                                🚫 NO ATTACK
                               </span>
                             </div>
                           )}
@@ -6818,7 +6916,10 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                               setHoveredCard(leg);
                               setPreviewCard(leg);
                             }
-                            if (!isMyTurn) {
+                            const inReactionWin = Boolean(
+                              gameState.pendingReaction && gameState.pendingReaction.attackerPlayerKey === 'bot'
+                            );
+                            if (!isMyTurn && !inReactionWin) {
                               if (leg.isFaceUp) {
                                 setInspectedCard(leg);
                               }
@@ -6839,6 +6940,8 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                               ? pendingGearEquip.stagedTargetId === leg.instanceId
                                 ? 'border-[#FCEE0A] ring-4 ring-[#FCEE0A] shadow-[0_0_28px_rgba(252,238,10,0.95)] scale-110 z-30'
                                 : 'border-[#0dfceb] ring-2 ring-[#0dfceb] shadow-[0_0_24px_rgba(13,252,235,0.9)] animate-pulse z-20'
+                              : gameState?.pendingReaction?.attackerPlayerKey === 'bot' && !leg.isFaceUp && !p.hasCalledLegendThisTurn && getTotalAvailableEddies(p) >= 1
+                              ? 'border-2 border-[#0dfceb] shadow-[0_0_16px_rgba(13,252,235,0.65)] hover:border-white z-20'
                               : recentHighlights[leg.instanceId] ? 'ring-2 ring-[#FCEE0A] scale-105 z-20' : isMenuOpen
                               ? 'border-[#0dfceb] ring-2 ring-[#0dfceb] shadow-[0_0_18px_rgba(13,252,235,0.6)]'
                               : leg.isFaceUp
@@ -7377,6 +7480,11 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                 const canAfford = handPool >= handEffCost;
                 const isJustDrawn = Boolean(card.isJustDrawn);
                 const handCardType = getCardType(card);
+                const isPlayableReactionQuick = Boolean(
+                  gameState?.pendingReaction?.attackerPlayerKey === 'bot' &&
+                  hasKeyword(card, 'Quick') &&
+                  canAfford
+                );
                 const totalHand = p.hand.length;
                 const midHand = (totalHand - 1) / 2;
                 const offset = cardIdx - midHand;
@@ -7434,6 +7542,8 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                         ? 'border-2 border-[#FCEE0A] shadow-[0_0_28px_rgba(252,238,10,0.9)]'
                         : isJustDrawn
                         ? 'border-2 border-[#0dfceb] shadow-[0_0_22px_rgba(13,252,235,0.95)] animate-pulse'
+                        : isPlayableReactionQuick
+                        ? 'border-2 border-[#0dfceb] shadow-[0_0_24px_rgba(13,252,235,0.9)] hover:border-white'
                         : canAfford && isMyTurn
                         ? handCardType === 'UNIT'
                           ? 'border-2 border-[#0dfceb] shadow-[0_0_16px_rgba(13,252,235,0.5)] hover:border-white'
@@ -7605,6 +7715,8 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
               ? 'NIGHT CITY RANKED'
               : 'MODO TESTEO'
           }
+          botLegends={bot.legends || []}
+          onHoverCard={setHoveredCard}
           actionLog={gameState.actionLog || []}
           hoveredCard={hoveredCard}
           displayCard={rawDisplayCard}
@@ -8529,30 +8641,78 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
         </div>
       )}
 
+      {/* BANNER CYBERPUNK A PANTALLA COMPLETA AL CAMBIAR DE TURNO (EXACTO AL VÍDEO 04m32s) */}
+      <AnimatePresence>
+        {turnBanner && (
+          <motion.div
+            key={`turn-banner-${turnBanner.turnNumber}-${turnBanner.isPlayer ? 'p' : 'b'}`}
+            initial={{ opacity: 0, scaleY: 0.7 }}
+            animate={{ opacity: 1, scaleY: 1 }}
+            exit={{ opacity: 0, scaleY: 0.75 }}
+            transition={{ duration: 0.18 }}
+            className="fixed inset-x-0 top-1/2 -translate-y-1/2 z-[60] pointer-events-none select-none font-mono"
+          >
+            <div
+              className="h-2 w-full"
+              style={{
+                backgroundImage:
+                  'repeating-linear-gradient(-45deg, #FCEE0A 0px, #FCEE0A 10px, #070a10 10px, #070a10 20px)'
+              }}
+            />
+            <div
+              className={`w-full py-3.5 sm:py-4 flex items-center justify-center relative overflow-hidden backdrop-blur-sm ${
+                turnBanner.isPlayer
+                  ? 'bg-[#04141d]/90 shadow-[0_0_50px_rgba(13,252,235,0.35)]'
+                  : 'bg-[#1a050d]/90 shadow-[0_0_50px_rgba(255,0,60,0.4)]'
+              }`}
+            >
+              <span
+                className={`text-2xl sm:text-4xl font-black uppercase tracking-[0.28em] ${
+                  turnBanner.isPlayer ? 'text-[#0dfceb]' : 'text-[#ff4f7a]'
+                }`}
+                style={{
+                  textShadow: turnBanner.isPlayer
+                    ? '0 0 24px rgba(13,252,235,0.9), -4px 0 0 rgba(252,238,10,0.28)'
+                    : '0 0 24px rgba(255,0,60,0.95), -4px 0 0 rgba(252,238,10,0.35)'
+                }}
+              >
+                {turnBanner.isPlayer ? 'YOUR TURN' : 'RIVAL TURN'}
+              </span>
+            </div>
+            <div
+              className="h-2 w-full"
+              style={{
+                backgroundImage:
+                  'repeating-linear-gradient(-45deg, #FCEE0A 0px, #FCEE0A 10px, #070a10 10px, #070a10 20px)'
+              }}
+            />
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* FLECHAS SVG ANIMADAS DE ATAQUE Y BLOQUEO EN TIEMPO REAL SOBRE EL TABLERO */}
       {(() => {
         const activeArrows = [];
         const r = gameState?.pendingReaction;
         if (r && r.attackerPlayerKey === 'bot' && !showFullReactionModal) {
           const shortAtk = String(r.attackerName || 'ATACANTE').split(':')[0].trim().slice(0, 20);
+          const hasBlocker = Boolean(r.blockerUnitId);
           activeArrows.push({
             id: 'bot-attack-arrow',
             fromAnchor: [r.attackerUnitId, 'bot-field', 'bot-pill'],
-            toAnchor: r.targetType === 'GIGS' ? ['player-gigs', 'player-field'] : [r.targetUnitId, 'player-field'],
+            toAnchor: hasBlocker
+              ? [r.blockerUnitId, 'player-field']
+              : r.targetType === 'GIGS'
+              ? ['player-gigs', 'player-field']
+              : [r.targetUnitId, 'player-field'],
             color: '#FF003C',
             dashed: true,
-            label: r.targetType === 'GIGS' ? `⚔️ ${shortAtk} → GIGS` : `⚔️ ${shortAtk}`
+            label: hasBlocker
+              ? `🛡️ BLOQUEADO`
+              : r.targetType === 'GIGS'
+              ? `⚔️ ${shortAtk} → GIGS`
+              : `⚔️ ${shortAtk}`
           });
-          if (r.blockerUnitId) {
-            activeArrows.push({
-              id: 'player-block-arrow',
-              fromAnchor: r.blockerUnitId,
-              toAnchor: r.attackerUnitId,
-              color: '#0dfceb',
-              dashed: false,
-              label: '🛡️ BLOCKER'
-            });
-          }
         }
         if (transientBotArrows.length > 0 && !showFullReactionModal) {
           for (const bArr of transientBotArrows) {
@@ -8579,7 +8739,8 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
 
       {/* MENÚ CONTEXTUAL FLOTANTE DE UNIDAD (ATTACK + HABILIDADES ↷ CON EXPLICACIÓN SI NO ESTÁN DISPONIBLES) */}
       {(() => {
-        if (!unitActionMenuId || !gameState || gameState.isGameOver || !isMyTurn) return null;
+        const inReactionWin = Boolean(gameState?.pendingReaction && gameState.pendingReaction.attackerPlayerKey === 'bot');
+        if (!unitActionMenuId || !gameState || gameState.isGameOver || (!isMyTurn && !inReactionWin)) return null;
         const menuUnit = (p.field || []).find((u) => u.instanceId === unitActionMenuId);
         if (!menuUnit) return null;
 
@@ -8868,79 +9029,82 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
           quickCards.length + (!p.hasCalledLegendThisTurn && uncalledLegends.length > 0 && totalEddies >= 1 ? uncalledLegends.length : 0);
 
         if (!showFullReactionModal) {
+          const canCallInReaction = !p.hasCalledLegendThisTurn && uncalledLegends.length > 0 && totalEddies >= 1;
+          const hasAnyAbilityInReaction =
+            faceUpLegends.some((l) => getCardActivatedAbilities(l, 'player', gameState).some((ab) => ab.canActivateNow)) ||
+            (p.field || []).some((u) => getCardActivatedAbilities(u, 'player', gameState).some((ab) => ab.canActivateNow));
+
           return (
-            <div className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-[46] w-[94vw] max-w-3xl pointer-events-auto font-mono select-none">
+            <div className="fixed left-1/2 top-[47%] -translate-x-1/2 -translate-y-1/2 z-[46] max-w-[94vw] pointer-events-auto font-mono select-none">
               <motion.div
-                initial={{ opacity: 0, y: -10, scale: 0.96 }}
+                initial={{ opacity: 0, y: -6, scale: 0.98 }}
                 animate={{ opacity: 1, y: 0, scale: 1 }}
-                style={{ clipPath: CYBER_CLIP }}
-                className="bg-[#070a10]/95 border-2 border-[#FF003C] px-3.5 py-2.5 shadow-[0_0_40px_rgba(255,0,60,0.5)] backdrop-blur-md space-y-2"
+                className="bg-[#090d16]/96 border border-[#FF003C]/85 px-3 py-1.5 rounded-sm shadow-[0_0_32px_rgba(255,0,60,0.45)] backdrop-blur-md flex flex-wrap items-center justify-center gap-2"
               >
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <span className="px-2 py-0.5 bg-[#FF003C] text-white font-black text-[9px] uppercase tracking-widest shrink-0 animate-pulse">
-                      COMBATE RIVAL
-                    </span>
-                    <span className="text-xs font-black text-white truncate">
-                      <span className="text-[#FF003C]">{reaction.attackerName}</span> (⚡{reaction.attackerPower})
-                      {' ataca '}
-                      <span className="text-[#FCEE0A]">
-                        {currentBlocker ? `🛡️ ${currentBlocker.name}` : reaction.targetType === 'GIGS' ? 'TUS GIGS' : reaction.targetName}
-                      </span>
-                    </span>
-                  </div>
+                <span className="px-1.5 py-0.5 bg-[#FF003C]/20 border border-[#FF003C] text-[#FF003C] font-black text-[9px] uppercase tracking-widest shrink-0">
+                  {currentBlocker ? "RIVAL'S TURN • COMBAT" : '⚔️ UNDER ATTACK'}
+                </span>
 
-                  <div className="flex items-center gap-1.5 shrink-0">
-                    <button
-                      type="button"
-                      onClick={() => setShowFullReactionModal(true)}
-                      style={{ clipPath: CYBER_BUTTON }}
-                      className="px-2.5 py-1.5 bg-black border border-[#FCEE0A]/70 hover:bg-[#FCEE0A] text-[#FCEE0A] hover:text-black font-black text-[10px] uppercase cursor-pointer transition-colors"
-                      title="Abrir panel táctico completo (Quick, Call Legend y Bloqueadores)"
-                    >
-                      ⚡ RESPONDER {extraReactionCount > 0 ? `(${extraReactionCount})` : ""}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleResolveReactionCombat}
-                      style={{ clipPath: CYBER_BUTTON }}
-                      className={`px-4 py-1.5 font-black text-xs uppercase cursor-pointer transition-all shadow-lg ${
-                        currentBlocker
-                          ? 'bg-[#0dfceb] hover:bg-white text-[#070a10] shadow-[0_0_18px_#0dfceb]'
-                          : 'bg-[#0dfceb] hover:bg-white text-[#070a10] shadow-[0_0_18px_rgba(13,252,235,0.65)]'
-                      }`}
-                    >
-                      {currentBlocker ? '🛡️ RESOLVER BLOQUEO' : 'PASS / RESOLVER'}
-                    </button>
-                  </div>
-                </div>
+                <span className="text-[11px] font-bold text-white whitespace-nowrap">
+                  <span className="text-[#FF003C] font-black">{String(reaction.attackerName || '').split('//')[0].trim()}</span>
+                  <span className="text-gray-400"> attacks </span>
+                  <span className="text-[#0dfceb] font-black">
+                    {currentBlocker
+                      ? String(currentBlocker.name || '').split('//')[0].trim()
+                      : reaction.targetType === 'GIGS'
+                      ? 'your Gigs'
+                      : String(reaction.targetName || '').split('//')[0].trim()}
+                  </span>
+                </span>
 
-                {/* Acceso 1-clic a Bloqueadores directamente sobre el tablero */}
-                {readyBlockers.length > 0 && (
-                  <div className="flex flex-wrap items-center gap-1.5 pt-1 border-t border-gray-800/80">
-                    <span className="text-[9px] font-black uppercase text-[#0dfceb] mr-1">
-                      🛡️ BLOQUEAR (o clic en carta en mesa):
-                    </span>
-                    {readyBlockers.map((b) => {
-                      const isAssigned = reaction.blockerUnitId === b.instanceId;
-                      const pb = getUnitPowerBreakdown(b);
-                      return (
-                        <button
-                          key={b.instanceId}
-                          type="button"
-                          onClick={() => handleSelectBlocker(b.instanceId)}
-                          className={`px-2 py-0.5 rounded text-[10px] font-black uppercase cursor-pointer border transition-all ${
-                            isAssigned
-                              ? 'bg-[#0dfceb] text-black border-white shadow-[0_0_10px_#0dfceb]'
-                              : 'bg-black text-[#0dfceb] border-[#0dfceb]/60 hover:bg-[#0dfceb]/20'
-                          }`}
-                        >
-                          🛡️ {b.name} (⚡{pb.currentPower}) {isAssigned ? "✓" : ""}
-                        </button>
-                      );
-                    })}
-                  </div>
+                {/* Chips informativos interactivos idénticos al vídeo de referencia */}
+                {!currentBlocker && readyBlockers.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => handleSelectBlocker(readyBlockers[0].instanceId)}
+                    className="px-2 py-0.5 bg-[#0dfceb]/15 hover:bg-[#0dfceb] text-[#0dfceb] hover:text-black border border-[#0dfceb]/70 rounded-sm text-[10px] font-black cursor-pointer transition-colors"
+                    title="Clic aquí o directamente sobre tu unidad Blocker en mesa"
+                  >
+                    🛡️ Block ({String(readyBlockers[0].name || '').split('//')[0].trim()})
+                  </button>
                 )}
+
+                {quickCards.length > 0 && (
+                  <span className="px-1.5 py-0.5 bg-[#0dfceb]/10 border border-[#0dfceb]/40 text-[#0dfceb] rounded-sm text-[9px] font-bold">
+                    Quick en mano ({quickCards.length})
+                  </span>
+                )}
+
+                {canCallInReaction && (
+                  <span className="px-1.5 py-0.5 bg-[#FCEE0A]/10 border border-[#FCEE0A]/50 text-[#FCEE0A] rounded-sm text-[9px] font-bold">
+                    Call Leyenda
+                  </span>
+                )}
+
+                {hasAnyAbilityInReaction && (
+                  <span className="px-1.5 py-0.5 bg-white/5 border border-white/25 text-gray-200 rounded-sm text-[9px] font-bold">
+                    Habilidad (↷)
+                  </span>
+                )}
+
+                <button
+                  type="button"
+                  onClick={handleResolveReactionCombat}
+                  className="px-2.5 py-0.5 bg-[#FCEE0A] hover:bg-white text-[#070a10] font-black text-[10px] uppercase tracking-wider rounded-sm cursor-pointer shadow-[0_0_14px_rgba(252,238,10,0.65)] transition-colors flex items-center gap-1"
+                  title="Resolver combate (o pulsa Barra Espaciadora)"
+                >
+                  <span>RESPOND OR PASS</span>
+                  <span className="hidden sm:inline px-1 bg-black/20 rounded text-[8px]">SPACE</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setShowFullReactionModal(true)}
+                  className="px-1.5 py-0.5 bg-black/80 border border-white/20 hover:border-[#FCEE0A] text-gray-300 hover:text-[#FCEE0A] text-[9px] font-black rounded-sm cursor-pointer transition-colors"
+                  title="Abrir panel completo de opciones de respuesta"
+                >
+                  ⚡ {extraReactionCount > 0 ? extraReactionCount : '⋯'}
+                </button>
               </motion.div>
             </div>
           );
@@ -9390,78 +9554,129 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                 </div>
               </div>
 
-              {/* Grid de cartas reveladas o Estado Vacío */}
-              {(choice.cards || []).length > 0 ? (
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 py-2 justify-items-center">
-                  {(choice.cards || []).map((card) => {
-                    const isEligible = eligibleIds.has(card.instanceId);
-                    const isSelected = selectedIds.includes(card.instanceId);
+              {/* Selector dividido DRAW / BOTTOM OF DECK (exacto al vídeo de referencia 02m52s) */}
+              {(choice.cards || []).length > 0 ? (() => {
+                const togglePickCard = (card) => {
+                  if (!eligibleIds.has(card.instanceId)) return;
+                  const already = selectedIds.includes(card.instanceId);
+                  let next;
+                  if (already) {
+                    next = selectedIds.filter((id) => id !== card.instanceId);
+                  } else if (selectedIds.length >= choice.maxChoices) {
+                    next = choice.maxChoices === 1 ? [card.instanceId] : selectedIds;
+                  } else {
+                    next = [...selectedIds, card.instanceId];
+                  }
+                  setGameState((prev) => ({
+                    ...prev,
+                    pendingCardChoice: {
+                      ...prev.pendingCardChoice,
+                      selectedIds: next
+                    }
+                  }));
+                };
 
-                    return (
-                      <div
-                        key={card.instanceId}
-                        onClick={() => {
-                          if (!isEligible) return;
-                          let next;
-                          if (isSelected) {
-                            next = selectedIds.filter((id) => id !== card.instanceId);
-                          } else {
-                            if (selectedIds.length >= choice.maxChoices) {
-                              next = choice.maxChoices === 1 ? [card.instanceId] : selectedIds;
-                            } else {
-                              next = [...selectedIds, card.instanceId];
-                            }
-                          }
-                          setGameState((prev) => ({
-                            ...prev,
-                            pendingCardChoice: {
-                              ...prev.pendingCardChoice,
-                              selectedIds: next
-                            }
-                          }));
-                        }}
-                        onContextMenu={(e) => handleCardRightClick(e, card)}
-                        title="Clic izq para seleccionar // Clic DERECHO para ver en PANTALLA COMPLETA"
-                        className={`relative w-28 sm:w-32 aspect-[7/10] rounded overflow-hidden border-2 transition-all duration-200 flex flex-col justify-between ${
-                          !isEligible
-                            ? 'border-gray-800 opacity-40 cursor-not-allowed grayscale'
-                            : isSelected
-                            ? 'border-[#0dfceb] ring-2 ring-[#0dfceb] shadow-[0_0_20px_rgba(13,252,235,0.8)] -translate-y-1.5 cursor-pointer'
-                            : 'border-gray-700 hover:border-[#0dfceb] cursor-pointer hover:scale-105'
-                        }`}
-                      >
-                        <img src={card.image} alt={card.name} className="w-full h-full object-cover" />
+                const selectedCardsList = (choice.cards || []).filter((c) => selectedIds.includes(c.instanceId));
+                const remainingCardsList = (choice.cards || []).filter((c) => !selectedIds.includes(c.instanceId));
+                const topZoneLabel =
+                  choice.destination === 'FIELD'
+                    ? 'DEPLOY'
+                    : choice.type === 'FORCED_DISCARD_HAND'
+                    ? 'TRASH'
+                    : 'DRAW';
+                const bottomZoneLabel =
+                  choice.remainingDestination === 'TRASH'
+                    ? 'SEND TO TRASH'
+                    : choice.type === 'FORCED_DISCARD_HAND'
+                    ? 'KEEP IN HAND'
+                    : 'BOTTOM OF DECK • Random order';
 
-                        {/* Badge superior */}
-                        <div className="absolute top-1 inset-x-1 flex items-center justify-between">
-                          <span className="px-1 py-0.2 bg-black/90 text-[7px] text-gray-300 rounded font-black uppercase">
-                            {(card._lizzyZone || card._yorinobuZone)
-                              ? ((card._lizzyZone || card._yorinobuZone) === 'HAND' ? '🖐️ MANO' : '🗑️ BASURA')
-                              : (card.officialType || 'CARD')}
+                const renderChoiceCard = (card, inTopZone) => {
+                  const isEligible = eligibleIds.has(card.instanceId);
+                  return (
+                    <div
+                      key={card.instanceId}
+                      onMouseEnter={() => {
+                        setHoveredCard(card);
+                        setPreviewCard(card);
+                      }}
+                      onMouseLeave={() => setHoveredCard(null)}
+                      onClick={() => togglePickCard(card)}
+                      onContextMenu={(e) => handleCardRightClick(e, card)}
+                      title={
+                        isEligible
+                          ? 'Clic izq para mover de zona // Clic derecho para ampliar'
+                          : 'Esta carta no cumple el criterio'
+                      }
+                      className={`relative w-24 sm:w-28 aspect-[7/10] rounded overflow-hidden border-2 transition-all duration-150 flex flex-col justify-between ${
+                        !isEligible
+                          ? 'border-gray-800 opacity-55 cursor-not-allowed grayscale-[45%]'
+                          : inTopZone
+                          ? 'border-[#FCEE0A] ring-2 ring-[#FCEE0A]/80 shadow-[0_0_20px_rgba(252,238,10,0.65)] cursor-pointer hover:scale-105'
+                          : 'border-white/25 hover:border-[#0dfceb] cursor-pointer hover:scale-105'
+                      }`}
+                    >
+                      <img src={card.image} alt={card.name} className="w-full h-full object-cover" />
+                      {!isEligible && (
+                        <div className="absolute top-1 inset-x-1 flex justify-center">
+                          <span className="px-1.5 py-0.5 bg-[#FF003C] text-white text-[8px] font-black uppercase rounded shadow">
+                            NOT ALLOWED
                           </span>
-                          {isSelected && (
-                            <span className="px-1.5 py-0.5 bg-[#0dfceb] text-black font-black text-[9px] rounded-full shadow">
-                              ✓ ELEGIDA
-                            </span>
-                          )}
-                          {!isEligible && (
-                            <span className="px-1 py-0.2 bg-[#FF003C] text-white text-[7px] font-black uppercase rounded">
-                              NO VÁLIDA
-                            </span>
-                          )}
                         </div>
-
-                        {/* Pie de carta */}
-                        <div className="absolute bottom-0 inset-x-0 bg-black/90 p-1 border-t border-gray-800 text-center">
-                          <span className="text-[8px] font-bold text-white uppercase truncate block">
-                            {card.name}
+                      )}
+                      {inTopZone && (
+                        <div className="absolute top-1 right-1">
+                          <span className="px-1.5 py-0.5 bg-[#FCEE0A] text-[#070a10] font-black text-[8px] rounded shadow">
+                            ✓
                           </span>
                         </div>
+                      )}
+                      <div className="absolute bottom-0 inset-x-0 bg-black/90 px-1 py-0.5 border-t border-white/10 text-center">
+                        <span className="text-[8px] font-bold text-white uppercase truncate block">
+                          {card.name}
+                        </span>
                       </div>
-                    );
-                  })}
-                </div>
-              ) : (
+                    </div>
+                  );
+                };
+
+                return (
+                  <div className="space-y-3 py-1">
+                    {/* Zona superior dorada: DRAW X/Y */}
+                    <div className="rounded border border-[#FCEE0A]/65 bg-[#0b101b]/80 p-3 min-h-[126px] space-y-2">
+                      <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-widest">
+                        <span className="text-[#FCEE0A]">
+                          {topZoneLabel} <span className="text-white">{selectedCardsList.length}/{choice.maxChoices}</span>
+                        </span>
+                        <span className="text-gray-500 text-[9px]">
+                          {selectedCardsList.length === 0 ? 'Haz clic abajo para añadir aquí' : 'Clic en una carta para devolverla'}
+                        </span>
+                      </div>
+                      {selectedCardsList.length > 0 ? (
+                        <div className="flex flex-wrap items-center justify-center gap-2.5">
+                          {selectedCardsList.map((c) => renderChoiceCard(c, true))}
+                        </div>
+                      ) : (
+                        <div className="h-20 border border-dashed border-white/10 rounded flex items-center justify-center text-[10px] text-gray-600 uppercase tracking-widest">
+                          Sin cartas seleccionadas
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Zona inferior: BOTTOM OF DECK */}
+                    <div className="rounded border border-white/15 bg-black/55 p-3 space-y-2">
+                      <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-widest text-gray-400">
+                        <span>
+                          {bottomZoneLabel} <span className="text-white">{remainingCardsList.length}/{(choice.cards || []).length}</span>
+                        </span>
+                      </div>
+                      <div className="flex flex-wrap items-center justify-center gap-2.5">
+                        {remainingCardsList.map((c) => renderChoiceCard(c, false))}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })() : (
                 <div className="p-6 text-center border border-dashed border-gray-700 rounded bg-black/40 my-2">
                   <p className="text-sm text-[#FF003C] font-bold uppercase tracking-wider">⚠️ ZONA SIN CARTAS DISPONIBLES</p>
                   <p className="text-xs text-gray-400 mt-1">El efecto del trigger se ha disparado correctamente, pero no hay cartas disponibles en el mazo o zona para examinar.</p>
