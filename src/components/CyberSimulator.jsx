@@ -44,6 +44,7 @@ import { CyberDieShape } from './CyberDiceSvg.jsx';
 import CyberRightSidebar from './CyberRightSidebar.jsx';
 import { CyberLeftTelemetryRail, CyberRightGigsRail } from './CyberArenaColumns.jsx';
 import CyberNumberPickerModal from './CyberNumberPickerModal.jsx';
+import CyberResolveQueueModal from './CyberResolveQueueModal.jsx';
 import {
   getRivalById,
   getRivalByStage,
@@ -3895,7 +3896,14 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
     'SWAP_GIGS',
     'STEAL_RIVAL_GIG'
   ]);
-  const isInlineBoardTargeting = Boolean(activeTargetSel && INLINE_TARGET_ACTIONS.has(activeTargetSel.actionType));
+  const pendingTriggerQueueList =
+    activeTargetSel &&
+    (gameState?.pendingTargetSelectionQueue || []).length > 0 &&
+    !activeTargetSel._chosenToResolveNow
+      ? [activeTargetSel, ...(gameState.pendingTargetSelectionQueue || [])]
+      : [];
+  const isChoosingTriggerOrder = pendingTriggerQueueList.length >= 2;
+  const isInlineBoardTargeting = Boolean(!isChoosingTriggerOrder && activeTargetSel && INLINE_TARGET_ACTIONS.has(activeTargetSel.actionType));
 
   const isUnitEligibleForInlineTarget = (unit, ownerKey) => {
     if (!activeTargetSel || activeTargetSel.actionType !== 'TARGET_UNIT') return false;
@@ -8308,6 +8316,23 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
         );
       })()}
 
+      {/* MODAL DE ORDEN DE RESOLUCIÓN DE MÚLTIPLES TRIGGERS SIMULTÁNEOS (CHOOSE WHAT TO RESOLVE) */}
+      {isChoosingTriggerOrder && (
+        <CyberResolveQueueModal
+          items={pendingTriggerQueueList}
+          onPickIndex={(pickedIdx) => {
+            const all = [gameState.pendingTargetSelection, ...(gameState.pendingTargetSelectionQueue || [])];
+            const chosen = all[pickedIdx];
+            if (!chosen) return;
+            const rest = all.filter((_, i) => i !== pickedIdx);
+            gameState.pendingTargetSelection = { ...chosen, _chosenToResolveNow: true };
+            gameState.pendingTargetSelectionQueue = rest;
+            setStagedTarget(null);
+            setGameState({ ...gameState });
+          }}
+        />
+      )}
+
       {/* BARRA INLINE DE FIJACIÓN DE OBJETIVOS SOBRE EL TABLERO (ESTILO CAPTURAS 1, 3 Y 5) */}
       {isInlineBoardTargeting && !pendingGigNumberPick && (
         <div className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-[46] w-[92vw] max-w-2xl pointer-events-auto font-mono select-none">
@@ -9589,7 +9614,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
       })()}
 
       {/* 5.10. MODAL UNIVERSAL DE SELECCIÓN DE OBJETIVOS (KIROSHI TARGETING SYSTEM) */}
-      {gameState?.pendingTargetSelection && !isInlineBoardTargeting && (() => {
+      {gameState?.pendingTargetSelection && !isInlineBoardTargeting && !isChoosingTriggerOrder && (() => {
         const sel = gameState.pendingTargetSelection;
         const playerGigs = gameState.player.gigs || [];
         const botGigs = gameState.bot.gigs || [];
