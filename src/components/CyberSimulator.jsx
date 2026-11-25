@@ -5720,7 +5720,10 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                           setPreviewCard(unit);
                         }}
                         onMouseLeave={() => setHoveredCard(null)}
-                        style={unit.gear?.length ? { marginRight: `${unit.gear.length * 18}px` } : undefined}
+                        style={{
+                          ...(unit.gear?.length ? { marginRight: `${unit.gear.length * 18}px` } : {}),
+                          transform: unit.isSpent ? 'rotate(16deg)' : 'rotate(0deg)'
+                        }}
                         className="relative transition-all duration-300 flex flex-col items-center justify-center shrink-0 w-18 sm:w-20 md:w-22 lg:w-28 xl:w-32 h-25 sm:h-28 md:h-31 lg:h-39 xl:h-45"
                       >
                         {/* GEARS EQUIPADOS AL RIVAL (Sobresalen por detrás a la derecha estilo carta física) */}
@@ -5862,29 +5865,18 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                             </div>
                           )}
 
-                          {/* Estado: GASTADA / OBJETIVO DE ATAQUE */}
+                          {/* Estado: SPENT / OBJETIVO DE ATAQUE */}
                           {unit.isSpent && (
-                            <div className="absolute inset-0 bg-black/45 flex items-center justify-center z-20">
+                            <div className="absolute inset-0 bg-black/45 flex items-center justify-center z-20 pointer-events-none">
                               {canAttackThisUnit ? (
-                                <div className="flex flex-col items-center justify-center -rotate-[12deg]">
-                                  <span className="px-2 py-0.5 bg-[#0dfceb] text-[#070a10] font-mono font-black text-[9px] uppercase tracking-wider shadow-[0_0_15px_#0dfceb] animate-pulse">
-                                    ⚔️ ATACAR
-                                  </span>
-                                </div>
+                                <span className="px-2 py-0.5 bg-[#0dfceb] text-[#070a10] font-mono font-black text-[9px] uppercase tracking-wider shadow-[0_0_15px_#0dfceb] animate-pulse -rotate-[16deg]">
+                                  ⚔️ ATACAR
+                                </span>
                               ) : (
-                                <span className="px-1.5 py-0.5 bg-black/85 border border-gray-600 text-gray-300 font-mono font-black text-[7.5px] uppercase tracking-wider -rotate-[14deg]">
+                                <span className="px-2 py-0.5 bg-[#070a10]/90 border border-gray-500 text-gray-200 font-mono font-black text-[9px] uppercase tracking-widest shadow -rotate-[16deg]">
                                   SPENT
                                 </span>
                               )}
-                            </div>
-                          )}
-
-                          {/* Estado: LAG en unidad rival recién entrada */}
-                          {unit.isLagging && !unit.isSpent && (
-                            <div className="absolute inset-0 bg-black/45 flex items-center justify-center z-15 pointer-events-none">
-                              <span className="px-1.5 py-0.5 bg-black/90 border border-[#FCEE0A]/80 text-[#FCEE0A] font-mono font-black text-[7px] sm:text-[8px] uppercase tracking-wider shadow">
-                                ⏳ LAG
-                              </span>
                             </div>
                           )}
 
@@ -6152,7 +6144,10 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                             handlePlayCard(draggedCardId, unit.instanceId);
                           }
                         }}
-                        style={unit.gear?.length ? { marginRight: `${unit.gear.length * 18}px` } : undefined}
+                        style={{
+                          ...(unit.gear?.length ? { marginRight: `${unit.gear.length * 18}px` } : {}),
+                          transform: unit.isSpent ? 'rotate(16deg)' : 'rotate(0deg)'
+                        }}
                         className="relative transition-all duration-300 flex flex-col items-center justify-center shrink-0 w-18 sm:w-20 md:w-22 lg:w-28 xl:w-32 h-25 sm:h-28 md:h-31 lg:h-39 xl:h-45"
                       >
                         {/* GEARS EQUIPADOS AL JUGADOR (Sobresalen por detrás a la derecha estilo carta física) */}
@@ -6386,11 +6381,11 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                             );
                           })()}
 
-                          {/* Estado: GASTADA */}
+                          {/* Estado: SPENT */}
                           {unit.isSpent && (
-                            <div className="absolute inset-0 bg-black/60 flex items-center justify-center z-20">
-                              <span className="px-2 py-0.5 bg-black border border-gray-600 text-gray-300 font-mono font-black text-[10px] uppercase tracking-wider -rotate-90">
-                                GASTADA
+                            <div className="absolute inset-0 bg-black/45 flex items-center justify-center z-20 pointer-events-none">
+                              <span className="px-2 py-0.5 bg-[#070a10]/90 border border-gray-500 text-gray-200 font-mono font-black text-[9px] uppercase tracking-widest shadow -rotate-[16deg]">
+                                SPENT
                               </span>
                             </div>
                           )}
