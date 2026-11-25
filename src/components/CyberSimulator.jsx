@@ -970,6 +970,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
   const [stagedTarget, setStagedTarget] = useState(null);
   const [pendingGigNumberPick, setPendingGigNumberPick] = useState(null);
   const [pendingManualPayment, setPendingManualPayment] = useState(null);
+  const [pendingGearEquip, setPendingGearEquip] = useState(null); // { cardInstanceId, card, cost, stagedTargetId }
   const [showLeaderboardModal, setShowLeaderboardModal] = useState(false);
   const [userRankingStats, setUserRankingStats] = useState(null);
   const [selectedBotDifficulty, setSelectedBotDifficulty] = useState(1);
@@ -1318,6 +1319,36 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
     const handCard = (gameState.player?.hand || []).find((c) => c.instanceId === cardInstanceId);
     if (handCard) {
       const effCost = getEffectiveCardCost(handCard, gameState.player, gameState);
+      if (getCardType(handCard) === 'GEAR' && !targetId) {
+        const eligibleUnits = gameState.player?.field || [];
+        const eligibleFaceUpLegends = (gameState.player?.legends || []).filter(
+          (l) => l.isFaceUp && !l.isOnField && !l.isRemovedFromGame
+        );
+        if (eligibleUnits.length === 0 && eligibleFaceUpLegends.length === 0) {
+          setHolocall({
+            title: 'SIN OBJETIVO PARA GEAR',
+            characterName: 'VIKTOR // RIPPERDOC',
+            message: `Necesitas al menos 1 Unidad aliada en el campo o 1 Leyenda boca arriba para equipar "${handCard.name}".`,
+            type: 'warning'
+          });
+          return;
+        }
+        if (getTotalAvailableEddies(gameState.player) < effCost) {
+          const missing = Math.max(1, effCost - getTotalAvailableEddies(gameState.player));
+          setHolocall({
+            title: 'EDDIES INSUFICIENTES',
+            characterName: 'VIKTOR // RIPPERDOC',
+            message: `Necesitas ${effCost} €$ para equipar "${handCard.name}". Te faltan ${missing} €$.`,
+            missingEddies: missing,
+            type: 'warning'
+          });
+          return;
+        }
+        setPendingGearEquip({ cardInstanceId, card: handCard, cost: effCost, stagedTargetId: null });
+        setSelectedHandCard(null);
+        setSelectedFieldUnit(null);
+        return;
+      }
       const curFloating = gameState.player.floatingEddies || 0;
       if (curFloating < effCost) {
         if (autoPayEddies) {
@@ -1330,6 +1361,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
       }
     }
     setPendingManualPayment(null);
+    setPendingGearEquip(null);
     const res = playCard(gameState, 'player', cardInstanceId, targetId);
     if (res.success) {
       setSelectedHandCard(null);
@@ -5851,8 +5883,10 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                       gameState.pendingReaction &&
                       gameState.pendingReaction.blockerUnitId === unit.instanceId
                     );
-                    const isInlineTargetUnit = isUnitEligibleForInlineTarget(unit, 'player');
-                    const isStagedTargetUnit = stagedTarget?.kind === 'UNIT' && stagedTarget.unitInstanceId === unit.instanceId;
+                    const isGearEquipTarget = Boolean(pendingGearEquip);
+                    const isStagedGearTarget = pendingGearEquip?.stagedTargetId === unit.instanceId;
+                    const isInlineTargetUnit = isUnitEligibleForInlineTarget(unit, 'player') || isGearEquipTarget;
+                    const isStagedTargetUnit = (stagedTarget?.kind === 'UNIT' && stagedTarget.unitInstanceId === unit.instanceId) || isStagedGearTarget;
                     const recentColor = recentHighlights[unit.instanceId] || null;
 
                     return (
@@ -5957,6 +5991,16 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                           }}
                           whileHover={{ scale: canAttack || isEligibleBlocker ? 1.08 : 1.03, y: -3 }}
                           onClick={() => {
+                            if (isGearEquipTarget) {
+                              if (isStagedGearTarget) {
+                                const { cardInstanceId } = pendingGearEquip;
+                                setPendingGearEquip(null);
+                                handlePlayCard(cardInstanceId, unit.instanceId);
+                              } else {
+                                setPendingGearEquip((prev) => (prev ? { ...prev, stagedTargetId: unit.instanceId } : null));
+                              }
+                              return;
+                            }
                             if (isInlineTargetUnit) {
                               if (isStagedTargetUnit) {
                                 confirmInlineStagedTarget({ kind: 'UNIT', unitInstanceId: unit.instanceId, ownerKey: 'player' });
@@ -6622,6 +6666,16 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                           }}
                           onClick={(e) => {
                             e.stopPropagation();
+                            if (pendingGearEquip && leg.isFaceUp && !leg.isOnField && !leg.isRemovedFromGame) {
+                              if (pendingGearEquip.stagedTargetId === leg.instanceId) {
+                                const { cardInstanceId } = pendingGearEquip;
+                                setPendingGearEquip(null);
+                                handlePlayCard(cardInstanceId, leg.instanceId);
+                              } else {
+                                setPendingGearEquip((prev) => (prev ? { ...prev, stagedTargetId: leg.instanceId } : null));
+                              }
+                              return;
+                            }
                             if (leg.isFaceUp) {
                               setHoveredCard(leg);
                               setPreviewCard(leg);
@@ -6636,7 +6690,11 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                           }}
                           style={recentHighlights[leg.instanceId] ? { boxShadow: `0 0 28px ${recentHighlights[leg.instanceId]}`, borderColor: recentHighlights[leg.instanceId] } : undefined}
                           className={`w-11 sm:w-12 lg:w-16 xl:w-17 h-15 sm:h-17 lg:h-22 xl:h-24 rounded-md border transition-all cursor-pointer flex flex-col items-center justify-center relative shadow-md group ${
-                            recentHighlights[leg.instanceId] ? 'ring-2 ring-[#FCEE0A] scale-105 z-20' : isMenuOpen
+                            pendingGearEquip && leg.isFaceUp && !leg.isOnField && !leg.isRemovedFromGame
+                              ? pendingGearEquip.stagedTargetId === leg.instanceId
+                                ? 'border-[#FCEE0A] ring-4 ring-[#FCEE0A] shadow-[0_0_28px_rgba(252,238,10,0.95)] scale-110 z-30'
+                                : 'border-[#0dfceb] ring-2 ring-[#0dfceb] shadow-[0_0_24px_rgba(13,252,235,0.9)] animate-pulse z-20'
+                              : recentHighlights[leg.instanceId] ? 'ring-2 ring-[#FCEE0A] scale-105 z-20' : isMenuOpen
                               ? 'border-[#0dfceb] ring-2 ring-[#0dfceb] shadow-[0_0_18px_rgba(13,252,235,0.6)]'
                               : leg.isFaceUp
                               ? leg.isSpent
@@ -6988,14 +7046,16 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                   const cardType = getCardType(selectedHandCard);
                   const isProgram = cardType === 'PROGRAM';
                   const isGear = cardType === 'GEAR';
-                  const gearTarget = selectedFieldUnit?.instanceId || (p.field.length > 0 ? p.field[0].instanceId : (p.legends[0]?.instanceId || null));
+                  const hasAnyGearTarget =
+                    p.field.length > 0 ||
+                    (p.legends || []).some((l) => l.isFaceUp && !l.isOnField && !l.isRemovedFromGame);
                   const baseCardCost = selectedHandCard.parsedCost || 0;
                   const cardCost = getEffectiveCardCost(selectedHandCard, p, gameState);
                   const hasDiscount = cardCost < baseCardCost;
                   const effectiveEddiesPool = getTotalAvailableEddies(p);
                   const canAfford = effectiveEddiesPool >= cardCost;
                   const missingEddies = Math.max(0, cardCost - effectiveEddiesPool);
-                  const canPlay = isMyTurn && canAfford && (!isGear || Boolean(gearTarget));
+                  const canPlay = isMyTurn && canAfford && (!isGear || hasAnyGearTarget);
 
                   let actionLabel = `JUGAR UNIDAD (${cardCost} €$)`;
                   if (!canAfford) {
@@ -7005,19 +7065,15 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                       ? `LANZAR PROGRAMA (${cardCost} €$, antes ${baseCardCost})`
                       : `LANZAR PROGRAMA (${cardCost} €$)`;
                   } else if (isGear) {
-                    if (selectedFieldUnit) {
-                      actionLabel = `EQUIPAR A ${selectedFieldUnit.name.split(' ')[0]} (${cardCost} €$)`;
-                    } else if (gearTarget) {
-                      actionLabel = `EQUIPAR GEAR (${cardCost} €$)`;
-                    } else {
-                      actionLabel = 'GEAR (SIN OBJETIVO)';
-                    }
+                    actionLabel = hasAnyGearTarget
+                      ? `EQUIPAR GEAR (${cardCost} €$) — ELEGIR OBJETIVO`
+                      : 'GEAR (SIN OBJETIVO)';
                   }
 
                   return (
                     <button
                       type="button"
-                      disabled={isGear && canAfford && !gearTarget}
+                      disabled={isGear && canAfford && !hasAnyGearTarget}
                       onClick={() => {
                         if (!canAfford) {
                           setHolocall({
@@ -7029,7 +7085,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                           });
                           return;
                         }
-                        handlePlayCard(selectedHandCard.instanceId, isGear ? gearTarget : null);
+                        handlePlayCard(selectedHandCard.instanceId, null);
                       }}
                       style={{ clipPath: CYBER_BUTTON }}
                       className={`px-3 py-1 font-black text-xs uppercase cursor-pointer transition-all shadow-md ${
@@ -8415,6 +8471,65 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
           handleResolveTargetSelection({ gigInfo: info, delta: chosenDelta });
         }}
       />
+
+      {/* BARRA INLINE DE EQUIPAR GEAR: SIEMPRE PERMITE ELEGIR OBJETIVO EN MESA (AUNQUE SOLO HAYA 1) */}
+      {pendingGearEquip && (
+        <div className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-[46] w-[92vw] max-w-2xl pointer-events-auto font-mono select-none">
+          <motion.div
+            initial={{ opacity: 0, y: -8, scale: 0.96 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            className="bg-[#070c16]/96 border border-[#0dfceb]/80 rounded-md px-3.5 py-2.5 shadow-[0_0_40px_rgba(0,0,0,0.9)] backdrop-blur-md flex items-center justify-between gap-3"
+          >
+            <div className="flex items-center gap-2.5 min-w-0 flex-1">
+              {pendingGearEquip.card?.image && (
+                <div className="w-9 h-12 rounded border border-[#FCEE0A]/70 overflow-hidden bg-black shrink-0">
+                  <img src={pendingGearEquip.card.image} alt={pendingGearEquip.card.name} className="w-full h-full object-cover" />
+                </div>
+              )}
+              <div className="min-w-0">
+                <span className="text-xs font-black uppercase text-[#0dfceb] tracking-wider block truncate">
+                  EQUIP {pendingGearEquip.card?.name}: CHOOSE A TARGET
+                </span>
+                <p className="text-[11px] text-gray-300 font-sans leading-snug truncate">
+                  Haz clic en la Unidad aliada o Leyenda boca arriba iluminada a la que quieres equipar ({pendingGearEquip.cost} €$).
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 shrink-0">
+              <span className="text-xs font-black text-white px-1.5">
+                <span className={pendingGearEquip.stagedTargetId ? "text-[#FCEE0A]" : "text-gray-400"}>
+                  {pendingGearEquip.stagedTargetId ? 1 : 0}
+                </span>/1
+              </span>
+              <button
+                type="button"
+                onClick={() => setPendingGearEquip(null)}
+                className="px-2.5 py-1.5 bg-black border border-gray-700 hover:border-[#FF003C] text-gray-300 hover:text-[#FF003C] text-[10px] font-bold uppercase rounded-sm cursor-pointer"
+              >
+                CANCEL
+              </button>
+              <button
+                type="button"
+                disabled={!pendingGearEquip.stagedTargetId}
+                onClick={() => {
+                  const { cardInstanceId, stagedTargetId } = pendingGearEquip;
+                  if (!stagedTargetId) return;
+                  setPendingGearEquip(null);
+                  handlePlayCard(cardInstanceId, stagedTargetId);
+                }}
+                className={`px-4 py-1.5 text-xs font-black uppercase tracking-wider rounded-sm transition-all ${
+                  pendingGearEquip.stagedTargetId
+                    ? 'bg-[#FCEE0A] hover:bg-white text-[#070a10] cursor-pointer shadow-[0_0_18px_rgba(252,238,10,0.65)]'
+                    : 'bg-white/10 text-gray-500 cursor-not-allowed'
+                }`}
+              >
+                CONFIRM
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
 
       {/* BARRA INTERACTIVA DE PAGO MANUAL "PAY X €$" (ESTILO CAPTURA 6) */}
       {pendingManualPayment && (() => {
