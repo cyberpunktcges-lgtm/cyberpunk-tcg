@@ -2296,6 +2296,47 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
     const p = gameState.player;
     const opp = gameState.bot;
 
+    const enqueueModalTargetSelection = (selection) => {
+      if (!gameState.pendingTargetSelection) {
+        gameState.pendingTargetSelection = selection;
+      } else {
+        if (!Array.isArray(gameState.pendingTargetSelectionQueue)) {
+          gameState.pendingTargetSelectionQueue = [];
+        }
+        gameState.pendingTargetSelectionQueue.push(selection);
+      }
+    };
+
+    // CP-037: Fool on the Hill jugado por el Rival -> TÚ decides si se queda las 2 cartas reveladas o las tira y roba 2
+    if (optionId === 'FOOL_BOT_ADD_HAND') {
+      const revealed = Array.isArray(choice.revealedCards) ? choice.revealedCards : [];
+      if (!opp.hand) opp.hand = [];
+      opp.hand.push(...revealed);
+      gameState.actionLog.unshift(
+        `🃏 [Fool on the Hill] Has elegido AÑADIR A LA MANO DEL RIVAL: ${revealed.map((c) => c.name).join(', ')}.`
+      );
+      delete gameState.pendingModalChoice;
+      setGameState({ ...gameState });
+      return;
+    }
+    if (optionId === 'FOOL_BOT_TRASH') {
+      const revealed = Array.isArray(choice.revealedCards) ? choice.revealedCards : [];
+      if (!opp.trash) opp.trash = [];
+      opp.trash.push(...revealed);
+      const drawn = (opp.deck || []).splice(0, Math.min(2, opp.deck?.length || 0));
+      if (!opp.hand) opp.hand = [];
+      drawn.forEach((c) => {
+        c.isJustDrawn = true;
+      });
+      opp.hand.push(...drawn);
+      gameState.actionLog.unshift(
+        `☣️ [Fool on the Hill] Has elegido ENVIAR AL TRASH (${revealed.map((c) => c.name).join(', ')}). El rival roba ${drawn.length} carta(s).`
+      );
+      delete gameState.pendingModalChoice;
+      setGameState({ ...gameState });
+      return;
+    }
+
     // CP-050: Jackie Welles // Mama's Favorite (pagar 1 €$ y sacrificar a Jackie para salvar unidad derrotada)
     if (optionId === 'JACKIE_MAMA_SACRIFICE') {
       const savedUnit = choice.unitToSave;
@@ -2462,8 +2503,8 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
 
     // Muamar Reyes
     else if (optionId === 'MUAMAR_PROTECT') {
-      if ((p.field || []).length > 1) {
-        gameState.pendingTargetSelection = {
+      if ((p.field || []).length > 0) {
+        enqueueModalTargetSelection({
           actionType: 'TARGET_UNIT',
           effectType: 'PROTECT',
           targetScope: 'FRIENDLY_UNITS',
@@ -2471,17 +2512,10 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
           prompt: 'Selecciona una unidad amiga: no podrá ser derrotada en combate este turno:',
           sourceCardName: 'Muamar Reyes',
           sourceCardImage: choice.sourceCardImage
-        };
+        });
         delete gameState.pendingModalChoice;
         setGameState({ ...gameState });
         return;
-      }
-      const target = p.field && p.field.length > 0 ? p.field[0] : null;
-      if (target) {
-        target.cannotBeDefeatedThisTurn = true;
-        gameState.actionLog.unshift(
-          `🚗 [Muamar Reyes] "${target.name}" no podrá ser derrotada en combate este turno.`
-        );
       }
     } else if (optionId === 'MUAMAR_DRAW') {
       if (p.deck && p.deck.length > 0) {
@@ -2497,8 +2531,8 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
     // Padre
     else if (optionId === 'PADRE_SPEND_RIVAL') {
       const eligible = (opp.field || []).filter((u) => !u.isSpent);
-      if (eligible.length > 1) {
-        gameState.pendingTargetSelection = {
+      if (eligible.length > 0) {
+        enqueueModalTargetSelection({
           actionType: 'TARGET_UNIT',
           effectType: 'SPEND',
           targetScope: 'RIVAL_UNITS',
@@ -2506,17 +2540,10 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
           prompt: 'Selecciona la unidad rival que deseas girar (Spend):',
           sourceCardName: 'Padre',
           sourceCardImage: choice.sourceCardImage
-        };
+        });
         delete gameState.pendingModalChoice;
         setGameState({ ...gameState });
         return;
-      }
-      const target = eligible[0] || opp.field?.[0];
-      if (target) {
-        target.isSpent = true;
-        gameState.actionLog.unshift(
-          `✝️ [Padre] Giró (Spend) a la unidad rival "${target.name}".`
-        );
       }
     } else if (optionId === 'PADRE_DRAW') {
       if (p.deck && p.deck.length > 0) {
@@ -2531,8 +2558,8 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
 
     // Wakako Okada
     else if (optionId === 'WAKAKO_DEBUFF_RIVAL') {
-      if ((opp.field || []).length > 1) {
-        gameState.pendingTargetSelection = {
+      if ((opp.field || []).length > 0) {
+        enqueueModalTargetSelection({
           actionType: 'TARGET_UNIT',
           effectType: 'DEBUFF',
           amount: 2,
@@ -2541,17 +2568,10 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
           prompt: 'Selecciona la unidad rival a la que deseas reducir 2 de poder este turno:',
           sourceCardName: 'Wakako Okada',
           sourceCardImage: choice.sourceCardImage
-        };
+        });
         delete gameState.pendingModalChoice;
         setGameState({ ...gameState });
         return;
-      }
-      const target = opp.field && opp.field.length > 0 ? opp.field[0] : null;
-      if (target) {
-        target.currentPower = Math.max(0, (target.currentPower || target.power || 0) - 2);
-        gameState.actionLog.unshift(
-          `🌸 [Wakako Okada] Redujo el poder de la unidad rival "${target.name}" en 2 (Poder actual: ${target.currentPower}).`
-        );
       }
     } else if (optionId === 'WAKAKO_DRAW') {
       if (p.deck && p.deck.length > 0) {
@@ -2566,8 +2586,8 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
 
     // Pyramid Song
     else if (optionId === 'PYRAMID_DEBUFF') {
-      if ((opp.field || []).length > 1) {
-        gameState.pendingTargetSelection = {
+      if ((opp.field || []).length > 0) {
+        enqueueModalTargetSelection({
           actionType: 'TARGET_UNIT',
           effectType: 'DEBUFF',
           amount: 4,
@@ -2576,17 +2596,10 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
           prompt: 'Selecciona la unidad rival a la que deseas reducir 4 de poder este turno:',
           sourceCardName: 'Pyramid Song',
           sourceCardImage: choice.sourceCardImage
-        };
+        });
         delete gameState.pendingModalChoice;
         setGameState({ ...gameState });
         return;
-      }
-      const target = opp.field && opp.field.length > 0 ? opp.field[0] : null;
-      if (target) {
-        target.currentPower = Math.max(0, (target.currentPower || target.power || 0) - 4);
-        gameState.actionLog.unshift(
-          `🌊 [Pyramid Song] Redujo el poder de "${target.name}" en 4 este turno.`
-        );
       }
     } else if (optionId === 'PYRAMID_BOTTOM_ZERO') {
       const zeroIdx = (opp.field || []).findIndex((u) => (u.currentPower || 0) === 0);
@@ -2634,8 +2647,8 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
         `🎶 [Nocturne Op55N1] Robaste 2 cartas: ${drawnCards.join(', ')}.`
       );
     } else if (optionId === 'NOCTURNE_FREEZE_RIVAL') {
-      if ((opp.field || []).length > 1) {
-        gameState.pendingTargetSelection = {
+      if ((opp.field || []).length > 0) {
+        enqueueModalTargetSelection({
           actionType: 'TARGET_UNIT',
           effectType: 'FREEZE',
           targetScope: 'RIVAL_UNITS',
@@ -2643,17 +2656,10 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
           prompt: 'Selecciona una unidad rival: no podrá atacar hasta tu próximo turno:',
           sourceCardName: 'Nocturne Op55N1',
           sourceCardImage: choice.sourceCardImage
-        };
+        });
         delete gameState.pendingModalChoice;
         setGameState({ ...gameState });
         return;
-      }
-      const target = opp.field && opp.field.length > 0 ? opp.field[0] : null;
-      if (target) {
-        target.cannotAttackUntilNextTurn = true;
-        gameState.actionLog.unshift(
-          `🎶 [Nocturne Op55N1] "${target.name}" no podrá atacar hasta tu próximo turno.`
-        );
       }
     }
 
@@ -3896,7 +3902,14 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
   useEffect(() => {
     if (showLobby || !gameState || gameState.isGameOver || !gameState.mulliganDecided) return;
 
-    if (gameState.activePlayer === 'bot' && !isBotThinking && !gameState.pendingReaction) {
+    if (
+      gameState.activePlayer === 'bot' &&
+      !isBotThinking &&
+      !gameState.pendingReaction &&
+      !gameState.pendingModalChoice &&
+      !gameState.pendingCardChoice &&
+      !gameState.pendingTargetSelection
+    ) {
       setIsBotThinking(true);
       runBotTurn(gameState, (updated) => setGameState({ ...updated }), 650, waitForBotAck).then(() => {
         setIsBotThinking(false);
@@ -3908,6 +3921,9 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
     gameState?.isGameOver,
     gameState?.mulliganDecided,
     gameState?.pendingReaction,
+    gameState?.pendingModalChoice,
+    gameState?.pendingCardChoice,
+    gameState?.pendingTargetSelection,
     showLobby
   ]);
 
@@ -6197,6 +6213,11 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                             {hasKeyword(unit, 'Blocker') && !isCurrentBlocker && !isEligibleBlocker && (
                               <span className="w-6 h-6 rounded-full bg-[#070a10]/90 border border-[#0dfceb] flex items-center justify-center shadow-[0_0_10px_rgba(13,252,235,0.5)]">
                                 <Shield className="w-3.5 h-3.5 text-[#0dfceb]" />
+                              </span>
+                            )}
+                            {unit.cannotBeDefeatedThisTurn && (
+                              <span className="px-1 py-0.5 bg-[#0dfceb] text-[#070a10] font-mono font-black text-[7px] sm:text-[7.5px] uppercase shadow-[0_0_10px_#0dfceb] border border-white">
+                                🛡️ INMUNE
                               </span>
                             )}
                             {unit.mustAttackNextTurn && !unit.isSpent && (
@@ -9437,6 +9458,37 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                   </span>
                 </div>
               </div>
+
+              {/* Cartas reveladas del mazo (ej: Fool on the Hill) */}
+              {Array.isArray(choice.revealedCards) && choice.revealedCards.length > 0 && (
+                <div className="bg-black/70 border border-[#FCEE0A]/40 rounded p-3 space-y-2">
+                  <span className="text-[10px] font-black uppercase tracking-widest text-[#FCEE0A] block">
+                    CARTAS REVELADAS ({choice.revealedCards.length})
+                  </span>
+                  <div className="flex flex-wrap items-center justify-center gap-3">
+                    {choice.revealedCards.map((rc, rIdx) => (
+                      <div
+                        key={rc.instanceId || rIdx}
+                        onMouseEnter={() => {
+                          setHoveredCard(rc);
+                          setPreviewCard(rc);
+                        }}
+                        onMouseLeave={() => setHoveredCard(null)}
+                        onClick={() => setInspectedCard(rc)}
+                        className="flex flex-col items-center gap-1 cursor-pointer group w-24 sm:w-28"
+                        title="Clic para ampliar carta"
+                      >
+                        <div className="w-24 h-34 sm:w-28 sm:h-40 rounded border-2 border-[#FCEE0A]/70 group-hover:border-[#0dfceb] overflow-hidden bg-black shadow-lg transition-transform group-hover:scale-105">
+                          <img src={rc.image} alt={rc.name} className="w-full h-full object-cover" />
+                        </div>
+                        <span className="text-[9px] font-bold text-white text-center leading-tight line-clamp-2">
+                          {rc.name}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {/* Lista de Opciones estilo 01 / 02 en cuadrícula limpia (exacto a captura) */}
               <div className={`grid grid-cols-1 ${options.length === 2 ? "sm:grid-cols-2" : ""} gap-3 py-1`}>

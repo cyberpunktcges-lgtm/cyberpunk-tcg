@@ -929,6 +929,12 @@ export async function runBotTurn(gameState, updateCallback, delayMs = 700, pause
   let aborted = false;
   const pauseAfterPlay = async (actionType, card, prevLogLen, targetName = '', subtitle = '') => {
     updateCallback({ ...gameState });
+    // Si la jugada del Bot abrió una decisión interactiva para el jugador (ej: Fool on the Hill, descarte forzado),
+    // detenemos aquí el bucle del Bot y se reanudará automáticamente en cuanto el jugador resuelva el modal.
+    if (gameState.pendingModalChoice || gameState.pendingCardChoice || gameState.pendingTargetSelection) {
+      aborted = true;
+      return false;
+    }
     if (typeof pauseForAck === 'function' && !gameState.isGameOver) {
       const ack = await pauseForAck({
         actionType,

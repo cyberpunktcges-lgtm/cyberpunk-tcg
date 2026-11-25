@@ -1798,96 +1798,146 @@ export function resolveFight(state, attPlayerKey, attUnit, defPlayerKey, defUnit
     // Atacante gana (por fuerza mayor o habilidad oficial de Johnny Silverhand CP-054 contra CORPO)
     const idx = defender.field.findIndex((u) => u.instanceId === defUnit.instanceId);
     if (idx !== -1) {
-      const [defeated] = defender.field.splice(idx, 1);
-      const defOutcome = sendDefeatedUnitToGraveyardOrExile(defender, defeated, state);
-      if (!defOutcome?.intercepted) {
-        if (johnnyAttBeatsCorpo) {
-          state.actionLog.unshift(
-            `🎸 [Johnny Silverhand // Never Stop Fighting] ¡Gana SIEMPRE contra unidades CORPO! Derrota automáticamente a "${defUnit.name}" (${attPower} vs ${defPower})${
-              defeated.gear?.length ? ` junto con ${defeated.gear.length} Gear(s)` : ''
-            }.`
-          );
-        } else {
-          state.actionLog.unshift(
-            `💀 [FASE 3: DERROTA] "${defUnit.name}" tiene menor fuerza (${defPower} < ${attPower}) y es derrotada${
-              defeated.gear?.length ? ` junto con ${defeated.gear.length} Gear(s)` : ''
-            }.`
-          );
+      if (defUnit.cannotBeDefeatedThisTurn) {
+        state.actionLog.unshift(
+          `🛡️ [INMUNIDAD EN COMBATE] "${defUnit.name}" no puede ser derrotada en combate este turno y sobrevive en el campo (${defPower} vs ${attPower}).`
+        );
+        executeCombatWinTrigger(state, attPlayerKey, attUnit, defUnit);
+        executeCombatLossTrigger(state, defPlayerKey, defUnit, attUnit);
+        result = {
+          ...result,
+          winnerKey: attPlayerKey,
+          winnerUnit: attUnit,
+          loserKey: defPlayerKey,
+          loserUnit: defUnit,
+          loserSurvivedByImmunity: true,
+          isTie: false,
+          johnnyAntiCorpoWin: johnnyAttBeatsCorpo
+        };
+      } else {
+        const [defeated] = defender.field.splice(idx, 1);
+        const defOutcome = sendDefeatedUnitToGraveyardOrExile(defender, defeated, state);
+        if (!defOutcome?.intercepted) {
+          if (johnnyAttBeatsCorpo) {
+            state.actionLog.unshift(
+              `🎸 [Johnny Silverhand // Never Stop Fighting] ¡Gana SIEMPRE contra unidades CORPO! Derrota automáticamente a "${defUnit.name}" (${attPower} vs ${defPower})${
+                defeated.gear?.length ? ` junto con ${defeated.gear.length} Gear(s)` : ''
+              }.`
+            );
+          } else {
+            state.actionLog.unshift(
+              `💀 [FASE 3: DERROTA] "${defUnit.name}" tiene menor fuerza (${defPower} < ${attPower}) y es derrotada${
+                defeated.gear?.length ? ` junto con ${defeated.gear.length} Gear(s)` : ''
+              }.`
+            );
+          }
         }
+        executeCombatWinTrigger(state, attPlayerKey, attUnit, defeated);
+        executeCombatLossTrigger(state, defPlayerKey, defeated, attUnit);
+        if (!defOutcome?.intercepted) {
+          executeUnitDefeatedTrigger(state, defPlayerKey, defeated);
+        }
+        result = {
+          ...result,
+          winnerKey: attPlayerKey,
+          winnerUnit: attUnit,
+          loserKey: defPlayerKey,
+          loserUnit: defeated,
+          isTie: false,
+          johnnyAntiCorpoWin: johnnyAttBeatsCorpo
+        };
       }
-      executeCombatWinTrigger(state, attPlayerKey, attUnit, defeated);
-      executeCombatLossTrigger(state, defPlayerKey, defeated, attUnit);
-      if (!defOutcome?.intercepted) {
-        executeUnitDefeatedTrigger(state, defPlayerKey, defeated);
-      }
-      result = {
-        ...result,
-        winnerKey: attPlayerKey,
-        winnerUnit: attUnit,
-        loserKey: defPlayerKey,
-        loserUnit: defeated,
-        isTie: false,
-        johnnyAntiCorpoWin: johnnyAttBeatsCorpo
-      };
     }
   } else if (johnnyDefBeatsCorpo || defPower > attPower) {
     // Defensor gana (por fuerza mayor o habilidad oficial de Johnny Silverhand CP-054 contra CORPO)
     const idx = attacker.field.findIndex((u) => u.instanceId === attUnit.instanceId);
     if (idx !== -1) {
-      const [defeated] = attacker.field.splice(idx, 1);
-      const attOutcome = sendDefeatedUnitToGraveyardOrExile(attacker, defeated, state);
-      if (!attOutcome?.intercepted) {
-        if (johnnyDefBeatsCorpo) {
-          state.actionLog.unshift(
-            `🎸 [Johnny Silverhand // Never Stop Fighting] ¡Gana SIEMPRE contra unidades CORPO! Derrota automáticamente al atacante "${attUnit.name}" (${defPower} vs ${attPower})${
-              defeated.gear?.length ? ` junto con ${defeated.gear.length} Gear(s)` : ''
-            }.`
-          );
-        } else {
-          state.actionLog.unshift(
-            `💥 [FASE 3: CONTRAATAQUE] "${attUnit.name}" tiene menor fuerza (${attPower} < ${defPower}) y es derrotada${
-              defeated.gear?.length ? ` junto con ${defeated.gear.length} Gear(s)` : ''
-            }.`
-          );
+      if (attUnit.cannotBeDefeatedThisTurn) {
+        state.actionLog.unshift(
+          `🛡️ [INMUNIDAD EN COMBATE] "${attUnit.name}" no puede ser derrotada en combate este turno y sobrevive en el campo (${attPower} vs ${defPower}).`
+        );
+        executeCombatWinTrigger(state, defPlayerKey, defUnit, attUnit);
+        executeCombatLossTrigger(state, attPlayerKey, attUnit, defUnit);
+        result = {
+          ...result,
+          winnerKey: defPlayerKey,
+          winnerUnit: defUnit,
+          loserKey: attPlayerKey,
+          loserUnit: attUnit,
+          loserSurvivedByImmunity: true,
+          isTie: false,
+          johnnyAntiCorpoWin: johnnyDefBeatsCorpo
+        };
+      } else {
+        const [defeated] = attacker.field.splice(idx, 1);
+        const attOutcome = sendDefeatedUnitToGraveyardOrExile(attacker, defeated, state);
+        if (!attOutcome?.intercepted) {
+          if (johnnyDefBeatsCorpo) {
+            state.actionLog.unshift(
+              `🎸 [Johnny Silverhand // Never Stop Fighting] ¡Gana SIEMPRE contra unidades CORPO! Derrota automáticamente al atacante "${attUnit.name}" (${defPower} vs ${attPower})${
+                defeated.gear?.length ? ` junto con ${defeated.gear.length} Gear(s)` : ''
+              }.`
+            );
+          } else {
+            state.actionLog.unshift(
+              `💥 [FASE 3: CONTRAATAQUE] "${attUnit.name}" tiene menor fuerza (${attPower} < ${defPower}) y es derrotada${
+                defeated.gear?.length ? ` junto con ${defeated.gear.length} Gear(s)` : ''
+              }.`
+            );
+          }
         }
+        executeCombatWinTrigger(state, defPlayerKey, defUnit, defeated);
+        executeCombatLossTrigger(state, attPlayerKey, defeated, defUnit);
+        if (!attOutcome?.intercepted) {
+          executeUnitDefeatedTrigger(state, attPlayerKey, defeated);
+        }
+        result = {
+          ...result,
+          winnerKey: defPlayerKey,
+          winnerUnit: defUnit,
+          loserKey: attPlayerKey,
+          loserUnit: defeated,
+          isTie: false,
+          johnnyAntiCorpoWin: johnnyDefBeatsCorpo
+        };
       }
-      executeCombatWinTrigger(state, defPlayerKey, defUnit, defeated);
-      executeCombatLossTrigger(state, attPlayerKey, defeated, defUnit);
-      if (!attOutcome?.intercepted) {
-        executeUnitDefeatedTrigger(state, attPlayerKey, defeated);
-      }
-      result = {
-        ...result,
-        winnerKey: defPlayerKey,
-        winnerUnit: defUnit,
-        loserKey: attPlayerKey,
-        loserUnit: defeated,
-        isTie: false,
-        johnnyAntiCorpoWin: johnnyDefBeatsCorpo
-      };
     }
   } else {
-    // REGLA OFICIAL DE EMPATE: ¡Ambas unidades tienen la misma fuerza y son derrotadas!
+    // REGLA OFICIAL DE EMPATE: ¡Ambas unidades tienen la misma fuerza y son derrotadas (salvo inmunidad en combate)!
     if (attPower > 0 || defPower > 0) {
       const defIdx = defender.field.findIndex((u) => u.instanceId === defUnit.instanceId);
       let defeatedDef = null;
       let defTieOutcome = null;
       if (defIdx !== -1) {
-        [defeatedDef] = defender.field.splice(defIdx, 1);
-        defTieOutcome = sendDefeatedUnitToGraveyardOrExile(defender, defeatedDef, state);
+        if (defUnit.cannotBeDefeatedThisTurn) {
+          state.actionLog.unshift(
+            `🛡️ [INMUNIDAD EN COMBATE] "${defUnit.name}" sobrevive al empate (${defPower} vs ${attPower}) gracias a su inmunidad.`
+          );
+        } else {
+          [defeatedDef] = defender.field.splice(defIdx, 1);
+          defTieOutcome = sendDefeatedUnitToGraveyardOrExile(defender, defeatedDef, state);
+        }
       }
       const attIdx = attacker.field.findIndex((u) => u.instanceId === attUnit.instanceId);
       let defeatedAtt = null;
       let attTieOutcome = null;
       if (attIdx !== -1) {
-        [defeatedAtt] = attacker.field.splice(attIdx, 1);
-        attTieOutcome = sendDefeatedUnitToGraveyardOrExile(attacker, defeatedAtt, state);
+        if (attUnit.cannotBeDefeatedThisTurn) {
+          state.actionLog.unshift(
+            `🛡️ [INMUNIDAD EN COMBATE] "${attUnit.name}" sobrevive al empate (${attPower} vs ${defPower}) gracias a su inmunidad.`
+          );
+        } else {
+          [defeatedAtt] = attacker.field.splice(attIdx, 1);
+          attTieOutcome = sendDefeatedUnitToGraveyardOrExile(attacker, defeatedAtt, state);
+        }
       }
       if (defeatedDef && !defTieOutcome?.intercepted) executeUnitDefeatedTrigger(state, defPlayerKey, defeatedDef);
       if (defeatedAtt && !attTieOutcome?.intercepted) executeUnitDefeatedTrigger(state, attPlayerKey, defeatedAtt);
-      state.actionLog.unshift(
-        `☠️ [FASE 3: EMPATE LETAL] (${attPower} vs ${defPower}): Ambas unidades tienen la misma fuerza: ¡AMBAS SON DERROTADAS!`
-      );
+      if (defeatedDef && defeatedAtt) {
+        state.actionLog.unshift(
+          `☠️ [FASE 3: EMPATE LETAL] (${attPower} vs ${defPower}): Ambas unidades tienen la misma fuerza: ¡AMBAS SON DERROTADAS!`
+        );
+      }
       result = {
         ...result,
         isTie: true,

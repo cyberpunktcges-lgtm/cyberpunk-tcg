@@ -118,8 +118,11 @@ function drawCards(player, count, state, sourceName) {
     c.isJustDrawn = true;
   });
   player.hand.push(...drawn);
+  const isBotPlayer = Boolean(state?.bot && player === state.bot);
   state.actionLog.unshift(
-    `🃏 [${sourceName}] ${player.name} roba ${drawn.length} carta(s): ${drawn.map((c) => c.name).join(', ')}.`
+    isBotPlayer
+      ? `🃏 [${sourceName}] ${player.name} roba ${drawn.length} carta(s).`
+      : `🃏 [${sourceName}] ${player.name} roba ${drawn.length} carta(s): ${drawn.map((c) => c.name).join(', ')}.`
   );
   return drawn;
 }
@@ -554,13 +557,75 @@ export function executeKerryGigRollTrigger(state, playerKey, gigIndex, isAfterRe
 // 1. MOTOR DE PROGRAMAS (34 CARTAS)
 // =========================================================================
 
+function isBraindanceProgramCard(card) {
+  if (!card) return false;
+  const cid = resolveCardId(card);
+  const ruleEntry = cid ? CARD_RULES_TEXT[cid] : null;
+  if (ruleEntry && Array.isArray(ruleEntry.classification)) {
+    if (ruleEntry.classification.some((cls) => /braindance/i.test(String(cls)))) {
+      return true;
+    }
+  }
+  const combined = `${card.cardType || ''} ${card.traits || ''} ${Array.isArray(card.classification) ? card.classification.join(' ') : card.classification || ''}`;
+  return /\bbraindance\b/i.test(combined);
+}
+
+/**
+ * CP-057: Judy Álvarez // Braindance Maestro
+ * "When you play a BRAINDANCE Program, give a friendly Unit +1 power this turn."
+ */
+function executeJudyBraindanceTriggers(state, playerKey, programCard) {
+  if (!state || !programCard || !isBraindanceProgramCard(programCard)) return;
+  const p = state[playerKey];
+  if (!p || !(p.field || []).length) return;
+
+  const activeJudys = [
+    ...(p.legends || []).filter(
+      (l) =>
+        l.isFaceUp &&
+        !l.isRemovedFromGame &&
+        (resolveCardId(l) === 'CP-057' || String(l.slug || '').includes('judy-alvarez-braindance-maestro'))
+    ),
+    ...(p.field || []).filter(
+      (u) => resolveCardId(u) === 'CP-057' || String(u.slug || '').includes('judy-alvarez-braindance-maestro')
+    )
+  ];
+
+  for (const judy of activeJudys) {
+    if (playerKey === 'player') {
+      queueTargetSelection(state, {
+        actionType: 'TARGET_UNIT',
+        effectType: 'BUFF',
+        amount: 1,
+        targetScope: 'FRIENDLY_UNITS',
+        sourceCardId: 'CP-057',
+        sourceCardName: 'Judy Álvarez // Braindance Maestro',
+        sourceCardImage: judy.image,
+        title: '🧠 JUDY ÁLVAREZ // BRAINDANCE (+1 PODER)',
+        prompt: `Jugaste el Programa Braindance "${programCard.name}". Selecciona una Unidad amiga para darle +1 de poder este turno:`
+      });
+    } else {
+      const bestUnit = [...(p.field || [])].sort((a, b) => (b.currentPower || 0) - (a.currentPower || 0))[0];
+      if (bestUnit) {
+        bestUnit.currentPower = (bestUnit.currentPower || 0) + 1;
+        state.actionLog.unshift(
+          `🧠 [Judy Álvarez Rival] Al jugar el Braindance "${programCard.name}", otorga +1 de poder a "${bestUnit.name}" (Poder actual: ${bestUnit.currentPower}).`
+        );
+      }
+    }
+  }
+}
+
 export function executeProgramEffect(state, playerKey, card) {
   if (!state || !card) return { executed: false };
   const p = state[playerKey];
   const oppKey = playerKey === 'player' ? 'bot' : 'player';
   const opp = state[oppKey];
-  const cardId = card.id || '';
+  const cardId = resolveCardId(card) || card.id || '';
   const cardName = card.name || 'Programa';
+
+  // Disparador pasivo oficial de CP-057 Judy Álvarez // Braindance Maestro al jugar un Braindance
+  executeJudyBraindanceTriggers(state, playerKey, card);
 
   // CP-005: Afterparty at Lizzie's
   // "Adjust a Gig by up to 1. If you control 2 or more Gigs with different values, draw 1."
@@ -826,9 +891,75 @@ export function executeProgramEffect(state, playerKey, card) {
   // CP-037: Fool on the Hill
   // "Reveal the top 2 cards of your deck. A Rival chooses whether you add them to your hand or trash them. If you trash them, draw 2."
   if (cardId === 'CP-037') {
-    trashFromDeck(p, 2, state, cardName);
-    drawCards(p, 2, state, cardName);
-    return { executed: true };
+    const top2 = (p.deck || []).splice(0, Math.min(2, p.deck?.length || 0));
+    if (top2.length === 0) {
+      state.actionLog.unshift(`🃏 [Fool on the Hill] El mazo está vacío; no hay cartas que revelar.`);
+      return { executed: true };
+    }
+
+    const revealedNames = top2.map((c) => c.name).join(', ');
+
+    if (playerKey === 'bot') {
+      // El Rival eres TÚ (jugador humano): revelamos las 2 cartas y abrimos el selector modal
+      state.actionLog.unshift(
+        `🃏 [Fool on the Hill Rival] Revela las ${top2.length} primeras cartas de su mazo: ${revealedNames}. ¡Debes elegir si se las queda o las envía al Trash!`
+      );
+      state.pendingModalChoice = {
+        sourceCardId: 'CP-037',
+        sourceCardName: 'Fool on the Hill',
+        sourceCardImage: card.image,
+        title: '🃏 FOOL ON THE HILL // ELIGE COMO RIVAL',
+        prompt:
+          'El rival reveló las 2 primeras cartas de su mazo. Elige si las añade a su mano o las envía a su Basura (si las descartas, robará 2 cartas ocultas):',
+        revealedCards: top2,
+        options: [
+          {
+            id: 'FOOL_BOT_ADD_HAND',
+            title: `AÑADIR A SU MANO (${top2.map((c) => String(c.name || '').split('//')[0].trim()).join(', ')})`,
+            description: 'El rival añade estas cartas reveladas directamente a su mano.',
+            isEligible: true
+          },
+          {
+            id: 'FOOL_BOT_TRASH',
+            title: 'ENVIAR A LA BASURA (TRASH THEM)',
+            description: 'Descarta estas cartas reveladas al Trash del rival y luego el rival roba 2 cartas nuevas.',
+            isEligible: true
+          }
+        ]
+      };
+      return { executed: true };
+    } else {
+      // Tú jugaste Fool on the Hill: revelas las 2 cartas y el Bot (tu Rival) decide estratégicamente
+      state.actionLog.unshift(
+        `🃏 [Fool on the Hill] Revelas las ${top2.length} primeras cartas de tu mazo: ${revealedNames}.`
+      );
+      const threatScore = top2.reduce((sum, c) => {
+        const cost = Number(c.parsedCost ?? c.costNum ?? 2);
+        const pow = Number(c.parsedPower ?? 0);
+        const isHighImpact = cost >= 4 || pow >= 5 || /destroy|bottom-deck|steal|defeat/i.test(getCardRulesText(c));
+        return sum + cost + (isHighImpact ? 3 : 0);
+      }, 0);
+      const botPrefersTrash = threatScore >= 9;
+
+      if (botPrefersTrash) {
+        if (!p.trash) p.trash = [];
+        p.trash.push(...top2);
+        state.actionLog.unshift(
+          `🤖 [Fool on the Hill] El rival decide ENVIAR AL TRASH las cartas reveladas (${revealedNames}). Robas 2 cartas nuevas.`
+        );
+        drawCards(p, 2, state, cardName);
+      } else {
+        if (!p.hand) p.hand = [];
+        top2.forEach((c) => {
+          c.isJustDrawn = true;
+        });
+        p.hand.push(...top2);
+        state.actionLog.unshift(
+          `🤖 [Fool on the Hill] El rival decide AÑADIR A TU MANO las cartas reveladas: ${revealedNames}.`
+        );
+      }
+      return { executed: true };
+    }
   }
 
   // CP-043: Gunpoint Diplomacy
@@ -1234,9 +1365,12 @@ export function executeProgramEffect(state, playerKey, card) {
   }
 
   // CP-129: Three Mouths, One Desire
-  // "Search the top 3 cards of your deck. Add 1 to your hand. Bottom-deck the rest."
+  // "Search the top 3 cards of your deck. Add 1 to your hand. You may add 1 more for each friendly min Gig. Bottom-deck the rest."
   if (cardId === 'CP-129') {
     const top3 = (p.deck || []).splice(0, Math.min(3, p.deck?.length || 0));
+    const minGigCount = (p.gigs || []).filter((g) => Number(g.value) === 1).length;
+    const maxPick = Math.min(top3.length, 1 + minGigCount);
+
     if (playerKey === 'player') {
       state.pendingCardChoice = {
         type: 'SEARCH_AND_CHOOSE',
@@ -1246,11 +1380,13 @@ export function executeProgramEffect(state, playerKey, card) {
         sourceCardImage: card.image,
         title: '🎭 THREE MOUTHS, ONE DESIRE // PROGRAMA',
         prompt: top3.length > 0
-          ? 'Se han revelado las 3 primeras cartas de tu mazo. Selecciona 1 carta para añadir a tu mano (el resto irá al fondo del mazo):'
+          ? minGigCount > 0
+            ? `Examinas las ${top3.length} primeras cartas de tu mazo. Puedes añadir hasta ${maxPick} carta(s) a tu mano (1 base + ${minGigCount} por Gig mínimo) y el resto irá al fondo del mazo:`
+            : `Examinas las ${top3.length} primeras cartas de tu mazo. Selecciona 1 carta para añadir a tu mano (el resto irá al fondo del mazo):`
           : 'Tu mazo está vacío. No hay cartas que examinar.',
         cards: top3,
         eligibleIds: top3.map((c) => c.instanceId),
-        maxChoices: 1,
+        maxChoices: maxPick,
         minChoices: top3.length > 0 ? 1 : 0,
         filterDescription: 'Cualquier carta',
         remainingDestination: 'BOTTOM_DECK',
@@ -1258,10 +1394,19 @@ export function executeProgramEffect(state, playerKey, card) {
       };
     } else {
       if (top3.length > 0) {
-        const chosen = top3.shift();
-        p.hand.push(chosen);
-        p.deck.push(...top3);
-        state.actionLog.unshift(`🎭 [Three Mouths, One Desire Rival] Añade "${chosen.name}" a su mano.`);
+        // Priorizar cartas de mayor impacto sin revelar nombres en el log (Search es información privada)
+        const sorted = [...top3].sort(
+          (a, b) => (Number(b.parsedCost ?? b.costNum ?? 0) - Number(a.parsedCost ?? a.costNum ?? 0))
+        );
+        const taken = sorted.slice(0, maxPick);
+        const rest = sorted.slice(maxPick);
+        p.hand.push(...taken);
+        p.deck.push(...rest);
+        state.actionLog.unshift(
+          `🎭 [Three Mouths, One Desire Rival] Examina las ${top3.length} primeras cartas de su mazo, añade ${taken.length} carta(s) a su mano${
+            rest.length > 0 ? ` y envía ${rest.length} al fondo de su mazo` : ''
+          }.`
+        );
       }
     }
     return { executed: true };
@@ -1816,7 +1961,9 @@ export function executeUnitPlayTrigger(state, playerKey, unitInstance) {
   // -------------------------------------------------------------------------
   if (cardId === 'CP-024') {
     const drawn = drawCards(p, 2, state, cardName);
-    notifyTrigger('🚕 DELAMAIN // PLAY', `Robaste ${drawn.length} carta(s): ${drawn.map((c) => c.name).join(', ') || 'Mazo vacío'}.`, 'success');
+    if (playerKey === 'player') {
+      notifyTrigger('🚕 DELAMAIN // PLAY', `Robaste ${drawn.length} carta(s): ${drawn.map((c) => c.name).join(', ') || 'Mazo vacío'}.`, 'success');
+    }
     return;
   }
 

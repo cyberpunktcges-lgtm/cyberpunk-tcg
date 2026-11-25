@@ -596,9 +596,14 @@ export const ACTIVATED_ABILITIES_CONFIG = {
           drawn.push(d.name);
         }
         state.actionLog.unshift(
-          `🎸 [Kerry Eurodyne] Activa (↷): ¡Condición de Gig ≥ 8 cumplida! Roba 2 cartas: ${drawn.join(', ')}.`
+          playerKey === 'bot'
+            ? `🎸 [Kerry Eurodyne Rival] Activa (↷): ¡Condición de Gig ≥ 8 cumplida! Roba ${drawn.length} carta(s).`
+            : `🎸 [Kerry Eurodyne] Activa (↷): ¡Condición de Gig ≥ 8 cumplida! Roba ${drawn.length} carta(s): ${drawn.join(', ')}.`
         );
-        return { success: true, message: `Robadas 2 cartas: ${drawn.join(', ')}.` };
+        return {
+          success: true,
+          message: playerKey === 'bot' ? `El rival robó ${drawn.length} carta(s).` : `Robadas ${drawn.length} cartas: ${drawn.join(', ')}.`
+        };
       }
     }
   ],
