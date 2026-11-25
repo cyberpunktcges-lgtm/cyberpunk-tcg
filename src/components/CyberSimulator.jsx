@@ -1312,6 +1312,68 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
     }
   };
 
+  // Seleccionar/deseleccionar un Eddie o Leyenda durante la barra interactiva PAY X €$
+  const toggleManualPaymentSource = (kind, instanceId) => {
+    setPendingManualPayment((prev) => {
+      if (!prev) return null;
+      const list = prev.selectedSources || [];
+      const exists = list.some((s) => s.kind === kind && s.instanceId === instanceId);
+      if (exists) {
+        return {
+          ...prev,
+          selectedSources: list.filter((s) => !(s.kind === kind && s.instanceId === instanceId))
+        };
+      }
+      const alreadyPaid = (gameState?.player?.floatingEddies || 0) + list.length;
+      if (alreadyPaid >= prev.cost) return prev;
+      return {
+        ...prev,
+        selectedSources: [...list, { kind, instanceId }]
+      };
+    });
+  };
+
+  // Confirmar pago manual: gira exactamente los Eddies/Leyendas elegidos y juega la carta
+  const confirmManualPayment = () => {
+    if (!pendingManualPayment || !gameState) return;
+    const { cardInstanceId, targetId, cost, selectedSources = [] } = pendingManualPayment;
+    const totalReady = (gameState.player?.floatingEddies || 0) + selectedSources.length;
+    if (totalReady < cost) return;
+    pushHistory();
+    for (const srcItem of selectedSources) {
+      if (srcItem.kind === 'eddie') {
+        toggleEddieSpent(gameState, 'player', srcItem.instanceId);
+      } else if (srcItem.kind === 'legend') {
+        toggleLegendSpent(gameState, 'player', srcItem.instanceId);
+      }
+    }
+    setPendingManualPayment(null);
+    const res = playCard(gameState, 'player', cardInstanceId, targetId);
+    if (res.success) {
+      setSelectedHandCard(null);
+      if (
+        !gameState.pendingCardChoice &&
+        !gameState.pendingModalChoice &&
+        !gameState.pendingTargetSelection &&
+        gameState.lastTriggerNotification
+      ) {
+        const notif = gameState.lastTriggerNotification;
+        delete gameState.lastTriggerNotification;
+        setHolocall({
+          title: notif.title,
+          message: notif.message,
+          characterName: 'KIROSHI OS // TRIGGER PLAY',
+          type: notif.type || 'success'
+        });
+      } else {
+        delete gameState.lastTriggerNotification;
+      }
+      setGameState({ ...gameState });
+    } else {
+      setGameState({ ...gameState });
+    }
+  };
+
   // Jugar carta arrastrada o clicada (Unidad -> Campo, Programa -> Trash, Gear -> Equipa)
   const handlePlayCard = (cardInstanceId, targetId = null) => {
     if (!gameState || gameState.activePlayer !== 'player' || gameState.isGameOver) return;
@@ -1354,7 +1416,13 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
         if (autoPayEddies) {
           autoTapEddiesForCost(effCost);
         } else if (getTotalAvailableEddies(gameState.player) >= effCost) {
-          setPendingManualPayment({ cardInstanceId, targetId, card: handCard, cost: effCost });
+          setPendingManualPayment({
+            cardInstanceId,
+            targetId,
+            card: handCard,
+            cost: effCost,
+            selectedSources: []
+          });
           setSelectedHandCard(null);
           return;
         }
@@ -6666,6 +6734,10 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                           }}
                           onClick={(e) => {
                             e.stopPropagation();
+                            if (pendingManualPayment && !leg.isSpent && !leg.isOnField && !leg.isRemovedFromGame) {
+                              toggleManualPaymentSource('legend', leg.instanceId);
+                              return;
+                            }
                             if (pendingGearEquip && leg.isFaceUp && !leg.isOnField && !leg.isRemovedFromGame) {
                               if (pendingGearEquip.stagedTargetId === leg.instanceId) {
                                 const { cardInstanceId } = pendingGearEquip;
@@ -6690,7 +6762,11 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                           }}
                           style={recentHighlights[leg.instanceId] ? { boxShadow: `0 0 28px ${recentHighlights[leg.instanceId]}`, borderColor: recentHighlights[leg.instanceId] } : undefined}
                           className={`w-11 sm:w-12 lg:w-16 xl:w-17 h-15 sm:h-17 lg:h-22 xl:h-24 rounded-md border transition-all cursor-pointer flex flex-col items-center justify-center relative shadow-md group ${
-                            pendingGearEquip && leg.isFaceUp && !leg.isOnField && !leg.isRemovedFromGame
+                            pendingManualPayment && !leg.isSpent && !leg.isOnField && !leg.isRemovedFromGame
+                              ? (pendingManualPayment.selectedSources || []).some((s) => s.kind === 'legend' && s.instanceId === leg.instanceId)
+                                ? 'border-2 border-[#FCEE0A] ring-2 ring-[#FCEE0A] shadow-[0_0_24px_rgba(252,238,10,0.9)] -translate-y-1.5 rotate-[10deg] z-30'
+                                : 'border-2 border-[#0dfceb] shadow-[0_0_20px_rgba(13,252,235,0.85)] hover:border-white hover:-translate-y-1 z-20'
+                              : pendingGearEquip && leg.isFaceUp && !leg.isOnField && !leg.isRemovedFromGame
                               ? pendingGearEquip.stagedTargetId === leg.instanceId
                                 ? 'border-[#FCEE0A] ring-4 ring-[#FCEE0A] shadow-[0_0_28px_rgba(252,238,10,0.95)] scale-110 z-30'
                                 : 'border-[#0dfceb] ring-2 ring-[#0dfceb] shadow-[0_0_24px_rgba(13,252,235,0.9)] animate-pulse z-20'
@@ -6797,14 +6873,24 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                       key={ed.instanceId || idx}
                       onMouseEnter={() => setHoveredCard(makeEddieBackPreview('TU EDDIE (1 €$) // CARTA VENDIDA', ed.isSpent))}
                       onMouseLeave={() => setHoveredCard(null)}
-                      onClick={() => handleToggleEddie(ed.instanceId)}
+                      onClick={() => {
+                        if (pendingManualPayment && !ed.isSpent) {
+                          toggleManualPaymentSource('eddie', ed.instanceId);
+                          return;
+                        }
+                        handleToggleEddie(ed.instanceId);
+                      }}
                       onContextMenu={(e) => handleCardRightClick(e, ed)}
                       className="transition-all duration-300 flex items-center justify-center shrink-0 cursor-pointer w-11 sm:w-12 lg:w-16 xl:w-17 h-15 sm:h-17 lg:h-22 xl:h-24"
-                      title={ed.isSpent ? 'Eddie gastado este turno' : '1 €$ disponible (clic para girar en modo Manual)'}
+                      title={pendingManualPayment && !ed.isSpent ? 'Clic para usar este Eddie para pagar' : ed.isSpent ? 'Eddie gastado este turno' : '1 €$ disponible'}
                     >
                       <div
-                        className={`w-full h-full rounded-md overflow-hidden border transition-transform duration-300 relative shadow-md ${
-                          ed.isSpent
+                        className={`w-full h-full rounded-md overflow-hidden border transition-all duration-200 relative shadow-md ${
+                          pendingManualPayment && !ed.isSpent
+                            ? (pendingManualPayment.selectedSources || []).some((s) => s.kind === 'eddie' && s.instanceId === ed.instanceId)
+                              ? 'border-2 border-[#FCEE0A] ring-2 ring-[#FCEE0A] shadow-[0_0_24px_rgba(252,238,10,0.9)] -translate-y-1.5 rotate-[10deg]'
+                              : 'border-2 border-[#0dfceb] shadow-[0_0_20px_rgba(13,252,235,0.85)] hover:border-white hover:-translate-y-1'
+                            : ed.isSpent
                             ? 'rotate-[14deg] brightness-50 border-gray-800'
                             : 'border-[#0dfceb]/80 hover:border-[#FCEE0A] hover:scale-105 shadow-[0_0_12px_rgba(13,252,235,0.3)]'
                         }`}
@@ -8531,9 +8617,10 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
         </div>
       )}
 
-      {/* BARRA INTERACTIVA DE PAGO MANUAL "PAY X €$" (ESTILO CAPTURA 6) */}
+      {/* BARRA INTERACTIVA DE PAGO MANUAL "PAY X €$" (EXACTA A CAPTURA DE KERRY) */}
       {pendingManualPayment && (() => {
-        const paidNow = availableEddies;
+        const pickedCount = (pendingManualPayment.selectedSources || []).length;
+        const paidNow = availableEddies + pickedCount;
         const needed = pendingManualPayment.cost;
         const isReadyToPay = paidNow >= needed;
         return (
@@ -8541,7 +8628,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
             <motion.div
               initial={{ opacity: 0, y: 10, scale: 0.96 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
-              className="bg-[#070c16]/96 border border-[#FCEE0A]/80 rounded-md px-3.5 py-2.5 shadow-[0_0_40px_rgba(0,0,0,0.9)] backdrop-blur-md flex items-center justify-between gap-3"
+              className="bg-[#070c16]/96 border border-[#FCEE0A]/85 rounded-md px-3.5 py-2.5 shadow-[0_0_45px_rgba(0,0,0,0.92)] backdrop-blur-md flex items-center justify-between gap-3"
             >
               <div className="flex items-center gap-2.5 min-w-0 flex-1">
                 {pendingManualPayment.card?.image && (
@@ -8554,14 +8641,14 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                     PAY {needed} €$
                   </span>
                   <p className="text-[11px] text-gray-300 font-sans truncate">
-                    Gira {needed} Eddie(s) en tu fila iluminada abajo ({pendingManualPayment.card?.name}).
+                    Haz clic en {needed} Eddie(s) o Leyenda(s) iluminados abajo para jugar {pendingManualPayment.card?.name}.
                   </p>
                 </div>
               </div>
 
               <div className="flex items-center gap-2 shrink-0">
                 <span className="text-xs font-black text-white px-1">
-                  <span className={isReadyToPay ? "text-[#00FF9C]" : "text-[#FCEE0A]"}>{paidNow}</span>/{needed}
+                  <span className={isReadyToPay ? "text-[#00FF9C]" : "text-[#FCEE0A]"}>{Math.min(paidNow, needed)}</span>/{needed}
                 </span>
                 <button
                   type="button"
@@ -8573,11 +8660,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                 <button
                   type="button"
                   disabled={!isReadyToPay}
-                  onClick={() => {
-                    const { cardInstanceId, targetId } = pendingManualPayment;
-                    setPendingManualPayment(null);
-                    handlePlayCard(cardInstanceId, targetId);
-                  }}
+                  onClick={confirmManualPayment}
                   className={`px-4 py-1.5 text-xs font-black uppercase tracking-wider rounded-sm transition-all ${
                     isReadyToPay
                       ? 'bg-[#FCEE0A] hover:bg-white text-[#070a10] cursor-pointer shadow-[0_0_18px_rgba(252,238,10,0.75)]'
