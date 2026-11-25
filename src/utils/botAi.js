@@ -412,6 +412,286 @@ function chooseBestLegendToCall(bot) {
   return pool[pickIdx];
 }
 
+let botArrowBatchSeq = 1;
+
+function shortArrowName(card, fallback = 'RIVAL') {
+  const raw = String(card?.name || fallback).split(':')[0].trim();
+  return raw.length > 22 ? `${raw.slice(0, 21)}…` : raw;
+}
+
+function captureBotActionSnapshot(gameState) {
+  const p = gameState?.player || {};
+  const b = gameState?.bot || {};
+  return {
+    playerField: (p.field || []).map((u) => ({
+      instanceId: u.instanceId,
+      name: u.name || 'Unidad',
+      currentPower: Number(u.currentPower ?? u.parsedPower ?? 0),
+      isSpent: Boolean(u.isSpent),
+      cannotReadyNextTurn: Boolean(u.cannotReadyNextTurn),
+      gearCount: (u.gear || []).length
+    })),
+    playerGigsSig: (p.gigs || []).map((g) => `${g.die}:${g.value}`).join('|'),
+    playerGigsCount: (p.gigs || []).length,
+    playerHandLen: (p.hand || []).length,
+    playerLegends: (p.legends || []).map((l) => ({
+      instanceId: l.instanceId,
+      isFaceUp: Boolean(l.isFaceUp),
+      isSpent: Boolean(l.isSpent)
+    })),
+    botField: (b.field || []).map((u) => ({
+      instanceId: u.instanceId,
+      name: u.name || 'Unidad',
+      currentPower: Number(u.currentPower ?? u.parsedPower ?? 0),
+      gearCount: (u.gear || []).length
+    })),
+    botGigsSig: (b.gigs || []).map((g) => `${g.die}:${g.value}`).join('|'),
+    botGigsCount: (b.gigs || []).length,
+    hadModalChoice: Boolean(gameState?.pendingModalChoice),
+    logLen: (gameState?.actionLog || []).length
+  };
+}
+
+function recordBotActionArrows(
+  beforeSnap,
+  gameState,
+  { actionType = 'ACTION', card = null, sourceAnchor = null, explicitTargetId = null, extraArrows = [] } = {}
+) {
+  if (!beforeSnap || !gameState) return [];
+  const p = gameState.player || {};
+  const b = gameState.bot || {};
+  const labelBase = shortArrowName(card, actionType);
+
+  let sourceCandidates = ['bot-trash', 'bot-pill', 'bot-field'];
+  if (sourceAnchor) {
+    sourceCandidates = Array.isArray(sourceAnchor)
+      ? [...sourceAnchor, 'bot-trash', 'bot-pill']
+      : [sourceAnchor, 'bot-trash', 'bot-pill'];
+  } else if (card) {
+    if (actionType === 'GEAR') {
+      sourceCandidates = ['bot-pill', 'bot-trash', 'bot-field'];
+    } else if (actionType === 'PROGRAM') {
+      sourceCandidates = ['bot-trash', 'bot-pill', 'bot-field'];
+    } else {
+      const matchingFieldUnit = (b.field || []).find(
+        (u) => u.instanceId === card.instanceId || u.legendInstanceId === card.instanceId
+      );
+      sourceCandidates = [
+        matchingFieldUnit?.instanceId,
+        card.instanceId,
+        'bot-trash',
+        'bot-pill',
+        'bot-field'
+      ].filter(Boolean);
+    }
+  }
+
+  const arrows = [...extraArrows];
+  const afterPlayerField = p.field || [];
+  const afterPlayerFieldMap = new Map(afterPlayerField.map((u) => [u.instanceId, u]));
+  const afterPlayerTrashIds = new Set((p.trash || []).map((c) => c.instanceId));
+  const afterPlayerHandIds = new Set((p.hand || []).map((c) => c.instanceId));
+
+  // 1. Cambios sobre unidades del jugador (debuff, giro/congelado, quitar gear, destrucción/bounce)
+  for (const prevU of beforeSnap.playerField) {
+    const curU = afterPlayerFieldMap.get(prevU.instanceId);
+    if (curU) {
+      const curPow = Number(curU.currentPower ?? curU.parsedPower ?? 0);
+      if (curPow < prevU.currentPower) {
+        arrows.push({
+          fromAnchor: sourceCandidates,
+          toAnchor: curU.instanceId,
+          color: '#FF003C',
+          dashed: true,
+          label: `⚡ ${labelBase} (-${prevU.currentPower - curPow})`,
+          targetPlayerUnitId: curU.instanceId
+        });
+      } else if ((!prevU.isSpent && curU.isSpent) || (!prevU.cannotReadyNextTurn && curU.cannotReadyNextTurn)) {
+        arrows.push({
+          fromAnchor: sourceCandidates,
+          toAnchor: curU.instanceId,
+          color: '#ff4fd8',
+          dashed: true,
+          label: `🔒 ${labelBase}`,
+          targetPlayerUnitId: curU.instanceId
+        });
+      } else if ((curU.gear || []).length < prevU.gearCount) {
+        arrows.push({
+          fromAnchor: sourceCandidates,
+          toAnchor: curU.instanceId,
+          color: '#FF003C',
+          dashed: true,
+          label: `💥 ${labelBase} (-GEAR)`,
+          targetPlayerUnitId: curU.instanceId
+        });
+      }
+    } else {
+      const uShort = shortArrowName(prevU, 'UNIDAD');
+      if (afterPlayerTrashIds.has(prevU.instanceId)) {
+        arrows.push({
+          fromAnchor: sourceCandidates,
+          toAnchor: ['player-trash', 'player-field'],
+          color: '#FF003C',
+          dashed: true,
+          label: `☠️ ${labelBase} → ${uShort}`
+        });
+      } else if (afterPlayerHandIds.has(prevU.instanceId)) {
+        arrows.push({
+          fromAnchor: sourceCandidates,
+          toAnchor: ['player-hand', 'player-field'],
+          color: '#ff4fd8',
+          dashed: true,
+          label: `↩️ ${labelBase} → ${uShort}`
+        });
+      } else {
+        arrows.push({
+          fromAnchor: sourceCandidates,
+          toAnchor: ['player-deck', 'player-field'],
+          color: '#FF003C',
+          dashed: true,
+          label: `⚡ ${labelBase} → ${uShort}`
+        });
+      }
+    }
+  }
+
+  // 2. Cambios sobre Gigs del jugador (robo, ajuste, intercambio)
+  const afterPlayerGigsSig = (p.gigs || []).map((g) => `${g.die}:${g.value}`).join('|');
+  if (afterPlayerGigsSig !== beforeSnap.playerGigsSig) {
+    const stoleGig = (p.gigs || []).length < beforeSnap.playerGigsCount;
+    arrows.push({
+      fromAnchor: sourceCandidates,
+      toAnchor: ['player-gigs', 'player-field'],
+      color: '#FF003C',
+      dashed: true,
+      label: stoleGig ? `🎲 ${labelBase} (ROBA GIG)` : `🎲 ${labelBase} (GIGS)`
+    });
+  }
+
+  // 3. Descarte forzado en mano del jugador
+  if ((p.hand || []).length < beforeSnap.playerHandLen) {
+    arrows.push({
+      fromAnchor: sourceCandidates,
+      toAnchor: ['player-hand', 'player-trash', 'player-field'],
+      color: '#ff4fd8',
+      dashed: true,
+      label: `🃏 ${labelBase} (MANO)`
+    });
+  }
+
+  // 4. Leyendas del jugador afectadas
+  const afterPlayerLegendsMap = new Map((p.legends || []).map((l) => [l.instanceId, l]));
+  for (const prevL of beforeSnap.playerLegends) {
+    const curL = afterPlayerLegendsMap.get(prevL.instanceId);
+    if (curL && (Boolean(curL.isFaceUp) !== prevL.isFaceUp || Boolean(curL.isSpent) !== prevL.isSpent)) {
+      arrows.push({
+        fromAnchor: sourceCandidates,
+        toAnchor: [curL.instanceId, 'player-field'],
+        color: '#ff4fd8',
+        dashed: true,
+        label: `⚡ ${labelBase}`
+      });
+    }
+  }
+
+  // 5. Gear equipado por el rival sobre su propia unidad
+  if (actionType === 'GEAR' && explicitTargetId) {
+    arrows.push({
+      fromAnchor: ['bot-pill', 'bot-trash'],
+      toAnchor: [explicitTargetId, 'bot-field'],
+      color: '#FCEE0A',
+      dashed: true,
+      label: `🔧 ${labelBase}`
+    });
+  }
+
+  // 6. Buffs a unidades del rival por Programa / Habilidad / Trigger PLAY
+  const afterBotFieldMap = new Map((b.field || []).map((u) => [u.instanceId, u]));
+  for (const prevB of beforeSnap.botField) {
+    const curB = afterBotFieldMap.get(prevB.instanceId);
+    if (!curB || curB.instanceId === explicitTargetId) continue;
+    const curPow = Number(curB.currentPower ?? curB.parsedPower ?? 0);
+    if (curPow > prevB.currentPower) {
+      arrows.push({
+        fromAnchor: sourceCandidates,
+        toAnchor: curB.instanceId,
+        color: '#FCEE0A',
+        dashed: true,
+        label: `⚡ ${labelBase} (+${curPow - prevB.currentPower})`
+      });
+    }
+  }
+
+  // 7. Gigs del propio rival modificados por Programa o Habilidad
+  const afterBotGigsSig = (b.gigs || []).map((g) => `${g.die}:${g.value}`).join('|');
+  if (afterBotGigsSig !== beforeSnap.botGigsSig && actionType !== 'END_BOT_TURN') {
+    arrows.push({
+      fromAnchor: sourceCandidates,
+      toAnchor: 'bot-gigs',
+      color: '#FCEE0A',
+      dashed: true,
+      label: `🎲 ${labelBase}`
+    });
+  }
+
+  // 8. Decisión interactiva lanzada al jugador (ej: Fool on the Hill)
+  if (!beforeSnap.hadModalChoice && gameState.pendingModalChoice && arrows.length === 0) {
+    arrows.push({
+      fromAnchor: sourceCandidates,
+      toAnchor: ['player-field', 'player-pill'],
+      color: '#ff4fd8',
+      dashed: true,
+      label: `⚡ ${labelBase}`
+    });
+  }
+
+  // 9. Respaldo por log recién añadido (captura flags especiales como cannotBlock, mustAttack o debuff sobre poder 0)
+  if (arrows.length === 0 && typeof beforeSnap.logLen === 'number') {
+    const newCount = Math.max(0, (gameState.actionLog || []).length - beforeSnap.logLen);
+    if (newCount > 0) {
+      const recentLogsText = (gameState.actionLog || []).slice(0, newCount).join(' \n ');
+      for (const pu of afterPlayerField) {
+        const puName = String(pu.name || '').trim();
+        const puShort = puName.split(':')[0].trim();
+        if (
+          (puName && recentLogsText.includes(puName)) ||
+          (puShort && puShort.length >= 4 && recentLogsText.includes(puShort))
+        ) {
+          arrows.push({
+            fromAnchor: sourceCandidates,
+            toAnchor: pu.instanceId,
+            color: '#ff4fd8',
+            dashed: true,
+            label: `⚡ ${labelBase}`,
+            targetPlayerUnitId: pu.instanceId
+          });
+        }
+      }
+      if (arrows.length === 0 && /tus gigs|gig rival|roba.*gig|reduce.*gig/i.test(recentLogsText)) {
+        arrows.push({
+          fromAnchor: sourceCandidates,
+          toAnchor: ['player-gigs', 'player-field'],
+          color: '#FF003C',
+          dashed: true,
+          label: `🎲 ${labelBase}`
+        });
+      }
+    }
+  }
+
+  if (arrows.length > 0) {
+    const batchId = `bot-arr-${Date.now()}-${botArrowBatchSeq++}`;
+    gameState.lastBotActionArrows = {
+      batchId,
+      arrows: arrows.map((a, idx) => ({
+        ...a,
+        id: `${batchId}-${idx}`
+      }))
+    };
+  }
+  return arrows;
+}
+
 /**
  * Evalúa si conviene activar una habilidad (↷) gratuita o rentable de una Leyenda/Unidad del bot.
  */
@@ -460,8 +740,14 @@ function tryActivateBotAbilities(gameState, bot, player) {
       }
 
       if (shouldUse) {
+        const snapBeforeAb = captureBotActionSnapshot(gameState);
         const res = executeCardActivatedAbility(gameState, 'bot', card.instanceId, ab.id);
         if (res && res.success) {
+          recordBotActionArrows(snapBeforeAb, gameState, {
+            actionType: 'ABILITY',
+            card,
+            sourceAnchor: card.instanceId
+          });
           activatedAny = { card, ability: ab };
           break;
         }
@@ -555,8 +841,14 @@ export function executeBotReaction(gameState, attackerUnit, targetType, targetUn
   if (quickCards.length > 0) {
     const qCard = quickCards[0];
     const cost = getEffectiveCardCost(qCard, bot, gameState);
+    const snapBeforeQuick = captureBotActionSnapshot(gameState);
     botPrepareEddies(bot, cost);
     playCard(gameState, 'bot', qCard.instanceId);
+    recordBotActionArrows(snapBeforeQuick, gameState, {
+      actionType: 'PROGRAM',
+      card: qCard,
+      sourceAnchor: ['bot-trash', 'bot-pill']
+    });
     gameState.actionLog.unshift(
       `⚡ [FASE 2: REACCIÓN] ¡QUICK! El rival responde jugando "${qCard.name}".`
     );
@@ -566,8 +858,14 @@ export function executeBotReaction(gameState, attackerUnit, targetType, targetUn
   if (!bot.hasCalledLegendThisTurn && getBotMaxCapacity(bot) >= 1) {
     const uncalledLeg = chooseBestLegendToCall(bot, gameState.player);
     if (uncalledLeg) {
+      const snapBeforeCall = captureBotActionSnapshot(gameState);
       botPrepareEddies(bot, 1, uncalledLeg.instanceId);
       callLegendFaceUp(gameState, 'bot', uncalledLeg.instanceId);
+      recordBotActionArrows(snapBeforeCall, gameState, {
+        actionType: 'CALL_LEGEND',
+        card: uncalledLeg,
+        sourceAnchor: uncalledLeg.instanceId
+      });
       gameState.actionLog.unshift(
         `👑 [FASE 2: REACCIÓN] ¡CALL! El rival responde llamando a su Leyenda "${uncalledLeg.name}" boca arriba.`
       );
@@ -575,7 +873,25 @@ export function executeBotReaction(gameState, attackerUnit, targetType, targetUn
   }
 
   if (chosenBlocker) {
+    const snapBeforeBlock = captureBotActionSnapshot(gameState);
     chosenBlocker.isSpent = true;
+    recordBotActionArrows(snapBeforeBlock, gameState, {
+      actionType: 'BLOCKER',
+      card: chosenBlocker,
+      sourceAnchor: chosenBlocker.instanceId,
+      extraArrows: attackerUnit?.instanceId
+        ? [
+            {
+              fromAnchor: chosenBlocker.instanceId,
+              toAnchor: attackerUnit.instanceId,
+              color: '#FF003C',
+              dashed: false,
+              label: `🛡️ BLOCK: ${shortArrowName(chosenBlocker)}`,
+              targetPlayerUnitId: attackerUnit.instanceId
+            }
+          ]
+        : []
+    });
     gameState.actionLog.unshift(
       `🛡️ [FASE 2: REACCIÓN] ¡BLOCKER! El rival gira a "${chosenBlocker.name}" [Fuerza: ${chosenBlocker.currentPower}] para interceptar el ataque.`
     );
@@ -670,9 +986,11 @@ export async function runBotTurn(gameState, updateCallback, delayMs = 700, pause
       const uCost = getEffectiveCardCost(unitToPlay, bot, gameState);
       await wait(Math.min(delayMs, 450));
       const logBefore = (gameState.actionLog || []).length;
+      const snapBefore = captureBotActionSnapshot(gameState);
       botPrepareEddies(bot, uCost);
       const res = playUnitCard(gameState, 'bot', unitToPlay.instanceId);
       if (res.success) {
+        recordBotActionArrows(snapBefore, gameState, { actionType: 'UNIT', card: unitToPlay });
         const cont = await pauseAfterPlay('UNIT', unitToPlay, logBefore);
         if (!cont) return;
       }
@@ -683,8 +1001,14 @@ export async function runBotTurn(gameState, updateCallback, delayMs = 700, pause
         if (leg) {
           await wait(Math.min(delayMs, 450));
           const logBefore = (gameState.actionLog || []).length;
+          const snapBefore = captureBotActionSnapshot(gameState);
           botPrepareEddies(bot, 1, leg.instanceId);
           callLegendFaceUp(gameState, 'bot', leg.instanceId);
+          recordBotActionArrows(snapBefore, gameState, {
+            actionType: 'CALL_LEGEND',
+            card: leg,
+            sourceAnchor: leg.instanceId
+          });
           const cont = await pauseAfterPlay('CALL_LEGEND', leg, logBefore);
           if (!cont) return;
         }
@@ -838,10 +1162,12 @@ export async function runBotTurn(gameState, updateCallback, delayMs = 700, pause
 
       await wait(Math.min(delayMs, 450));
       const logBefore = (gameState.actionLog || []).length;
+      const snapBefore = captureBotActionSnapshot(gameState);
       if (best.kind === 'GO_SOLO') {
         botPrepareEddies(bot, best.cost);
         const res = playLegendToField(gameState, 'bot', best.card.instanceId, true);
         if (res.success) {
+          recordBotActionArrows(snapBefore, gameState, { actionType: 'GO_SOLO', card: best.card });
           const cont = await pauseAfterPlay('GO_SOLO', best.card, logBefore);
           if (!cont) return;
         } else {
@@ -855,6 +1181,11 @@ export async function runBotTurn(gameState, updateCallback, delayMs = 700, pause
             ? playGearCard(gameState, 'bot', best.card.instanceId, best.targetId)
             : playCard(gameState, 'bot', best.card.instanceId, best.targetId);
         if (res.success) {
+          recordBotActionArrows(snapBefore, gameState, {
+            actionType: cardType || 'UNIT',
+            card: best.card,
+            explicitTargetId: best.targetId || null
+          });
           const cont = await pauseAfterPlay(cardType || 'UNIT', best.card, logBefore, best.targetName || '');
           if (!cont) return;
         } else {
@@ -871,8 +1202,14 @@ export async function runBotTurn(gameState, updateCallback, delayMs = 700, pause
       if (faceDownLegend) {
         await wait(Math.min(delayMs, 450));
         const logBefore = (gameState.actionLog || []).length;
+        const snapBeforeCall = captureBotActionSnapshot(gameState);
         botPrepareEddies(bot, 1, faceDownLegend.instanceId);
         callLegendFaceUp(gameState, 'bot', faceDownLegend.instanceId);
+        recordBotActionArrows(snapBeforeCall, gameState, {
+          actionType: 'CALL_LEGEND',
+          card: faceDownLegend,
+          sourceAnchor: faceDownLegend.instanceId
+        });
         const cont = await pauseAfterPlay('CALL_LEGEND', faceDownLegend, logBefore);
         if (!cont) return;
       }
@@ -940,10 +1277,16 @@ export async function runBotTurn(gameState, updateCallback, delayMs = 700, pause
       canUnitAttack(unit, bot, gameState, 'GIGS');
 
     if (canOvertimeWin) {
+      const snapBeforeAtk = captureBotActionSnapshot(gameState);
       unit.isSpent = true;
       unit.hasTriggeredAttackThisDeclaration = true;
       executeCardSpentTriggers(gameState, 'bot', unit);
       executeUnitAttackTrigger(gameState, 'bot', unit);
+      recordBotActionArrows(snapBeforeAtk, gameState, {
+        actionType: 'ATTACK_TRIGGER',
+        card: unit,
+        sourceAnchor: unit.instanceId
+      });
       gameState.pendingReaction = {
         attackerPlayerKey: 'bot',
         attackerUnitId: unit.instanceId,
@@ -975,10 +1318,16 @@ export async function runBotTurn(gameState, updateCallback, delayMs = 700, pause
       .sort((a, b) => (b.currentPower || 0) - (a.currentPower || 0))[0];
 
     if (killableSpentEnemy && canUnitAttack(unit, bot, gameState, 'UNIT')) {
+      const snapBeforeAtk = captureBotActionSnapshot(gameState);
       unit.isSpent = true;
       unit.hasTriggeredAttackThisDeclaration = true;
       executeCardSpentTriggers(gameState, 'bot', unit);
       executeUnitAttackTrigger(gameState, 'bot', unit);
+      recordBotActionArrows(snapBeforeAtk, gameState, {
+        actionType: 'ATTACK_TRIGGER',
+        card: unit,
+        sourceAnchor: unit.instanceId
+      });
 
       gameState.pendingReaction = {
         attackerPlayerKey: 'bot',
@@ -1011,10 +1360,16 @@ export async function runBotTurn(gameState, updateCallback, delayMs = 700, pause
       if (!blockedByStronger || hasBackupAttackers || unit.mustAttackNextTurn || gigsToSteal === 0) {
         // Si tiene poder 0, solo atacar si tiene habilidad ATTACK útil (ej: Sketchy Ripper, Evelyn)
         if (gigsToSteal > 0 || ['CP-034', 'CP-121'].includes(resolveCardId(unit)) || unit.mustAttackNextTurn) {
+          const snapBeforeAtk = captureBotActionSnapshot(gameState);
           unit.isSpent = true;
           unit.hasTriggeredAttackThisDeclaration = true;
           executeCardSpentTriggers(gameState, 'bot', unit);
           executeUnitAttackTrigger(gameState, 'bot', unit);
+          recordBotActionArrows(snapBeforeAtk, gameState, {
+            actionType: 'ATTACK_TRIGGER',
+            card: unit,
+            sourceAnchor: unit.instanceId
+          });
 
           gameState.pendingReaction = {
             attackerPlayerKey: 'bot',
@@ -1046,10 +1401,16 @@ export async function runBotTurn(gameState, updateCallback, delayMs = 700, pause
         ((pu.currentPower || 0) === unitPower && (pu.currentPower || 0) >= 5 || unit.mustAttackNextTurn)
     );
     if (tieEnemy && canUnitAttack(unit, bot, gameState, 'UNIT')) {
+      const snapBeforeAtk = captureBotActionSnapshot(gameState);
       unit.isSpent = true;
       unit.hasTriggeredAttackThisDeclaration = true;
       executeCardSpentTriggers(gameState, 'bot', unit);
       executeUnitAttackTrigger(gameState, 'bot', unit);
+      recordBotActionArrows(snapBeforeAtk, gameState, {
+        actionType: 'ATTACK_TRIGGER',
+        card: unit,
+        sourceAnchor: unit.instanceId
+      });
 
       gameState.pendingReaction = {
         attackerPlayerKey: 'bot',
@@ -1100,6 +1461,7 @@ export async function resolvePendingAttackAndContinueBot(gameState, updateCallba
   const player = gameState.player;
   const attackerUnit = (bot.field || []).find((u) => u.instanceId === reaction.attackerUnitId);
   const logLenBeforeCombat = (gameState.actionLog || []).length;
+  const snapBeforeCombat = captureBotActionSnapshot(gameState);
 
   if (attackerUnit) {
     if (reaction.targetType === 'GIGS') {
@@ -1126,6 +1488,11 @@ export async function resolvePendingAttackAndContinueBot(gameState, updateCallba
         reaction.blockerUnitId
       );
     }
+    recordBotActionArrows(snapBeforeCombat, gameState, {
+      actionType: 'COMBAT_RESULT',
+      card: attackerUnit,
+      sourceAnchor: [attackerUnit.instanceId, 'bot-trash', 'bot-pill']
+    });
   }
 
   gameState.pendingReaction = null;

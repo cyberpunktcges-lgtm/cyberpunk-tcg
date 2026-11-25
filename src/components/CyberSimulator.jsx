@@ -967,6 +967,8 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
   const [showFullReactionModal, setShowFullReactionModal] = useState(false);
   const [recentHighlights, setRecentHighlights] = useState({});
   const prevBoardSnapshotRef = useRef(null);
+  const [transientBotArrows, setTransientBotArrows] = useState([]);
+  const lastBotArrowBatchRef = useRef(null);
   const [stagedTarget, setStagedTarget] = useState(null);
   const [pendingGigNumberPick, setPendingGigNumberPick] = useState(null);
   const [pendingManualPayment, setPendingManualPayment] = useState(null);
@@ -3845,6 +3847,50 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
     return () => window.clearTimeout(timer);
   }, [gameState]);
 
+  // Flechas animadas universales cuando el rival juega cualquier carta, programa, gear o habilidad sobre tus cosas
+  useEffect(() => {
+    if (!gameState) {
+      setTransientBotArrows([]);
+      lastBotArrowBatchRef.current = null;
+      return;
+    }
+    const batch = gameState.lastBotActionArrows;
+    if (!batch || !batch.batchId || !Array.isArray(batch.arrows) || batch.arrows.length === 0) return;
+    if (lastBotArrowBatchRef.current === batch.batchId) return;
+    lastBotArrowBatchRef.current = batch.batchId;
+    setTransientBotArrows(batch.arrows);
+
+    // Resaltar también el borde neón rojo de las unidades del jugador que hayan sido objetivo
+    const targetedUnitIds = batch.arrows
+      .map((a) => a.targetPlayerUnitId)
+      .filter(Boolean);
+    if (targetedUnitIds.length > 0) {
+      const freshTargetGlow = {};
+      for (const uid of targetedUnitIds) freshTargetGlow[uid] = '#FF003C';
+      setRecentHighlights((old) => ({ ...old, ...freshTargetGlow }));
+      window.setTimeout(() => {
+        setRecentHighlights((old) => {
+          const next = { ...old };
+          for (const uid of targetedUnitIds) {
+            if (next[uid] === '#FF003C') delete next[uid];
+          }
+          return next;
+        });
+      }, 2500);
+    }
+  }, [gameState?.lastBotActionArrows?.batchId, gameState?.matchId]);
+
+  useEffect(() => {
+    if (transientBotArrows.length === 0) return;
+    // Mientras la ventana paso a paso del Bot esté abierta (salvo FIN DE TURNO), mantenemos las flechas fijas
+    if (pendingBotAck && pendingBotAck.actionType !== 'END_BOT_TURN') return;
+    const timeoutMs = pendingBotAck?.actionType === 'END_BOT_TURN' ? 1400 : 2800;
+    const timer = window.setTimeout(() => {
+      setTransientBotArrows([]);
+    }, timeoutMs);
+    return () => window.clearTimeout(timer);
+  }, [transientBotArrows, pendingBotAck]);
+
   // Turno del bot automático cuando le toque y el jugador ya haya decidido el Mulligan
   // (Pausa durante la Fase de Respuesta si pendingReaction está activo)
   useEffect(() => {
@@ -5097,6 +5143,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                     leg.isOnField ? (
                       <div
                         key={leg.instanceId || i}
+                        data-arrow-anchor={leg.instanceId}
                         onClick={() => {
                           const u = (bot.field || []).find(
                             (unit) => unit.legendInstanceId === leg.instanceId || unit.instanceId === leg.unitInstanceId
@@ -5130,6 +5177,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                     ) : (
                     <div
                       key={leg.instanceId || i}
+                      data-arrow-anchor={leg.instanceId}
                       onMouseEnter={() => {
                         if (leg.isFaceUp) {
                           setHoveredCard(leg);
@@ -5489,7 +5537,10 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
             {/* 2.B ZONA CENTRAL: CAMPO RIVAL -> LÍNEA CENTRAL -> CAMPO JUGADOR */}
             <div className="flex-1 flex flex-col gap-1.5 min-w-0 justify-between">
               {/* FRONTLINE: CAMPO DE BATALLA DEL RIVAL (FIELD) */}
-              <div className="flex-1 rounded-2xl border border-[#FF003C]/25 lg:border-white/5 bg-[#060b14]/60 lg:bg-transparent p-2 pt-5 pb-2 min-h-[120px] sm:min-h-[145px] lg:min-h-[170px] flex items-center relative overflow-x-auto overflow-y-hidden">
+              <div
+                data-arrow-anchor="bot-field"
+                className="flex-1 rounded-2xl border border-[#FF003C]/25 lg:border-white/5 bg-[#060b14]/60 lg:bg-transparent p-2 pt-5 pb-2 min-h-[120px] sm:min-h-[145px] lg:min-h-[170px] flex items-center relative overflow-x-auto overflow-y-hidden"
+              >
                 {bot.field.length === 0 && (
                   <span className="pointer-events-none absolute inset-0 flex items-center justify-center text-[10px] font-mono uppercase tracking-[0.25em] text-gray-600/80">
                     NO RIVAL UNITS
@@ -5925,6 +5976,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                     }
                   }
                 }}
+                data-arrow-anchor="player-field"
                 className={`flex-1 rounded-2xl border transition-all p-2 pt-5 pb-2 min-h-[130px] sm:min-h-[150px] lg:min-h-[175px] flex items-center relative overflow-x-auto overflow-y-hidden ${
                   isDragOverField
                     ? 'border-[#0dfceb] bg-[#0dfceb]/15 shadow-[0_0_35px_rgba(13,252,235,0.45)]'
@@ -6702,6 +6754,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
 
                         {/* Carta de Leyenda */}
                         <div
+                          data-arrow-anchor={leg.instanceId}
                           draggable={Boolean(leg.isFaceUp && canDeploy && !leg.isOnField && !leg.isRemovedFromGame)}
                           onDragStart={(e) => {
                             e.dataTransfer.setData('text/plain', `legend:${leg.instanceId}`);
@@ -7258,7 +7311,10 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
               [CARRUSEL DE MANO IZQUIERDA/CENTRO] [PILAS DE MAZO Y TRASH A LA DERECHA] [BOTÓN TERMINAR TURNO DERECHA] */}
           <div className="flex items-center justify-between gap-3">
             {/* MANO EN ABANICO CURVO (ESTILO TCG PROFESIONAL) */}
-            <div className="flex-1 flex items-end justify-start sm:justify-center overflow-x-auto lg:overflow-visible pt-4 pb-1 px-2 sm:px-4">
+            <div
+              data-arrow-anchor="player-hand"
+              className="flex-1 flex items-end justify-start sm:justify-center overflow-x-auto lg:overflow-visible pt-4 pb-1 px-2 sm:px-4"
+            >
               {p.hand.map((card, cardIdx) => {
                 const isSelected = selectedHandCard?.instanceId === card.instanceId;
                 const handPool = getTotalAvailableEddies(p);
@@ -8423,12 +8479,14 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
         const activeArrows = [];
         const r = gameState?.pendingReaction;
         if (r && r.attackerPlayerKey === 'bot' && !showFullReactionModal) {
+          const shortAtk = String(r.attackerName || 'ATACANTE').split(':')[0].trim().slice(0, 20);
           activeArrows.push({
             id: 'bot-attack-arrow',
-            fromAnchor: r.attackerUnitId,
-            toAnchor: r.targetType === 'GIGS' ? 'player-gigs' : r.targetUnitId,
+            fromAnchor: [r.attackerUnitId, 'bot-field', 'bot-pill'],
+            toAnchor: r.targetType === 'GIGS' ? ['player-gigs', 'player-field'] : [r.targetUnitId, 'player-field'],
             color: '#FF003C',
-            dashed: true
+            dashed: true,
+            label: r.targetType === 'GIGS' ? `⚔️ ${shortAtk} → GIGS` : `⚔️ ${shortAtk}`
           });
           if (r.blockerUnitId) {
             activeArrows.push({
@@ -8436,8 +8494,14 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
               fromAnchor: r.blockerUnitId,
               toAnchor: r.attackerUnitId,
               color: '#0dfceb',
-              dashed: false
+              dashed: false,
+              label: '🛡️ BLOCKER'
             });
+          }
+        }
+        if (transientBotArrows.length > 0 && !showFullReactionModal) {
+          for (const bArr of transientBotArrows) {
+            activeArrows.push(bArr);
           }
         }
         const liveAttackAnchor =

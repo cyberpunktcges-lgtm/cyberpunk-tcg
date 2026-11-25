@@ -4,10 +4,11 @@ import { CyberDieShape } from './CyberDiceSvg.jsx';
 
 const FIXER_ORDER = ['d4', 'd6', 'd8', 'd10', 'd12', 'd20'];
 
-function MiniDeckStack({ count = 0, label = 'DECK', onClick }) {
+function MiniDeckStack({ count = 0, label = 'DECK', onClick, anchorId = null }) {
   return (
     <button
       type="button"
+      data-arrow-anchor={anchorId || undefined}
       onClick={onClick}
       className="flex flex-col items-center gap-1 group cursor-pointer shrink-0"
       title={`${label}: ${count} cartas`}
@@ -29,11 +30,12 @@ function MiniDeckStack({ count = 0, label = 'DECK', onClick }) {
   );
 }
 
-function MiniTrashStack({ trash = [], accent = '#FF003C', onViewTrash, onHoverCard }) {
+function MiniTrashStack({ trash = [], accent = '#FF003C', onViewTrash, onHoverCard, anchorId = null }) {
   const lastCard = trash.length > 0 ? trash[trash.length - 1] : null;
   return (
     <button
       type="button"
+      data-arrow-anchor={anchorId || undefined}
       onClick={onViewTrash}
       onMouseEnter={() => lastCard && onHoverCard && onHoverCard(lastCard)}
       onMouseLeave={() => onHoverCard && onHoverCard(null)}
@@ -85,10 +87,11 @@ export function CyberLeftTelemetryRail({
       {/* ARRIBA: MAZO + TRASH + €$ DEL RIVAL EN HORIZONTAL (EXACTO A LAS CAPTURAS) */}
       <div className="flex items-center gap-2.5">
         <div className="flex items-start gap-2">
-          <MiniDeckStack count={bot?.deck?.length || 0} label="Mazo Rival" />
+          <MiniDeckStack count={bot?.deck?.length || 0} label="Mazo Rival" anchorId="bot-deck" />
           <MiniTrashStack
             trash={bot?.trash || []}
             accent="#FF003C"
+            anchorId="bot-trash"
             onViewTrash={onViewBotTrash}
             onHoverCard={onHoverCard}
           />
@@ -104,6 +107,7 @@ export function CyberLeftTelemetryRail({
       <div className="space-y-4 my-auto pr-2">
         {/* Pill Rival */}
         <div
+          data-arrow-anchor="bot-pill"
           className={`p-2.5 rounded-md border bg-[#090d16]/90 flex items-center gap-2.5 transition-all ${
             !isMyTurn
               ? 'border-[#FF003C] shadow-[0_0_20px_rgba(255,0,60,0.3)]'
@@ -139,6 +143,7 @@ export function CyberLeftTelemetryRail({
 
         {/* Tu Pill */}
         <div
+          data-arrow-anchor="player-pill"
           className={`p-2.5 rounded-md border bg-[#090d16]/90 flex items-center gap-2.5 transition-all ${
             isMyTurn
               ? 'border-[#0dfceb] shadow-[0_0_20px_rgba(13,252,235,0.3)]'
@@ -163,10 +168,11 @@ export function CyberLeftTelemetryRail({
       {/* ABAJO: TU MAZO + TRASH + €$ EN HORIZONTAL (EXACTO A LAS CAPTURAS) */}
       <div className="flex items-center gap-2.5">
         <div className="flex items-start gap-2">
-          <MiniDeckStack count={player?.deck?.length || 0} label="Tu Mazo" />
+          <MiniDeckStack count={player?.deck?.length || 0} label="Tu Mazo" anchorId="player-deck" />
           <MiniTrashStack
             trash={player?.trash || []}
             accent="#0dfceb"
+            anchorId="player-trash"
             onViewTrash={onViewPlayerTrash}
             onHoverCard={onHoverCard}
           />
