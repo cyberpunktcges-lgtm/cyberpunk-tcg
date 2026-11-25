@@ -7014,7 +7014,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
           playerGigs={p.gigs || []}
           playerStreetCred={playerStreetCred}
           playerFixerDice={p.fixerDice || []}
-          eligiblePlayerDice={getEligibleFixerDice(p)}
+          eligiblePlayerDice={getEligibleFixerDice(p.fixerDice || [])}
           canRollFixerNow={Boolean(gameState.mulliganDecided && isMyTurn && (gameState.pendingGigRoll || gameState.phase === 'START_GIG_SELECT') && !rollingAnimation)}
           onRollFixerDie={(d) => triggerDiceRoll(d)}
           canAttackGigs={Boolean(canAttackGigs)}
