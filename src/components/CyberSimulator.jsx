@@ -45,6 +45,7 @@ import CyberRightSidebar from './CyberRightSidebar.jsx';
 import { CyberLeftTelemetryRail, CyberRightGigsRail } from './CyberArenaColumns.jsx';
 import CyberNumberPickerModal from './CyberNumberPickerModal.jsx';
 import CyberResolveQueueModal from './CyberResolveQueueModal.jsx';
+import CyberUnitActionPopover from './CyberUnitActionPopover.jsx';
 import {
   getRivalById,
   getRivalByStage,
@@ -1122,6 +1123,19 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
   // Menú contextual flotante sobre una Leyenda (elección entre HACER CALL y SACAR EDDIE)
   const [legendMenuId, setLegendMenuId] = useState(null);
   const legendMenuRef = useRef(null);
+  // Menú contextual flotante sobre una Unidad propia en mesa (ATTACK + Habilidades ↷ con motivos)
+  const [unitActionMenuId, setUnitActionMenuId] = useState(null);
+
+  useEffect(() => {
+    setUnitActionMenuId(null);
+  }, [
+    gameState?.activePlayer,
+    gameState?.turnNumber,
+    gameState?.pendingReaction,
+    gameState?.pendingTargetSelection,
+    gameState?.pendingModalChoice,
+    gameState?.matchId
+  ]);
 
   // Cerrar el menú flotante de la Leyenda si se hace clic fuera de él (sin backdrops molestos)
   useEffect(() => {
@@ -6151,17 +6165,19 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                                 return;
                               }
                             }
-                            if (canAttack) {
+                            const ownUnitAbilities = getCardActivatedAbilities(unit, 'player', gameState);
+                            const ownGearAbilities = (unit.gear || []).flatMap((g) =>
+                              getCardActivatedAbilities(g, 'player', gameState)
+                            );
+                            const hasAnyUnitAbility = ownUnitAbilities.length + ownGearAbilities.length > 0;
+
+                            if (isMyTurn && (hasAnyUnitAbility || !canAttack)) {
+                              setSelectedFieldUnit(null);
+                              setUnitActionMenuId((prev) => (prev === unit.instanceId ? null : unit.instanceId));
+                            } else if (canAttack) {
+                              setUnitActionMenuId(null);
                               setSelectedFieldUnit(isSelected ? null : unit);
                             } else {
-                              if (attackRestriction) {
-                                setHolocall({
-                                  title: 'NO PUEDE ATACAR',
-                                  characterName: 'KIROSHI OS // PROTOCOLO DE COMBATE',
-                                  message: attackRestriction,
-                                  type: 'warning'
-                                });
-                              }
                               setInspectedCard(unit);
                             }
                           }}
@@ -6183,8 +6199,8 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                               ? 'border-[#0dfceb] ring-4 ring-[#0dfceb] -translate-y-2 scale-105'
                               : isEligibleBlocker
                               ? 'border-[#0dfceb] ring-2 ring-[#0dfceb] shadow-[0_0_24px_rgba(13,252,235,0.8)] animate-pulse hover:border-white'
-                              : isSelected
-                              ? 'border-[#FCEE0A] ring-2 ring-[#FCEE0A] -translate-y-2 scale-105'
+                              : isSelected || unitActionMenuId === unit.instanceId
+                              ? 'border-[#FCEE0A] ring-2 ring-[#FCEE0A] -translate-y-2 scale-105 z-20'
                               : canAttack
                               ? 'border-[#0dfceb] hover:border-[#FCEE0A]'
                               : unit.isSpent
@@ -8539,6 +8555,61 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
             arrows={activeArrows}
             liveFromAnchor={liveAttackAnchor}
             liveColor="#0dfceb"
+          />
+        );
+      })()}
+
+      {/* MENÚ CONTEXTUAL FLOTANTE DE UNIDAD (ATTACK + HABILIDADES ↷ CON EXPLICACIÓN SI NO ESTÁN DISPONIBLES) */}
+      {(() => {
+        if (!unitActionMenuId || !gameState || gameState.isGameOver || !isMyTurn) return null;
+        const menuUnit = (p.field || []).find((u) => u.instanceId === unitActionMenuId);
+        if (!menuUnit) return null;
+
+        const menuCanAttack = isMyTurn && canUnitAttack(menuUnit, p, gameState);
+        const menuRestriction = !menuUnit.isSpent && !menuUnit.isLagging ? getUnitAttackRestriction(menuUnit, p, gameState) : null;
+        let menuAttackDisabledReason = null;
+        if (!menuCanAttack) {
+          if (menuUnit.isSpent) menuAttackDisabledReason = 'Ya está girada (Spent) este turno.';
+          else if (menuUnit.isLagging) menuAttackDisabledReason = 'Tiene Lag (recién desplegada); podrá atacar el próximo turno.';
+          else if (menuRestriction) menuAttackDisabledReason = menuRestriction;
+          else if ((bot.gigs || []).length === 0 && !(bot.field || []).some((u) => u.isSpent || menuUnit.canAttackReadyUnits)) {
+            menuAttackDisabledReason = 'No hay Gigs ni unidades rivales válidas que atacar.';
+          } else {
+            menuAttackDisabledReason = 'Esta unidad no puede atacar ahora mismo.';
+          }
+        }
+
+        const menuAbilities = [
+          ...getCardActivatedAbilities(menuUnit, 'player', gameState).map((ab) => ({
+            ...ab,
+            sourceCardInstanceId: menuUnit.instanceId,
+            sourceLabel: null
+          })),
+          ...(menuUnit.gear || []).flatMap((g) =>
+            getCardActivatedAbilities(g, 'player', gameState).map((ab) => ({
+              ...ab,
+              sourceCardInstanceId: g.instanceId,
+              sourceLabel: g.name
+            }))
+          )
+        ];
+
+        return (
+          <CyberUnitActionPopover
+            unit={menuUnit}
+            canAttack={menuCanAttack}
+            attackDisabledReason={menuAttackDisabledReason}
+            abilities={menuAbilities}
+            onAttack={(u) => {
+              setUnitActionMenuId(null);
+              setSelectedFieldUnit(u);
+            }}
+            onActivateAbility={(sourceCardInstanceId, abilityId) => {
+              setUnitActionMenuId(null);
+              handleExecuteActivatedAbility(sourceCardInstanceId, abilityId);
+            }}
+            onInspect={(u) => setInspectedCard(u)}
+            onClose={() => setUnitActionMenuId(null)}
           />
         );
       })()}
