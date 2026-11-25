@@ -199,7 +199,10 @@ export function CyberRightGigsRail({
   isBotThinking = false,
   hasPendingReaction = false,
   hasBlockerAssigned = false,
-  onPrimaryAction
+  onPrimaryAction,
+  targetGigInfo = null, // { isBotGigEligible: (gig, idx)=>bool, isPlayerGigEligible: (gig, idx)=>bool, selectedGig: { owner, gigIndex }|null, onSelectGig: (owner, gig, idx)=>void }
+  recentHighlightBotGigs = false,
+  recentHighlightPlayerGigs = false
 }) {
   const botFixerSet = new Set((botFixerDice || []).map((d) => String(d).toLowerCase()));
   const playerFixerSet = new Set((playerFixerDice || []).map((d) => String(d).toLowerCase()));
@@ -276,24 +279,59 @@ export function CyberRightGigsRail({
           {botGigs.length === 0 ? (
             <span className="text-[10px] text-gray-600 italic">—</span>
           ) : (
-            botGigs.map((gig, idx) => (
-              <button
-                key={`bg-${idx}`}
-                type="button"
-                onClick={() => canAttackGigs && onStealSpecificDie && onStealSpecificDie(gig.die.toLowerCase())}
-                className={canAttackGigs ? 'cursor-pointer hover:scale-115 transition-transform' : 'cursor-default'}
-                title={`Gig Rival ${gig.die.toUpperCase()} (Valor ${gig.value})`}
-              >
-                <CyberDieShape
-                  dieType={gig.die}
-                  value={gig.value}
-                  size={40}
-                  color={gig.stolenFrom ? '#0dfceb' : '#FF003C'}
-                  selected={canAttackGigs}
-                  showProgressBar
-                />
-              </button>
-            ))
+            botGigs.map((gig, idx) => {
+              const isTargetEligible = Boolean(targetGigInfo?.isBotGigEligible?.(gig, idx));
+              const isTargetSelected =
+                targetGigInfo?.selectedGig?.owner === 'bot' &&
+                targetGigInfo?.selectedGig?.gigIndex === idx;
+              const isInteractive = Boolean(canAttackGigs || isTargetEligible);
+              return (
+                <button
+                  key={`bg-${idx}`}
+                  type="button"
+                  onClick={() => {
+                    if (isTargetEligible && targetGigInfo?.onSelectGig) {
+                      targetGigInfo.onSelectGig('bot', gig, idx);
+                    } else if (canAttackGigs && onStealSpecificDie) {
+                      onStealSpecificDie(gig.die.toLowerCase());
+                    }
+                  }}
+                  className={
+                    isInteractive
+                      ? `cursor-pointer hover:scale-115 transition-transform rounded p-0.5 ${
+                          isTargetSelected
+                            ? 'ring-2 ring-[#FCEE0A] bg-[#FCEE0A]/15 scale-110'
+                            : isTargetEligible
+                            ? 'ring-2 ring-[#0dfceb] bg-[#0dfceb]/10 animate-pulse'
+                            : ''
+                        }`
+                      : 'cursor-default'
+                  }
+                  title={
+                    isTargetEligible
+                      ? `Clic para seleccionar Gig Rival ${gig.die.toUpperCase()} (Valor ${gig.value})`
+                      : `Gig Rival ${gig.die.toUpperCase()} (Valor ${gig.value})`
+                  }
+                >
+                  <CyberDieShape
+                    dieType={gig.die}
+                    value={gig.value}
+                    size={40}
+                    color={
+                      isTargetSelected
+                        ? '#FCEE0A'
+                        : isTargetEligible
+                        ? '#0dfceb'
+                        : gig.stolenFrom
+                        ? '#0dfceb'
+                        : '#FF003C'
+                    }
+                    selected={canAttackGigs || isTargetEligible || isTargetSelected}
+                    showProgressBar
+                  />
+                </button>
+              );
+            })
           )}
         </div>
 
@@ -343,20 +381,54 @@ export function CyberRightGigsRail({
           {playerGigs.length === 0 ? (
             <span className="text-[10px] text-gray-600 italic">—</span>
           ) : (
-            playerGigs.map((gig, idx) => (
-              <div
-                key={`pg-${idx}`}
-                title={`Tu Gig ${gig.die.toUpperCase()} (Valor ${gig.value})`}
-              >
-                <CyberDieShape
-                  dieType={gig.die}
-                  value={gig.value}
-                  size={40}
-                  color={gig.stolenFrom ? '#FF003C' : '#0dfceb'}
-                  showProgressBar
-                />
-              </div>
-            ))
+            playerGigs.map((gig, idx) => {
+              const isTargetEligible = Boolean(targetGigInfo?.isPlayerGigEligible?.(gig, idx));
+              const isTargetSelected =
+                targetGigInfo?.selectedGig?.owner === 'player' &&
+                targetGigInfo?.selectedGig?.gigIndex === idx;
+              return (
+                <button
+                  key={`pg-${idx}`}
+                  type="button"
+                  onClick={() => {
+                    if (isTargetEligible && targetGigInfo?.onSelectGig) {
+                      targetGigInfo.onSelectGig('player', gig, idx);
+                    }
+                  }}
+                  className={
+                    isTargetEligible
+                      ? `cursor-pointer hover:scale-115 transition-transform rounded p-0.5 ${
+                          isTargetSelected
+                            ? 'ring-2 ring-[#FCEE0A] bg-[#FCEE0A]/15 scale-110'
+                            : 'ring-2 ring-[#0dfceb] bg-[#0dfceb]/10 animate-pulse'
+                        }`
+                      : 'cursor-default'
+                  }
+                  title={
+                    isTargetEligible
+                      ? `Clic para seleccionar tu Gig ${gig.die.toUpperCase()} (Valor ${gig.value})`
+                      : `Tu Gig ${gig.die.toUpperCase()} (Valor ${gig.value})`
+                  }
+                >
+                  <CyberDieShape
+                    dieType={gig.die}
+                    value={gig.value}
+                    size={40}
+                    color={
+                      isTargetSelected
+                        ? '#FCEE0A'
+                        : isTargetEligible
+                        ? '#0dfceb'
+                        : gig.stolenFrom
+                        ? '#FF003C'
+                        : '#0dfceb'
+                    }
+                    selected={isTargetEligible || isTargetSelected}
+                    showProgressBar
+                  />
+                </button>
+              );
+            })
           )}
         </div>
 

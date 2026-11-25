@@ -43,6 +43,7 @@ import CyberAttackArrowOverlay from './CyberAttackArrowOverlay.jsx';
 import { CyberDieShape } from './CyberDiceSvg.jsx';
 import CyberRightSidebar from './CyberRightSidebar.jsx';
 import { CyberLeftTelemetryRail, CyberRightGigsRail } from './CyberArenaColumns.jsx';
+import CyberNumberPickerModal from './CyberNumberPickerModal.jsx';
 import {
   getRivalById,
   getRivalByStage,
@@ -963,6 +964,11 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
     }
   });
   const [showFullReactionModal, setShowFullReactionModal] = useState(false);
+  const [recentHighlights, setRecentHighlights] = useState({});
+  const prevBoardSnapshotRef = useRef(null);
+  const [stagedTarget, setStagedTarget] = useState(null);
+  const [pendingGigNumberPick, setPendingGigNumberPick] = useState(null);
+  const [pendingManualPayment, setPendingManualPayment] = useState(null);
   const [showLeaderboardModal, setShowLeaderboardModal] = useState(false);
   const [userRankingStats, setUserRankingStats] = useState(null);
   const [selectedBotDifficulty, setSelectedBotDifficulty] = useState(1);
@@ -1308,15 +1314,21 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
   const handlePlayCard = (cardInstanceId, targetId = null) => {
     if (!gameState || gameState.activePlayer !== 'player' || gameState.isGameOver) return;
     pushHistory();
-    if (autoPayEddies) {
-      const handCard = (gameState.player?.hand || []).find((c) => c.instanceId === cardInstanceId);
-      if (handCard) {
-        const effCost = getEffectiveCardCost(handCard, gameState.player, gameState);
-        if ((gameState.player.floatingEddies || 0) < effCost) {
+    const handCard = (gameState.player?.hand || []).find((c) => c.instanceId === cardInstanceId);
+    if (handCard) {
+      const effCost = getEffectiveCardCost(handCard, gameState.player, gameState);
+      const curFloating = gameState.player.floatingEddies || 0;
+      if (curFloating < effCost) {
+        if (autoPayEddies) {
           autoTapEddiesForCost(effCost);
+        } else if (getTotalAvailableEddies(gameState.player) >= effCost) {
+          setPendingManualPayment({ cardInstanceId, targetId, card: handCard, cost: effCost });
+          setSelectedHandCard(null);
+          return;
         }
       }
     }
+    setPendingManualPayment(null);
     const res = playCard(gameState, 'player', cardInstanceId, targetId);
     if (res.success) {
       setSelectedHandCard(null);
@@ -3678,6 +3690,60 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
     }
   }, [gameState?.pendingReaction?.attackerUnitId]);
 
+  // Limpiar objetivo preseleccionado cuando cambia pendingTargetSelection
+  useEffect(() => {
+    setStagedTarget(null);
+    setPendingGigNumberPick(null);
+  }, [gameState?.pendingTargetSelection]);
+
+  // Resaltar temporalmente (2.4s) el borde neón de cartas recién jugadas, Leyendas volteadas o Gears equipados
+  useEffect(() => {
+    if (!gameState) return;
+    const curBotField = new Map((gameState.bot?.field || []).map((u) => [u.instanceId, (u.gear || []).length]));
+    const curPlayerField = new Map((gameState.player?.field || []).map((u) => [u.instanceId, (u.gear || []).length]));
+    const curBotLegends = new Map((gameState.bot?.legends || []).map((l) => [l.instanceId, Boolean(l.isFaceUp)]));
+    const curPlayerLegends = new Map((gameState.player?.legends || []).map((l) => [l.instanceId, Boolean(l.isFaceUp)]));
+
+    const prev = prevBoardSnapshotRef.current;
+    prevBoardSnapshotRef.current = {
+      matchId: gameState.matchId,
+      botField: curBotField,
+      playerField: curPlayerField,
+      botLegends: curBotLegends,
+      playerLegends: curPlayerLegends
+    };
+
+    if (!prev || prev.matchId !== gameState.matchId) return;
+
+    const fresh = {};
+    for (const [id, gearLen] of curBotField.entries()) {
+      if (!prev.botField.has(id)) fresh[id] = '#ff4fd8';
+      else if (gearLen > (prev.botField.get(id) || 0)) fresh[id] = '#FCEE0A';
+    }
+    for (const [id, gearLen] of curPlayerField.entries()) {
+      if (!prev.playerField.has(id)) fresh[id] = '#0dfceb';
+      else if (gearLen > (prev.playerField.get(id) || 0)) fresh[id] = '#FCEE0A';
+    }
+    for (const [id, faceUp] of curBotLegends.entries()) {
+      if (faceUp && !prev.botLegends.get(id)) fresh[id] = '#FCEE0A';
+    }
+    for (const [id, faceUp] of curPlayerLegends.entries()) {
+      if (faceUp && !prev.playerLegends.get(id)) fresh[id] = '#FCEE0A';
+    }
+
+    const ids = Object.keys(fresh);
+    if (ids.length === 0) return;
+    setRecentHighlights((old) => ({ ...old, ...fresh }));
+    const timer = window.setTimeout(() => {
+      setRecentHighlights((old) => {
+        const next = { ...old };
+        for (const id of ids) delete next[id];
+        return next;
+      });
+    }, 2400);
+    return () => window.clearTimeout(timer);
+  }, [gameState]);
+
   // Turno del bot automático cuando le toque y el jugador ya haya decidido el Mulligan
   // (Pausa durante la Fase de Respuesta si pendingReaction está activo)
   useEffect(() => {
@@ -3819,6 +3885,97 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
     bot.gigs &&
     bot.gigs.length > 0;
   const gigsToSteal = canAttackGigs ? calculateGigsToSteal(selectedFieldUnit.currentPower) : 0;
+
+  // Helpers para fijación de objetivos DIRECTAMENTE SOBRE EL TABLERO (estilo Capturas 1, 3, 4 y 5)
+  const activeTargetSel = gameState?.pendingTargetSelection || null;
+  const INLINE_TARGET_ACTIONS = new Set([
+    'TARGET_UNIT',
+    'ADJUST_GIG',
+    'PEACE_OFFERING',
+    'SWAP_GIGS',
+    'STEAL_RIVAL_GIG'
+  ]);
+  const isInlineBoardTargeting = Boolean(activeTargetSel && INLINE_TARGET_ACTIONS.has(activeTargetSel.actionType));
+
+  const isUnitEligibleForInlineTarget = (unit, ownerKey) => {
+    if (!activeTargetSel || activeTargetSel.actionType !== 'TARGET_UNIT') return false;
+    if (ownerKey === 'player' && activeTargetSel.targetScope !== 'FRIENDLY_UNITS' && activeTargetSel.targetScope !== 'ALL') return false;
+    if (ownerKey === 'bot' && activeTargetSel.targetScope !== 'RIVAL_UNITS' && activeTargetSel.targetScope !== 'ALL') return false;
+    const uPower = unit.currentPower ?? unit.power ?? 0;
+    if (activeTargetSel.maxPower !== undefined && uPower > activeTargetSel.maxPower) return false;
+    if (activeTargetSel.maxCost !== undefined && getNumericCost(unit) > activeTargetSel.maxCost) return false;
+    if (activeTargetSel.onlyUnequipped && unit.gear && unit.gear.length > 0) return false;
+    if (activeTargetSel.excludeInstanceId && unit.instanceId === activeTargetSel.excludeInstanceId) return false;
+    return true;
+  };
+
+  const isGigEligibleForInlineTarget = (ownerKey, gig, gigIdx) => {
+    if (!activeTargetSel) return false;
+    const act = activeTargetSel.actionType;
+    if (act === 'STEAL_RIVAL_GIG') {
+      return ownerKey === 'bot' && (activeTargetSel.eligibleGigIndices || []).includes(gigIdx);
+    }
+    if (act === 'ADJUST_GIG' || act === 'PEACE_OFFERING' || act === 'SWAP_GIGS') {
+      if (activeTargetSel.targetScope === 'FRIENDLY_GIGS' && ownerKey !== 'player') return false;
+      if (activeTargetSel.targetScope === 'SPECIFIC_GIG') {
+        return activeTargetSel.onlyGig?.owner === ownerKey && activeTargetSel.onlyGig?.gigIndex === gigIdx;
+      }
+      if (act === 'SWAP_GIGS') {
+        if (activeTargetSel.step === 1) return ownerKey === 'player';
+        if (activeTargetSel.step === 2) return ownerKey === 'bot';
+      }
+      if (act === 'PEACE_OFFERING' && activeTargetSel.step === 2) {
+        const sameAsStep1 =
+          activeTargetSel.selectedTargetGig?.owner === ownerKey &&
+          activeTargetSel.selectedTargetGig?.gigIndex === gigIdx;
+        if (sameAsStep1) return false;
+        if (activeTargetSel.requireOtherPlayerSource && activeTargetSel.selectedTargetGig?.owner === ownerKey) return false;
+      }
+      return true;
+    }
+    return false;
+  };
+
+  const confirmInlineStagedTarget = (targetOverride = null) => {
+    const chosen = targetOverride || stagedTarget;
+    if (!activeTargetSel || !chosen) return;
+    if (chosen.kind === 'UNIT') {
+      setStagedTarget(null);
+      handleResolveTargetSelection({ unitInstanceId: chosen.unitInstanceId, ownerKey: chosen.ownerKey });
+      return;
+    }
+    if (chosen.kind === 'GIG') {
+      const act = activeTargetSel.actionType;
+      if (act === 'ADJUST_GIG') {
+        const maxDelta = activeTargetSel.maxDelta || 1;
+        const needsNumberPicker =
+          maxDelta > 1 ||
+          (activeTargetSel.canIncrease && activeTargetSel.canDecrease) ||
+          Boolean(activeTargetSel.allowZero);
+        if (needsNumberPicker) {
+          setPendingGigNumberPick({
+            gigInfo: { owner: chosen.owner, die: chosen.die, value: chosen.value, gigIndex: chosen.gigIndex },
+            maxFace: chosen.maxFace
+          });
+          return;
+        }
+        const fixedDelta = activeTargetSel.canIncrease ? maxDelta : -maxDelta;
+        setStagedTarget(null);
+        handleResolveTargetSelection({
+          gigInfo: { owner: chosen.owner, die: chosen.die, value: chosen.value, gigIndex: chosen.gigIndex },
+          delta: fixedDelta
+        });
+        return;
+      }
+      setStagedTarget(null);
+      handleResolveTargetSelection({
+        owner: chosen.owner,
+        die: chosen.die,
+        value: chosen.value,
+        gigIndex: chosen.gigIndex
+      });
+    }
+  };
 
   const handleDiscardSavedMatch = () => {
     try {
@@ -4878,8 +5035,9 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                       onContextMenu={(e) => {
                         if (leg.isFaceUp) handleCardRightClick(e, leg);
                       }}
+                      style={recentHighlights[leg.instanceId] ? { boxShadow: `0 0 28px ${recentHighlights[leg.instanceId]}`, borderColor: recentHighlights[leg.instanceId] } : undefined}
                       className={`w-11 sm:w-12 lg:w-16 xl:w-17 h-15 sm:h-17 lg:h-22 xl:h-24 rounded-md border transition-all flex flex-col items-center justify-center relative shadow-md ${
-                        leg.isFaceUp
+                        recentHighlights[leg.instanceId] ? 'ring-2 ring-[#FCEE0A] scale-105 z-20' : leg.isFaceUp
                           ? leg.isSpent
                             ? 'border-[#FF003C]/70 shadow-[0_0_8px_rgba(255,0,60,0.3)] cursor-pointer'
                             : 'border-[#FF003C] shadow-[0_0_12px_rgba(255,0,60,0.5)] cursor-pointer'
@@ -5232,9 +5390,13 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                 <div className="flex items-center gap-2.5 sm:gap-3.5 w-full justify-start lg:justify-center">
                   {bot.field.map((unit) => {
                     const canAttackThisUnit =
+                      !isInlineBoardTargeting &&
                       selectedFieldUnit &&
                       canUnitAttack(selectedFieldUnit, p, gameState, 'UNIT') &&
                       (unit.isSpent || selectedFieldUnit.canAttackReadyUnits);
+                    const isInlineTargetUnit = isUnitEligibleForInlineTarget(unit, 'bot');
+                    const isStagedTargetUnit = stagedTarget?.kind === 'UNIT' && stagedTarget.unitInstanceId === unit.instanceId;
+                    const recentColor = recentHighlights[unit.instanceId] || null;
 
                     return (
                       <div
@@ -5315,6 +5477,14 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                           }}
                           whileHover={{ scale: canAttackThisUnit ? 1.08 : 1.04 }}
                           onClick={() => {
+                            if (isInlineTargetUnit) {
+                              if (isStagedTargetUnit) {
+                                confirmInlineStagedTarget({ kind: 'UNIT', unitInstanceId: unit.instanceId, ownerKey: 'bot' });
+                              } else {
+                                setStagedTarget({ kind: 'UNIT', unitInstanceId: unit.instanceId, ownerKey: 'bot' });
+                              }
+                              return;
+                            }
                             if (canAttackThisUnit) {
                               handlePlayerAttack('UNIT', unit.instanceId);
                             } else {
@@ -5322,9 +5492,20 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                             }
                           }}
                           onContextMenu={(e) => handleCardRightClick(e, unit)}
-                          style={{ clipPath: CYBER_CARD_CLIP }}
-                          className={`w-18 sm:w-20 md:w-22 lg:w-28 xl:w-32 h-25 sm:h-28 md:h-31 lg:h-39 xl:h-45 bg-black rounded-md border-2 transition-transform duration-300 cursor-pointer flex flex-col justify-between relative shadow-2xl z-10 overflow-hidden ${
-                            canAttackThisUnit
+                          style={{
+                            clipPath: CYBER_CARD_CLIP,
+                            ...(recentColor ? { borderColor: recentColor, boxShadow: `0 0 32px ${recentColor}` } : {})
+                          }}
+                          className={`w-18 sm:w-20 md:w-22 lg:w-28 xl:w-32 h-25 sm:h-28 md:h-31 lg:h-39 xl:h-45 bg-black rounded-md border-2 transition-all duration-300 cursor-pointer flex flex-col justify-between relative shadow-2xl z-10 overflow-hidden ${
+                            isStagedTargetUnit
+                              ? 'border-[#FCEE0A] ring-4 ring-[#FCEE0A] shadow-[0_0_30px_rgba(252,238,10,0.95)] scale-105 z-30'
+                              : isInlineTargetUnit
+                              ? 'border-[#0dfceb] ring-2 ring-[#0dfceb] shadow-[0_0_26px_rgba(13,252,235,0.9)] animate-pulse z-20'
+                              : activeTargetSel?.actionType === 'TARGET_UNIT'
+                              ? 'border-gray-800 opacity-35'
+                              : recentColor
+                              ? 'ring-2 scale-[1.03] z-20'
+                              : canAttackThisUnit
                               ? 'border-[#0dfceb] ring-2 ring-[#0dfceb] shadow-[0_0_22px_rgba(13,252,235,0.95)] animate-pulse rotate-[12deg]'
                               : unit.isSpent
                               ? 'border-gray-700 brightness-75 rotate-[14deg]'
@@ -5662,6 +5843,9 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                       gameState.pendingReaction &&
                       gameState.pendingReaction.blockerUnitId === unit.instanceId
                     );
+                    const isInlineTargetUnit = isUnitEligibleForInlineTarget(unit, 'player');
+                    const isStagedTargetUnit = stagedTarget?.kind === 'UNIT' && stagedTarget.unitInstanceId === unit.instanceId;
+                    const recentColor = recentHighlights[unit.instanceId] || null;
 
                     return (
                       <div
@@ -5765,6 +5949,14 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                           }}
                           whileHover={{ scale: canAttack || isEligibleBlocker ? 1.08 : 1.03, y: -3 }}
                           onClick={() => {
+                            if (isInlineTargetUnit) {
+                              if (isStagedTargetUnit) {
+                                confirmInlineStagedTarget({ kind: 'UNIT', unitInstanceId: unit.instanceId, ownerKey: 'player' });
+                              } else {
+                                setStagedTarget({ kind: 'UNIT', unitInstanceId: unit.instanceId, ownerKey: 'player' });
+                              }
+                              return;
+                            }
                             if (gameState.pendingReaction && gameState.pendingReaction.attackerPlayerKey === 'bot') {
                               if (isEligibleBlocker || isCurrentBlocker) {
                                 handleSelectBlocker(unit.instanceId);
@@ -5786,12 +5978,23 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                             }
                           }}
                           onContextMenu={(e) => handleCardRightClick(e, unit)}
-                          style={{ clipPath: CYBER_CARD_CLIP }}
-                          className={`w-18 sm:w-20 md:w-22 lg:w-28 xl:w-32 h-25 sm:h-28 md:h-31 lg:h-39 xl:h-45 bg-black rounded-md border-2 transition-transform duration-300 cursor-pointer flex flex-col justify-between relative z-10 shadow-2xl overflow-hidden ${
-                            isCurrentBlocker
+                          style={{
+                            clipPath: CYBER_CARD_CLIP,
+                            ...(recentColor ? { borderColor: recentColor, boxShadow: `0 0 32px ${recentColor}` } : {})
+                          }}
+                          className={`w-18 sm:w-20 md:w-22 lg:w-28 xl:w-32 h-25 sm:h-28 md:h-31 lg:h-39 xl:h-45 bg-black rounded-md border-2 transition-all duration-300 cursor-pointer flex flex-col justify-between relative z-10 shadow-2xl overflow-hidden ${
+                            isStagedTargetUnit
+                              ? 'border-[#FCEE0A] ring-4 ring-[#FCEE0A] shadow-[0_0_30px_rgba(252,238,10,0.95)] scale-105 z-30'
+                              : isInlineTargetUnit
+                              ? 'border-[#0dfceb] ring-2 ring-[#0dfceb] shadow-[0_0_26px_rgba(13,252,235,0.9)] animate-pulse z-20'
+                              : activeTargetSel?.actionType === 'TARGET_UNIT'
+                              ? 'border-gray-800 opacity-35'
+                              : recentColor
+                              ? 'ring-2 scale-[1.03] z-20'
+                              : isCurrentBlocker
                               ? 'border-[#0dfceb] ring-4 ring-[#0dfceb] -translate-y-2 scale-105'
                               : isEligibleBlocker
-                              ? 'border-[#0dfceb] animate-pulse hover:border-white'
+                              ? 'border-[#0dfceb] ring-2 ring-[#0dfceb] shadow-[0_0_24px_rgba(13,252,235,0.8)] animate-pulse hover:border-white'
                               : isSelected
                               ? 'border-[#FCEE0A] ring-2 ring-[#FCEE0A] -translate-y-2 scale-105'
                               : canAttack
@@ -6114,8 +6317,8 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                 </div>
               </div>
 
-              {/* FILA INFERIOR (BACKLINE): LEYENDAS + EDDIES + BOTÓN "+" EN UNA SOLA FILA LIMPIA Y CENTRADA */}
-              <div className="h-16 sm:h-18 lg:h-24 xl:h-26 flex gap-2 lg:gap-3 items-center justify-start lg:justify-center w-full">
+              {/* FILA INFERIOR (BACKLINE): LEYENDAS + EDDIES + BOTÓN "+" (SE ILUMINA EN CIAN AL PAGAR EN MODO MANUAL) */}
+              <div className={`h-16 sm:h-18 lg:h-24 xl:h-26 flex gap-2 lg:gap-3 items-center justify-start lg:justify-center w-full transition-all ${pendingManualPayment ? "ring-2 ring-[#0dfceb] bg-[#0dfceb]/10 shadow-[0_0_34px_rgba(13,252,235,0.65)] rounded-xl px-2 py-1 relative z-45" : ""}`}>
                 {/* 1. LEYENDAS JUGADOR (3 SLOTS) */}
                 <div className={`rounded-2xl lg:rounded-none border border-[#0dfceb]/30 lg:border-0 bg-[#060b14]/80 lg:bg-transparent p-1.5 lg:p-0 flex items-center justify-center gap-1.5 sm:gap-2 lg:gap-2.5 shrink-0 ${
                   legendMenuId ? 'relative z-40' : ''
@@ -6423,8 +6626,9 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                             }
                             setLegendMenuId((prev) => (prev === leg.instanceId ? null : leg.instanceId));
                           }}
+                          style={recentHighlights[leg.instanceId] ? { boxShadow: `0 0 28px ${recentHighlights[leg.instanceId]}`, borderColor: recentHighlights[leg.instanceId] } : undefined}
                           className={`w-11 sm:w-12 lg:w-16 xl:w-17 h-15 sm:h-17 lg:h-22 xl:h-24 rounded-md border transition-all cursor-pointer flex flex-col items-center justify-center relative shadow-md group ${
-                            isMenuOpen
+                            recentHighlights[leg.instanceId] ? 'ring-2 ring-[#FCEE0A] scale-105 z-20' : isMenuOpen
                               ? 'border-[#0dfceb] ring-2 ring-[#0dfceb] shadow-[0_0_18px_rgba(13,252,235,0.6)]'
                               : leg.isFaceUp
                               ? leg.isSpent
@@ -6780,7 +6984,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                   const baseCardCost = selectedHandCard.parsedCost || 0;
                   const cardCost = getEffectiveCardCost(selectedHandCard, p, gameState);
                   const hasDiscount = cardCost < baseCardCost;
-                  const effectiveEddiesPool = autoPayEddies ? getTotalAvailableEddies(p) : availableEddies;
+                  const effectiveEddiesPool = getTotalAvailableEddies(p);
                   const canAfford = effectiveEddiesPool >= cardCost;
                   const missingEddies = Math.max(0, cardCost - effectiveEddiesPool);
                   const canPlay = isMyTurn && canAfford && (!isGear || Boolean(gearTarget));
@@ -6907,7 +7111,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
             <div className="flex-1 flex items-end justify-start sm:justify-center overflow-x-auto lg:overflow-visible pt-4 pb-1 px-2 sm:px-4">
               {p.hand.map((card, cardIdx) => {
                 const isSelected = selectedHandCard?.instanceId === card.instanceId;
-                const handPool = autoPayEddies ? getTotalAvailableEddies(p) : availableEddies;
+                const handPool = getTotalAvailableEddies(p);
                 const handEffCost = getEffectiveCardCost(card, p, gameState);
                 const canAfford = handPool >= handEffCost;
                 const isJustDrawn = Boolean(card.isJustDrawn);
@@ -7072,6 +7276,30 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
           isBotThinking={isBotThinking}
           hasPendingReaction={Boolean(gameState?.pendingReaction && gameState.pendingReaction.attackerPlayerKey === 'bot')}
           hasBlockerAssigned={Boolean(gameState?.pendingReaction?.blockerUnitId)}
+          targetGigInfo={
+            isInlineBoardTargeting && activeTargetSel?.actionType !== 'TARGET_UNIT'
+              ? {
+                  isBotGigEligible: (gig, idx) => isGigEligibleForInlineTarget('bot', gig, idx),
+                  isPlayerGigEligible: (gig, idx) => isGigEligibleForInlineTarget('player', gig, idx),
+                  selectedGig: stagedTarget?.kind === 'GIG' ? stagedTarget : null,
+                  onSelectGig: (owner, gig, idx) => {
+                    const nextSpec = {
+                      kind: 'GIG',
+                      owner,
+                      die: String(gig.die).toLowerCase(),
+                      value: gig.value,
+                      gigIndex: idx,
+                      maxFace: getGigMaxFace(gig)
+                    };
+                    if (stagedTarget?.kind === 'GIG' && stagedTarget.owner === owner && stagedTarget.gigIndex === idx) {
+                      confirmInlineStagedTarget(nextSpec);
+                    } else {
+                      setStagedTarget(nextSpec);
+                    }
+                  }
+                }
+              : null
+          }
           onPrimaryAction={() => {
             if (gameState?.pendingReaction && gameState.pendingReaction.attackerPlayerKey === 'bot') {
               handleResolveReactionCombat();
@@ -8077,6 +8305,150 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
             liveFromAnchor={liveAttackAnchor}
             liveColor="#0dfceb"
           />
+        );
+      })()}
+
+      {/* BARRA INLINE DE FIJACIÓN DE OBJETIVOS SOBRE EL TABLERO (ESTILO CAPTURAS 1, 3 Y 5) */}
+      {isInlineBoardTargeting && !pendingGigNumberPick && (
+        <div className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-[46] w-[92vw] max-w-2xl pointer-events-auto font-mono select-none">
+          <motion.div
+            initial={{ opacity: 0, y: -8, scale: 0.96 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            className="bg-[#070c16]/96 border border-[#0dfceb]/80 rounded-md px-3.5 py-2.5 shadow-[0_0_40px_rgba(0,0,0,0.9)] backdrop-blur-md flex items-center justify-between gap-3"
+          >
+            <div className="flex items-center gap-2.5 min-w-0 flex-1">
+              {activeTargetSel.sourceCardImage && (
+                <div className="w-9 h-12 rounded border border-[#0dfceb]/60 overflow-hidden bg-black shrink-0">
+                  <img src={activeTargetSel.sourceCardImage} alt={activeTargetSel.sourceCardName} className="w-full h-full object-cover" />
+                </div>
+              )}
+              <div className="min-w-0">
+                <span className="text-xs font-black uppercase text-[#0dfceb] tracking-wider block truncate">
+                  {activeTargetSel.sourceCardName || activeTargetSel.title}: CHOOSE A TARGET
+                </span>
+                <p className="text-[11px] text-gray-300 font-sans leading-snug truncate">
+                  {activeTargetSel.prompt}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 shrink-0">
+              <span className="text-xs font-black text-white px-1.5">
+                <span className={stagedTarget ? "text-[#FCEE0A]" : "text-gray-400"}>{stagedTarget ? 1 : 0}</span>/1
+              </span>
+              {activeTargetSel.actionType === 'ADJUST_GIG' && activeTargetSel.allowZero && (
+                <button
+                  type="button"
+                  onClick={() => handleResolveTargetSelection({ gigInfo: null, delta: 0 })}
+                  className="px-2.5 py-1.5 bg-black border border-gray-700 hover:border-white text-gray-300 hover:text-white text-[10px] font-bold uppercase rounded-sm cursor-pointer"
+                >
+                  SKIP (0)
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={handleCancelTargetSelection}
+                className="px-2.5 py-1.5 bg-black border border-gray-700 hover:border-[#FF003C] text-gray-300 hover:text-[#FF003C] text-[10px] font-bold uppercase rounded-sm cursor-pointer"
+              >
+                CANCEL
+              </button>
+              <button
+                type="button"
+                disabled={!stagedTarget}
+                onClick={() => confirmInlineStagedTarget()}
+                className={`px-4 py-1.5 text-xs font-black uppercase tracking-wider rounded-sm transition-all ${
+                  stagedTarget
+                    ? 'bg-[#FCEE0A] hover:bg-white text-[#070a10] cursor-pointer shadow-[0_0_18px_rgba(252,238,10,0.65)]'
+                    : 'bg-white/10 text-gray-500 cursor-not-allowed'
+                }`}
+              >
+                CONFIRM
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
+      {/* MODAL MINIMALISTA CHOOSE A NUMBER (ESTILO CAPTURA 4 — LA LLORONA / ADJUST GIG) */}
+      <CyberNumberPickerModal
+        isOpen={Boolean(pendingGigNumberPick && activeTargetSel)}
+        sourceCardName={activeTargetSel?.sourceCardName || activeTargetSel?.title || ""}
+        sourceCardImage={activeTargetSel?.sourceCardImage || ""}
+        prompt={activeTargetSel?.prompt || ""}
+        gigLabel={pendingGigNumberPick ? String(pendingGigNumberPick.gigInfo.die || "").toUpperCase() : ""}
+        currentValue={pendingGigNumberPick?.gigInfo?.value || 1}
+        maxFace={pendingGigNumberPick?.maxFace || 6}
+        canIncrease={Boolean(activeTargetSel?.canIncrease)}
+        canDecrease={Boolean(activeTargetSel?.canDecrease)}
+        maxDelta={activeTargetSel?.maxDelta || 1}
+        allowZero={Boolean(activeTargetSel?.allowZero)}
+        onCancel={() => setPendingGigNumberPick(null)}
+        onConfirm={(chosenDelta) => {
+          const info = pendingGigNumberPick?.gigInfo;
+          setPendingGigNumberPick(null);
+          setStagedTarget(null);
+          handleResolveTargetSelection({ gigInfo: info, delta: chosenDelta });
+        }}
+      />
+
+      {/* BARRA INTERACTIVA DE PAGO MANUAL "PAY X €$" (ESTILO CAPTURA 6) */}
+      {pendingManualPayment && (() => {
+        const paidNow = availableEddies;
+        const needed = pendingManualPayment.cost;
+        const isReadyToPay = paidNow >= needed;
+        return (
+          <div className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-[46] w-[92vw] max-w-xl pointer-events-auto font-mono select-none">
+            <motion.div
+              initial={{ opacity: 0, y: 10, scale: 0.96 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              className="bg-[#070c16]/96 border border-[#FCEE0A]/80 rounded-md px-3.5 py-2.5 shadow-[0_0_40px_rgba(0,0,0,0.9)] backdrop-blur-md flex items-center justify-between gap-3"
+            >
+              <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                {pendingManualPayment.card?.image && (
+                  <div className="w-9 h-12 rounded border border-[#FCEE0A]/60 overflow-hidden bg-black shrink-0">
+                    <img src={pendingManualPayment.card.image} alt={pendingManualPayment.card.name} className="w-full h-full object-cover" />
+                  </div>
+                )}
+                <div className="min-w-0">
+                  <span className="text-xs font-black uppercase text-[#FCEE0A] tracking-wider block">
+                    PAY {needed} €$
+                  </span>
+                  <p className="text-[11px] text-gray-300 font-sans truncate">
+                    Gira {needed} Eddie(s) en tu fila iluminada abajo ({pendingManualPayment.card?.name}).
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 shrink-0">
+                <span className="text-xs font-black text-white px-1">
+                  <span className={isReadyToPay ? "text-[#00FF9C]" : "text-[#FCEE0A]"}>{paidNow}</span>/{needed}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setPendingManualPayment(null)}
+                  className="px-2.5 py-1.5 bg-black border border-gray-700 hover:border-white text-gray-300 hover:text-white text-[10px] font-bold uppercase rounded-sm cursor-pointer"
+                >
+                  CANCEL
+                </button>
+                <button
+                  type="button"
+                  disabled={!isReadyToPay}
+                  onClick={() => {
+                    const { cardInstanceId, targetId } = pendingManualPayment;
+                    setPendingManualPayment(null);
+                    handlePlayCard(cardInstanceId, targetId);
+                  }}
+                  className={`px-4 py-1.5 text-xs font-black uppercase tracking-wider rounded-sm transition-all ${
+                    isReadyToPay
+                      ? 'bg-[#FCEE0A] hover:bg-white text-[#070a10] cursor-pointer shadow-[0_0_18px_rgba(252,238,10,0.75)]'
+                      : 'bg-white/10 text-gray-500 cursor-not-allowed'
+                  }`}
+                >
+                  PAY
+                </button>
+              </div>
+            </motion.div>
+          </div>
         );
       })()}
 
@@ -9217,7 +9589,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
       })()}
 
       {/* 5.10. MODAL UNIVERSAL DE SELECCIÓN DE OBJETIVOS (KIROSHI TARGETING SYSTEM) */}
-      {gameState?.pendingTargetSelection && (() => {
+      {gameState?.pendingTargetSelection && !isInlineBoardTargeting && (() => {
         const sel = gameState.pendingTargetSelection;
         const playerGigs = gameState.player.gigs || [];
         const botGigs = gameState.bot.gigs || [];
