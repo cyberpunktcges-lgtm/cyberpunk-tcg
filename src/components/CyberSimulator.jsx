@@ -39,6 +39,8 @@ import CyberBugReportModal from './CyberBugReportModal.jsx';
 import CyberBotActionPopup from './CyberBotActionPopup.jsx';
 import CyberLeaderboardModal from './CyberLeaderboardModal.jsx';
 import CyberSimulatorLobby from './CyberSimulatorLobby.jsx';
+import CyberAttackArrowOverlay from './CyberAttackArrowOverlay.jsx';
+import { CyberDieShape } from './CyberDiceSvg.jsx';
 import {
   getRivalById,
   getRivalByStage,
@@ -949,6 +951,16 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
   const [showLobby, setShowLobby] = useState(true);
   const [hasResumableMatch, setHasResumableMatch] = useState(false);
   const [towerProgressVersion, setTowerProgressVersion] = useState(0);
+  const [autoPayEddies, setAutoPayEddies] = useState(() => {
+    if (typeof window === 'undefined') return true;
+    try {
+      const saved = localStorage.getItem('cp_sim_auto_pay');
+      return saved === null ? true : saved === 'true';
+    } catch {
+      return true;
+    }
+  });
+  const [showFullReactionModal, setShowFullReactionModal] = useState(false);
   const [showLeaderboardModal, setShowLeaderboardModal] = useState(false);
   const [userRankingStats, setUserRankingStats] = useState(null);
   const [selectedBotDifficulty, setSelectedBotDifficulty] = useState(1);
@@ -1262,10 +1274,47 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
     }, 65);
   };
 
+  // Helper para girar Eddies automáticamente cuando el modo €$ AUTO está activado
+  const autoTapEddiesForCost = (neededCost) => {
+    if (!gameState || !autoPayEddies) return;
+    const pl = gameState.player;
+    if (!pl) return;
+    const totalAvail = getTotalAvailableEddies(pl);
+    if (totalAvail < neededCost) return;
+    // 1) Primero cartas vendidas en Zona de Eddies
+    for (const ed of pl.eddies || []) {
+      if ((pl.floatingEddies || 0) >= neededCost) break;
+      if (!ed.isSpent) toggleEddieSpent(gameState, 'player', ed.instanceId);
+    }
+    // 2) Luego Leyendas boca abajo sin girar
+    for (const leg of pl.legends || []) {
+      if ((pl.floatingEddies || 0) >= neededCost) break;
+      if (!leg.isFaceUp && !leg.isSpent && !leg.isOnField && !leg.isRemovedFromGame) {
+        toggleLegendSpent(gameState, 'player', leg.instanceId);
+      }
+    }
+    // 3) Finalmente Leyendas boca arriba sin girar
+    for (const leg of pl.legends || []) {
+      if ((pl.floatingEddies || 0) >= neededCost) break;
+      if (leg.isFaceUp && !leg.isSpent && !leg.isOnField && !leg.isRemovedFromGame) {
+        toggleLegendSpent(gameState, 'player', leg.instanceId);
+      }
+    }
+  };
+
   // Jugar carta arrastrada o clicada (Unidad -> Campo, Programa -> Trash, Gear -> Equipa)
   const handlePlayCard = (cardInstanceId, targetId = null) => {
     if (!gameState || gameState.activePlayer !== 'player' || gameState.isGameOver) return;
     pushHistory();
+    if (autoPayEddies) {
+      const handCard = (gameState.player?.hand || []).find((c) => c.instanceId === cardInstanceId);
+      if (handCard) {
+        const effCost = getEffectiveCardCost(handCard, gameState.player, gameState);
+        if ((gameState.player.floatingEddies || 0) < effCost) {
+          autoTapEddiesForCost(effCost);
+        }
+      }
+    }
     const res = playCard(gameState, 'player', cardInstanceId, targetId);
     if (res.success) {
       setSelectedHandCard(null);
@@ -3621,6 +3670,12 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
       });
   }, [gameState?.isGameOver, gameState?.winner, gameState?.matchId, currentUser?.uid]);
 
+  useEffect(() => {
+    if (gameState?.pendingReaction?.attackerUnitId) {
+      setShowFullReactionModal(false);
+    }
+  }, [gameState?.pendingReaction?.attackerUnitId]);
+
   // Turno del bot automático cuando le toque y el jugador ya haya decidido el Mulligan
   // (Pausa durante la Fase de Respuesta si pendingReaction está activo)
   useEffect(() => {
@@ -4933,29 +4988,47 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
 
               {/* BARRA DE GIGS DEL RIVAL (DADOS VISIBLES CON VALOR Y ELECCIÓN AL ASALTAR) */}
               <div
-                className={`px-3 py-1 rounded-xl bg-[#070a10] border transition-all flex items-center justify-between ${
+                data-arrow-anchor="bot-gigs"
+                className={`px-3 py-1 rounded-xl bg-[#070a10] border transition-all flex items-center justify-between gap-2 relative ${
                   canAttackGigs
-                    ? 'border-[#FCEE0A] bg-[#FCEE0A]/10 shadow-[0_0_20px_rgba(252,238,10,0.35)]'
+                    ? 'border-[#FCEE0A] bg-[#FF003C]/12 shadow-[0_0_24px_rgba(252,238,10,0.4)]'
                     : 'border-[#FF003C]/35'
                 }`}
               >
-                <div className="flex items-center gap-2">
-                  <span className="text-[10px] sm:text-[11px] font-mono font-bold text-[#FF003C] uppercase tracking-wider flex items-center gap-1.5">
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className="text-[10px] sm:text-[11px] font-mono font-bold text-[#FF003C] uppercase tracking-wider flex items-center gap-1.5 shrink-0">
                     <span className="w-2 h-2 rounded-full bg-[#FF003C] animate-pulse" />
                     <span>GIGS RIVAL ({bot.gigs.length}/7):</span>
                   </span>
                   {canAttackGigs ? (
-                    <span className="text-[10px] sm:text-[11px] font-mono font-black text-[#FCEE0A] animate-pulse">
-                      ⚡ ¡HAZ CLIC EN EL DADO QUE QUIERES ROBAR! (Roba {gigsToSteal} Gig)
-                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (gigsToSteal <= 0) {
+                          handlePlayerAttack('GIGS', null, []);
+                        } else if (bot.gigs.length > 1) {
+                          setPendingGigTheft({
+                            countToSteal: Math.min(gigsToSteal, bot.gigs.length),
+                            selectedDice: [],
+                            attackerUnit: selectedFieldUnit
+                          });
+                        } else if (bot.gigs.length === 1) {
+                          handlePlayerAttack('GIGS', null, [bot.gigs[0].die.toLowerCase()]);
+                        }
+                      }}
+                      style={{ clipPath: CYBER_BUTTON }}
+                      className="px-2.5 py-0.5 bg-[#FCEE0A] hover:bg-white text-[#070a10] font-mono font-black text-[10px] sm:text-[11px] uppercase tracking-wider cursor-pointer shadow-[0_0_18px_rgba(252,238,10,0.85)] animate-pulse shrink-0"
+                    >
+                      ⚔️ ATTACK GIGS ({gigsToSteal})
+                    </button>
                   ) : (
-                    <span className="text-[9px] font-mono text-gray-500 hidden sm:inline">
+                    <span className="text-[9px] font-mono text-gray-500 hidden sm:inline truncate">
                       (Asalta esta zona con una unidad lista para robar dados)
                     </span>
                   )}
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 shrink-0">
                   {bot.gigs.length === 0 ? (
                     <span className="text-[10px] font-mono text-gray-500 italic">
                       Sin Gigs en juego aún
@@ -4971,7 +5044,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                         }}
                         className={`transition-all duration-200 ${
                           canAttackGigs
-                            ? 'cursor-pointer hover:scale-130 ring-2 ring-[#FF003C] hover:ring-[#FCEE0A] rounded-full p-0.5 animate-pulse'
+                            ? 'cursor-pointer hover:scale-120 ring-1 ring-[#FCEE0A]/80 rounded p-0.5'
                             : ''
                         }`}
                         title={
@@ -4980,21 +5053,22 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                             : `Dado ${gig.die.toUpperCase()} del Rival (Valor: ${gig.value})`
                         }
                       >
-                        <PolyhedralDie
-                          type={gig.die.toLowerCase()}
+                        <CyberDieShape
+                          dieType={gig.die}
                           value={gig.value}
-                          isWaiting={false}
-                          isStolen={Boolean(gig.stolenFrom)}
-                          size={canAttackGigs ? 32 : 26}
+                          size={canAttackGigs ? 32 : 28}
+                          color={gig.stolenFrom ? '#0dfceb' : '#FF003C'}
+                          selected={Boolean(canAttackGigs)}
+                          showProgressBar
                         />
                       </div>
                     ))
                   )}
-                  <span className="text-xs font-mono font-black text-[#FF003C] ml-1.5">
+                  <span className="text-xs font-mono font-black text-[#FCEE0A] ml-1.5">
                     ⭐ {botStreetCred}
                   </span>
                 </div>
-                            </div>
+              </div>
             </div>
 
             {/* 1.B COLUMNA DERECHA: TRASH DEL RIVAL */}
@@ -5166,16 +5240,13 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                     return (
                       <div
                         key={unit.instanceId}
+                        data-arrow-anchor={unit.instanceId}
                         onMouseEnter={() => {
                           setHoveredCard(unit);
                           setPreviewCard(unit);
                         }}
                         onMouseLeave={() => setHoveredCard(null)}
-                        className={`relative transition-all duration-300 flex flex-col items-center justify-center shrink-0 ${
-                          unit.isSpent
-                            ? 'w-20 sm:w-24 h-14 sm:h-17 my-0.5'
-                            : 'w-12 sm:w-14 md:w-16 h-17 sm:h-20 md:h-23'
-                        }`}
+                        className="relative transition-all duration-300 flex flex-col items-center justify-center shrink-0 w-14 sm:w-16 md:w-18 h-20 sm:h-23 md:h-26"
                       >
                         {/* GEARS EQUIPADOS AL RIVAL (Sobresaliendo por detrás escalonados hacia arriba y a la derecha) */}
                         {unit.gear && unit.gear.length > 0 && unit.gear.map((g, gIdx) => {
@@ -5253,11 +5324,11 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                           }}
                           onContextMenu={(e) => handleCardRightClick(e, unit)}
                           style={{ clipPath: CYBER_CARD_CLIP }}
-                          className={`w-12 sm:w-14 md:w-16 h-17 sm:h-20 md:h-23 bg-black border-2 transition-transform duration-300 cursor-pointer flex flex-col justify-between relative shadow-xl z-10 ${
+                          className={`w-14 sm:w-16 md:w-18 h-20 sm:h-23 md:h-26 bg-black border-2 transition-transform duration-300 cursor-pointer flex flex-col justify-between relative shadow-xl z-10 ${
                             canAttackThisUnit
-                              ? 'border-[#FF003C] ring-2 ring-[#FF003C] shadow-[0_0_20px_rgba(255,0,60,0.9)] animate-pulse rotate-90'
+                              ? 'border-[#0dfceb] ring-2 ring-[#0dfceb] shadow-[0_0_22px_rgba(13,252,235,0.95)] animate-pulse rotate-[12deg]'
                               : unit.isSpent
-                              ? 'border-gray-800 opacity-75 rotate-90'
+                              ? 'border-gray-700 brightness-75 rotate-[14deg]'
                               : 'border-[#FF003C]/80 hover:border-[#FF003C]'
                           }`}
                         >
@@ -5308,21 +5379,27 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                             );
                           })()}
 
+                          {/* Sello zZ LAG si acaba de entrar al campo */}
+                          {unit.isLagging && !unit.isSpent && (
+                            <div className="pointer-events-none absolute inset-0 bg-[#070a10]/45 flex items-center justify-center z-15">
+                              <span className="px-1.5 py-0.5 bg-[#070a10]/90 border border-[#0dfceb]/60 text-[#0dfceb] font-mono font-black text-[8px] tracking-widest uppercase shadow">
+                                zZ LAG
+                              </span>
+                            </div>
+                          )}
+
                           {/* Estado: GASTADA / OBJETIVO DE ATAQUE */}
                           {unit.isSpent && (
-                            <div className="absolute inset-0 bg-black/60 flex items-center justify-center z-20">
+                            <div className="absolute inset-0 bg-black/45 flex items-center justify-center z-20">
                               {canAttackThisUnit ? (
-                                <div className="flex flex-col items-center justify-center -rotate-90">
-                                  <span className="px-2 py-0.5 bg-[#FF003C] text-white font-mono font-black text-[9px] uppercase tracking-wider shadow-[0_0_15px_#FF003C] animate-pulse">
+                                <div className="flex flex-col items-center justify-center -rotate-[12deg]">
+                                  <span className="px-2 py-0.5 bg-[#0dfceb] text-[#070a10] font-mono font-black text-[9px] uppercase tracking-wider shadow-[0_0_15px_#0dfceb] animate-pulse">
                                     ⚔️ ATACAR
-                                  </span>
-                                  <span className="text-[7px] text-[#FCEE0A] font-bold mt-0.5 bg-black/90 px-1 rounded whitespace-nowrap">
-                                    MENOR FUERZA AL TRASH
                                   </span>
                                 </div>
                               ) : (
-                                <span className="px-1 py-0.5 bg-black border border-[#FF003C] text-[#FF003C] font-mono font-black text-[8px] uppercase tracking-wider -rotate-90">
-                                  GASTADA
+                                <span className="px-1.5 py-0.5 bg-black/85 border border-gray-600 text-gray-300 font-mono font-black text-[7.5px] uppercase tracking-wider -rotate-[14deg]">
+                                  SPENT
                                 </span>
                               )}
                             </div>
@@ -5601,6 +5678,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                     return (
                       <div
                         key={unit.instanceId}
+                        data-arrow-anchor={unit.instanceId}
                         onMouseEnter={() => {
                           setHoveredCard(unit);
                           setPreviewCard(unit);
@@ -5618,11 +5696,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                             handlePlayCard(draggedCardId, unit.instanceId);
                           }
                         }}
-                        className={`relative transition-all duration-300 flex flex-col items-center justify-center shrink-0 ${
-                          unit.isSpent
-                            ? 'w-22 sm:w-26 md:w-30 h-15 sm:h-18 md:h-21 my-0.5'
-                            : 'w-13 sm:w-15 md:w-18 lg:w-20 h-18 sm:h-22 md:h-25 lg:h-28'
-                        }`}
+                        className="relative transition-all duration-300 flex flex-col items-center justify-center shrink-0 w-14 sm:w-16 md:w-18 lg:w-20 h-20 sm:h-23 md:h-26 lg:h-28"
                       >
                         {/* GEARS EQUIPADOS AL JUGADOR (Sobresaliendo por detrás escalonados hacia arriba y a la derecha) */}
                         {unit.gear && unit.gear.length > 0 && unit.gear.map((g, gIdx) => {
@@ -5725,17 +5799,17 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                           }}
                           onContextMenu={(e) => handleCardRightClick(e, unit)}
                           style={{ clipPath: CYBER_CARD_CLIP }}
-                          className={`w-13 sm:w-15 md:w-18 lg:w-20 h-18 sm:h-22 md:h-25 lg:h-28 bg-black border-2 transition-transform duration-300 cursor-pointer flex flex-col justify-between relative z-10 shadow-xl ${
+                          className={`w-14 sm:w-16 md:w-18 lg:w-20 h-20 sm:h-23 md:h-26 lg:h-28 bg-black border-2 transition-transform duration-300 cursor-pointer flex flex-col justify-between relative z-10 shadow-xl ${
                             isCurrentBlocker
                               ? 'border-[#0dfceb] ring-4 ring-[#0dfceb] -translate-y-2 scale-105'
                               : isEligibleBlocker
                               ? 'border-[#0dfceb] animate-pulse hover:border-white'
                               : isSelected
-                              ? 'border-[#FCEE0A] -translate-y-2 scale-105'
+                              ? 'border-[#FCEE0A] ring-2 ring-[#FCEE0A] -translate-y-2 scale-105'
                               : canAttack
                               ? 'border-[#0dfceb] hover:border-[#FCEE0A]'
                               : unit.isSpent
-                              ? 'border-gray-800 opacity-75 rotate-90'
+                              ? 'border-gray-700 brightness-75 rotate-[14deg]'
                               : 'border-gray-800'
                           }`}
                         >
@@ -5782,12 +5856,16 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                                 🚫 NO ATACA
                               </span>
                             )}
-                            {unit.isLagging && (
-                              <span className="px-1.5 py-0.5 bg-[#FF003C] text-white font-mono font-bold text-[8px] uppercase shadow">
-                                LAG
-                              </span>
-                            )}
                           </div>
+
+                          {/* Sello visual zZ LAG centrado sobre la unidad */}
+                          {unit.isLagging && !unit.isSpent && (
+                            <div className="pointer-events-none absolute inset-0 bg-[#070a10]/50 flex items-center justify-center z-15">
+                              <span className="px-1.5 py-0.5 bg-[#070a10]/90 border border-[#0dfceb]/70 text-[#0dfceb] font-mono font-black text-[9px] tracking-widest uppercase shadow-[0_0_10px_rgba(13,252,235,0.45)]">
+                                zZ LAG
+                              </span>
+                            </div>
+                          )}
 
                           {/* Badge de Gear del Jugador */}
                           {unit.gear && unit.gear.length > 0 && (
@@ -6014,7 +6092,14 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
             {/* 3.A ZONA CENTRAL DEL JUGADOR: GIGS -> BACKLINE (LEYENDAS + EDDIES) */}
             <div className="flex-1 flex flex-col gap-1.5 min-w-0">
               {/* BARRA DE GIGS DEL JUGADOR (DADOS ACTIVOS Y STREET CRED) */}
-              <div className="px-3 py-1 rounded-xl bg-[#070a10] border border-[#0dfceb]/35 flex items-center justify-between">
+              <div
+                data-arrow-anchor="player-gigs"
+                className={`px-3 py-1 rounded-xl bg-[#070a10] border transition-all flex items-center justify-between ${
+                  gameState?.pendingReaction?.attackerPlayerKey === 'bot' && gameState.pendingReaction.targetType === 'GIGS' && !gameState.pendingReaction.blockerUnitId
+                    ? 'border-[#FF003C] bg-[#FF003C]/10 shadow-[0_0_24px_rgba(255,0,60,0.45)]'
+                    : 'border-[#0dfceb]/35'
+                }`}
+              >
                 <div className="flex items-center gap-2">
                   <span className="text-[10px] sm:text-[11px] font-mono font-bold text-[#0dfceb] uppercase tracking-wider flex items-center gap-1.5">
                     <span className="w-2 h-2 rounded-full bg-[#0dfceb] animate-pulse" />
@@ -6039,17 +6124,17 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                         className="transition-transform hover:scale-110"
                         title={`Dado ${gig.die.toUpperCase()} (Valor: ${gig.value})${gig.stolenFrom ? ' - ¡Robado al Rival!' : ''}`}
                       >
-                        <PolyhedralDie
-                          type={gig.die.toLowerCase()}
+                        <CyberDieShape
+                          dieType={gig.die}
                           value={gig.value}
-                          isWaiting={false}
-                          isStolen={Boolean(gig.stolenFrom)}
-                          size={26}
+                          size={28}
+                          color={gig.stolenFrom ? '#FCEE0A' : '#0dfceb'}
+                          showProgressBar
                         />
                       </div>
                     ))
                   )}
-                  <span className="text-xs font-mono font-black text-[#0dfceb] ml-1.5">
+                  <span className="text-xs font-mono font-black text-[#FCEE0A] ml-1.5">
                     ⭐ {playerStreetCred}
                   </span>
                 </div>
@@ -6635,12 +6720,36 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
           <div className="w-full px-2.5 sm:px-4 py-1 sm:py-1.5">
           {/* Barra Superior del Dock: Estado o Acciones de la Carta Seleccionada */}
           <div className="flex flex-wrap items-center justify-between text-xs border-b border-[#0dfceb]/20 pb-1 mb-1">
-            <span className="text-gray-400 font-bold uppercase tracking-wider text-[11px]">
-              TU MANO ({p.hand.length} CARTAS) • EDDIES GIRADOS: <strong className={`font-mono ${availableEddies > 0 ? 'text-[#0dfceb]' : 'text-gray-400'}`}>{availableEddies} €$</strong>
-              {unspentEddiesCount + unspentLegendsCount > 0 && (
-                <span className="text-[10px] text-gray-500 ml-2">({unspentEddiesCount + unspentLegendsCount} disponibles para girar)</span>
-              )}
-            </span>
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-gray-400 font-bold uppercase tracking-wider text-[11px]">
+                TU MANO ({p.hand.length}) • <strong className={`font-mono ${getTotalAvailableEddies(p) > 0 ? 'text-[#0dfceb]' : 'text-gray-400'}`}>€$ {getTotalAvailableEddies(p)}</strong>
+                {availableEddies > 0 && (
+                  <span className="text-[10px] text-[#FCEE0A] ml-1.5">({availableEddies} girados)</span>
+                )}
+              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  const next = !autoPayEddies;
+                  setAutoPayEddies(next);
+                  try {
+                    localStorage.setItem('cp_sim_auto_pay', String(next));
+                  } catch {}
+                }}
+                className={`px-2 py-0.5 rounded border text-[9px] font-black uppercase tracking-wider cursor-pointer transition-all ${
+                  autoPayEddies
+                    ? 'bg-[#FCEE0A]/15 border-[#FCEE0A] text-[#FCEE0A] shadow-[0_0_10px_rgba(252,238,10,0.25)]'
+                    : 'bg-black border-gray-700 text-gray-400 hover:border-[#0dfceb] hover:text-[#0dfceb]'
+                }`}
+                title={
+                  autoPayEddies
+                    ? 'Pago automático ACTIVO: al jugar una carta el juego gira tus Eddies por ti. Clic para cambiar a Manual.'
+                    : 'Pago MANUAL: giras tú los Eddies antes de jugar. Clic para activar Auto.'
+                }
+              >
+                {autoPayEddies ? '⚡ €$ AUTO' : '✋ €$ MANUAL'}
+              </button>
+            </div>
 
             {selectedHandCard && (
               <div className="flex items-center gap-2">
@@ -6656,8 +6765,9 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                   const baseCardCost = selectedHandCard.parsedCost || 0;
                   const cardCost = getEffectiveCardCost(selectedHandCard, p, gameState);
                   const hasDiscount = cardCost < baseCardCost;
-                  const canAfford = availableEddies >= cardCost;
-                  const missingEddies = Math.max(0, cardCost - availableEddies);
+                  const effectiveEddiesPool = autoPayEddies ? getTotalAvailableEddies(p) : availableEddies;
+                  const canAfford = effectiveEddiesPool >= cardCost;
+                  const missingEddies = Math.max(0, cardCost - effectiveEddiesPool);
                   const canPlay = isMyTurn && canAfford && (!isGear || Boolean(gearTarget));
 
                   let actionLabel = `JUGAR UNIDAD (${cardCost} €$)`;
@@ -6782,8 +6892,11 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
             <div className="flex-1 flex items-center justify-start sm:justify-center gap-1.5 sm:gap-2 overflow-x-auto overflow-y-visible pt-1.5 pb-0.5 px-1 sm:px-2">
               {p.hand.map((card) => {
                 const isSelected = selectedHandCard?.instanceId === card.instanceId;
-                const canAfford = availableEddies >= (card.parsedCost || 0);
+                const handPool = autoPayEddies ? getTotalAvailableEddies(p) : availableEddies;
+                const handEffCost = getEffectiveCardCost(card, p, gameState);
+                const canAfford = handPool >= handEffCost;
                 const isJustDrawn = Boolean(card.isJustDrawn);
+                const handCardType = getCardType(card);
 
                 return (
                   <motion.div
@@ -6821,8 +6934,10 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                         : isJustDrawn
                         ? 'border-2 border-[#0dfceb] shadow-[0_0_22px_rgba(13,252,235,0.95)] animate-pulse z-20'
                         : canAfford && isMyTurn
-                        ? 'border-[#0dfceb]/80 hover:border-[#FCEE0A]'
-                        : 'border-gray-800 opacity-70'
+                        ? handCardType === 'UNIT'
+                          ? 'border-2 border-[#0dfceb] shadow-[0_0_14px_rgba(13,252,235,0.45)] hover:border-white'
+                          : 'border-2 border-[#FCEE0A] shadow-[0_0_14px_rgba(252,238,10,0.4)] hover:border-white'
+                        : 'border-gray-800 opacity-65'
                     }`}
                     title="Arrastra esta carta al campo para jugarla, o haz clic para seleccionarla"
                   >
@@ -7795,6 +7910,46 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
         </div>
       )}
 
+      {/* FLECHAS SVG ANIMADAS DE ATAQUE Y BLOQUEO EN TIEMPO REAL SOBRE EL TABLERO */}
+      {(() => {
+        const activeArrows = [];
+        const r = gameState?.pendingReaction;
+        if (r && r.attackerPlayerKey === 'bot' && !showFullReactionModal) {
+          activeArrows.push({
+            id: 'bot-attack-arrow',
+            fromAnchor: r.attackerUnitId,
+            toAnchor: r.targetType === 'GIGS' ? 'player-gigs' : r.targetUnitId,
+            color: '#FF003C',
+            dashed: true
+          });
+          if (r.blockerUnitId) {
+            activeArrows.push({
+              id: 'player-block-arrow',
+              fromAnchor: r.blockerUnitId,
+              toAnchor: r.attackerUnitId,
+              color: '#0dfceb',
+              dashed: false
+            });
+          }
+        }
+        const liveAttackAnchor =
+          isMyTurn &&
+          selectedFieldUnit &&
+          !selectedFieldUnit.isSpent &&
+          !selectedFieldUnit.isLagging &&
+          !gameState?.pendingReaction &&
+          !gameState?.isGameOver
+            ? selectedFieldUnit.instanceId
+            : null;
+        return (
+          <CyberAttackArrowOverlay
+            arrows={activeArrows}
+            liveFromAnchor={liveAttackAnchor}
+            liveColor="#0dfceb"
+          />
+        );
+      })()}
+
       {/* 5.5. MODAL TÁCTICO: FASE DE RESPUESTA DEL JUGADOR ANTE ATAQUE DEL RIVAL */}
       {gameState?.pendingReaction && gameState.pendingReaction.attackerPlayerKey === 'bot' && (() => {
         const reaction = gameState.pendingReaction;
@@ -7810,6 +7965,88 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
           (c) => hasKeyword(c, 'Quick') && (c.parsedCost || 0) <= totalEddies
         );
 
+        const extraReactionCount =
+          quickCards.length + (!p.hasCalledLegendThisTurn && uncalledLegends.length > 0 && totalEddies >= 1 ? uncalledLegends.length : 0);
+
+        if (!showFullReactionModal) {
+          return (
+            <div className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-[46] w-[94vw] max-w-3xl pointer-events-auto font-mono select-none">
+              <motion.div
+                initial={{ opacity: 0, y: -10, scale: 0.96 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                style={{ clipPath: CYBER_CLIP }}
+                className="bg-[#070a10]/95 border-2 border-[#FF003C] px-3.5 py-2.5 shadow-[0_0_40px_rgba(255,0,60,0.5)] backdrop-blur-md space-y-2"
+              >
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="px-2 py-0.5 bg-[#FF003C] text-white font-black text-[9px] uppercase tracking-widest shrink-0 animate-pulse">
+                      COMBATE RIVAL
+                    </span>
+                    <span className="text-xs font-black text-white truncate">
+                      <span className="text-[#FF003C]">{reaction.attackerName}</span> (⚡{reaction.attackerPower})
+                      {' ataca '}
+                      <span className="text-[#FCEE0A]">
+                        {currentBlocker ? `🛡️ ${currentBlocker.name}` : reaction.targetType === 'GIGS' ? 'TUS GIGS' : reaction.targetName}
+                      </span>
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => setShowFullReactionModal(true)}
+                      style={{ clipPath: CYBER_BUTTON }}
+                      className="px-2.5 py-1.5 bg-black border border-[#FCEE0A]/70 hover:bg-[#FCEE0A] text-[#FCEE0A] hover:text-black font-black text-[10px] uppercase cursor-pointer transition-colors"
+                      title="Abrir panel táctico completo (Quick, Call Legend y Bloqueadores)"
+                    >
+                      ⚡ RESPONDER {extraReactionCount > 0 ? `(${extraReactionCount})` : ""}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleResolveReactionCombat}
+                      style={{ clipPath: CYBER_BUTTON }}
+                      className={`px-4 py-1.5 font-black text-xs uppercase cursor-pointer transition-all shadow-lg ${
+                        currentBlocker
+                          ? 'bg-[#0dfceb] hover:bg-white text-[#070a10] shadow-[0_0_18px_#0dfceb]'
+                          : 'bg-[#0dfceb] hover:bg-white text-[#070a10] shadow-[0_0_18px_rgba(13,252,235,0.65)]'
+                      }`}
+                    >
+                      {currentBlocker ? '🛡️ RESOLVER BLOQUEO' : 'PASS / RESOLVER'}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Acceso 1-clic a Bloqueadores directamente sobre el tablero */}
+                {readyBlockers.length > 0 && (
+                  <div className="flex flex-wrap items-center gap-1.5 pt-1 border-t border-gray-800/80">
+                    <span className="text-[9px] font-black uppercase text-[#0dfceb] mr-1">
+                      🛡️ BLOQUEAR (o clic en carta en mesa):
+                    </span>
+                    {readyBlockers.map((b) => {
+                      const isAssigned = reaction.blockerUnitId === b.instanceId;
+                      const pb = getUnitPowerBreakdown(b);
+                      return (
+                        <button
+                          key={b.instanceId}
+                          type="button"
+                          onClick={() => handleSelectBlocker(b.instanceId)}
+                          className={`px-2 py-0.5 rounded text-[10px] font-black uppercase cursor-pointer border transition-all ${
+                            isAssigned
+                              ? 'bg-[#0dfceb] text-black border-white shadow-[0_0_10px_#0dfceb]'
+                              : 'bg-black text-[#0dfceb] border-[#0dfceb]/60 hover:bg-[#0dfceb]/20'
+                          }`}
+                        >
+                          🛡️ {b.name} (⚡{pb.currentPower}) {isAssigned ? "✓" : ""}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </motion.div>
+            </div>
+          );
+        }
+
         return (
           <div className="fixed inset-0 z-45 bg-[#000000]/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 font-mono select-none">
             <motion.div
@@ -7819,16 +8056,20 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
               className="max-w-2xl w-full bg-[#070a10]/98 border-2 border-[#FF003C] p-4 sm:p-5 space-y-3 sm:space-y-4 shadow-[0_0_60px_rgba(255,0,60,0.5)] relative max-h-[90vh] overflow-y-auto cyber-scrollbar"
             >
               {/* Cabecera de Alerta */}
-              <div className="flex items-center justify-between border-b border-[#FF003C]/40 pb-2.5">
+              <div className="flex items-center justify-between border-b border-[#FF003C]/40 pb-2.5 gap-2">
                 <div className="flex items-center gap-2">
                   <span className="w-3 h-3 bg-[#FF003C] rounded-full animate-ping" />
                   <span className="text-xs sm:text-sm font-black uppercase tracking-wider text-[#FF003C]">
                     // COMBATE OFICIAL // FASE 2: FASE DE REACCIÓN //
                   </span>
                 </div>
-                <span className="text-[10px] text-[#FCEE0A] uppercase font-bold tracking-widest">
-                  TU TURNO DE RESPUESTA
-                </span>
+                <button
+                  type="button"
+                  onClick={() => setShowFullReactionModal(false)}
+                  className="px-2 py-1 bg-black border border-[#0dfceb]/60 hover:bg-[#0dfceb] text-[#0dfceb] hover:text-black text-[10px] font-black uppercase cursor-pointer transition-colors"
+                >
+                  👁️ VER TABLERO Y FLECHA
+                </button>
               </div>
 
               {/* Resumen del Ataque Entrante */}
