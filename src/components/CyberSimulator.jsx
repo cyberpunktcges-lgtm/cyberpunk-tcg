@@ -957,12 +957,12 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
   const [hasResumableMatch, setHasResumableMatch] = useState(false);
   const [towerProgressVersion, setTowerProgressVersion] = useState(0);
   const [autoPayEddies, setAutoPayEddies] = useState(() => {
-    if (typeof window === 'undefined') return true;
+    if (typeof window === 'undefined') return false;
     try {
       const saved = localStorage.getItem('cp_sim_auto_pay');
-      return saved === null ? true : saved === 'true';
+      return saved === null ? false : saved === 'true';
     } catch {
-      return true;
+      return false;
     }
   });
   const [showFullReactionModal, setShowFullReactionModal] = useState(false);
@@ -1364,10 +1364,18 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
     });
   };
 
-  // Confirmar pago manual: gira exactamente los Eddies/Leyendas elegidos y juega la carta
+  // Confirmar pago manual: gira exactamente los Eddies/Leyendas elegidos y ejecuta la acción (Carta, Call Leyenda o Go Solo)
   const confirmManualPayment = () => {
     if (!pendingManualPayment || !gameState) return;
-    const { cardInstanceId, targetId, cost, selectedSources = [] } = pendingManualPayment;
+    const {
+      actionKind = 'PLAY_CARD',
+      cardInstanceId,
+      targetId,
+      legendInstanceId,
+      isGoSolo = true,
+      cost,
+      selectedSources = []
+    } = pendingManualPayment;
     const totalReady = (gameState.player?.floatingEddies || 0) + selectedSources.length;
     if (totalReady < cost) return;
     pushHistory();
@@ -1379,6 +1387,54 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
       }
     }
     setPendingManualPayment(null);
+
+    if (actionKind === 'CALL_LEGEND') {
+      const leg = (gameState.player?.legends || []).find((l) => l.instanceId === legendInstanceId);
+      const res = callLegendFaceUp(gameState, 'player', legendInstanceId);
+      if (!res.success) {
+        setHolocall({
+          title: 'FONDOS INSUFICIENTES',
+          message: res.reason || 'No se pudo llamar a la Leyenda.',
+          characterName: 'VIKTOR // RIPPERDOC',
+          type: 'warning'
+        });
+      } else if (leg) {
+        setPreviewCard(leg);
+        setHoveredCard(leg);
+      }
+      setGameState({ ...gameState });
+      return;
+    }
+
+    if (actionKind === 'GO_SOLO') {
+      const leg = (gameState.player?.legends || []).find((l) => l.instanceId === legendInstanceId);
+      const res = playLegendToField(gameState, 'player', legendInstanceId, isGoSolo);
+      setLegendMenuId(null);
+      if (res.success) {
+        const hasInteractiveModal = Boolean(
+          gameState.pendingTargetSelection || gameState.pendingCardChoice || gameState.pendingModalChoice
+        );
+        const triggerNotif = gameState.lastTriggerNotification;
+        delete gameState.lastTriggerNotification;
+        setGameState({ ...gameState });
+        if (!hasInteractiveModal && leg) {
+          setHolocall({
+            title: triggerNotif ? triggerNotif.title : (isGoSolo ? '🔥 ¡GO SOLO ACTIVADO!' : '⚔️ LEYENDA DESPLEGADA'),
+            message: triggerNotif
+              ? `${isGoSolo ? '🔥 Go Solo activado (entra lista y sin Lag). ' : ''}${triggerNotif.message}`
+              : isGoSolo
+              ? `"${leg.name}" ha entrado al campo de batalla lista y sin lag. ¡Puede atacar este mismo turno!`
+              : `"${leg.name}" ha sido desplegada al campo de batalla.`,
+            characterName: 'NETWATCH // OVERWATCH',
+            type: triggerNotif?.type || 'success'
+          });
+        }
+      } else {
+        setGameState({ ...gameState });
+      }
+      return;
+    }
+
     const res = playCard(gameState, 'player', cardInstanceId, targetId);
     if (res.success) {
       setSelectedHandCard(null);
@@ -1393,11 +1449,9 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
         setHolocall({
           title: notif.title,
           message: notif.message,
-          characterName: 'KIROSHI OS // TRIGGER PLAY',
-          type: notif.type || 'success'
+          characterName: 'NETWATCH // OVERWATCH',
+          type: notif.type || 'info'
         });
-      } else {
-        delete gameState.lastTriggerNotification;
       }
       setGameState({ ...gameState });
     } else {
@@ -1672,11 +1726,22 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
     const floating = getAvailableEddies(p);
     const totalCap = getTotalAvailableEddies(p);
 
-    // Si los eddies girados son inferiores al coste pero el jugador tiene capacidad suficiente (eddies/leyendas sin girar):
+    // Si los eddies girados son inferiores al coste pero el jugador tiene capacidad suficiente:
     if (floating < cost) {
       if (totalCap >= cost) {
+        if (!autoPayEddies) {
+          setLegendMenuId(null);
+          setPendingManualPayment({
+            actionKind: 'GO_SOLO',
+            legendInstanceId,
+            isGoSolo,
+            card: leg,
+            cost,
+            selectedSources: []
+          });
+          return;
+        }
         let needed = cost - floating;
-        // 1. Girar cartas de la zona de eddies no giradas
         for (const ed of p.eddies || []) {
           if (needed <= 0) break;
           if (!ed.isSpent) {
@@ -1685,13 +1750,11 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
             needed--;
           }
         }
-        // 2. Si todavía falta y es Go Solo, podemos girar la propia leyenda para 1 €$ (la regla oficial lo permite)
         if (needed > 0 && isGoSolo && !leg.isSpent) {
           leg.isSpent = true;
           p.floatingEddies = (p.floatingEddies || 0) + 1;
           needed--;
         }
-        // 3. Si aún falta, girar otras leyendas disponibles
         for (const ol of p.legends || []) {
           if (needed <= 0) break;
           if (ol.instanceId !== legendInstanceId && !ol.isSpent && !ol.isOnField && !ol.isRemovedFromGame) {
@@ -3174,70 +3237,15 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
   // Llamar a Leyenda durante la Fase de Respuesta del Jugador (cuesta 1 €$, máx 1 por turno)
   const handleReactionCallLegend = (legendInstanceId) => {
     if (!gameState?.pendingReaction || gameState.player.hasCalledLegendThisTurn) return;
-    const totalEddies = getTotalAvailableEddies(gameState.player);
-    if (totalEddies < 1) {
-      setHolocall({
-        title: 'FONDOS INSUFICIENTES',
-        message: 'Necesitas al menos 1 €$ para llamar a una Leyenda durante la Fase de Respuesta.',
-        type: 'warning'
-      });
-      return;
-    }
-    // Si no hay floating eddies, girar 1 eddie disponible (priorizando zona de eddies u otra leyenda para preservar el estado de esta leyenda)
-    if (gameState.player.floatingEddies < 1) {
-      const unspentEddie = (gameState.player.eddies || []).find((e) => !e.isSpent);
-      if (unspentEddie) {
-        toggleEddieSpent(gameState, 'player', unspentEddie.instanceId);
-      } else {
-        const otherUnspentLeg = (gameState.player.legends || []).find(
-          (l) => !l.isSpent && l.instanceId !== legendInstanceId
-        );
-        if (otherUnspentLeg) {
-          toggleLegendSpent(gameState, 'player', otherUnspentLeg.instanceId);
-        } else {
-          const thisLeg = (gameState.player.legends || []).find((l) => l.instanceId === legendInstanceId);
-          if (thisLeg && !thisLeg.isSpent) {
-            toggleLegendSpent(gameState, 'player', thisLeg.instanceId);
-          }
-        }
-      }
-    }
-    callLegendFaceUp(gameState, 'player', legendInstanceId);
-    const revealedLeg = (gameState.player.legends || []).find((l) => l.instanceId === legendInstanceId);
-    gameState.actionLog.unshift(
-      `🛡️ [Fase de Respuesta] ¡Has volteado tu Leyenda boca arriba: ${revealedLeg?.name || 'Leyenda'}!`
-    );
-    setGameState({ ...gameState });
+    setShowFullReactionModal(false);
+    handleCallLegendAction(legendInstanceId);
   };
 
   // Jugar una carta Quick desde la mano durante la Fase de Respuesta del Jugador
   const handleReactionPlayQuickCard = (cardInstanceId) => {
     if (!gameState?.pendingReaction) return;
-    const card = (gameState.player.hand || []).find((c) => c.instanceId === cardInstanceId);
-    if (!card) return;
-    const cost = card.parsedCost || 0;
-    const totalEddies = getTotalAvailableEddies(gameState.player);
-    if (totalEddies < cost) {
-      setHolocall({
-        title: 'FONDOS INSUFICIENTES',
-        message: `Necesitas ${cost} €$ para jugar "${card.name}" en la Fase de Respuesta. Dispones de ${totalEddies} €$.`,
-        type: 'warning'
-      });
-      return;
-    }
-    while (gameState.player.floatingEddies < cost) {
-      const unspentEddie = (gameState.player.eddies || []).find((e) => !e.isSpent);
-      if (unspentEddie) {
-        toggleEddieSpent(gameState, 'player', unspentEddie.instanceId);
-      } else {
-        const unspentLeg = (gameState.player.legends || []).find((l) => !l.isSpent);
-        if (unspentLeg) toggleLegendSpent(gameState, 'player', unspentLeg.instanceId);
-        else break;
-      }
-    }
-    playCard(gameState, 'player', cardInstanceId);
-    gameState.actionLog.unshift(`⚡ [Fase de Respuesta] ¡Has jugado "${card.name}" (QUICK)!`);
-    setGameState({ ...gameState });
+    setShowFullReactionModal(false);
+    handlePlayCard(cardInstanceId, null);
   };
 
   // Resolver el combate pendiente tras la Fase de Respuesta del Jugador
@@ -3724,34 +3732,23 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
       return;
     }
 
-    pushHistory();
-
-    // Si no hay floating eddies en reserva, girar automáticamente 1 eddie de la zona de eddies u otra leyenda
+    // Nunca automatizar el pago al hacer CALL a una Leyenda: dejar elegir exactamente qué Eddie o Leyenda girar
     if ((p.floatingEddies || 0) < 1) {
-      const unspentEddie = (p.eddies || []).find((e) => !e.isSpent);
-      if (unspentEddie) {
-        unspentEddie.isSpent = true;
-        p.floatingEddies = (p.floatingEddies || 0) + 1;
-        (gameState.actionLog = gameState.actionLog || []).unshift(
-          `💶 ${p.name} gira 1 carta en su Zona de Eddies para pagar la llamada (+1 €$).`
-        );
-      } else {
-        const otherUnspentLeg = (p.legends || []).find(
-          (l) => !l.isSpent && l.instanceId !== legendInstanceId
-        );
-        if (otherUnspentLeg) {
-          otherUnspentLeg.isSpent = true;
-          p.floatingEddies = (p.floatingEddies || 0) + 1;
-          (gameState.actionLog = gameState.actionLog || []).unshift(
-            `👑 ${p.name} gira a su Leyenda "${otherUnspentLeg.name}" para pagar la llamada (+1 €$).`
-          );
-        } else if (!leg.isSpent) {
-          leg.isSpent = true;
-          p.floatingEddies = (p.floatingEddies || 0) + 1;
-        }
-      }
+      setLegendMenuId(null);
+      setPendingManualPayment({
+        actionKind: 'CALL_LEGEND',
+        legendInstanceId,
+        card: {
+          name: 'CALL LEYENDA',
+          image: '/images/back_legend.png'
+        },
+        cost: 1,
+        selectedSources: []
+      });
+      return;
     }
 
+    pushHistory();
     const res = callLegendFaceUp(gameState, 'player', legendInstanceId);
     if (!res.success) {
       setHolocall({
@@ -8958,8 +8955,14 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
         const paidNow = availableEddies + pickedCount;
         const needed = pendingManualPayment.cost;
         const isReadyToPay = paidNow >= needed;
+        const actionPrompt =
+          pendingManualPayment.actionKind === 'CALL_LEGEND'
+            ? 'Haz clic en 1 Eddie o Leyenda iluminado abajo para hacer CALL a tu Leyenda.'
+            : pendingManualPayment.actionKind === 'GO_SOLO'
+            ? `Haz clic en ${needed} Eddie(s) o Leyenda(s) iluminados abajo para activar GO SOLO con ${pendingManualPayment.card?.name}.`
+            : `Haz clic en ${needed} Eddie(s) o Leyenda(s) iluminados abajo para jugar ${pendingManualPayment.card?.name}.`;
         return (
-          <div className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-[46] w-[92vw] max-w-xl pointer-events-auto font-mono select-none">
+          <div className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-[55] w-[92vw] max-w-xl pointer-events-auto font-mono select-none">
             <motion.div
               initial={{ opacity: 0, y: 10, scale: 0.96 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -8973,10 +8976,10 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                 )}
                 <div className="min-w-0">
                   <span className="text-xs font-black uppercase text-[#FCEE0A] tracking-wider block">
-                    PAY {needed} €$
+                    PAY {needed} €${' '}{pendingManualPayment.actionKind === 'CALL_LEGEND' ? '• CALL LEYENDA' : pendingManualPayment.actionKind === 'GO_SOLO' ? '• GO SOLO' : ''}
                   </span>
                   <p className="text-[11px] text-gray-300 font-sans truncate">
-                    Haz clic en {needed} Eddie(s) o Leyenda(s) iluminados abajo para jugar {pendingManualPayment.card?.name}.
+                    {actionPrompt}
                   </p>
                 </div>
               </div>
