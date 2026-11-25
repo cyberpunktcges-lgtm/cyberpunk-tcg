@@ -3876,24 +3876,14 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
           onOpenBugReport={() => setShowBugReportModal(true)}
         />
       ) : (
-    <div className="min-h-[100dvh] max-h-[100dvh] h-[100dvh] bg-[#070a10] text-white font-sans select-none flex flex-col justify-between relative overflow-hidden">
-      {/* =====================================================================
-          1. ESTRUCTURA DEL TABLERO: FONDO OSCURO SÓLIDO Y LÍNEAS DE CUADRÍCULA NEÓN
-         ===================================================================== */}
+    <div className="min-h-[100dvh] max-h-[100dvh] h-[100dvh] bg-[#060911] text-white font-sans select-none flex flex-col justify-between relative overflow-hidden">
+      {/* FONDO ULTRA LIMPIO NIGHT CITY ARENA CON MICRO-REJILLA SUTIL */}
       <div
-        className="pointer-events-none fixed inset-0 z-0 bg-cover bg-[center_22%] opacity-[0.12] scale-[1.03] filter blur-[1.5px]"
+        className="pointer-events-none fixed inset-0 opacity-[0.06] z-0"
         style={{
           backgroundImage:
-            "url('/images/pandart-studio-alt-cunningham-soulkiller-architect.webp')"
-        }}
-      />
-      <div className="pointer-events-none fixed inset-0 z-0 bg-gradient-to-b from-[#070a10]/85 via-[#070a10]/70 to-[#070a10]/95" />
-      <div
-        className="pointer-events-none fixed inset-0 opacity-15 z-0"
-        style={{
-          backgroundImage:
-            'linear-gradient(to right, rgba(13, 252, 235, 0.18) 1px, transparent 1px), linear-gradient(to bottom, rgba(252, 238, 10, 0.1) 1px, transparent 1px)',
-          backgroundSize: '40px 40px'
+            'linear-gradient(to right, rgba(13, 252, 235, 0.35) 1px, transparent 1px), linear-gradient(to bottom, rgba(13, 252, 235, 0.25) 1px, transparent 1px)',
+          backgroundSize: '42px 42px'
         }}
       />
 
@@ -3901,7 +3891,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
           BARRA SUPERIOR: BOTONES CON BORDES AFILADOS Y EFECTO EXTERIOR
           hover:shadow-[0_0_15px_rgba(13,252,235,0.4)]
          ===================================================================== */}
-      <header className="relative z-30 bg-[#070a10]/95 border-b border-[#0dfceb]/30 px-2.5 sm:px-3 py-1.5 font-mono text-xs shrink-0 shadow-lg backdrop-blur-md">
+      <header className="lg:hidden relative z-30 bg-[#070a10]/95 border-b border-[#0dfceb]/30 px-2.5 sm:px-3 py-1.5 font-mono text-xs shrink-0 shadow-lg backdrop-blur-md">
         {/* ================= BARRA SUPERIOR MÓVIL / TABLET (< lg) ================= */}
         <div className="flex lg:hidden items-center justify-between gap-1.5 w-full min-w-0">
           {/* Izquierda: Botón Lobby + Turno y Estado compacto */}
@@ -4797,39 +4787,34 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
           <div className="flex gap-2 sm:gap-3 w-full items-stretch">
             {/* 1.A ZONA CENTRAL DEL RIVAL: BACKLINE (LEYENDAS + EDDIES) -> GIGS -> FRONTLINE (CAMPO) */}
             <div className="flex-1 flex flex-col gap-1.5 min-w-0">
-              {/* FILA DE CARTAS EN MANO DEL RIVAL (BOCA ABAJO EN MINIATURA) */}
-              <div className="flex items-center justify-between px-2.5 py-1 bg-[#060b14]/90 border border-[#FF003C]/40 rounded-xl shadow-[0_0_10px_rgba(255,0,60,0.15)]">
-                <div className="flex items-center gap-1.5 shrink-0">
+              {/* FILA DE CARTAS EN MANO DEL RIVAL — ABANICO LIMPIO ASOMANDO ARRIBA EN DESKTOP */}
+              <div className="flex items-center justify-between lg:justify-center px-2.5 lg:px-0 py-1 lg:py-0 lg:-mt-4 bg-[#060b14]/90 lg:bg-transparent border border-[#FF003C]/40 lg:border-0 rounded-xl lg:rounded-none shadow-none">
+                <div className="flex lg:hidden items-center gap-1.5 shrink-0">
                   <span className="w-1.5 h-1.5 rounded-full bg-[#FF003C] animate-pulse" />
                   <span className="text-[8px] sm:text-[9px] font-mono text-gray-300 uppercase font-black tracking-wider">
-                    MANO DEL RIVAL:
+                    MANO RIVAL:
                   </span>
                   <span className="text-[8px] sm:text-[9px] font-mono text-[#FF003C] font-bold">
-                    {bot.hand.length} {bot.hand.length === 1 ? 'CARTA' : 'CARTAS'}
+                    {bot.hand.length}
                   </span>
                 </div>
-                <div className="flex items-center -space-x-1 sm:-space-x-1.5 py-0.5 overflow-x-auto max-w-[65%]">
+                <div className="flex items-center justify-center -space-x-1 sm:-space-x-1.5 lg:-space-x-2 py-0.5 lg:py-0">
                   {bot.hand.map((_, hIdx) => (
-                    <motion.div
+                    <div
                       key={hIdx}
-                      whileHover={{ y: -3, scale: 1.15, zIndex: 30 }}
-                      style={{ clipPath: CYBER_CARD_CLIP }}
-                      className="w-5 sm:w-6 h-7 sm:h-9 bg-black border border-[#FF003C]/70 rounded-sm shadow-md shrink-0 transition-transform relative select-none"
-                      title={`Carta #${hIdx + 1} de la mano del rival (boca abajo)`}
+                      className="w-5 sm:w-6 lg:w-10 h-7 sm:h-9 lg:h-11 bg-black border border-[#FCEE0A]/70 rounded-sm shadow-md shrink-0 relative select-none overflow-hidden"
+                      title={`Carta #${hIdx + 1} de la mano del rival`}
                     >
-                      <CyberCardBack className="w-full h-full" />
-                    </motion.div>
+                      <img src="/images/back_normal.png" alt="Carta rival" className="w-full h-full object-cover" />
+                    </div>
                   ))}
-                  {bot.hand.length === 0 && (
-                    <span className="text-[8px] text-gray-600 italic">Mano vacía</span>
-                  )}
                 </div>
               </div>
 
-              {/* FILA SUPERIOR (BACKLINE): LEYENDAS RIVAL A LA IZQUIERDA + EDDIES RIVAL A LA DERECHA */}
-              <div className="h-14 sm:h-16 md:h-18 lg:h-20 flex gap-1.5 sm:gap-2 items-stretch w-full">
-                {/* LEYENDAS RIVAL (3 SLOTS) A LA IZQUIERDA */}
-                <div className="rounded-2xl border border-[#FF003C]/30 bg-[#060b14]/80 p-1.5 sm:p-2 flex items-center justify-center gap-1.5 sm:gap-2 shrink-0">
+              {/* FILA SUPERIOR (BACKLINE): LEYENDAS + EDDIES RIVAL EN UNA SOLA FILA LIMPIA Y CENTRADA */}
+              <div className="h-16 sm:h-18 lg:h-24 xl:h-26 flex gap-2 lg:gap-3 items-center justify-start lg:justify-center w-full">
+                {/* LEYENDAS RIVAL (3 SLOTS) */}
+                <div className="rounded-2xl lg:rounded-none border border-[#FF003C]/30 lg:border-0 bg-[#060b14]/80 lg:bg-transparent p-1.5 lg:p-0 flex items-center justify-center gap-1.5 sm:gap-2 lg:gap-2.5 shrink-0">
                   {bot.legends.map((leg, i) => (
                     leg.isOnField ? (
                       <div
@@ -4880,7 +4865,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                       onContextMenu={(e) => {
                         if (leg.isFaceUp) handleCardRightClick(e, leg);
                       }}
-                      className={`w-10 sm:w-11 md:w-12 lg:w-14 h-14 sm:h-16 md:h-18 lg:h-20 rounded-lg border transition-all flex flex-col items-center justify-center relative shadow-md ${
+                      className={`w-11 sm:w-12 lg:w-16 xl:w-17 h-15 sm:h-17 lg:h-22 xl:h-24 rounded-md border transition-all flex flex-col items-center justify-center relative shadow-md ${
                         leg.isFaceUp
                           ? leg.isSpent
                             ? 'border-[#FF003C]/70 shadow-[0_0_8px_rgba(255,0,60,0.3)] cursor-pointer'
@@ -4927,10 +4912,9 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                         </AnimatePresence>
                       </div>
 
-                      {/* Indicador sutil de girada sin tapar la ilustración */}
                       {leg.isSpent && (
-                        <div className="absolute bottom-0.5 left-0.5 z-20 pointer-events-none">
-                          <span className="px-1 py-0.2 bg-black/90 border border-[#FF003C]/60 text-[#FF003C] font-mono font-black text-[6px] sm:text-[7px] uppercase tracking-tighter shadow">
+                        <div className="lg:hidden absolute bottom-0.5 left-0.5 z-20 pointer-events-none">
+                          <span className="px-1 py-0.2 bg-black/90 border border-[#FF003C]/60 text-[#FF003C] font-mono font-black text-[6px] uppercase">
                             GIRADA
                           </span>
                         </div>
@@ -4947,51 +4931,38 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                   ))}
                 </div>
 
-                {/* ZONA DE EDDIES RIVAL (A LA DERECHA DE SUS LEYENDAS) */}
-                <div className="flex-1 rounded-2xl border border-[#FF003C]/30 bg-[#060b14]/80 p-2 sm:p-2.5 relative flex items-center overflow-hidden">
+                {/* ZONA DE EDDIES RIVAL (LIMPIA AL LADO DE SUS LEYENDAS) */}
+                <div className="flex-1 lg:flex-none rounded-2xl lg:rounded-none border border-[#FF003C]/30 lg:border-0 bg-[#060b14]/80 lg:bg-transparent p-2 lg:p-0 relative flex items-center overflow-visible">
                   {bot.eddies.length === 0 ? (
-                    <div className="text-gray-500 font-mono text-xs sm:text-sm select-none pl-2">
+                    <div className="lg:hidden text-gray-500 font-mono text-xs select-none pl-2">
                       No Eddies yet.
                     </div>
                   ) : (
-                    <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 py-0.5 pr-24 overflow-x-auto w-full">
+                    <div className="flex items-center gap-1.5 sm:gap-2 lg:gap-2.5 py-0.5 lg:py-0">
                       {bot.eddies.map((ed, idx) => (
                         <div
                           key={ed.instanceId || idx}
                           onMouseEnter={() => setHoveredCard(makeEddieBackPreview('EDDIE RIVAL (1 €$) // VENDIDA', ed.isSpent))}
                           onMouseLeave={() => setHoveredCard(null)}
-                          className={`transition-all duration-300 flex items-center justify-center shrink-0 ${
-                            ed.isSpent ? 'w-14 sm:w-16 h-10 sm:h-12 my-0.5' : 'w-10 sm:w-12 h-14 sm:h-16'
-                          }`}
+                          className="transition-all duration-300 flex items-center justify-center shrink-0 w-11 sm:w-12 lg:w-16 xl:w-17 h-15 sm:h-17 lg:h-22 xl:h-24"
                           title={ed.isSpent ? 'Eddie del rival gastado' : '1 €$ del rival disponible'}
                         >
                           <div
-                            className={`w-10 sm:w-12 h-14 sm:h-16 rounded-md overflow-hidden border transition-transform duration-300 relative shadow-md ${
+                            className={`w-full h-full rounded-md overflow-hidden border transition-transform duration-300 relative shadow-md ${
                               ed.isSpent
-                                ? 'rotate-90 opacity-40 border-gray-800'
-                                : 'border-[#FF003C]/60 shadow-[0_0_10px_rgba(255,0,60,0.3)]'
+                                ? 'rotate-[14deg] brightness-50 border-gray-800'
+                                : 'border-[#FCEE0A]/60 shadow-[0_0_10px_rgba(252,238,10,0.2)]'
                             }`}
                           >
-                            <CyberCardBack className="w-full h-full" />
-                            <div className="absolute inset-0 bg-black/30 flex items-center justify-center">
-                              <span
-                                className={`font-mono font-black text-[8px] px-1 bg-black/90 ${
-                                  ed.isSpent ? '-rotate-90 text-gray-500' : 'text-[#FCEE0A]'
-                                }`}
-                              >
-                                {ed.isSpent ? 'USADO' : '1 €$'}
-                              </span>
-                            </div>
+                            <img src="/images/back_normal.png" alt="Eddie rival" className="w-full h-full object-cover" />
                           </div>
                         </div>
                       ))}
                     </div>
                   )}
 
-                  {/* Badge inferior derecho: Eddies X/Y Ⓐ del Rival */}
-                  <div className="absolute bottom-1.5 right-2.5 flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-[#031525]/90 border border-[#FF003C]/60 text-[#FF003C] font-mono text-[10px] sm:text-xs font-bold shadow-[0_0_10px_rgba(255,0,60,0.25)] select-none pointer-events-none">
-                    <span>Eddies {getAvailableEddies(bot)}/{bot.eddies.length + bot.legends.length}</span>
-                    <span className="w-3.5 h-3.5 rounded-full border border-[#FF003C] flex items-center justify-center text-[9px] font-black leading-none">Ⓐ</span>
+                  <div className="lg:hidden absolute bottom-1.5 right-2.5 flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#031525]/90 border border-[#FF003C]/60 text-[#FF003C] font-mono text-[10px] font-bold pointer-events-none">
+                    <span>€$ {getAvailableEddies(bot)}/{bot.eddies.length + bot.legends.length}</span>
                   </div>
                 </div>
               </div>
@@ -5261,7 +5232,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                           setPreviewCard(unit);
                         }}
                         onMouseLeave={() => setHoveredCard(null)}
-                        className="relative transition-all duration-300 flex flex-col items-center justify-center shrink-0 w-16 sm:w-18 md:w-20 lg:w-24 xl:w-26 h-23 sm:h-26 md:h-28 lg:h-34 xl:h-36"
+                        className="relative transition-all duration-300 flex flex-col items-center justify-center shrink-0 w-18 sm:w-20 md:w-22 lg:w-28 xl:w-32 h-25 sm:h-28 md:h-31 lg:h-39 xl:h-45"
                       >
                         {/* GEARS EQUIPADOS AL RIVAL (Sobresaliendo por detrás escalonados hacia arriba y a la derecha) */}
                         {unit.gear && unit.gear.length > 0 && unit.gear.map((g, gIdx) => {
@@ -5339,7 +5310,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                           }}
                           onContextMenu={(e) => handleCardRightClick(e, unit)}
                           style={{ clipPath: CYBER_CARD_CLIP }}
-                          className={`w-16 sm:w-18 md:w-20 lg:w-24 xl:w-26 h-23 sm:h-26 md:h-28 lg:h-34 xl:h-36 bg-black border-2 transition-transform duration-300 cursor-pointer flex flex-col justify-between relative shadow-xl z-10 ${
+                          className={`w-18 sm:w-20 md:w-22 lg:w-28 xl:w-32 h-25 sm:h-28 md:h-31 lg:h-39 xl:h-45 bg-black rounded-md border-2 transition-transform duration-300 cursor-pointer flex flex-col justify-between relative shadow-2xl z-10 overflow-hidden ${
                             canAttackThisUnit
                               ? 'border-[#0dfceb] ring-2 ring-[#0dfceb] shadow-[0_0_22px_rgba(13,252,235,0.95)] animate-pulse rotate-[12deg]'
                               : unit.isSpent
@@ -5353,43 +5324,27 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                             className="w-full h-full object-cover object-center"
                           />
 
-                          {/* Badges de Palabras Clave Oficiales (Rival) */}
-                          <div className="absolute top-0.5 left-0.5 flex flex-col gap-0.5 z-10 pointer-events-none">
-                            {hasKeyword(unit, 'Blocker') && (
-                              <span className="px-1 py-0.2 bg-[#0dfceb] text-black font-mono font-black text-[6px] sm:text-[7px] uppercase shadow">
-                                🛡️
-                              </span>
-                            )}
-                            {hasKeyword(unit, 'Adrenaline') && (
-                              <span className="px-1 py-0.2 bg-[#FCEE0A] text-black font-mono font-black text-[6px] sm:text-[7px] uppercase shadow">
-                                ⚡
-                              </span>
-                            )}
-                            {hasKeyword(unit, 'Go Solo') && (
-                              <span className="px-1 py-0.2 bg-[#FF003C] text-white font-mono font-black text-[6px] sm:text-[7px] uppercase shadow">
-                                🔥
-                              </span>
-                            )}
-                          </div>
+                          {/* Icono de escudo limpio en borde izquierdo si tiene Blocker (exacto a capturas) */}
+                          {hasKeyword(unit, 'Blocker') && (
+                            <div className="pointer-events-none absolute top-1/3 -left-0.5 w-6 h-6 rounded-full bg-[#070a10]/90 border border-[#0dfceb] flex items-center justify-center z-20 shadow-[0_0_10px_rgba(13,252,235,0.6)]">
+                              <Shield className="w-3.5 h-3.5 text-[#0dfceb]" />
+                            </div>
+                          )}
 
-                          {/* Insignia de Poder con indicador visual de Buff / Debuff (Fase 2) */}
+                          {/* Insignia de Poder en vivo (solo cuando tiene Buff verde o Debuff rojo para no tapar el número impreso) */}
                           {(() => {
                             const pb = getUnitPowerBreakdown(unit);
+                            if (pb.status === 'base') return null;
                             const badgeClass =
                               pb.status === 'debuffed'
-                                ? 'bg-[#FF003C] text-white border border-white animate-pulse shadow-[0_0_12px_#FF003C]'
-                                : pb.status === 'buffed'
-                                ? 'bg-[#00FF9C] text-[#070a10] border border-white shadow-[0_0_10px_rgba(0,255,156,0.7)]'
-                                : 'bg-[#FF003C] text-white shadow-md';
+                                ? 'bg-[#FF003C] text-white border border-white shadow-[0_0_12px_#FF003C]'
+                                : 'bg-[#00FF9C] text-[#070a10] border border-white shadow-[0_0_12px_rgba(0,255,156,0.8)]';
                             return (
                               <div
                                 title={pb.tooltip}
-                                className={`absolute bottom-0.5 right-0.5 px-1.5 py-0.2 font-mono font-black text-[9px] sm:text-[10px] z-20 flex items-center gap-0.5 ${badgeClass}`}
+                                className={`absolute bottom-1 right-1 px-1.5 py-0.5 rounded-sm font-mono font-black text-xs z-20 ${badgeClass}`}
                               >
-                                <span>⚡{pb.currentPower}</span>
-                                {pb.deltaBadge && (
-                                  <span className="text-[7.5px] opacity-90">({pb.deltaBadge})</span>
-                                )}
+                                {String(pb.currentPower).padStart(2, "0")}
                               </div>
                             );
                           })()}
@@ -5716,7 +5671,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                             handlePlayCard(draggedCardId, unit.instanceId);
                           }
                         }}
-                        className="relative transition-all duration-300 flex flex-col items-center justify-center shrink-0 w-16 sm:w-18 md:w-20 lg:w-24 xl:w-26 h-23 sm:h-26 md:h-28 lg:h-34 xl:h-36"
+                        className="relative transition-all duration-300 flex flex-col items-center justify-center shrink-0 w-18 sm:w-20 md:w-22 lg:w-28 xl:w-32 h-25 sm:h-28 md:h-31 lg:h-39 xl:h-45"
                       >
                         {/* GEARS EQUIPADOS AL JUGADOR (Sobresaliendo por detrás escalonados hacia arriba y a la derecha) */}
                         {unit.gear && unit.gear.length > 0 && unit.gear.map((g, gIdx) => {
@@ -5819,7 +5774,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                           }}
                           onContextMenu={(e) => handleCardRightClick(e, unit)}
                           style={{ clipPath: CYBER_CARD_CLIP }}
-                          className={`w-16 sm:w-18 md:w-20 lg:w-24 xl:w-26 h-23 sm:h-26 md:h-28 lg:h-34 xl:h-36 bg-black border-2 transition-transform duration-300 cursor-pointer flex flex-col justify-between relative z-10 shadow-xl ${
+                          className={`w-18 sm:w-20 md:w-22 lg:w-28 xl:w-32 h-25 sm:h-28 md:h-31 lg:h-39 xl:h-45 bg-black rounded-md border-2 transition-transform duration-300 cursor-pointer flex flex-col justify-between relative z-10 shadow-2xl overflow-hidden ${
                             isCurrentBlocker
                               ? 'border-[#0dfceb] ring-4 ring-[#0dfceb] -translate-y-2 scale-105'
                               : isEligibleBlocker
@@ -5852,18 +5807,8 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                               </span>
                             )}
                             {hasKeyword(unit, 'Blocker') && !isCurrentBlocker && !isEligibleBlocker && (
-                              <span className="px-1 py-0.5 bg-[#0dfceb] text-black font-mono font-black text-[7px] sm:text-[8px] uppercase shadow">
-                                🛡️ BLOCKER
-                              </span>
-                            )}
-                            {hasKeyword(unit, 'Adrenaline') && (
-                              <span className="px-1 py-0.5 bg-[#FCEE0A] text-black font-mono font-black text-[7px] sm:text-[8px] uppercase shadow">
-                                ⚡ ADRENALINE
-                              </span>
-                            )}
-                            {hasKeyword(unit, 'Go Solo') && (
-                              <span className="px-1 py-0.5 bg-[#FF003C] text-white font-mono font-black text-[7px] sm:text-[8px] uppercase shadow">
-                                🔥 GO SOLO
+                              <span className="w-6 h-6 rounded-full bg-[#070a10]/90 border border-[#0dfceb] flex items-center justify-center shadow-[0_0_10px_rgba(13,252,235,0.5)]">
+                                <Shield className="w-3.5 h-3.5 text-[#0dfceb]" />
                               </span>
                             )}
                             {unit.mustAttackNextTurn && !unit.isSpent && (
@@ -5895,24 +5840,20 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                             </div>
                           )}
 
-                          {/* Insignia de Poder en vivo del Jugador con indicador visual de Buff / Debuff (Fase 2) */}
+                          {/* Insignia de Poder en vivo (solo cuando hay Buff verde o Debuff rojo) */}
                           {(() => {
                             const pb = getUnitPowerBreakdown(unit);
+                            if (pb.status === 'base') return null;
                             const badgeClass =
                               pb.status === 'debuffed'
-                                ? 'bg-[#FF003C] text-white border border-white animate-pulse shadow-[0_0_12px_#FF003C]'
-                                : pb.status === 'buffed'
-                                ? 'bg-[#00FF9C] text-[#070a10] border border-white shadow-[0_0_10px_rgba(0,255,156,0.7)]'
-                                : 'bg-[#070a10]/90 text-[#0dfceb] border border-[#0dfceb]/70 shadow-md';
+                                ? 'bg-[#FF003C] text-white border border-white shadow-[0_0_12px_#FF003C]'
+                                : 'bg-[#00FF9C] text-[#070a10] border border-white shadow-[0_0_12px_rgba(0,255,156,0.8)]';
                             return (
                               <div
                                 title={pb.tooltip}
-                                className={`absolute bottom-0.5 right-0.5 px-1.5 py-0.2 font-mono font-black text-[9px] sm:text-[10px] z-20 flex items-center gap-0.5 ${badgeClass}`}
+                                className={`absolute bottom-1 right-1 px-1.5 py-0.5 rounded-sm font-mono font-black text-xs z-20 ${badgeClass}`}
                               >
-                                <span>⚡{pb.currentPower}</span>
-                                {pb.deltaBadge && (
-                                  <span className="text-[7.5px] opacity-90">({pb.deltaBadge})</span>
-                                )}
+                                {String(pb.currentPower).padStart(2, "0")}
                               </div>
                             );
                           })()}
@@ -6160,10 +6101,10 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                 </div>
               </div>
 
-              {/* FILA INFERIOR (BACKLINE): LEYENDAS JUGADOR A LA IZQUIERDA + ZONA DE EDDIES JUGADOR */}
-              <div className="h-14 sm:h-16 md:h-18 lg:h-20 flex gap-1.5 sm:gap-2 items-stretch w-full">
-                {/* 1. LEYENDAS JUGADOR (3 SLOTS) A LA IZQUIERDA */}
-                <div className={`rounded-2xl border border-[#0dfceb]/30 bg-[#060b14]/80 p-1.5 sm:p-2 flex items-center justify-center gap-1.5 sm:gap-2 shrink-0 ${
+              {/* FILA INFERIOR (BACKLINE): LEYENDAS + EDDIES + BOTÓN "+" EN UNA SOLA FILA LIMPIA Y CENTRADA */}
+              <div className="h-16 sm:h-18 lg:h-24 xl:h-26 flex gap-2 lg:gap-3 items-center justify-start lg:justify-center w-full">
+                {/* 1. LEYENDAS JUGADOR (3 SLOTS) */}
+                <div className={`rounded-2xl lg:rounded-none border border-[#0dfceb]/30 lg:border-0 bg-[#060b14]/80 lg:bg-transparent p-1.5 lg:p-0 flex items-center justify-center gap-1.5 sm:gap-2 lg:gap-2.5 shrink-0 ${
                   legendMenuId ? 'relative z-40' : ''
                 }`}>
                   {p.legends.map((leg, i) => {
@@ -6469,7 +6410,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                             }
                             setLegendMenuId((prev) => (prev === leg.instanceId ? null : leg.instanceId));
                           }}
-                          className={`w-10 sm:w-11 md:w-12 lg:w-14 h-14 sm:h-16 md:h-18 lg:h-20 rounded-lg border transition-all cursor-pointer flex flex-col items-center justify-center relative shadow-md group ${
+                          className={`w-11 sm:w-12 lg:w-16 xl:w-17 h-15 sm:h-17 lg:h-22 xl:h-24 rounded-md border transition-all cursor-pointer flex flex-col items-center justify-center relative shadow-md group ${
                             isMenuOpen
                               ? 'border-[#0dfceb] ring-2 ring-[#0dfceb] shadow-[0_0_18px_rgba(13,252,235,0.6)]'
                               : leg.isFaceUp
@@ -6493,8 +6434,8 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                           }
                         >
                           <div
-                            className={`w-full h-full transition-transform duration-500 flex items-center justify-center ${
-                              leg.isSpent ? 'rotate-90 scale-75' : ''
+                            className={`w-full h-full transition-transform duration-300 flex items-center justify-center ${
+                              leg.isSpent ? 'rotate-[14deg] brightness-55' : ''
                             }`}
                           >
                             <AnimatePresence mode="wait">
@@ -6528,11 +6469,10 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                             </AnimatePresence>
                           </div>
 
-                          {/* Indicador elegante de Penalización Turno 1 o Gastada sin tapar la carta */}
                           {leg.isSpent && (
-                            <div className="absolute bottom-0.5 left-0.5 z-20 pointer-events-none">
-                              <span className="px-1 py-0.2 bg-black/90 border border-[#FCEE0A]/60 text-[#FCEE0A] font-mono font-black text-[6px] sm:text-[7px] uppercase tracking-tighter shadow">
-                                {isTurn1Penalty ? 'T1 GIRADA' : 'GIRADA'}
+                            <div className="lg:hidden absolute bottom-0.5 left-0.5 z-20 pointer-events-none">
+                              <span className="px-1 py-0.2 bg-black/90 border border-[#FCEE0A]/60 text-[#FCEE0A] font-mono font-black text-[6px] uppercase">
+                                {isTurn1Penalty ? 'T1' : 'GIRADA'}
                               </span>
                             </div>
                           )}
@@ -6549,7 +6489,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                   })}
                 </div>
 
-                {/* 2. ZONA DE EDDIES JUGADOR (CON SOPORTE DRAG & DROP Y BADGE EDDIES X/Y Ⓐ) */}
+                {/* 2. ZONA DE EDDIES JUGADOR + SLOT "+" AMARILLO (EXACTO A LAS CAPTURAS) */}
                 <div
                   onDragOver={(e) => {
                     e.preventDefault();
@@ -6562,18 +6502,60 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                     const cardId = e.dataTransfer.getData('text/plain');
                     if (cardId) handleSellCard(cardId);
                   }}
-                  className={`flex-1 rounded-2xl border transition-all relative flex items-center p-2 sm:p-2.5 overflow-hidden ${
+                  className={`flex-1 lg:flex-none rounded-2xl lg:rounded-none border lg:border-0 transition-all relative flex items-center gap-2 lg:gap-2.5 p-2 lg:p-0 overflow-visible ${
                     isDragOverEddies
-                      ? 'border-[#FCEE0A] bg-[#FCEE0A]/15 shadow-[0_0_25px_rgba(252,238,10,0.4)]'
-                      : 'border-[#0dfceb]/30 bg-[#060b14]/80'
+                      ? 'border-[#FCEE0A] bg-[#FCEE0A]/15 lg:bg-transparent'
+                      : 'border-[#0dfceb]/30 bg-[#060b14]/80 lg:bg-transparent'
                   }`}
                 >
-                  {/* Contenido cuando no hay Eddies vs cuando hay Eddies vendidos */}
+                  {/* Cartas vendidas como Eddies */}
+                  {p.eddies.map((ed, idx) => (
+                    <div
+                      key={ed.instanceId || idx}
+                      onMouseEnter={() => setHoveredCard(makeEddieBackPreview('TU EDDIE (1 €$) // CARTA VENDIDA', ed.isSpent))}
+                      onMouseLeave={() => setHoveredCard(null)}
+                      onClick={() => handleToggleEddie(ed.instanceId)}
+                      onContextMenu={(e) => handleCardRightClick(e, ed)}
+                      className="transition-all duration-300 flex items-center justify-center shrink-0 cursor-pointer w-11 sm:w-12 lg:w-16 xl:w-17 h-15 sm:h-17 lg:h-22 xl:h-24"
+                      title={ed.isSpent ? 'Eddie gastado este turno' : '1 €$ disponible (clic para girar en modo Manual)'}
+                    >
+                      <div
+                        className={`w-full h-full rounded-md overflow-hidden border transition-transform duration-300 relative shadow-md ${
+                          ed.isSpent
+                            ? 'rotate-[14deg] brightness-50 border-gray-800'
+                            : 'border-[#0dfceb]/80 hover:border-[#FCEE0A] hover:scale-105 shadow-[0_0_12px_rgba(13,252,235,0.3)]'
+                        }`}
+                      >
+                        <img src="/images/back_normal.png" alt="Tu Eddie" className="w-full h-full object-cover" />
+                      </div>
+                    </div>
+                  ))}
+
+                  {/* Slot amarillo "+" para arrastrar o clicar y vender 1 carta vendible por turno */}
+                  {!p.hasSoldThisTurn && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (selectedHandCard && isMyTurn && isCardVendible(selectedHandCard)) {
+                          handleSellCard(selectedHandCard.instanceId);
+                        }
+                      }}
+                      className={`w-11 sm:w-12 lg:w-16 xl:w-17 h-15 sm:h-17 lg:h-22 xl:h-24 rounded-md border border-dashed flex items-center justify-center shrink-0 transition-all cursor-pointer ${
+                        isDragOverEddies || (selectedHandCard && isMyTurn && isCardVendible(selectedHandCard))
+                          ? 'border-[#FCEE0A] bg-[#FCEE0A]/15 text-[#FCEE0A] shadow-[0_0_18px_rgba(252,238,10,0.45)] animate-pulse'
+                          : 'border-[#FCEE0A]/35 bg-[#FCEE0A]/[0.03] text-[#FCEE0A]/60 hover:border-[#FCEE0A] hover:text-[#FCEE0A]'
+                      }`}
+                      title="Arrastra una carta vendible aquí (o selecciónala y haz clic en +) para venderla por +1 €$"
+                    >
+                      <span className="text-xl font-black leading-none">+</span>
+                    </button>
+                  )}
+                </div>
+                {false && (<div>
                   {p.eddies.length === 0 ? (
-                    <div className="text-gray-400 font-mono text-xs sm:text-sm select-none pl-2 sm:pl-3">
+                    <div>
                       {isDragOverEddies ? (
-                        <span className="text-[#FCEE0A] font-bold animate-pulse">
-                          ¡Suelta aquí para vender (+1 €$)!
+                        <span>
                         </span>
                       ) : (
                         <span>No Eddies yet.</span>
@@ -6634,9 +6616,9 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                     title={`${availableEddies} €$ girados listos para gastar`}
                   >
                     <span>Eddies {availableEddies}/{p.eddies.length + p.legends.length}</span>
-                    <span className="w-3.5 h-3.5 rounded-full border border-[#00F0FF] flex items-center justify-center text-[9px] font-black leading-none">Ⓐ</span>
+                    <span>Ⓐ</span>
                   </div>
-                </div>
+                </div>)}
               </div>
             </div>
 
@@ -6736,11 +6718,11 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
             - Contenedor flexible en la parte inferior para la mano del jugador
             - Dock horizontal responsivo que se adapta a cualquier resolución
            ===================================================================== */}
-        <footer className="relative z-30 shrink-0 bg-[#070a10]/95 backdrop-blur-md border-t border-[#0dfceb]/40 shadow-[0_-10px_35px_rgba(0,0,0,0.85)] font-mono overflow-visible pb-[env(safe-area-inset-bottom)]">
-          <div className="w-full px-2.5 sm:px-4 py-1 sm:py-1.5">
-          {/* Barra Superior del Dock: Estado o Acciones de la Carta Seleccionada */}
-          <div className="flex flex-wrap items-center justify-between text-xs border-b border-[#0dfceb]/20 pb-1 mb-1">
-            <div className="flex items-center gap-2 flex-wrap">
+        <footer className="relative z-30 shrink-0 bg-[#070a10]/95 lg:bg-transparent backdrop-blur-md lg:backdrop-blur-none border-t border-[#0dfceb]/40 lg:border-t-0 shadow-[0_-10px_35px_rgba(0,0,0,0.85)] lg:shadow-none font-mono overflow-visible pb-[env(safe-area-inset-bottom)]">
+          <div className="w-full px-2.5 sm:px-4 py-1 lg:py-0 lg:pb-1">
+          {/* Barra Superior del Dock: en desktop solo aparece como píldora limpia cuando seleccionas una carta */}
+          <div className={`flex flex-wrap items-center justify-between lg:justify-center text-xs border-b border-[#0dfceb]/20 lg:border-b-0 pb-1 mb-1 ${selectedHandCard ? "" : "lg:hidden"}`}>
+            <div className="flex lg:hidden items-center gap-2 flex-wrap">
               <span className="text-gray-400 font-bold uppercase tracking-wider text-[11px]">
                 TU MANO ({p.hand.length}) • <strong className={`font-mono ${getTotalAvailableEddies(p) > 0 ? 'text-[#0dfceb]' : 'text-gray-400'}`}>€$ {getTotalAvailableEddies(p)}</strong>
                 {availableEddies > 0 && (
@@ -6948,7 +6930,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                     }}
                     onContextMenu={(e) => handleCardRightClick(e, card)}
                     style={{ clipPath: CYBER_CARD_CLIP }}
-                    className={`w-14 sm:w-16 md:w-18 lg:w-20 xl:w-22 h-20 sm:h-23 md:h-26 lg:h-28 xl:h-31 bg-black border transition-all duration-150 cursor-grab active:cursor-grabbing shrink-0 relative shadow-lg ${
+                    className={`w-15 sm:w-18 md:w-20 lg:w-24 xl:w-28 h-21 sm:h-25 md:h-28 lg:h-34 xl:h-39 bg-black rounded-md border transition-all duration-150 cursor-grab active:cursor-grabbing shrink-0 relative shadow-2xl overflow-hidden ${
                       isSelected
                         ? 'border-[#FCEE0A] shadow-[0_0_25px_rgba(252,238,10,0.85)] -translate-y-4 scale-110 z-30'
                         : isJustDrawn
@@ -6974,10 +6956,9 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                       </div>
                     )}
 
-                    {/* Distintivo de Carta Vendible oficial (Programas, Gears y MT0D12 Flathead) */}
                     {isCardVendible(card) && (
-                      <div className={`absolute ${isJustDrawn ? 'top-3.5' : 'top-0.5'} right-0.5 px-1 bg-[#FCEE0A] text-[#070a10] text-[7px] font-black uppercase tracking-tighter shadow z-10`}>
-                        €$ VENDIBLE
+                      <div className={`lg:hidden absolute ${isJustDrawn ? 'top-3.5' : 'top-0.5'} right-0.5 px-1 bg-[#FCEE0A] text-[#070a10] text-[7px] font-black uppercase z-10`}>
+                        €$
                       </div>
                     )}
 
@@ -7125,6 +7106,13 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
             handleCancelPendingBotAck();
             setShowLobby(true);
           }}
+          onOpenRules={() => {
+            setHelpModalTab('turn');
+            setShowRulesModal(true);
+          }}
+          onOpenLeaderboard={() => setShowLeaderboardModal(true)}
+          onOpenDeckSelector={() => handleResetGame()}
+          onOpenBugReport={() => setShowBugReportModal(true)}
         />
   </div>
 
@@ -8757,63 +8745,44 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                 </div>
               </div>
 
-              {/* Lista de Opciones */}
-              <div className="space-y-3 py-1">
+              {/* Lista de Opciones estilo 01 / 02 en cuadrícula limpia (exacto a captura) */}
+              <div className={`grid grid-cols-1 ${options.length === 2 ? "sm:grid-cols-2" : ""} gap-3 py-1`}>
                 {options.map((opt, idx) => {
                   const isEligible = opt.isEligible;
+                  const numLabel = String(idx + 1).padStart(2, "0");
                   return (
-                    <div
+                    <button
                       key={opt.id}
+                      type="button"
+                      disabled={!isEligible}
                       onClick={() => {
                         if (isEligible) handleResolveModalChoice(opt.id);
                       }}
-                      className={`p-3.5 rounded border-2 transition-all flex items-center justify-between gap-3 ${
+                      className={`p-4 rounded border text-left transition-all flex flex-col justify-between gap-2 ${
                         isEligible
-                          ? 'border-[#0dfceb]/60 hover:border-[#0dfceb] bg-[#0dfceb]/5 hover:bg-[#0dfceb]/15 cursor-pointer shadow-[0_0_15px_rgba(13,252,235,0.15)] group'
-                          : 'border-red-900/40 bg-red-950/20 opacity-50 cursor-not-allowed grayscale'
+                          ? 'border-[#0dfceb]/45 hover:border-[#FCEE0A] bg-[#0a111f] hover:bg-[#0dfceb]/10 cursor-pointer group'
+                          : 'border-white/10 bg-black/40 opacity-40 cursor-not-allowed grayscale'
                       }`}
                     >
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-2">
-                          <span className={`px-1.5 py-0.5 text-[8px] font-black rounded uppercase ${
-                            isEligible ? 'bg-[#0dfceb] text-black' : 'bg-red-800 text-white'
-                          }`}>
-                            OPCIÓN {idx + 1}
+                      <div className="space-y-1.5">
+                        <div className="flex items-start gap-2">
+                          <span className="text-xs font-black text-[#FCEE0A] shrink-0">
+                            {numLabel}
                           </span>
-                          <span className="text-xs font-black text-white uppercase group-hover:text-[#0dfceb] transition-colors">
+                          <span className="text-xs font-black text-white uppercase group-hover:text-[#FCEE0A] leading-snug transition-colors">
                             {opt.title}
                           </span>
                         </div>
-                        <p className="text-[11px] text-gray-300 leading-snug">
+                        <p className="text-[11px] text-gray-400 font-sans leading-snug">
                           {opt.description}
                         </p>
                         {!isEligible && (
-                          <span className="inline-block text-[9px] text-[#FF003C] font-bold mt-1">
-                            ⚠️ {opt.ineligibleReason || 'Sin objetivos válidos en este momento'}
+                          <span className="inline-block text-[9px] text-[#FF003C] font-bold">
+                            ⚠️ {opt.ineligibleReason || 'Sin objetivos válidos'}
                           </span>
                         )}
                       </div>
-
-                      <div className="shrink-0">
-                        {isEligible ? (
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleResolveModalChoice(opt.id);
-                            }}
-                            style={{ clipPath: CYBER_BUTTON }}
-                            className="px-3 py-1.5 bg-[#0dfceb] hover:bg-white text-black font-black text-[10px] uppercase shadow-[0_0_15px_rgba(13,252,235,0.6)] cursor-pointer"
-                          >
-                            ELEGIR
-                          </button>
-                        ) : (
-                          <span className="px-2 py-1 bg-red-900/40 border border-red-700/60 text-red-300 text-[9px] font-bold rounded uppercase">
-                            NO ELEGIBLE
-                          </span>
-                        )}
-                      </div>
-                    </div>
+                    </button>
                   );
                 })}
               </div>
