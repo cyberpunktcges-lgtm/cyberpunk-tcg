@@ -12,14 +12,17 @@ import React, { useEffect, useState } from 'react';
 
 function getAnchorCenter(anchorId) {
   if (typeof document === 'undefined' || !anchorId) return null;
-  const el = document.querySelector(`[data-arrow-anchor="${CSS.escape(String(anchorId))}"]`);
-  if (!el) return null;
-  const rect = el.getBoundingClientRect();
-  if (rect.width === 0 && rect.height === 0) return null;
-  return {
-    x: rect.left + rect.width / 2,
-    y: rect.top + rect.height / 2
-  };
+  const nodes = document.querySelectorAll(`[data-arrow-anchor="${CSS.escape(String(anchorId))}"]`);
+  for (const el of nodes) {
+    const rect = el.getBoundingClientRect();
+    if (rect.width > 0 && rect.height > 0) {
+      return {
+        x: rect.left + rect.width / 2,
+        y: rect.top + rect.height / 2
+      };
+    }
+  }
+  return null;
 }
 
 function buildCurvedPath(from, to) {

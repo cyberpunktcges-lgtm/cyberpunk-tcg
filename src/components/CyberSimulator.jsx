@@ -41,6 +41,8 @@ import CyberLeaderboardModal from './CyberLeaderboardModal.jsx';
 import CyberSimulatorLobby from './CyberSimulatorLobby.jsx';
 import CyberAttackArrowOverlay from './CyberAttackArrowOverlay.jsx';
 import { CyberDieShape } from './CyberDiceSvg.jsx';
+import CyberRightSidebar from './CyberRightSidebar.jsx';
+import { CyberLeftTelemetryRail, CyberRightGigsRail } from './CyberArenaColumns.jsx';
 import {
   getRivalById,
   getRivalByStage,
@@ -4414,9 +4416,8 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
            =============================================================== */}
         <aside
           className={`
-            ${isHudOpen ? 'fixed inset-y-0 left-0 z-40 w-80 sm:w-88 shadow-2xl bg-[#070a10] flex' : 'hidden'}
-            ${isKiroshiCollapsed ? 'lg:hidden' : 'lg:flex lg:static lg:w-72 xl:w-80 2xl:w-88 lg:shadow-none'}
-            h-full bg-[#070a10]/95 border-r border-[#0dfceb]/30 p-2 sm:p-2.5 flex-col font-mono shrink-0 overflow-y-auto lg:overflow-hidden space-y-1.5 sm:space-y-2 pb-2 cyber-scrollbar
+            ${isHudOpen ? 'fixed inset-y-0 left-0 z-40 w-80 sm:w-88 shadow-2xl bg-[#070a10] flex lg:hidden' : 'hidden'}
+            h-full bg-[#070a10]/95 border-r border-[#0dfceb]/30 p-2 sm:p-2.5 flex-col font-mono shrink-0 overflow-y-auto space-y-1.5 sm:space-y-2 pb-2 cyber-scrollbar
           `}
         >
           {/* Botón de cierre en pantalla móvil */}
@@ -4746,24 +4747,33 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
           </div>
         </aside>
 
-        {/* Tab flotante en el lateral izquierdo cuando el Escáner Kiroshi está colapsado */}
-        {isKiroshiCollapsed && (
-          <button
-            type="button"
-            onClick={() => {
-              setIsKiroshiCollapsed(false);
-              try {
-                localStorage.setItem('cyber_sim_kiroshi_collapsed', 'false');
-              } catch (err) {}
-            }}
-            className="hidden lg:flex fixed left-0 top-1/2 -translate-y-1/2 z-40 bg-[#070a10]/95 border-r-2 border-y-2 border-[#0dfceb] text-[#0dfceb] hover:text-[#070a10] hover:bg-[#0dfceb] py-3.5 px-1 cursor-pointer shadow-[0_0_15px_rgba(13,252,235,0.4)] transition-all font-mono text-[9px] font-black uppercase tracking-wider items-center gap-1 select-none"
-            style={{ writingMode: 'vertical-rl' }}
-            title="Expandir Escáner Kiroshi y HUD lateral"
-          >
-            <ChevronRight className="w-3 h-3 rotate-180" />
-            <span>ESCÁNER KIROSHI</span>
-          </button>
-        )}
+        {/* FRANJA 1 (DESKTOP): COLUMNA IZQUIERDA COMPACTA — MAZO, TRASH, EDDIES Y PILLS DE JUGADORES */}
+        <CyberLeftTelemetryRail
+          turnNumber={gameState.turnNumber}
+          isMyTurn={isMyTurn}
+          bot={bot}
+          player={p}
+          botAvatar={botAvatar}
+          playerAvatar={playerAvatar}
+          playerNick={currentUser ? resolvePublicNickname(userProfile, currentUser) : 'NETRUNNER'}
+          botAvailableEddies={getTotalAvailableEddies(bot)}
+          botMaxEddies={(bot.eddies?.length || 0) + (bot.legends || []).filter((l) => !l.isOnField && !l.isRemovedFromGame).length}
+          playerAvailableEddies={getTotalAvailableEddies(p)}
+          playerMaxEddies={(p.eddies?.length || 0) + (p.legends || []).filter((l) => !l.isOnField && !l.isRemovedFromGame).length}
+          modePill={
+            seriesState?.mode === 'arasaka_tower'
+              ? `🗼 TORRE P${seriesState.towerStage || 1}/${TOTAL_TOWER_STAGES}`
+              : seriesState?.mode === 'ranked_bo3'
+              ? `🏆 BO3 ${seriesState.playerScore}-${seriesState.botScore}`
+              : '🧪 MODO TESTEO'
+          }
+          onViewBotTrash={() => setViewingTrashModal({ playerKey: 'bot', title: 'DESCARTE DEL RIVAL (TRASH)' })}
+          onViewPlayerTrash={() => setViewingTrashModal({ playerKey: 'player', title: 'TUS DESCARTES (TRASH)' })}
+          onHoverCard={(c) => {
+            setHoveredCard(c);
+            if (c) setPreviewCard(c);
+          }}
+        />
 
         {/* ===============================================================
             ÁREA DE JUEGO PRINCIPAL: CAMPO DE BATALLA Y DOCK DE MANO INFERIOR
@@ -4883,7 +4893,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                     >
                       <div
                         className={`w-full h-full transition-transform duration-500 flex items-center justify-center ${
-                          leg.isSpent ? 'rotate-90 scale-75' : ''
+                          leg.isSpent ? 'rotate-[14deg] brightness-75' : ''
                         }`}
                       >
                         <AnimatePresence mode="wait">
@@ -4989,7 +4999,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
               {/* BARRA DE GIGS DEL RIVAL (DADOS VISIBLES CON VALOR Y ELECCIÓN AL ASALTAR) */}
               <div
                 data-arrow-anchor="bot-gigs"
-                className={`px-3 py-1 rounded-xl bg-[#070a10] border transition-all flex items-center justify-between gap-2 relative ${
+                className={`lg:hidden px-3 py-1 rounded-xl bg-[#070a10] border transition-all flex items-center justify-between gap-2 relative ${
                   canAttackGigs
                     ? 'border-[#FCEE0A] bg-[#FF003C]/12 shadow-[0_0_24px_rgba(252,238,10,0.4)]'
                     : 'border-[#FF003C]/35'
@@ -5071,8 +5081,8 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
               </div>
             </div>
 
-            {/* 1.B COLUMNA DERECHA: TRASH DEL RIVAL */}
-            <div className="flex flex-col justify-end shrink-0 w-13 sm:w-16 md:w-18">
+            {/* 1.B COLUMNA DERECHA: TRASH DEL RIVAL (SOLO MÓVIL/TABLET) */}
+            <div className="flex lg:hidden flex-col justify-end shrink-0 w-13 sm:w-16 md:w-18">
               {/* TRASH RIVAL (ÚLTIMA CARTA JUGADA EN MINIATURA) */}
               {(() => {
                 const lastTrashCard = bot.trash && bot.trash.length > 0 ? bot.trash[bot.trash.length - 1] : null;
@@ -5169,10 +5179,10 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
               - Columna Derecha Extrema: Mazos (Deck Rival arriba y Tu Mazo abajo)
              =============================================================== */}
           <div className="flex gap-1.5 sm:gap-2.5 w-full items-stretch my-0.5">
-            {/* 2.A COLUMNA FLANCO IZQUIERDO: TUS DADOS GIG (JUGADOR) */}
+            {/* 2.A COLUMNA FLANCO IZQUIERDO: TUS DADOS GIG (SOLO MÓVIL/TABLET) */}
             <div
               style={{ clipPath: CYBER_CLIP }}
-              className="bg-[#070a10]/95 border border-[#0dfceb]/40 rounded-xl p-1 sm:p-1.5 flex items-center gap-1 shadow-[0_0_15px_rgba(13,252,235,0.2)] select-none shrink-0"
+              className="flex lg:hidden bg-[#070a10]/95 border border-[#0dfceb]/40 rounded-xl p-1 sm:p-1.5 items-center gap-1 shadow-[0_0_15px_rgba(13,252,235,0.2)] select-none shrink-0"
             >
               {/* Texto vertical rotado */}
               <div
@@ -5228,9 +5238,14 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
 
             {/* 2.B ZONA CENTRAL: CAMPO RIVAL -> LÍNEA CENTRAL -> CAMPO JUGADOR */}
             <div className="flex-1 flex flex-col gap-1.5 min-w-0 justify-between">
-              {/* FRONTLINE: CAMPO DE BATALLA DEL RIVAL (FIELD) — CARTAS MÁS PEQUEÑAS CON HOVER PREVIEW */}
-              <div className="flex-1 rounded-2xl border border-[#FF003C]/30 bg-[#060b14]/80 p-1.5 sm:p-2 pt-5 pb-1.5 min-h-[110px] sm:min-h-[125px] md:min-h-[140px] flex items-center relative overflow-x-auto overflow-y-hidden">
-                <div className="flex items-center gap-2 sm:gap-2.5 w-full justify-start">
+              {/* FRONTLINE: CAMPO DE BATALLA DEL RIVAL (FIELD) */}
+              <div className="flex-1 rounded-2xl border border-[#FF003C]/25 lg:border-white/5 bg-[#060b14]/60 lg:bg-transparent p-2 pt-5 pb-2 min-h-[120px] sm:min-h-[145px] lg:min-h-[170px] flex items-center relative overflow-x-auto overflow-y-hidden">
+                {bot.field.length === 0 && (
+                  <span className="pointer-events-none absolute inset-0 flex items-center justify-center text-[10px] font-mono uppercase tracking-[0.25em] text-gray-600/80">
+                    NO RIVAL UNITS
+                  </span>
+                )}
+                <div className="flex items-center gap-2.5 sm:gap-3.5 w-full justify-start lg:justify-center">
                   {bot.field.map((unit) => {
                     const canAttackThisUnit =
                       selectedFieldUnit &&
@@ -5246,7 +5261,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                           setPreviewCard(unit);
                         }}
                         onMouseLeave={() => setHoveredCard(null)}
-                        className="relative transition-all duration-300 flex flex-col items-center justify-center shrink-0 w-14 sm:w-16 md:w-18 h-20 sm:h-23 md:h-26"
+                        className="relative transition-all duration-300 flex flex-col items-center justify-center shrink-0 w-16 sm:w-18 md:w-20 lg:w-24 xl:w-26 h-23 sm:h-26 md:h-28 lg:h-34 xl:h-36"
                       >
                         {/* GEARS EQUIPADOS AL RIVAL (Sobresaliendo por detrás escalonados hacia arriba y a la derecha) */}
                         {unit.gear && unit.gear.length > 0 && unit.gear.map((g, gIdx) => {
@@ -5324,7 +5339,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                           }}
                           onContextMenu={(e) => handleCardRightClick(e, unit)}
                           style={{ clipPath: CYBER_CARD_CLIP }}
-                          className={`w-14 sm:w-16 md:w-18 h-20 sm:h-23 md:h-26 bg-black border-2 transition-transform duration-300 cursor-pointer flex flex-col justify-between relative shadow-xl z-10 ${
+                          className={`w-16 sm:w-18 md:w-20 lg:w-24 xl:w-26 h-23 sm:h-26 md:h-28 lg:h-34 xl:h-36 bg-black border-2 transition-transform duration-300 cursor-pointer flex flex-col justify-between relative shadow-xl z-10 ${
                             canAttackThisUnit
                               ? 'border-[#0dfceb] ring-2 ring-[#0dfceb] shadow-[0_0_22px_rgba(13,252,235,0.95)] animate-pulse rotate-[12deg]'
                               : unit.isSpent
@@ -5653,13 +5668,18 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                     }
                   }
                 }}
-                className={`flex-1 rounded-2xl border transition-all p-1.5 sm:p-2 pt-5 pb-1.5 min-h-[120px] sm:min-h-[135px] md:min-h-[150px] flex items-center relative overflow-x-auto overflow-y-hidden ${
+                className={`flex-1 rounded-2xl border transition-all p-2 pt-5 pb-2 min-h-[130px] sm:min-h-[150px] lg:min-h-[175px] flex items-center relative overflow-x-auto overflow-y-hidden ${
                   isDragOverField
                     ? 'border-[#0dfceb] bg-[#0dfceb]/15 shadow-[0_0_35px_rgba(13,252,235,0.45)]'
-                    : 'border-[#0dfceb]/30 bg-[#060b14]/80'
+                    : 'border-[#0dfceb]/25 lg:border-white/5 bg-[#060b14]/60 lg:bg-transparent'
                 }`}
               >
-                <div className="flex items-center gap-2 sm:gap-3 w-full justify-start">
+                {p.field.length === 0 && (
+                  <span className="pointer-events-none absolute inset-0 flex items-center justify-center text-[10px] font-mono uppercase tracking-[0.25em] text-gray-600/80">
+                    DEPLOY UNITS HERE
+                  </span>
+                )}
+                <div className="flex items-center gap-2.5 sm:gap-3.5 w-full justify-start lg:justify-center">
                   {p.field.map((unit) => {
                     const isSelected = selectedFieldUnit?.instanceId === unit.instanceId;
                     const canAttack = isMyTurn && canUnitAttack(unit, p, gameState);
@@ -5696,7 +5716,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                             handlePlayCard(draggedCardId, unit.instanceId);
                           }
                         }}
-                        className="relative transition-all duration-300 flex flex-col items-center justify-center shrink-0 w-14 sm:w-16 md:w-18 lg:w-20 h-20 sm:h-23 md:h-26 lg:h-28"
+                        className="relative transition-all duration-300 flex flex-col items-center justify-center shrink-0 w-16 sm:w-18 md:w-20 lg:w-24 xl:w-26 h-23 sm:h-26 md:h-28 lg:h-34 xl:h-36"
                       >
                         {/* GEARS EQUIPADOS AL JUGADOR (Sobresaliendo por detrás escalonados hacia arriba y a la derecha) */}
                         {unit.gear && unit.gear.length > 0 && unit.gear.map((g, gIdx) => {
@@ -5799,7 +5819,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                           }}
                           onContextMenu={(e) => handleCardRightClick(e, unit)}
                           style={{ clipPath: CYBER_CARD_CLIP }}
-                          className={`w-14 sm:w-16 md:w-18 lg:w-20 h-20 sm:h-23 md:h-26 lg:h-28 bg-black border-2 transition-transform duration-300 cursor-pointer flex flex-col justify-between relative z-10 shadow-xl ${
+                          className={`w-16 sm:w-18 md:w-20 lg:w-24 xl:w-26 h-23 sm:h-26 md:h-28 lg:h-34 xl:h-36 bg-black border-2 transition-transform duration-300 cursor-pointer flex flex-col justify-between relative z-10 shadow-xl ${
                             isCurrentBlocker
                               ? 'border-[#0dfceb] ring-4 ring-[#0dfceb] -translate-y-2 scale-105'
                               : isEligibleBlocker
@@ -5953,10 +5973,10 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
               </div>
             </div>
 
-            {/* 2.C COLUMNA FLANCO DERECHO: DADOS GIG RIVAL (BOT) */}
+            {/* 2.C COLUMNA FLANCO DERECHO: DADOS GIG RIVAL (SOLO MÓVIL/TABLET) */}
             <div
               style={{ clipPath: CYBER_CLIP }}
-              className="bg-[#070a10]/95 border border-[#FF003C]/40 rounded-xl p-1 sm:p-1.5 flex items-center gap-1 shadow-[0_0_15px_rgba(255,0,60,0.2)] select-none shrink-0"
+              className="flex lg:hidden bg-[#070a10]/95 border border-[#FF003C]/40 rounded-xl p-1 sm:p-1.5 items-center gap-1 shadow-[0_0_15px_rgba(255,0,60,0.2)] select-none shrink-0"
             >
               {/* Pila vertical de los 6 dados rivales: D20, D12, D10, D8, D6, D4 */}
               <div className="flex flex-col items-center justify-between h-full gap-1 py-0.5">
@@ -6017,8 +6037,8 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
               </div>
             </div>
 
-            {/* 2.D COLUMNA DERECHA EXTREMA: DECK RIVAL (ARRIBA) Y TU MAZO (ABAJO) */}
-            <div className="flex flex-col justify-between gap-1.5 sm:gap-2 shrink-0 w-13 sm:w-16 md:w-18">
+            {/* 2.D COLUMNA DERECHA EXTREMA: DECK RIVAL Y TU MAZO (SOLO MÓVIL/TABLET) */}
+            <div className="flex lg:hidden flex-col justify-between gap-1.5 sm:gap-2 shrink-0 w-13 sm:w-16 md:w-18">
               {/* DECK RIVAL (MAZO CON REVERSO AMARILLO OFICIAL Y CONTADOR NEÓN) */}
               <div
                 onMouseEnter={() => setHoveredCard(makeDeckBackPreview('DECK RIVAL', bot.deck.length))}
@@ -6091,10 +6111,10 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
           <div className="flex gap-2 sm:gap-3 w-full items-stretch">
             {/* 3.A ZONA CENTRAL DEL JUGADOR: GIGS -> BACKLINE (LEYENDAS + EDDIES) */}
             <div className="flex-1 flex flex-col gap-1.5 min-w-0">
-              {/* BARRA DE GIGS DEL JUGADOR (DADOS ACTIVOS Y STREET CRED) */}
+              {/* BARRA DE GIGS DEL JUGADOR (SOLO MÓVIL/TABLET) */}
               <div
                 data-arrow-anchor="player-gigs"
-                className={`px-3 py-1 rounded-xl bg-[#070a10] border transition-all flex items-center justify-between ${
+                className={`lg:hidden px-3 py-1 rounded-xl bg-[#070a10] border transition-all flex items-center justify-between ${
                   gameState?.pendingReaction?.attackerPlayerKey === 'bot' && gameState.pendingReaction.targetType === 'GIGS' && !gameState.pendingReaction.blockerUnitId
                     ? 'border-[#FF003C] bg-[#FF003C]/10 shadow-[0_0_24px_rgba(255,0,60,0.45)]'
                     : 'border-[#0dfceb]/35'
@@ -6620,8 +6640,8 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
               </div>
             </div>
 
-            {/* 3.B COLUMNA DERECHA DEL JUGADOR: TRASH JUGADOR */}
-            <div className="flex flex-col justify-start shrink-0 w-13 sm:w-16 md:w-18">
+            {/* 3.B COLUMNA DERECHA DEL JUGADOR: TRASH JUGADOR (SOLO MÓVIL/TABLET) */}
+            <div className="flex lg:hidden flex-col justify-start shrink-0 w-13 sm:w-16 md:w-18">
               {/* TRASH JUGADOR (ÚLTIMA CARTA JUGADA EN MINIATURA) */}
               {(() => {
                 const lastTrashCard = p.trash && p.trash.length > 0 ? p.trash[p.trash.length - 1] : null;
@@ -6928,7 +6948,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                     }}
                     onContextMenu={(e) => handleCardRightClick(e, card)}
                     style={{ clipPath: CYBER_CARD_CLIP }}
-                    className={`w-12 sm:w-14 md:w-16 lg:w-18 h-17 sm:h-20 md:h-23 lg:h-25 bg-black border transition-all duration-150 cursor-grab active:cursor-grabbing shrink-0 relative shadow-lg ${
+                    className={`w-14 sm:w-16 md:w-18 lg:w-20 xl:w-22 h-20 sm:h-23 md:h-26 lg:h-28 xl:h-31 bg-black border transition-all duration-150 cursor-grab active:cursor-grabbing shrink-0 relative shadow-lg ${
                       isSelected
                         ? 'border-[#FCEE0A] shadow-[0_0_25px_rgba(252,238,10,0.85)] -translate-y-4 scale-110 z-30'
                         : isJustDrawn
@@ -6967,8 +6987,8 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
               })}
             </div>
 
-            {/* LADO DERECHO DEL DOCK: Botón de Terminar Turno */}
-            <div className="flex items-center shrink-0">
+            {/* LADO DERECHO DEL DOCK: Botón de Terminar Turno (solo móvil/tablet; en escritorio está en el centro derecho) */}
+            <div className="flex lg:hidden items-center shrink-0">
               <button
                 type="button"
                 disabled={!isMyTurn}
@@ -7004,6 +7024,108 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
         </div>
       </footer>
     </div>
+
+        {/* FRANJA 3 (DESKTOP): COLUMNA DE GIGS + FIXER + BOTÓN PROTAGONISTA END TURN / PASS */}
+        <CyberRightGigsRail
+          botGigs={bot.gigs || []}
+          botStreetCred={botStreetCred}
+          botFixerDice={bot.fixerDice || []}
+          playerGigs={p.gigs || []}
+          playerStreetCred={playerStreetCred}
+          playerFixerDice={p.fixerDice || []}
+          eligiblePlayerDice={getEligibleFixerDice(p)}
+          canRollFixerNow={Boolean(gameState.mulliganDecided && isMyTurn && (gameState.pendingGigRoll || gameState.phase === 'START_GIG_SELECT') && !rollingAnimation)}
+          onRollFixerDie={(d) => triggerDiceRoll(d)}
+          canAttackGigs={Boolean(canAttackGigs)}
+          gigsToSteal={gigsToSteal}
+          onAttackGigs={() => {
+            if (!selectedFieldUnit) return;
+            if (gigsToSteal <= 0) {
+              handlePlayerAttack('GIGS', null, []);
+            } else if ((bot.gigs || []).length > 1) {
+              setPendingGigTheft({
+                countToSteal: Math.min(gigsToSteal, bot.gigs.length),
+                selectedDice: [],
+                attackerUnit: selectedFieldUnit
+              });
+            } else if ((bot.gigs || []).length === 1) {
+              handlePlayerAttack('GIGS', null, [bot.gigs[0].die.toLowerCase()]);
+            }
+          }}
+          onStealSpecificDie={(d) => handleStealSpecificDie(d)}
+          isMyTurn={isMyTurn}
+          isBotThinking={isBotThinking}
+          hasPendingReaction={Boolean(gameState?.pendingReaction && gameState.pendingReaction.attackerPlayerKey === 'bot')}
+          hasBlockerAssigned={Boolean(gameState?.pendingReaction?.blockerUnitId)}
+          onPrimaryAction={() => {
+            if (gameState?.pendingReaction && gameState.pendingReaction.attackerPlayerKey === 'bot') {
+              handleResolveReactionCombat();
+              return;
+            }
+            const forcedAttacker = (gameState.player?.field || []).find((u) => {
+              if (!u.mustAttackNextTurn) return false;
+              const canHitGigs = canUnitAttack(u, gameState.player, gameState, 'GIGS') && (gameState.bot?.gigs || []).length > 0;
+              const canHitUnit = canUnitAttack(u, gameState.player, gameState, 'UNIT') && (gameState.bot?.field || []).some((bu) => bu.isSpent || u.canAttackReadyUnits);
+              return canHitGigs || canHitUnit;
+            });
+            if (forcedAttacker) {
+              setHolocall({
+                title: '💢 ATAQUE OBLIGATORIO PENDIENTE',
+                characterName: 'KIROSHI OS // PROTOCOLO DE COMBATE',
+                message: `"${forcedAttacker.name}" está provocada y DEBE atacar este turno antes de que puedas pasar turno.`,
+                type: 'warning'
+              });
+              return;
+            }
+            setSelectedHandCard(null);
+            setSelectedFieldUnit(null);
+            setHistory([]);
+            passTurn(gameState);
+            setGameState({ ...gameState });
+          }}
+        />
+
+        {/* FRANJA 4 (DESKTOP): PANEL LATERAL DERECHO FIJO — GAME LOG + CARDS + HOVER ZOOM */}
+        <CyberRightSidebar
+          modeTitle={
+            seriesState?.mode === 'arasaka_tower'
+              ? `PISO ${seriesState.towerStage || 1}/${TOTAL_TOWER_STAGES} • ${(seriesState.towerRivalName || "JEFE").toUpperCase()}`
+              : seriesState?.mode === 'ranked_bo3'
+              ? `RANKED BO3 • J${seriesState.currentGame}/3 (${seriesState.playerScore}-${seriesState.botScore})`
+              : 'SINGLE GAME'
+          }
+          modeBadge={
+            seriesState?.mode === 'arasaka_tower'
+              ? 'CONQUISTA LA TORRE ARASAKA'
+              : seriesState?.mode === 'ranked_bo3'
+              ? 'NIGHT CITY RANKED'
+              : 'MODO TESTEO'
+          }
+          actionLog={gameState.actionLog || []}
+          hoveredCard={hoveredCard}
+          displayCard={rawDisplayCard}
+          onInspectCard={(c) => setInspectedCard(c)}
+          autoPayEddies={autoPayEddies}
+          onToggleAutoPay={() => {
+            const next = !autoPayEddies;
+            setAutoPayEddies(next);
+            try {
+              localStorage.setItem('cp_sim_auto_pay', String(next));
+            } catch {}
+          }}
+          botStepPauseEnabled={botStepPauseEnabled}
+          onToggleBotPause={() => {
+            const next = !botStepPauseEnabled;
+            setBotStepPauseEnabled(next);
+            botStepPauseEnabledRef.current = next;
+          }}
+          canUndo={history.length > 0 && isMyTurn}
+          onUndo={handleUndo}
+          onGoHome={() => {
+            handleCancelPendingBotAck();
+            setShowLobby(true);
+          }}
+        />
   </div>
 
       {/* =====================================================================
@@ -7019,136 +7141,122 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
         />
       )}
 
-      {/* 1. MODAL FLOTANTE DE MULLIGAN (INICIO DE PARTIDA) - ANCHO EXPANDIDO */}
+      {/* 1. MODAL MINIMALISTA DE OPENING HAND (MULLIGAN — ESTILO NIGHT CITY ARENA) */}
       {!gameState.mulliganDecided && !gameState.pendingFirstPlayerSelection && (
-        <div className="fixed inset-0 z-50 bg-[#000000]/85 backdrop-blur-md flex items-center justify-center p-4 font-mono">
-          <div
-            style={{ clipPath: CYBER_CLIP }}
-            className="max-w-5xl w-full bg-[#070a10]/95 border-2 border-[#FCEE0A] p-6 sm:p-8 space-y-6 shadow-[0_0_60px_rgba(252,238,10,0.45)] text-center backdrop-blur-md"
-          >
-            <div className="space-y-1">
-              <span className="text-[11px] text-[#0dfceb] uppercase tracking-widest block">
-                FASE INICIAL // PREPARACIÓN DE PARTIDA
-              </span>
-              <h2 className="text-2xl sm:text-3xl font-black text-white uppercase">
-                TU MANO INICIAL <span className="text-[#FCEE0A]">({p.hand.length} CARTAS)</span>
+        <div className="fixed inset-0 z-50 bg-[#050810]/88 backdrop-blur-md flex items-center justify-center p-4 font-mono">
+          <div className="max-w-5xl w-full text-center space-y-5">
+            <div className="space-y-2">
+              <div className="inline-flex items-center gap-1.5">
+                <span
+                  className={`px-2.5 py-0.5 text-[10px] font-black uppercase tracking-widest rounded-sm ${
+                    gameState.activePlayer === 'player'
+                      ? 'bg-[#0dfceb] text-[#070a10]'
+                      : 'bg-[#FF003C] text-white'
+                  }`}
+                >
+                  {gameState.activePlayer === 'player' ? 'YOU GO 1ST' : 'YOU GO 2ND'}
+                </span>
+                <span className="px-2.5 py-0.5 bg-white/10 text-gray-200 text-[10px] font-black uppercase tracking-widest rounded-sm">
+                  {seriesState?.mode === 'ranked_bo3' ? `BEST OF 3 • J${seriesState.currentGame}/3` : seriesState?.mode === 'arasaka_tower' ? `TORRE PISO ${seriesState.towerStage || 1}/11` : 'BEST OF 1'}
+                </span>
+              </div>
+              <h2 className="text-2xl sm:text-3xl font-black text-[#FCEE0A] uppercase tracking-[0.18em] drop-shadow-[0_0_15px_rgba(252,238,10,0.45)]">
+                OPENING HAND
               </h2>
             </div>
 
-            <p className="text-xs sm:text-sm text-gray-300 leading-relaxed max-w-2xl mx-auto">
-              Según el reglamento oficial de Cyberpunk TCG, ambos jugadores roban 6 cartas de apertura. Tienes derecho a un único <strong>MULLIGAN</strong> por partida para barajar tu mano entera en el mazo y robar 6 cartas nuevas.
-            </p>
-
-            {/* Vista previa de las 6 cartas iniciales en ancho completo */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3 sm:gap-4 justify-items-center py-4">
+            {/* 6 cartas grandes en fila limpia */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3 justify-items-center py-2">
               {p.hand.map((c) => (
                 <div
                   key={c.instanceId}
-                  style={{ clipPath: CYBER_CARD_CLIP }}
-                  className="w-28 sm:w-32 md:w-36 h-40 sm:h-48 md:h-52 bg-black border border-gray-700 shrink-0 relative overflow-hidden shadow-xl transition-transform hover:scale-105"
+                  onClick={() => setInspectedCard(c)}
+                  className="w-32 sm:w-36 md:w-full max-w-[165px] aspect-[5/7] bg-black rounded-lg border border-white/20 hover:border-[#FCEE0A] relative overflow-hidden shadow-2xl transition-all hover:scale-105 cursor-pointer"
                 >
                   <img src={c.image} alt={c.name} className="w-full h-full object-cover" />
-                  {isCardVendible(c) && (
-                    <span className="absolute top-1 right-1 px-1.5 py-0.5 bg-[#FCEE0A] text-[#070a10] text-[8px] font-black uppercase shadow">
-                      €$ VENDIBLE
-                    </span>
-                  )}
-                  {c.parsedCost > 0 && (
-                    <span className="absolute bottom-1 right-1 px-1.5 py-0.5 bg-black/90 border border-[#0dfceb] text-[#0dfceb] text-[9px] font-black shadow">
-                      {c.parsedCost} €$
-                    </span>
-                  )}
-                  {c.parsedPower > 0 && (
-                    <span className="absolute bottom-1 left-1 px-1.5 py-0.5 bg-[#FF003C] text-white text-[9px] font-black shadow">
-                      {c.parsedPower}
-                    </span>
-                  )}
                 </div>
               ))}
             </div>
 
-            <div className="grid grid-cols-2 gap-4 pt-2 max-w-xl mx-auto">
-              <button
-                type="button"
-                onClick={() => {
-                  keepHand(gameState, 'player');
-                  setGameState({ ...gameState });
-                }}
-                style={{ clipPath: CYBER_BUTTON }}
-                className="py-3.5 bg-[#0dfceb] hover:bg-[#FCEE0A] text-[#070a10] font-black text-xs sm:text-sm uppercase tracking-widest cursor-pointer transition-all shadow-[0_0_20px_rgba(13,252,235,0.4)]"
-              >
-                CONSERVAR (KEEP)
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  mulliganHand(gameState, 'player');
-                  setGameState({ ...gameState });
-                }}
-                style={{ clipPath: CYBER_BUTTON }}
-                className="py-3.5 bg-[#000000] border border-[#FF003C] hover:bg-[#FF003C] hover:text-white text-[#FF003C] font-black text-xs sm:text-sm uppercase tracking-widest cursor-pointer transition-colors shadow-[0_0_15px_rgba(255,0,60,0.4)]"
-              >
-                MULLIGAN (6 NUEVAS)
-              </button>
+            <div className="space-y-2.5 pt-1">
+              <div className="flex items-center justify-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    mulliganHand(gameState, 'player');
+                    setGameState({ ...gameState });
+                  }}
+                  className="px-7 py-2.5 bg-[#0b1220] border border-[#0dfceb]/60 hover:border-white text-[#0dfceb] hover:text-white font-black text-xs uppercase tracking-widest rounded-sm cursor-pointer transition-colors"
+                >
+                  MULLIGAN
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    keepHand(gameState, 'player');
+                    setGameState({ ...gameState });
+                  }}
+                  className="px-8 py-2.5 bg-[#FCEE0A] hover:bg-white text-[#070a10] font-black text-xs uppercase tracking-widest rounded-sm cursor-pointer shadow-[0_0_24px_rgba(252,238,10,0.5)] transition-colors"
+                >
+                  KEEP HAND
+                </button>
+              </div>
+              <p className="text-[11px] text-gray-500 font-sans">
+                Mulligan baraja tu mano entera de vuelta al mazo y roba 6 cartas nuevas.
+              </p>
             </div>
           </div>
         </div>
       )}
 
-      {/* 2. MODAL DE SELECCIÓN DE DADOS DEL FIXER (FASE DE INICIO // ROLL IN A GIG) */}
+      {/* 2. MODAL MINIMALISTA DE SELECCIÓN DE DADO FIXER (ESTILO CAPTURA 3) */}
       {gameState.mulliganDecided && isMyTurn && (gameState.pendingGigRoll || gameState.phase === 'START_GIG_SELECT') && p.fixerDice.length > 0 && !rollingAnimation && (
-        <div className="fixed inset-0 z-40 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 font-mono">
+        <div className="fixed inset-0 z-40 bg-black/55 backdrop-blur-xs flex items-center justify-center p-4 font-mono">
           <div
             style={{ clipPath: CYBER_CLIP }}
-            className="max-w-2xl w-full bg-[#070a10] border-2 border-[#0dfceb] p-6 sm:p-8 text-center space-y-6 shadow-[0_0_60px_rgba(13,252,235,0.45)]"
+            className="max-w-lg w-full bg-[#070c16]/96 border border-[#0dfceb]/50 p-5 sm:p-6 text-center space-y-5 shadow-[0_0_50px_rgba(0,0,0,0.85)]"
           >
-            <div className="space-y-1">
-              <span className="text-[10px] sm:text-xs text-[#FCEE0A] uppercase tracking-widest block font-bold">
-                FASE DE INICIO // ROLL IN A GIG (PASO 5)
+            <div className="text-left space-y-0.5 border-b border-white/10 pb-3">
+              <span className="text-[9px] text-[#FCEE0A] uppercase tracking-widest block font-bold">
+                CHOOSE A DIE • FASE DE INICIO
               </span>
-              <h3 className="text-xl sm:text-2xl font-black text-white uppercase">
-                ELIGE UN DADO DE TU FIXER PARA RODAR
+              <h3 className="text-sm sm:text-base font-black text-white uppercase tracking-wider">
+                GAIN A GIG: CHOOSE A FIXER DIE
               </h3>
-              <p className="text-xs text-gray-300 max-w-lg mx-auto">
-                Regla oficial: Puedes elegir y tirar <strong>cualquier dado</strong> de tu Fixer (D4, D6, D8, D10, D12), salvo el <strong>D20</strong>, que siempre es el último que se tira.
-              </p>
             </div>
 
-            {/* Grid de dados disponibles en el Fixer */}
-            <div className="flex flex-wrap items-center justify-center gap-4 py-4">
-              {p.fixerDice.map((d) => {
-                const isD20Disabled = p.fixerDice.length > 1 && d.toLowerCase() === 'd20';
-
-                return (
-                  <button
-                    key={d}
-                    type="button"
-                    disabled={isD20Disabled}
-                    onClick={() => triggerDiceRoll(d)}
-                    style={{ clipPath: CYBER_BUTTON }}
-                    className={`p-4 flex flex-col items-center justify-center gap-2 transition-all border ${
-                      isD20Disabled
-                        ? 'bg-black/60 border-gray-800 opacity-35 cursor-not-allowed'
-                        : 'bg-black border-[#0dfceb]/60 hover:border-[#FCEE0A] hover:bg-[#0dfceb]/15 cursor-pointer shadow-[0_0_20px_rgba(13,252,235,0.3)] hover:scale-110 active:scale-95'
-                    }`}
-                    title={
-                      isD20Disabled
-                        ? 'El D20 no se puede elegir hasta que sea el último dado restante en el Fixer'
-                        : `Lanzar dado ${d.toUpperCase()}`
-                    }
-                  >
-                    <PolyhedralDie type={d} size={52} isWaiting={false} />
-                    <span
-                      className={`text-xs font-black uppercase tracking-wider ${
-                        isD20Disabled ? 'text-gray-600' : 'text-[#FCEE0A]'
+            <div className="space-y-2">
+              <span className="text-[9px] text-gray-500 uppercase tracking-widest block">YOUR FIXER</span>
+              <div className="flex flex-wrap items-center justify-center gap-4 py-2">
+                {p.fixerDice.map((d) => {
+                  const isD20Disabled = p.fixerDice.length > 1 && d.toLowerCase() === 'd20';
+                  return (
+                    <button
+                      key={d}
+                      type="button"
+                      disabled={isD20Disabled}
+                      onClick={() => triggerDiceRoll(d)}
+                      className={`p-2 rounded transition-all ${
+                        isD20Disabled
+                          ? 'opacity-25 cursor-not-allowed'
+                          : 'cursor-pointer hover:scale-115 active:scale-95'
                       }`}
+                      title={
+                        isD20Disabled
+                          ? 'El D20 siempre es el último dado en tirarse'
+                          : `Clic para lanzar ${d.toUpperCase()} y ganar un nuevo Gig`
+                      }
                     >
-                      {isD20Disabled ? 'D20 (ÚLTIMO)' : `TIRAR ${d.toUpperCase()}`}
-                    </span>
-                  </button>
-                );
-              })}
+                      <CyberDieShape
+                        dieType={d}
+                        size={56}
+                        color="#0dfceb"
+                        dimmed={isD20Disabled}
+                      />
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           </div>
         </div>
@@ -8819,12 +8927,13 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                           : 'border-gray-800 hover:border-[#FCEE0A] hover:bg-[#FCEE0A]/5'
                       }`}
                     >
-                      <PolyhedralDie
-                        type={dieKey}
+                      <CyberDieShape
+                        dieType={dieKey}
                         value={gig.value}
-                        isWaiting={false}
-                        isStolen={Boolean(gig.stolenFrom)}
-                        size={38}
+                        size={52}
+                        color={isSelected ? '#FCEE0A' : '#0dfceb'}
+                        selected={isSelected}
+                        showLabelBelow
                       />
                       <div className="text-center">
                         <span className="text-xs font-black text-white uppercase block">
