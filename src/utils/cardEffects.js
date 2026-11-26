@@ -731,24 +731,17 @@ export function executeProgramEffect(state, playerKey, card) {
       return { executed: true };
     }
     if (playerKey === 'player') {
-      if (eligibleUnits.length === 1) {
-        const [dead] = opp.field.splice(opp.field.indexOf(eligibleUnits[0]), 1);
-        if (!opp.trash) opp.trash = [];
-        opp.trash.push(dead);
-        state.actionLog.unshift(`💥 [Bonnie and Clyde] Destruye a la unidad rival "${dead.name}" (Poder <= 4).`);
-      } else {
-        state.pendingTargetSelection = {
-          actionType: 'TARGET_UNIT',
-          sourceCardId: 'CP-013',
-          sourceCardName: 'Bonnie and Clyde',
-          sourceCardImage: card.image,
-          title: '🔫 BONNIE AND CLYDE // DESTRUIR UNIDAD',
-          prompt: 'Selecciona la unidad rival que deseas destruir (Poder <= 4):',
-          effectType: 'DEFEAT',
-          targetScope: 'RIVAL_UNITS',
-          maxPower: 4
-        };
-      }
+      queueTargetSelection(state, {
+        actionType: 'TARGET_UNIT',
+        sourceCardId: 'CP-013',
+        sourceCardName: 'Bonnie and Clyde',
+        sourceCardImage: card.image,
+        title: '🔫 BONNIE AND CLYDE // DESTRUIR UNIDAD',
+        prompt: 'Selecciona la unidad rival que deseas destruir (Poder ≤ 4):',
+        effectType: 'DEFEAT',
+        targetScope: 'RIVAL_UNITS',
+        maxPower: 4
+      });
     } else {
       const target = [...eligibleUnits].sort((a,b) => b.currentPower - a.currentPower)[0];
       const idx = opp.field.indexOf(target);
@@ -783,14 +776,29 @@ export function executeProgramEffect(state, playerKey, card) {
   // "Defeat a rival Unit with less power than a friendly Unit."
   if (cardId === 'CP-016') {
     const maxFriendlyPower = Math.max(0, ...(p.field || []).map((u) => u.currentPower || 0));
-    const targetIdx = (opp.field || []).findIndex((u) => (u.currentPower || 0) < maxFriendlyPower);
-    if (targetIdx !== -1) {
-      const [dead] = opp.field.splice(targetIdx, 1);
-      if (!opp.trash) opp.trash = [];
-      opp.trash.push(dead);
-      state.actionLog.unshift(`⚔️ [Carnage at the Colosseum] Destruye a "${dead.name}" (su poder es menor que el de tus unidades).`);
-    } else {
+    const eligible = (opp.field || []).filter((u) => (u.currentPower || 0) < maxFriendlyPower);
+    if (eligible.length === 0) {
       state.actionLog.unshift(`ℹ️ [Carnage at the Colosseum] No hay unidades rivales con menor poder que tus unidades.`);
+    } else if (playerKey === 'player') {
+      queueTargetSelection(state, {
+        actionType: 'TARGET_UNIT',
+        sourceCardId: 'CP-016',
+        sourceCardName: 'Carnage at the Colosseum',
+        sourceCardImage: card.image,
+        title: '⚔️ CARNAGE AT THE COLOSSEUM // DESTRUIR UNIDAD',
+        prompt: `Selecciona la unidad rival a destruir (Poder < ${maxFriendlyPower}):`,
+        effectType: 'DEFEAT',
+        targetScope: 'RIVAL_UNITS',
+        maxPower: Math.max(0, maxFriendlyPower - 1)
+      });
+    } else {
+      const target = [...eligible].sort((a, b) => (b.currentPower || 0) - (a.currentPower || 0))[0];
+      const idx = opp.field.indexOf(target);
+      if (idx !== -1) {
+        const [dead] = opp.field.splice(idx, 1);
+        sendDefeatedUnitToGraveyardOrExile(opp, dead, state);
+        state.actionLog.unshift(`⚔️ [Carnage at the Colosseum Rival] Destruye a tu unidad "${dead.name}".`);
+      }
     }
     return { executed: true };
   }
@@ -854,22 +862,54 @@ export function executeProgramEffect(state, playerKey, card) {
   // CP-020: Corporate Surveillance
   // "Spend a rival Unit with cost 4 or less."
   if (cardId === 'CP-020') {
-    const target = (opp.field || []).find((u) => !u.isSpent && (u.costNum || u.cost || 0) <= 4);
-    if (target) {
+    const eligible = (opp.field || []).filter((u) => !u.isSpent && getNumericCost(u) <= 4);
+    if (eligible.length === 0) {
+      state.actionLog.unshift(`👁️ [Corporate Surveillance] El rival no tiene unidades listas con coste ≤ 4.`);
+    } else if (playerKey === 'player') {
+      queueTargetSelection(state, {
+        actionType: 'TARGET_UNIT',
+        sourceCardId: 'CP-020',
+        sourceCardName: 'Corporate Surveillance',
+        sourceCardImage: card.image,
+        title: '👁️ CORPORATE SURVEILLANCE // GIRAR UNIDAD RIVAL',
+        prompt: 'Selecciona una unidad rival lista (coste ≤ 4) para girarla (Spend):',
+        effectType: 'SPEND',
+        targetScope: 'RIVAL_UNITS',
+        maxCost: 4,
+        onlyReady: true
+      });
+    } else {
+      const target = [...eligible].sort((a, b) => (b.currentPower || 0) - (a.currentPower || 0))[0];
       target.isSpent = true;
-      state.actionLog.unshift(`👁️ [Corporate Surveillance] Gira (Spend) a la unidad rival "${target.name}".`);
+      state.actionLog.unshift(`👁️ [Corporate Surveillance Rival] Gira (Spend) a tu unidad "${target.name}".`);
     }
     return { executed: true };
   }
 
   // CP-021: Cyberpsychosis
-  // "Give an equipped Unit +3 power this turn for each of its equipped Gears."
+  // "QUICK Give an equipped Unit +3 power this turn for each of its equipped Gears."
   if (cardId === 'CP-021') {
-    const target = (p.field || []).find((u) => u.gear && u.gear.length > 0);
-    if (target) {
+    const eligible = (p.field || []).filter((u) => u.gear && u.gear.length > 0);
+    if (eligible.length === 0) {
+      state.actionLog.unshift(`⚡ [Cyberpsychosis] No controlas ninguna unidad equipada con Gear.`);
+    } else if (playerKey === 'player') {
+      queueTargetSelection(state, {
+        actionType: 'TARGET_UNIT',
+        sourceCardId: 'CP-021',
+        sourceCardName: 'Cyberpsychosis',
+        sourceCardImage: card.image,
+        title: '⚡ CYBERPSYCHOSIS // +3 POR GEAR',
+        prompt: 'Selecciona una unidad equipada para otorgarle +3 de poder por cada Gear equipado:',
+        effectType: 'BUFF_PER_GEAR',
+        multiplier: 3,
+        targetScope: 'FRIENDLY_UNITS',
+        onlyEquipped: true
+      });
+    } else {
+      const target = [...eligible].sort((a, b) => (b.gear?.length || 0) - (a.gear?.length || 0))[0];
       const bonus = target.gear.length * 3;
       target.currentPower = (target.currentPower || target.power || 0) + bonus;
-      state.actionLog.unshift(`⚡ [Cyberpsychosis] "${target.name}" gana +${bonus} de poder este turno.`);
+      state.actionLog.unshift(`⚡ [Cyberpsychosis Rival] "${target.name}" gana +${bonus} de poder este turno.`);
     }
     return { executed: true };
   }
@@ -902,21 +942,55 @@ export function executeProgramEffect(state, playerKey, card) {
   if (cardId === 'CP-028') {
     (opp.field || []).forEach((u) => (u.isSpent = true));
     state.actionLog.unshift(`💀 [(Don't Fear) The Reaper] Gira a todas las unidades rivales.`);
-    if (opp.field && opp.field.length > 0) {
-      const [dead] = opp.field.splice(0, 1);
-      if (!opp.trash) opp.trash = [];
-      opp.trash.push(dead);
-      state.actionLog.unshift(`💀 [(Don't Fear) The Reaper] Destruye a la unidad girada "${dead.name}".`);
+    const spentOpp = (opp.field || []).filter((u) => u.isSpent);
+    if (spentOpp.length > 0) {
+      if (playerKey === 'player') {
+        queueTargetSelection(state, {
+          actionType: 'TARGET_UNIT',
+          sourceCardId: 'CP-028',
+          sourceCardName: "(Don't Fear) The Reaper",
+          sourceCardImage: card.image,
+          title: "💀 (DON'T FEAR) THE REAPER // DESTRUIR GIRADA",
+          prompt: 'Todas las unidades rivales están giradas. Elige la unidad girada que deseas destruir:',
+          effectType: 'DEFEAT',
+          targetScope: 'RIVAL_UNITS',
+          onlySpent: true
+        });
+      } else {
+        const target = [...spentOpp].sort((a, b) => (b.currentPower || 0) - (a.currentPower || 0))[0];
+        const idx = opp.field.indexOf(target);
+        if (idx !== -1) {
+          const [dead] = opp.field.splice(idx, 1);
+          sendDefeatedUnitToGraveyardOrExile(opp, dead, state);
+          state.actionLog.unshift(`💀 [(Don't Fear) The Reaper Rival] Destruye a tu unidad girada "${dead.name}".`);
+        }
+      }
     }
     return { executed: true };
   }
 
   // CP-036: Floor It!
-  // "Give a rival Unit -1 power this turn. Draw 1."
+  // "QUICK Give a rival Unit -1 power this turn. Draw 1."
   if (cardId === 'CP-036') {
-    if (opp.field && opp.field.length > 0) {
-      opp.field[0].currentPower = Math.max(0, (opp.field[0].currentPower || 1) - 1);
-      state.actionLog.unshift(`🏎️ [Floor It!] Reduce el poder de "${opp.field[0].name}" en 1.`);
+    const oppUnits = opp.field || [];
+    if (oppUnits.length > 0) {
+      if (playerKey === 'player') {
+        queueTargetSelection(state, {
+          actionType: 'TARGET_UNIT',
+          sourceCardId: 'CP-036',
+          sourceCardName: 'Floor It!',
+          sourceCardImage: card.image,
+          title: '🏎️ FLOOR IT! // -1 PODER A UNIDAD RIVAL',
+          prompt: 'Haz clic en la Unidad rival a la que deseas reducir -1 de poder este turno:',
+          effectType: 'DEBUFF',
+          amount: 1,
+          targetScope: 'RIVAL_UNITS'
+        });
+      } else {
+        const target = [...oppUnits].sort((a, b) => (b.currentPower || 0) - (a.currentPower || 0))[0];
+        target.currentPower = Math.max(0, (target.currentPower || 1) - 1);
+        state.actionLog.unshift(`🏎️ [Floor It! Rival] Reduce el poder de tu unidad "${target.name}" en 1.`);
+      }
     }
     drawCards(p, 1, state, cardName);
     return { executed: true };
@@ -999,10 +1073,25 @@ export function executeProgramEffect(state, playerKey, card) {
   // CP-043: Gunpoint Diplomacy
   // "Give a friendly Unit +3 power this turn and may attack ready Units."
   if (cardId === 'CP-043') {
-    if (p.field && p.field.length > 0) {
-      p.field[0].currentPower = (p.field[0].currentPower || 0) + 3;
-      p.field[0].canAttackReadyUnits = true;
-      state.actionLog.unshift(`🔫 [Gunpoint Diplomacy] "${p.field[0].name}" gana +3 de poder y puede atacar unidades enderezadas.`);
+    if ((p.field || []).length > 0) {
+      if (playerKey === 'player') {
+        queueTargetSelection(state, {
+          actionType: 'TARGET_UNIT',
+          sourceCardId: 'CP-043',
+          sourceCardName: 'Gunpoint Diplomacy',
+          sourceCardImage: card.image,
+          title: '🔫 GUNPOINT DIPLOMACY // +3 Y ATACA LISTAS',
+          prompt: 'Selecciona una unidad amiga para darle +3 de poder este turno y poder atacar unidades enderezadas:',
+          effectType: 'GUNPOINT_BUFF',
+          amount: 3,
+          targetScope: 'FRIENDLY_UNITS'
+        });
+      } else {
+        const target = [...p.field].sort((a, b) => (b.currentPower || 0) - (a.currentPower || 0))[0];
+        target.currentPower = (target.currentPower || 0) + 3;
+        target.canAttackReadyUnits = true;
+        state.actionLog.unshift(`🔫 [Gunpoint Diplomacy Rival] "${target.name}" gana +3 de poder y puede atacar unidades enderezadas.`);
+      }
     }
     return { executed: true };
   }
@@ -1046,12 +1135,28 @@ export function executeProgramEffect(state, playerKey, card) {
   // CP-062: Les Éléments
   // "Bottom-deck a Rival's lowest-power Unit."
   if (cardId === 'CP-062') {
-    if (opp.field && opp.field.length > 0) {
-      opp.field.sort((a, b) => (a.currentPower || 0) - (b.currentPower || 0));
-      const [lowest] = opp.field.splice(0, 1);
-      if (!opp.deck) opp.deck = [];
-      opp.deck.push(lowest);
-      state.actionLog.unshift(`🌊 [Les Éléments] Envía a "${lowest.name}" (la de menor poder) al fondo del mazo rival.`);
+    if ((opp.field || []).length > 0) {
+      const minPow = Math.min(...opp.field.map((u) => u.currentPower || 0));
+      if (playerKey === 'player') {
+        queueTargetSelection(state, {
+          actionType: 'TARGET_UNIT',
+          sourceCardId: 'CP-062',
+          sourceCardName: 'Les Éléments',
+          sourceCardImage: card.image,
+          title: '🌊 LES ÉLÉMENTS // FONDO DEL MAZO',
+          prompt: `Selecciona la unidad rival con menor poder (Poder ${minPow}) para enviarla al fondo de su mazo:`,
+          effectType: 'BOTTOM_DECK',
+          targetScope: 'RIVAL_UNITS',
+          maxPower: minPow
+        });
+      } else {
+        const idx = opp.field.findIndex((u) => (u.currentPower || 0) === minPow);
+        if (idx !== -1) {
+          const [lowest] = opp.field.splice(idx, 1);
+          sendUnitToBottomDeck(opp, lowest, state);
+          state.actionLog.unshift(`🌊 [Les Éléments Rival] Envía a tu unidad "${lowest.name}" (menor poder) al fondo de tu mazo.`);
+        }
+      }
     }
     return { executed: true };
   }
@@ -1059,17 +1164,50 @@ export function executeProgramEffect(state, playerKey, card) {
   // CP-063: Live With the Aftermath
   // "Each player defeats one of their Units."
   if (cardId === 'CP-063' || cardName.includes('Aftermath')) {
-    if (p.field && p.field.length > 0) {
-      const [deadFriendly] = p.field.splice(0, 1);
-      if (!p.trash) p.trash = [];
-      p.trash.push(deadFriendly);
-      state.actionLog.unshift(`💀 [Live With the Aftermath] ${p.name} destruye a su unidad "${deadFriendly.name}".`);
-    }
-    if (opp.field && opp.field.length > 0) {
-      const [deadRival] = opp.field.splice(0, 1);
-      if (!opp.trash) opp.trash = [];
-      opp.trash.push(deadRival);
-      state.actionLog.unshift(`💀 [Live With the Aftermath] ${opp.name} destruye a su unidad "${deadRival.name}".`);
+    if (playerKey === 'player') {
+      if ((p.field || []).length > 0) {
+        queueTargetSelection(state, {
+          actionType: 'TARGET_UNIT',
+          sourceCardId: 'CP-063',
+          sourceCardName: 'Live With the Aftermath',
+          sourceCardImage: card.image,
+          title: '💀 LIVE WITH THE AFTERMATH // SACRIFICIO',
+          prompt: 'Elige una de TUS unidades para destruirla (el rival destruirá una de las suyas):',
+          effectType: 'DEFEAT',
+          targetScope: 'FRIENDLY_UNITS'
+        });
+      }
+      if ((opp.field || []).length > 0) {
+        const weakest = [...opp.field].sort((a, b) => (a.currentPower || 0) - (b.currentPower || 0))[0];
+        const idx = opp.field.indexOf(weakest);
+        if (idx !== -1) {
+          const [deadRival] = opp.field.splice(idx, 1);
+          sendDefeatedUnitToGraveyardOrExile(opp, deadRival, state);
+          state.actionLog.unshift(`💀 [Live With the Aftermath] El rival destruye a su unidad "${deadRival.name}".`);
+        }
+      }
+    } else {
+      if ((p.field || []).length > 0) {
+        const weakest = [...p.field].sort((a, b) => (a.currentPower || 0) - (b.currentPower || 0))[0];
+        const idx = p.field.indexOf(weakest);
+        if (idx !== -1) {
+          const [deadBot] = p.field.splice(idx, 1);
+          sendDefeatedUnitToGraveyardOrExile(p, deadBot, state);
+          state.actionLog.unshift(`💀 [Live With the Aftermath Rival] El rival destruye a su unidad "${deadBot.name}".`);
+        }
+      }
+      if ((opp.field || []).length > 0) {
+        queueTargetSelection(state, {
+          actionType: 'TARGET_UNIT',
+          sourceCardId: 'CP-063',
+          sourceCardName: 'Live With the Aftermath',
+          sourceCardImage: card.image,
+          title: '💀 LIVE WITH THE AFTERMATH // ELIGE TU UNIDAD',
+          prompt: 'El rival jugó Live With the Aftermath. Elige una de TUS unidades para destruirla:',
+          effectType: 'DEFEAT',
+          targetScope: 'FRIENDLY_UNITS'
+        });
+      }
     }
     return { executed: true };
   }
@@ -1081,22 +1219,18 @@ export function executeProgramEffect(state, playerKey, card) {
     if (eligibleUnits.length === 0) {
       state.actionLog.unshift(`🧠 [Memory Relapse] El rival no tiene unidades enderezadas para girar.`);
     } else if (playerKey === 'player') {
-      if (eligibleUnits.length === 1) {
-        eligibleUnits[0].isSpent = true;
-        eligibleUnits[0].cannotReadyUntilNextTurn = true;
-        state.actionLog.unshift(`🧠 [Memory Relapse] Gira a "${eligibleUnits[0].name}" y no podrá enderezarse hasta tu próximo turno.`);
-      } else {
-        state.pendingTargetSelection = {
-          actionType: 'TARGET_UNIT',
-          sourceCardId: 'CP-074',
-          sourceCardName: 'Memory Relapse',
-          sourceCardImage: card.image,
-          title: '🧠 MEMORY RELAPSE // GIRAR UNIDAD RIVAL',
-          prompt: 'Selecciona la unidad rival que deseas girar (no podrá enderezarse en su turno):',
-          effectType: 'SPEND',
-          targetScope: 'RIVAL_UNITS'
-        };
-      }
+      queueTargetSelection(state, {
+        actionType: 'TARGET_UNIT',
+        sourceCardId: 'CP-074',
+        sourceCardName: 'Memory Relapse',
+        sourceCardImage: card.image,
+        title: '🧠 MEMORY RELAPSE // GIRAR UNIDAD RIVAL',
+        prompt: 'Selecciona la unidad rival que deseas girar (no podrá enderezarse en su turno):',
+        effectType: 'SPEND',
+        cannotReady: true,
+        onlyReady: true,
+        targetScope: 'RIVAL_UNITS'
+      });
     } else {
       const target = eligibleUnits[0];
       target.isSpent = true;
@@ -1157,24 +1291,17 @@ export function executeProgramEffect(state, playerKey, card) {
     }
 
     if (playerKey === 'player') {
-      if (eligibleUnits.length === 1) {
-        const [dead] = opp.field.splice(opp.field.indexOf(eligibleUnits[0]), 1);
-        if (!opp.trash) opp.trash = [];
-        opp.trash.push(dead);
-        state.actionLog.unshift(`💥 [Over the Edge] Destruye a "${dead.name}" (Poder <= ${maxVal} del Gig d20).`);
-      } else {
-        state.pendingTargetSelection = {
-          actionType: 'TARGET_UNIT',
-          sourceCardId: 'CP-088',
-          sourceCardName: 'Over the Edge',
-          sourceCardImage: card.image,
-          title: '💥 OVER THE EDGE // DESTRUIR UNIDAD',
-          prompt: `Selecciona la unidad rival que deseas destruir (Poder <= ${maxVal}):`,
-          effectType: 'DEFEAT',
-          targetScope: 'RIVAL_UNITS',
-          maxPower: maxVal
-        };
-      }
+      queueTargetSelection(state, {
+        actionType: 'TARGET_UNIT',
+        sourceCardId: 'CP-088',
+        sourceCardName: 'Over the Edge',
+        sourceCardImage: card.image,
+        title: '💥 OVER THE EDGE // DESTRUIR UNIDAD',
+        prompt: `Selecciona la unidad rival que deseas destruir (Poder ≤ ${maxVal}):`,
+        effectType: 'DEFEAT',
+        targetScope: 'RIVAL_UNITS',
+        maxPower: maxVal
+      });
     } else {
       const target = [...eligibleUnits].sort((a,b) => b.currentPower - a.currentPower)[0];
       const idx = opp.field.indexOf(target);
@@ -1253,20 +1380,37 @@ export function executeProgramEffect(state, playerKey, card) {
 
     if (hasMinD4) {
       state.actionLog.unshift(`🌊 [Pyramid Song] ¡Condición de dado d4 mínimo activa! Se ejecutan AMBOS efectos.`);
-      if (hasRivalUnits) {
-        const target = [...opp.field].sort((a, b) => (b.currentPower || 0) - (a.currentPower || 0))[0];
-        const before = target.currentPower || 0;
-        target.currentPower = Math.max(0, before - 4);
-        state.actionLog.unshift(
-          `🌊 [Pyramid Song] Reduce el poder de "${target.name}" en -4 este turno (${before} ➔ ${target.currentPower}).`
-        );
-      }
-      for (let i = (opp.field?.length || 0) - 1; i >= 0; i--) {
-        if ((opp.field[i].currentPower || 0) === 0) {
-          const [dead] = opp.field.splice(i, 1);
-          sendUnitToBottomDeck(opp, dead, state);
-          state.actionLog.unshift(`🌊 [Pyramid Song] Al tener 0 de poder, "${dead.name}" va al fondo del mazo.`);
-          break;
+      if (playerKey === 'player') {
+        if (hasRivalUnits) {
+          queueTargetSelection(state, {
+            actionType: 'TARGET_UNIT',
+            sourceCardId: 'CP-098',
+            sourceCardName: 'Pyramid Song',
+            sourceCardImage: card.image,
+            title: '🌊 PYRAMID SONG // -4 PODER (AMBOS EFECTOS)',
+            prompt: 'Selecciona la unidad rival a la que reducir -4 de poder (luego podrás mandar una unidad de poder 0 al fondo):',
+            effectType: 'DEBUFF',
+            amount: 4,
+            targetScope: 'RIVAL_UNITS',
+            chainBottomDeckZero: true
+          });
+        }
+      } else {
+        if (hasRivalUnits) {
+          const target = [...opp.field].sort((a, b) => (b.currentPower || 0) - (a.currentPower || 0))[0];
+          const before = target.currentPower || 0;
+          target.currentPower = Math.max(0, before - 4);
+          state.actionLog.unshift(
+            `🌊 [Pyramid Song Rival] Reduce el poder de "${target.name}" en -4 este turno (${before} ➔ ${target.currentPower}).`
+          );
+        }
+        for (let i = (opp.field?.length || 0) - 1; i >= 0; i--) {
+          if ((opp.field[i].currentPower || 0) === 0) {
+            const [dead] = opp.field.splice(i, 1);
+            sendUnitToBottomDeck(opp, dead, state);
+            state.actionLog.unshift(`🌊 [Pyramid Song Rival] Al tener 0 de poder, "${dead.name}" va al fondo del mazo.`);
+            break;
+          }
         }
       }
     } else if (playerKey === 'player') {
@@ -1342,24 +1486,56 @@ export function executeProgramEffect(state, playerKey, card) {
   }
 
   // CP-123: Synapse Burnout
-  // "A friendly Unit has +1 power for each friendly face-up Legend while fighting rival Units this turn."
+  // "QUICK A friendly Unit has +1 power for each friendly face-up Legend while fighting rival Units this turn."
   if (cardId === 'CP-123') {
     const faceUpLegends = (p.legends || []).filter((l) => l.isFaceUp).length;
-    if (p.field && p.field.length > 0) {
-      p.field[0].currentPower = (p.field[0].currentPower || 0) + faceUpLegends;
-      state.actionLog.unshift(`⚡ [Synapse Burnout] "${p.field[0].name}" gana +${faceUpLegends} de poder por tus Leyendas activas.`);
+    if ((p.field || []).length > 0 && faceUpLegends > 0) {
+      if (playerKey === 'player') {
+        queueTargetSelection(state, {
+          actionType: 'TARGET_UNIT',
+          sourceCardId: 'CP-123',
+          sourceCardName: 'Synapse Burnout',
+          sourceCardImage: card.image,
+          title: `⚡ SYNAPSE BURNOUT // +${faceUpLegends} PODER`,
+          prompt: `Selecciona una unidad amiga para darle +${faceUpLegends} de poder este turno (${faceUpLegends} Leyenda(s) boca arriba):`,
+          effectType: 'BUFF',
+          amount: faceUpLegends,
+          targetScope: 'FRIENDLY_UNITS'
+        });
+      } else {
+        const target = [...p.field].sort((a, b) => (b.currentPower || 0) - (a.currentPower || 0))[0];
+        target.currentPower = (target.currentPower || 0) + faceUpLegends;
+        state.actionLog.unshift(`⚡ [Synapse Burnout Rival] "${target.name}" gana +${faceUpLegends} de poder por sus Leyendas activas.`);
+      }
     }
     return { executed: true };
   }
 
   // CP-125: Take Control
-  // "A rival Unit steals 1 fewer Gig this turn. If that Unit is an AI, DRONE, or VEHICLE, draw 1."
+  // "QUICK A rival Unit steals 1 fewer Gig this turn. If that Unit is an AI, DRONE, or VEHICLE, draw 1."
   if (cardId === 'CP-125') {
-    if (opp.field && opp.field.length > 0) {
-      opp.field[0].stolenReduction = 1;
-      state.actionLog.unshift(`🎮 [Take Control] "${opp.field[0].name}" robará 1 Gig menos este turno.`);
+    if ((opp.field || []).length > 0) {
+      if (playerKey === 'player') {
+        queueTargetSelection(state, {
+          actionType: 'TARGET_UNIT',
+          sourceCardId: 'CP-125',
+          sourceCardName: 'Take Control',
+          sourceCardImage: card.image,
+          title: '🎮 TAKE CONTROL // -1 GIG ROBADO',
+          prompt: 'Selecciona una unidad rival: robará 1 Gig menos este turno (robas 1 si es AI, DRONE o VEHICLE):',
+          effectType: 'REDUCE_STEAL',
+          amount: 1,
+          targetScope: 'RIVAL_UNITS'
+        });
+      } else {
+        const target = [...opp.field].sort((a, b) => (b.currentPower || 0) - (a.currentPower || 0))[0];
+        target.stolenReduction = (target.stolenReduction || 0) + 1;
+        state.actionLog.unshift(`🎮 [Take Control Rival] Tu unidad "${target.name}" robará 1 Gig menos este turno.`);
+        if (/\b(AI|DRONE|VEHICLE)\b/i.test(`${target.traits || ''} ${target.cardType || ''}`)) {
+          drawCards(p, 1, state, cardName);
+        }
+      }
     }
-    drawCards(p, 1, state, cardName);
     return { executed: true };
   }
 
@@ -1884,16 +2060,9 @@ export function executeUnitPlayTrigger(state, playerKey, unitInstance) {
         `💥 [Adam Smasher // Ender of Legends] ¡PLAY activado! Pero el rival no controla ninguna Unidad en el campo de batalla.`
       );
       notifyTrigger('💥 ADAM SMASHER // PLAY', 'Habilidad PLAY activada, pero el rival no tiene unidades en el campo de batalla.', 'info');
-    } else if (oppUnits.length === 1) {
-      const [dead] = opp.field.splice(0, 1);
-      sendDefeatedUnitToGraveyardOrExile(opp, dead, state);
-      state.actionLog.unshift(
-        `💥 [Adam Smasher // Ender of Legends] ¡PLAY! Ha destruido a la unidad rival "${dead.name}".`
-      );
-      notifyTrigger('💥 ADAM SMASHER // PLAY', `¡Ender of Legends! Has destruido a la unidad rival "${dead.name}".`, 'success');
     } else {
       if (playerKey === 'player') {
-        state.pendingTargetSelection = {
+        queueTargetSelection(state, {
           actionType: 'TARGET_UNIT',
           sourceCardId: 'CP-002',
           sourceCardName: 'Adam Smasher // Ender of Legends',
@@ -1902,7 +2071,7 @@ export function executeUnitPlayTrigger(state, playerKey, unitInstance) {
           prompt: 'Elige una Unidad del rival para DESTRUIRLA inmediatamente:',
           effectType: 'DEFEAT',
           targetScope: 'RIVAL_UNITS'
-        };
+        });
       } else {
         let highestIdx = 0;
         for (let i = 1; i < oppUnits.length; i++) {
@@ -1947,25 +2116,17 @@ export function executeUnitPlayTrigger(state, playerKey, unitInstance) {
       state.actionLog.unshift(`🐕 [Caliber] ¡PLAY activado! El rival no tiene unidades con coste ≤ 2 €$.`);
       notifyTrigger('🐕 CALIBER // PLAY', 'Habilidad PLAY activada, pero el rival no controla unidades con coste ≤ 2 €$.', 'info');
     } else if (playerKey === 'player') {
-      if (eligible.length === 1) {
-        const idx = opp.field.indexOf(eligible[0]);
-        const [dead] = opp.field.splice(idx, 1);
-        sendDefeatedUnitToGraveyardOrExile(opp, dead, state);
-        state.actionLog.unshift(`🐕 [Caliber] ¡PLAY! Destruye a la unidad rival "${dead.name}" (Coste ≤ 2).`);
-        notifyTrigger('🐕 CALIBER // PLAY', `Has destruido a la unidad rival "${dead.name}" (coste ≤ 2).`, 'success');
-      } else {
-        state.pendingTargetSelection = {
-          actionType: 'TARGET_UNIT',
-          sourceCardId: 'CP-015',
-          sourceCardName: 'Caliber',
-          sourceCardImage: unitInstance.image,
-          title: '🐕 CALIBER // HABILIDAD PLAY',
-          prompt: 'Selecciona una Unidad rival con coste ≤ 2 €$ para destruirla:',
-          effectType: 'DEFEAT',
-          targetScope: 'RIVAL_UNITS',
-          maxCost: 2
-        };
-      }
+      queueTargetSelection(state, {
+        actionType: 'TARGET_UNIT',
+        sourceCardId: 'CP-015',
+        sourceCardName: 'Caliber',
+        sourceCardImage: unitInstance.image,
+        title: '🐕 CALIBER // HABILIDAD PLAY',
+        prompt: 'Selecciona una Unidad rival con coste ≤ 2 €$ para destruirla:',
+        effectType: 'DEFEAT',
+        targetScope: 'RIVAL_UNITS',
+        maxCost: 2
+      });
     } else {
       const target = [...eligible].sort((a, b) => (b.currentPower || 0) - (a.currentPower || 0))[0];
       const idx = opp.field.indexOf(target);
@@ -2395,24 +2556,17 @@ export function executeUnitPlayTrigger(state, playerKey, unitInstance) {
       state.actionLog.unshift(`🤖 [Minotaur] ¡PLAY activado! El rival no tiene unidades con Fuerza ≤ 5.`);
       notifyTrigger('🤖 MINOTAUR // PLAY', 'El rival no controla unidades con Fuerza ≤ 5.', 'info');
     } else if (playerKey === 'player') {
-      if (eligibleUnits.length === 1) {
-        const [dead] = opp.field.splice(opp.field.indexOf(eligibleUnits[0]), 1);
-        sendDefeatedUnitToGraveyardOrExile(opp, dead, state);
-        state.actionLog.unshift(`🤖 [Minotaur] ¡PLAY! Destruye a la unidad rival "${dead.name}" (Fuerza ≤ 5).`);
-        notifyTrigger('🤖 MINOTAUR // PLAY', `Has destruido a "${dead.name}" (Fuerza ≤ 5).`, 'success');
-      } else {
-        state.pendingTargetSelection = {
-          actionType: 'TARGET_UNIT',
-          sourceCardId: 'CP-076',
-          sourceCardName: 'Minotaur',
-          sourceCardImage: unitInstance.image,
-          title: '🤖 MINOTAUR // HABILIDAD PLAY',
-          prompt: 'Selecciona la unidad rival que deseas destruir (Fuerza ≤ 5):',
-          effectType: 'DEFEAT',
-          targetScope: 'RIVAL_UNITS',
-          maxPower: 5
-        };
-      }
+      queueTargetSelection(state, {
+        actionType: 'TARGET_UNIT',
+        sourceCardId: 'CP-076',
+        sourceCardName: 'Minotaur',
+        sourceCardImage: unitInstance.image,
+        title: '🤖 MINOTAUR // HABILIDAD PLAY',
+        prompt: 'Selecciona la unidad rival que deseas destruir (Fuerza ≤ 5):',
+        effectType: 'DEFEAT',
+        targetScope: 'RIVAL_UNITS',
+        maxPower: 5
+      });
     } else {
       const target = [...eligibleUnits].sort((a, b) => b.currentPower - a.currentPower)[0];
       const [dead] = opp.field.splice(opp.field.indexOf(target), 1);
@@ -2432,22 +2586,16 @@ export function executeUnitPlayTrigger(state, playerKey, unitInstance) {
       state.actionLog.unshift(`⚡ [Mox Inciters] ¡PLAY activado! El rival no tiene unidades en el campo.`);
       notifyTrigger('⚡ MOX INCITERS // PLAY', 'El rival no controla unidades para provocar.', 'info');
     } else if (playerKey === 'player') {
-      if (oppUnits.length === 1) {
-        oppUnits[0].mustAttackNextTurn = true;
-        state.actionLog.unshift(`⚡ [Mox Inciters] ¡PLAY! "${oppUnits[0].name}" del rival deberá atacar en su próximo turno si puede.`);
-        notifyTrigger('⚡ MOX INCITERS // PLAY', `"${oppUnits[0].name}" del rival está obligada a atacar en su próximo turno.`, 'success');
-      } else {
-        state.pendingTargetSelection = {
-          actionType: 'TARGET_UNIT',
-          sourceCardId: 'CP-080',
-          sourceCardName: 'Mox Inciters',
-          sourceCardImage: unitInstance.image,
-          title: '⚡ MOX INCITERS // HABILIDAD PLAY',
-          prompt: 'Selecciona una Unidad rival: deberá atacar en su próximo turno si puede:',
-          effectType: 'MUST_ATTACK',
-          targetScope: 'RIVAL_UNITS'
-        };
-      }
+      queueTargetSelection(state, {
+        actionType: 'TARGET_UNIT',
+        sourceCardId: 'CP-080',
+        sourceCardName: 'Mox Inciters',
+        sourceCardImage: unitInstance.image,
+        title: '⚡ MOX INCITERS // HABILIDAD PLAY',
+        prompt: 'Selecciona una Unidad rival: deberá atacar en su próximo turno si puede:',
+        effectType: 'MUST_ATTACK',
+        targetScope: 'RIVAL_UNITS'
+      });
     } else {
       oppUnits[0].mustAttackNextTurn = true;
       state.actionLog.unshift(`⚡ [Mox Inciters Rival] ¡PLAY! Tu unidad "${oppUnits[0].name}" debe atacar el próximo turno.`);
@@ -2466,22 +2614,17 @@ export function executeUnitPlayTrigger(state, playerKey, unitInstance) {
       state.actionLog.unshift(`🦅 [Off-Duty Malfini] ¡PLAY! Se gira a sí mismo (el rival no tiene unidades listas para girar).`);
       notifyTrigger('🦅 OFF-DUTY MALFINI // PLAY', 'Se gira a sí mismo. El rival no tiene unidades enderezadas para girar.', 'info');
     } else if (playerKey === 'player') {
-      if (eligibleUnits.length === 1) {
-        eligibleUnits[0].isSpent = true;
-        state.actionLog.unshift(`🦅 [Off-Duty Malfini] ¡PLAY! Se gira a sí mismo y gira a la unidad rival "${eligibleUnits[0].name}".`);
-        notifyTrigger('🦅 OFF-DUTY MALFINI // PLAY', `Girada la unidad rival "${eligibleUnits[0].name}".`, 'success');
-      } else {
-        state.pendingTargetSelection = {
-          actionType: 'TARGET_UNIT',
-          sourceCardId: 'CP-087',
-          sourceCardName: 'Off-Duty Malfini',
-          sourceCardImage: unitInstance.image,
-          title: '🦅 OFF-DUTY MALFINI // HABILIDAD PLAY',
-          prompt: 'Selecciona la unidad rival que deseas girar (Spend):',
-          effectType: 'SPEND',
-          targetScope: 'RIVAL_UNITS'
-        };
-      }
+      queueTargetSelection(state, {
+        actionType: 'TARGET_UNIT',
+        sourceCardId: 'CP-087',
+        sourceCardName: 'Off-Duty Malfini',
+        sourceCardImage: unitInstance.image,
+        title: '🦅 OFF-DUTY MALFINI // HABILIDAD PLAY',
+        prompt: 'Selecciona la unidad rival que deseas girar (Spend):',
+        effectType: 'SPEND',
+        onlyReady: true,
+        targetScope: 'RIVAL_UNITS'
+      });
     } else {
       eligibleUnits[0].isSpent = true;
       state.actionLog.unshift(`🦅 [Off-Duty Malfini Rival] ¡PLAY! Gira a tu unidad "${eligibleUnits[0].name}".`);
@@ -2505,22 +2648,16 @@ export function executeUnitPlayTrigger(state, playerKey, unitInstance) {
       state.actionLog.unshift(`💻 [Pacifica Netrunner] ¡PLAY! Street Cred par (${myCred}), pero el rival no tiene unidades.`);
       notifyTrigger('💻 PACIFICA NETRUNNER // PLAY', 'Street Cred par, pero el rival no tiene unidades en el campo.', 'info');
     } else if (playerKey === 'player') {
-      if (oppUnits.length === 1) {
-        oppUnits[0].cannotReadyUntilNextTurn = true;
-        state.actionLog.unshift(`💻 [Pacifica Netrunner] ¡PLAY! "${oppUnits[0].name}" del rival no podrá enderezarse hasta tu próximo turno.`);
-        notifyTrigger('💻 PACIFICA NETRUNNER // PLAY', `"${oppUnits[0].name}" no podrá enderezarse hasta tu próximo turno.`, 'success');
-      } else {
-        state.pendingTargetSelection = {
-          actionType: 'TARGET_UNIT',
-          sourceCardId: 'CP-090',
-          sourceCardName: 'Pacifica Netrunner',
-          sourceCardImage: unitInstance.image,
-          title: '💻 PACIFICA NETRUNNER // HABILIDAD PLAY',
-          prompt: `Tu Street Cred (${myCred}) es par. Selecciona una Unidad rival que NO podrá enderezarse hasta tu próximo turno:`,
-          effectType: 'CANNOT_READY',
-          targetScope: 'RIVAL_UNITS'
-        };
-      }
+      queueTargetSelection(state, {
+        actionType: 'TARGET_UNIT',
+        sourceCardId: 'CP-090',
+        sourceCardName: 'Pacifica Netrunner',
+        sourceCardImage: unitInstance.image,
+        title: '💻 PACIFICA NETRUNNER // HABILIDAD PLAY',
+        prompt: `Tu Street Cred (${myCred}) es par. Selecciona una Unidad rival que NO podrá enderezarse hasta tu próximo turno:`,
+        effectType: 'CANNOT_READY',
+        targetScope: 'RIVAL_UNITS'
+      });
     } else {
       oppUnits[0].cannotReadyUntilNextTurn = true;
       state.actionLog.unshift(`💻 [Pacifica Netrunner Rival] ¡PLAY! Tu unidad "${oppUnits[0].name}" no podrá enderezarse.`);
@@ -2585,24 +2722,17 @@ export function executeUnitPlayTrigger(state, playerKey, unitInstance) {
       state.actionLog.unshift(`🦾 [Royce] ¡PLAY activado! El rival no tiene unidades con Fuerza ≤ ${maxPower}.`);
       notifyTrigger('🦾 ROYCE // PLAY', `El rival no tiene unidades con Fuerza ≤ ${maxPower}.`, 'info');
     } else if (playerKey === 'player') {
-      if (eligible.length === 1) {
-        const [dead] = opp.field.splice(opp.field.indexOf(eligible[0]), 1);
-        sendDefeatedUnitToGraveyardOrExile(opp, dead, state);
-        state.actionLog.unshift(`🦾 [Royce] ¡PLAY! Destruye a la unidad rival "${dead.name}" (Fuerza ≤ ${maxPower}).`);
-        notifyTrigger('🦾 ROYCE // PLAY', `Has destruido a la unidad rival "${dead.name}" (Fuerza ≤ ${maxPower}).`, 'success');
-      } else {
-        state.pendingTargetSelection = {
-          actionType: 'TARGET_UNIT',
-          sourceCardId: 'CP-108',
-          sourceCardName: 'Royce // Don\'t Call Me Simon',
-          sourceCardImage: unitInstance.image,
-          title: '🦾 ROYCE // HABILIDAD PLAY',
-          prompt: `Selecciona una Unidad rival con Fuerza ≤ ${maxPower} para destruirla:`,
-          effectType: 'DEFEAT',
-          targetScope: 'RIVAL_UNITS',
-          maxPower
-        };
-      }
+      queueTargetSelection(state, {
+        actionType: 'TARGET_UNIT',
+        sourceCardId: 'CP-108',
+        sourceCardName: "Royce // Don't Call Me Simon",
+        sourceCardImage: unitInstance.image,
+        title: '🦾 ROYCE // HABILIDAD PLAY',
+        prompt: `Selecciona una Unidad rival con Fuerza ≤ ${maxPower} para destruirla:`,
+        effectType: 'DEFEAT',
+        targetScope: 'RIVAL_UNITS',
+        maxPower
+      });
     } else {
       const target = [...eligible].sort((a, b) => (b.currentPower || 0) - (a.currentPower || 0))[0];
       const [dead] = opp.field.splice(opp.field.indexOf(target), 1);

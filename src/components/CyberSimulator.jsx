@@ -965,7 +965,6 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
       return false;
     }
   });
-  const [showFullReactionModal, setShowFullReactionModal] = useState(false);
   const [recentHighlights, setRecentHighlights] = useState({});
   const prevBoardSnapshotRef = useRef(null);
   const [transientBotArrows, setTransientBotArrows] = useState([]);
@@ -1560,7 +1559,8 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
 
   // Girar o enderezar carta en la Zona de Eddies (+1 €$ en reserva)
   const handleToggleEddie = (eddieId) => {
-    if (!gameState || gameState.activePlayer !== 'player' || gameState.isGameOver) return;
+    const inReactionWin = Boolean(gameState?.pendingReaction && gameState.pendingReaction.attackerPlayerKey === 'bot');
+    if (!gameState || (gameState.activePlayer !== 'player' && !inReactionWin) || gameState.isGameOver) return;
     pushHistory();
     const res = toggleEddieSpent(gameState, 'player', eddieId);
     if (!res.success) {
@@ -1576,7 +1576,8 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
 
   // Girar Leyenda (+1 €$ en reserva)
   const handleToggleLegend = (legendId) => {
-    if (!gameState || gameState.activePlayer !== 'player' || gameState.isGameOver) return;
+    const inReactionWin = Boolean(gameState?.pendingReaction && gameState.pendingReaction.attackerPlayerKey === 'bot');
+    if (!gameState || (gameState.activePlayer !== 'player' && !inReactionWin) || gameState.isGameOver) return;
     pushHistory();
     const res = toggleLegendSpent(gameState, 'player', legendId);
     if (!res.success) {
@@ -2170,13 +2171,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
           }
         });
         const rivalUnequipped = (opp.field || []).filter((u) => !u.gear || u.gear.length === 0);
-        if (rivalUnequipped.length === 1) {
-          const [removed] = opp.field.splice(opp.field.indexOf(rivalUnequipped[0]), 1);
-          sendUnitToBottomDeck(opp, removed, gameState);
-          gameState.actionLog.unshift(
-            `🕯️ [Maman Brigitte] Descartaste 2 Programas y enviaste a "${removed.name}" al fondo del mazo rival.`
-          );
-        } else if (rivalUnequipped.length > 1) {
+        if (rivalUnequipped.length > 0) {
           gameState.pendingTargetSelection = {
             actionType: 'TARGET_UNIT',
             sourceCardId: 'CP-067',
@@ -2208,13 +2203,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
           p.trash.push(p.hand.splice(hIdx, 1)[0]);
         }
         const oppUnits = opp.field || [];
-        if (oppUnits.length === 1) {
-          const [removed] = opp.field.splice(0, 1);
-          sendUnitToBottomDeck(opp, removed, gameState);
-          gameState.actionLog.unshift(
-            `📡 [Placide] Descartaste "${selected.name}" y enviaste a "${removed.name}" al fondo del mazo rival.`
-          );
-        } else if (oppUnits.length > 1) {
+        if (oppUnits.length > 0) {
           gameState.pendingTargetSelection = {
             actionType: 'TARGET_UNIT',
             sourceCardId: 'CP-096',
@@ -2247,16 +2236,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
         const tIdx = (p.trash || []).findIndex((c) => c.instanceId === selected.instanceId);
         if (tIdx !== -1) p.trash.splice(tIdx, 1);
         const otherUnits = (p.field || []).filter((u) => u.instanceId !== choice.excludeUnitId);
-        if (otherUnits.length === 1) {
-          const targetUnit = otherUnits[0];
-          targetUnit.gear = targetUnit.gear || [];
-          targetUnit.gear.push(selected);
-          const bonus = selected.powerBonus || selected.parsedPower || parseCardPower(selected.power) || 1;
-          targetUnit.currentPower = (targetUnit.currentPower || 0) + bonus;
-          gameState.actionLog.unshift(
-            `💉 [Viktor Vektor] ¡PLAY! Equipó gratis "${selected.name}" desde tu Basura a "${targetUnit.name}" (+${bonus} Fuerza).`
-          );
-        } else if (otherUnits.length > 1) {
+        if (otherUnits.length > 0) {
           gameState.pendingTargetSelection = {
             actionType: 'TARGET_UNIT',
             sourceCardId: 'CP-142',
@@ -2511,7 +2491,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
 
     // Dexter DeShawn
     if (optionId === 'DEXTER_BUFF') {
-      if ((p.field || []).length > 1) {
+      if ((p.field || []).length > 0) {
         gameState.pendingTargetSelection = {
           actionType: 'TARGET_UNIT',
           effectType: 'BUFF',
@@ -2525,13 +2505,6 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
         delete gameState.pendingModalChoice;
         setGameState({ ...gameState });
         return;
-      }
-      const target = p.field && p.field.length > 0 ? p.field[0] : null;
-      if (target) {
-        target.currentPower = (target.currentPower || target.power || 0) + 2;
-        gameState.actionLog.unshift(
-          `💼 [Dexter DeShawn] Otorgó +2 de poder a "${target.name}" este turno (Poder actual: ${target.currentPower}).`
-        );
       }
     } else if (optionId === 'DEXTER_DRAW') {
       if (p.deck && p.deck.length > 0) {
@@ -3028,11 +3001,45 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
           gameState.actionLog.unshift(`⚡ [${sel.sourceCardName}] Otorgó +${sel.amount || 2} de poder a "${unit.name}" (Poder actual: ${unit.currentPower}).`);
         } else if (sel.effectType === 'BUFF_PER_GEAR') {
           const gCount = unit.gear ? unit.gear.length : 0;
-          unit.currentPower = (unit.currentPower || unit.power || 0) + gCount;
-          gameState.actionLog.unshift(`💉 [${sel.sourceCardName}] Otorgó +${gCount} de Fuerza este turno a "${unit.name}" (${gCount} Gear(s) equipado(s)). Fuerza actual: ${unit.currentPower}.`);
+          const mult = sel.multiplier || 1;
+          const bonus = gCount * mult;
+          unit.currentPower = (unit.currentPower || unit.power || 0) + bonus;
+          gameState.actionLog.unshift(`💉 [${sel.sourceCardName}] Otorgó +${bonus} de Fuerza este turno a "${unit.name}" (${gCount} Gear(s) × ${mult}). Fuerza actual: ${unit.currentPower}.`);
+        } else if (sel.effectType === 'GUNPOINT_BUFF') {
+          const amt = sel.amount || 3;
+          unit.currentPower = (unit.currentPower || unit.power || 0) + amt;
+          unit.canAttackReadyUnits = true;
+          gameState.actionLog.unshift(`🔫 [${sel.sourceCardName}] "${unit.name}" gana +${amt} de poder (actual: ${unit.currentPower}) y puede atacar a unidades Ready este turno.`);
+        } else if (sel.effectType === 'REDUCE_STEAL') {
+          const red = sel.amount || 1;
+          unit.stolenReduction = (unit.stolenReduction || 0) + red;
+          const isSpecialTag = /\b(AI|DRONE|VEHICLE)\b/i.test(`${unit.traits || ''} ${unit.cardType || ''} ${unit.subtypes || ''} ${unit.tags || ''} ${unit.text || ''}`);
+          let extraMsg = '';
+          if (isSpecialTag && p.deck && p.deck.length > 0) {
+            const d = p.deck.shift();
+            d.isJustDrawn = true;
+            p.hand.push(d);
+            extraMsg = ` Al ser AI/Drone/Vehicle, robas "${d.name}".`;
+          }
+          gameState.actionLog.unshift(`📡 [${sel.sourceCardName}] "${unit.name}" roba ${red} Gig menos este turno.${extraMsg}`);
         } else if (sel.effectType === 'DEBUFF') {
-          unit.currentPower = Math.max(0, (unit.currentPower || unit.power || 0) - (sel.amount || 2));
-          gameState.actionLog.unshift(`🔻 [${sel.sourceCardName}] Redujo el poder de "${unit.name}" en ${sel.amount || 2} (Poder actual: ${unit.currentPower}).`);
+          const amt = sel.amount || 2;
+          unit.currentPower = Math.max(0, (unit.currentPower || unit.power || 0) - amt);
+          gameState.actionLog.unshift(`🔻 [${sel.sourceCardName}] Redujo el poder de "${unit.name}" en ${amt} (Poder actual: ${unit.currentPower}).`);
+          if (sel.chainBottomDeckZero && (opp.field || []).some((u) => (u.currentPower ?? u.power ?? 0) === 0)) {
+            if (!Array.isArray(gameState.pendingTargetSelectionQueue)) gameState.pendingTargetSelectionQueue = [];
+            gameState.pendingTargetSelectionQueue.unshift({
+              actionType: 'TARGET_UNIT',
+              sourceCardId: sel.sourceCardId,
+              sourceCardName: sel.sourceCardName,
+              sourceCardImage: sel.sourceCardImage,
+              title: `🌊 ${String(sel.sourceCardName || 'EFECTO').toUpperCase()} // ENVIAR AL FONDO (0 PODER)`,
+              prompt: 'Selecciona una Unidad rival con 0 de poder para enviarla al fondo de su mazo:',
+              effectType: 'BOTTOM_DECK',
+              targetScope: 'RIVAL_UNITS',
+              maxPower: 0
+            });
+          }
         } else if (sel.effectType === 'FREEZE') {
           unit.cannotAttackUntilNextTurn = true;
           gameState.actionLog.unshift(`🛑 [${sel.sourceCardName}] "${unit.name}" no podrá atacar hasta tu próximo turno.`);
@@ -3086,14 +3093,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
         }
       }
       if (!keepSelectionForMoreSpends) {
-        delete gameState.pendingTargetSelection;
-        const pendingAttack = gameState.pendingAttackContinuation;
-        delete gameState.pendingAttackContinuation;
-        if (pendingAttack) {
-          continueAttackAfterTrigger(pendingAttack);
-        } else {
-          setGameState({ ...gameState });
-        }
+        finishTargetSelection();
       } else {
         setGameState({ ...gameState });
       }
@@ -3127,11 +3127,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
             gameState.actionLog.unshift(`💉 [Dum Dum] Robó 2 cartas: ${drawnCards.join(', ')}.`);
           } else if (sel.gearAction === 'GILDED_MATON_REWARD') {
             const eligibleOpp = (opp.field || []).filter((u) => getNumericCost(u) <= 3);
-            if (eligibleOpp.length === 1) {
-              const [dead] = opp.field.splice(opp.field.indexOf(eligibleOpp[0]), 1);
-              sendDefeatedUnitToGraveyardOrExile(opp, dead, gameState);
-              gameState.actionLog.unshift(`🔫 [Gilded Matón] ¡PLAY! Destruyó a la unidad rival "${dead.name}" (Coste ≤ 3).`);
-            } else if (eligibleOpp.length > 1) {
+            if (eligibleOpp.length > 0) {
               chainedSelection = {
                 actionType: 'TARGET_UNIT',
                 sourceCardId: 'CP-038',
@@ -3263,14 +3259,12 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
   // Llamar a Leyenda durante la Fase de Respuesta del Jugador (cuesta 1 €$, máx 1 por turno)
   const handleReactionCallLegend = (legendInstanceId) => {
     if (!gameState?.pendingReaction || gameState.player.hasCalledLegendThisTurn) return;
-    setShowFullReactionModal(false);
     handleCallLegendAction(legendInstanceId);
   };
 
   // Jugar una carta Quick desde la mano durante la Fase de Respuesta del Jugador
   const handleReactionPlayQuickCard = (cardInstanceId) => {
     if (!gameState?.pendingReaction) return;
-    setShowFullReactionModal(false);
     handlePlayCard(cardInstanceId, null);
   };
 
@@ -3301,7 +3295,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
 
   useEffect(() => {
     const inReaction = Boolean(gameState?.pendingReaction && gameState.pendingReaction.attackerPlayerKey === 'bot');
-    if (!inReaction || showFullReactionModal || showBugReportModal) return;
+    if (!inReaction || showBugReportModal) return;
     const onKey = (e) => {
       if (e.code !== 'Space') return;
       const tag = (e.target?.tagName || '').toLowerCase();
@@ -3329,7 +3323,6 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
     pendingManualPayment,
     pendingGearEquip,
     pendingBotAck,
-    showFullReactionModal,
     showBugReportModal
   ]);
 
@@ -3915,12 +3908,6 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
       });
   }, [gameState?.isGameOver, gameState?.winner, gameState?.matchId, currentUser?.uid]);
 
-  useEffect(() => {
-    if (gameState?.pendingReaction?.attackerUnitId) {
-      setShowFullReactionModal(false);
-    }
-  }, [gameState?.pendingReaction?.attackerUnitId]);
-
   // Limpiar objetivo preseleccionado cuando cambia pendingTargetSelection
   useEffect(() => {
     setStagedTarget(null);
@@ -4202,6 +4189,9 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
     if (activeTargetSel.maxPower !== undefined && uPower > activeTargetSel.maxPower) return false;
     if (activeTargetSel.maxCost !== undefined && getNumericCost(unit) > activeTargetSel.maxCost) return false;
     if (activeTargetSel.onlyUnequipped && unit.gear && unit.gear.length > 0) return false;
+    if (activeTargetSel.onlyEquipped && (!unit.gear || unit.gear.length === 0)) return false;
+    if (activeTargetSel.onlyReady && unit.isSpent) return false;
+    if (activeTargetSel.onlySpent && !unit.isSpent) return false;
     if (activeTargetSel.excludeInstanceId && unit.instanceId === activeTargetSel.excludeInstanceId) return false;
     return true;
   };
@@ -6788,7 +6778,8 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                                       onClick={(e) => {
                                         e.stopPropagation();
                                         setLegendMenuId(null);
-                                        handleActivateLegendAbility(leg.instanceId, ab.id);
+                                        const inReactionWin = Boolean(gameState?.pendingReaction && gameState.pendingReaction.attackerPlayerKey === 'bot');
+                                        handleActivateLegendAbility(leg.instanceId, ab.id, inReactionWin);
                                       }}
                                       title={ab.description}
                                       className={`w-full py-1.5 px-2 text-left flex flex-col rounded text-[10px] font-black uppercase transition-all border ${
@@ -6818,7 +6809,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                             })()}
 
                             {/* Opción ACTIVAR GO SOLO (arriba, igual que las habilidades activadas de otras leyendas) */}
-                            {leg.isFaceUp && canDeploy && (
+                            {isMyTurn && leg.isFaceUp && canDeploy && (
                               <div className="mb-1.5 flex flex-col gap-1">
                                 <button
                                   type="button"
@@ -8756,7 +8747,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
       {(() => {
         const activeArrows = [];
         const r = gameState?.pendingReaction;
-        if (r && r.attackerPlayerKey === 'bot' && !showFullReactionModal) {
+        if (r && r.attackerPlayerKey === 'bot') {
           const shortAtk = String(r.attackerName || 'ATACANTE').split(':')[0].trim().slice(0, 20);
           const hasBlocker = Boolean(r.blockerUnitId);
           activeArrows.push({
@@ -8776,9 +8767,41 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
               : `⚔️ ${shortAtk}`
           });
         }
+        if (isInlineBoardTargeting && stagedTarget?.kind === 'UNIT' && stagedTarget.unitInstanceId) {
+          const shortSrc = String(activeTargetSel?.sourceCardName || 'OBJETIVO').split('//')[0].trim().slice(0, 18);
+          activeArrows.push({
+            id: 'player-inline-target-arrow',
+            fromAnchor: [activeTargetSel?.sourceUnitId, 'player-trash', 'player-field', 'player-pill'].filter(Boolean),
+            toAnchor: [stagedTarget.unitInstanceId, stagedTarget.ownerKey === 'bot' ? 'bot-field' : 'player-field'],
+            color: '#0dfceb',
+            dashed: false,
+            label: `🎯 ${shortSrc}`
+          });
+        }
+        if (isInlineBoardTargeting && stagedTarget?.kind === 'LEGEND' && stagedTarget.legendInstanceId) {
+          const shortSrc = String(activeTargetSel?.sourceCardName || 'CALL').split('//')[0].trim().slice(0, 18);
+          activeArrows.push({
+            id: 'player-inline-legend-arrow',
+            fromAnchor: ['player-trash', 'player-field', 'player-pill'],
+            toAnchor: [stagedTarget.legendInstanceId, 'player-field'],
+            color: '#FCEE0A',
+            dashed: false,
+            label: `👑 ${shortSrc}`
+          });
+        }
+        if (pendingGearEquip?.stagedTargetId) {
+          const shortGear = String(pendingGearEquip.card?.name || 'GEAR').split('//')[0].trim().slice(0, 18);
+          activeArrows.push({
+            id: 'player-gear-equip-arrow',
+            fromAnchor: ['player-field', 'player-pill'],
+            toAnchor: [pendingGearEquip.stagedTargetId, 'player-field'],
+            color: '#FCEE0A',
+            dashed: false,
+            label: `🔧 ${shortGear}`
+          });
+        }
         if (
           transientBotArrows.length > 0 &&
-          !showFullReactionModal &&
           !rollingAnimation &&
           !(isMyTurn && (gameState?.pendingGigRoll || gameState?.phase === 'START_GIG_SELECT'))
         ) {
@@ -8852,7 +8875,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
             }}
             onActivateAbility={(sourceCardInstanceId, abilityId) => {
               setUnitActionMenuId(null);
-              handleExecuteActivatedAbility(sourceCardInstanceId, abilityId);
+              handleExecuteActivatedAbility(sourceCardInstanceId, abilityId, inReactionWin);
             }}
             onInspect={(u) => setInspectedCard(u)}
             onClose={() => setUnitActionMenuId(null)}
@@ -9092,9 +9115,18 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
         );
       })()}
 
-      {/* 5.5. MODAL TÁCTICO: FASE DE RESPUESTA DEL JUGADOR ANTE ATAQUE DEL RIVAL */}
-      {gameState?.pendingReaction && gameState.pendingReaction.attackerPlayerKey === 'bot' && (() => {
+      {/* 5.5. BARRA EN VIVO SOBRE EL TABLERO: FASE DE REACCIÓN ANTE ATAQUE DEL RIVAL (SIN MODAL OBSOLETO) */}
+      {gameState?.pendingReaction &&
+        gameState.pendingReaction.attackerPlayerKey === 'bot' &&
+        !isInlineBoardTargeting &&
+        !isChoosingTriggerOrder &&
+        !pendingManualPayment &&
+        !pendingGearEquip &&
+        !gameState.pendingModalChoice &&
+        !gameState.pendingCardChoice && (() => {
         const reaction = gameState.pendingReaction;
+        const liveAttacker = (bot.field || []).find((u) => u.instanceId === reaction.attackerUnitId);
+        const liveAttackerPower = liveAttacker?.currentPower ?? reaction.attackerPower ?? 0;
         // REGLA OFICIAL: Las unidades con Blocker pueden bloquear aunque tengan Lag (solo deben estar Ready/no giradas)
         const readyBlockers = (p.field || []).filter(
           (u) => !u.isSpent && hasKeyword(u, 'Blocker')
@@ -9106,481 +9138,78 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
         const quickCards = (p.hand || []).filter(
           (c) => hasKeyword(c, 'Quick') && (c.parsedCost || 0) <= totalEddies
         );
-
-        const extraReactionCount =
-          quickCards.length + (!p.hasCalledLegendThisTurn && uncalledLegends.length > 0 && totalEddies >= 1 ? uncalledLegends.length : 0);
-
-        if (!showFullReactionModal) {
-          const canCallInReaction = !p.hasCalledLegendThisTurn && uncalledLegends.length > 0 && totalEddies >= 1;
-          const hasAnyAbilityInReaction =
-            faceUpLegends.some((l) => getCardActivatedAbilities(l, 'player', gameState).some((ab) => ab.canActivateNow)) ||
-            (p.field || []).some((u) => getCardActivatedAbilities(u, 'player', gameState).some((ab) => ab.canActivateNow));
-
-          return (
-            <div className="fixed left-1/2 top-[47%] -translate-x-1/2 -translate-y-1/2 z-[46] max-w-[94vw] pointer-events-auto font-mono select-none">
-              <motion.div
-                initial={{ opacity: 0, y: -6, scale: 0.98 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                className="bg-[#090d16]/96 border border-[#FF003C]/85 px-3 py-1.5 rounded-sm shadow-[0_0_32px_rgba(255,0,60,0.45)] backdrop-blur-md flex flex-wrap items-center justify-center gap-2"
-              >
-                <span className="px-1.5 py-0.5 bg-[#FF003C]/20 border border-[#FF003C] text-[#FF003C] font-black text-[9px] uppercase tracking-widest shrink-0">
-                  {currentBlocker ? 'TURNO DEL RIVAL • COMBATE' : '⚔️ BAJO ATAQUE'}
-                </span>
-
-                <span className="text-[11px] font-bold text-white whitespace-nowrap">
-                  <span className="text-[#FF003C] font-black">{String(reaction.attackerName || '').split('//')[0].trim()}</span>
-                  <span className="text-gray-400"> attacks </span>
-                  <span className="text-[#0dfceb] font-black">
-                    {currentBlocker
-                      ? String(currentBlocker.name || '').split('//')[0].trim()
-                      : reaction.targetType === 'GIGS'
-                      ? 'your Gigs'
-                      : String(reaction.targetName || '').split('//')[0].trim()}
-                  </span>
-                </span>
-
-                {/* Chips informativos interactivos idénticos al vídeo de referencia */}
-                {!currentBlocker && readyBlockers.length > 0 && (
-                  <button
-                    type="button"
-                    onClick={() => handleSelectBlocker(readyBlockers[0].instanceId)}
-                    className="px-2 py-0.5 bg-[#0dfceb]/15 hover:bg-[#0dfceb] text-[#0dfceb] hover:text-black border border-[#0dfceb]/70 rounded-sm text-[10px] font-black cursor-pointer transition-colors"
-                    title="Clic aquí o directamente sobre tu unidad Blocker en mesa"
-                  >
-                    🛡️ Block ({String(readyBlockers[0].name || '').split('//')[0].trim()})
-                  </button>
-                )}
-
-                {quickCards.length > 0 && (
-                  <span className="px-1.5 py-0.5 bg-[#0dfceb]/10 border border-[#0dfceb]/40 text-[#0dfceb] rounded-sm text-[9px] font-bold">
-                    Quick en mano ({quickCards.length})
-                  </span>
-                )}
-
-                {canCallInReaction && (
-                  <span className="px-1.5 py-0.5 bg-[#FCEE0A]/10 border border-[#FCEE0A]/50 text-[#FCEE0A] rounded-sm text-[9px] font-bold">
-                    Call Leyenda
-                  </span>
-                )}
-
-                {hasAnyAbilityInReaction && (
-                  <span className="px-1.5 py-0.5 bg-white/5 border border-white/25 text-gray-200 rounded-sm text-[9px] font-bold">
-                    Habilidad (↷)
-                  </span>
-                )}
-
-                <button
-                  type="button"
-                  onClick={handleResolveReactionCombat}
-                  className="px-2.5 py-0.5 bg-[#FCEE0A] hover:bg-white text-[#070a10] font-black text-[10px] uppercase tracking-wider rounded-sm cursor-pointer shadow-[0_0_14px_rgba(252,238,10,0.65)] transition-colors flex items-center gap-1"
-                  title="Resolver combate (o pulsa Barra Espaciadora)"
-                >
-                  <span>RESPOND OR PASS</span>
-                  <span className="hidden sm:inline px-1 bg-black/20 rounded text-[8px]">SPACE</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setShowFullReactionModal(true)}
-                  className="px-1.5 py-0.5 bg-black/80 border border-white/20 hover:border-[#FCEE0A] text-gray-300 hover:text-[#FCEE0A] text-[9px] font-black rounded-sm cursor-pointer transition-colors"
-                  title="Abrir panel completo de opciones de respuesta"
-                >
-                  ⚡ {extraReactionCount > 0 ? extraReactionCount : '⋯'}
-                </button>
-              </motion.div>
-            </div>
+        const canCallInReaction = !p.hasCalledLegendThisTurn && uncalledLegends.length > 0 && totalEddies >= 1;
+        const hasAnyQuickAbilityInReaction =
+          faceUpLegends.some((l) => getCardActivatedAbilities(l, 'player', gameState).some((ab) => ab.isQuick && ab.canActivateNow)) ||
+          (p.field || []).some(
+            (u) =>
+              getCardActivatedAbilities(u, 'player', gameState).some((ab) => ab.isQuick && ab.canActivateNow) ||
+              (u.gear || []).some((g) => getCardActivatedAbilities(g, 'player', gameState).some((ab) => ab.isQuick && ab.canActivateNow))
           );
-        }
 
         return (
-          <div className="fixed inset-0 z-45 bg-[#000000]/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 font-mono select-none">
+          <div className="fixed left-1/2 top-[47%] -translate-x-1/2 -translate-y-1/2 z-[46] max-w-[94vw] pointer-events-auto font-mono select-none">
             <motion.div
-              initial={{ scale: 0.94, opacity: 0, y: 15 }}
-              animate={{ scale: 1, opacity: 1, y: 0 }}
-              style={{ clipPath: CYBER_CLIP }}
-              className="max-w-2xl w-full bg-[#070a10]/98 border-2 border-[#FF003C] p-4 sm:p-5 space-y-3 sm:space-y-4 shadow-[0_0_60px_rgba(255,0,60,0.5)] relative max-h-[90vh] overflow-y-auto cyber-scrollbar"
+              initial={{ opacity: 0, y: -6, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              className="bg-[#090d16]/96 border border-[#FF003C]/85 px-3 py-1.5 rounded-sm shadow-[0_0_32px_rgba(255,0,60,0.45)] backdrop-blur-md flex flex-wrap items-center justify-center gap-2"
             >
-              {/* Cabecera de Alerta */}
-              <div className="flex items-center justify-between border-b border-[#FF003C]/40 pb-2.5 gap-2">
-                <div className="flex items-center gap-2">
-                  <span className="w-3 h-3 bg-[#FF003C] rounded-full animate-ping" />
-                  <span className="text-xs sm:text-sm font-black uppercase tracking-wider text-[#FF003C]">
-                    // COMBATE OFICIAL // FASE 2: FASE DE REACCIÓN //
-                  </span>
-                </div>
+              <span className="px-1.5 py-0.5 bg-[#FF003C]/20 border border-[#FF003C] text-[#FF003C] font-black text-[9px] uppercase tracking-widest shrink-0">
+                {currentBlocker ? 'TURNO DEL RIVAL • COMBATE' : '⚔️ BAJO ATAQUE'}
+              </span>
+
+              <span className="text-[11px] font-bold text-white whitespace-nowrap">
+                <span className="text-[#FF003C] font-black">
+                  {String(reaction.attackerName || '').split('//')[0].trim()} (⚡{liveAttackerPower})
+                </span>
+                <span className="text-gray-400"> ataca a </span>
+                <span className="text-[#0dfceb] font-black">
+                  {currentBlocker
+                    ? String(currentBlocker.name || '').split('//')[0].trim()
+                    : reaction.targetType === 'GIGS'
+                    ? 'tus Gigs'
+                    : String(reaction.targetName || '').split('//')[0].trim()}
+                </span>
+              </span>
+
+              {!currentBlocker && readyBlockers.length > 0 && (
                 <button
                   type="button"
-                  onClick={() => setShowFullReactionModal(false)}
-                  className="px-2 py-1 bg-black border border-[#0dfceb]/60 hover:bg-[#0dfceb] text-[#0dfceb] hover:text-black text-[10px] font-black uppercase cursor-pointer transition-colors"
+                  onClick={() => handleSelectBlocker(readyBlockers[0].instanceId)}
+                  className="px-2 py-0.5 bg-[#0dfceb]/15 hover:bg-[#0dfceb] text-[#0dfceb] hover:text-black border border-[#0dfceb]/70 rounded-sm text-[10px] font-black cursor-pointer transition-colors"
+                  title="Clic aquí o directamente sobre tu unidad Blocker en mesa"
                 >
-                  👁️ VER TABLERO Y FLECHA
+                  🛡️ Bloquear ({String(readyBlockers[0].name || '').split('//')[0].trim()})
                 </button>
-              </div>
+              )}
 
-              {/* Resumen del Ataque Entrante */}
-              <div className="bg-[#000000] border border-[#FF003C]/60 p-3 rounded flex flex-col sm:flex-row items-center justify-between gap-3 shadow-inner">
-                {/* Atacante (Rival) */}
-                <div className="flex items-center gap-3">
-                  <div
-                    onClick={() => handleCardRightClick(null, { name: reaction.attackerName, image: reaction.attackerImage })}
-                    onContextMenu={(e) => handleCardRightClick(e, { name: reaction.attackerName, image: reaction.attackerImage })}
-                    className="w-16 h-22 rounded border-2 border-[#FF003C] overflow-hidden shrink-0 bg-black shadow-[0_0_15px_rgba(255,0,60,0.4)] cursor-pointer hover:scale-105 transition-transform"
-                    title="Clic para ver carta en PANTALLA COMPLETA"
-                  >
-                    <img
-                      src={reaction.attackerImage}
-                      alt={reaction.attackerName}
-                      className="w-full h-full object-cover"
-                    />
-                  </div>
-                  <div>
-                    <span className="text-[9px] text-[#FF003C] font-black block uppercase tracking-wider">
-                      ⚔️ FASE 1: ATACANTE RIVAL (SPENT)
-                    </span>
-                    <span className="text-sm sm:text-base font-black text-white uppercase block">
-                      {reaction.attackerName}
-                    </span>
-                    <span className="text-xs font-mono font-black text-[#FCEE0A] block">
-                      ⚡ FUERZA: {reaction.attackerPower}
-                    </span>
-                  </div>
-                </div>
+              {quickCards.length > 0 && (
+                <span className="px-1.5 py-0.5 bg-[#0dfceb]/10 border border-[#0dfceb]/40 text-[#0dfceb] rounded-sm text-[9px] font-bold">
+                  ⚡ Quick en mano ({quickCards.length})
+                </span>
+              )}
 
-                <div className="flex flex-col items-center justify-center text-center px-2">
-                  <span className="text-xl font-black text-[#FF003C] animate-pulse">VS</span>
-                  <span className="text-[9px] text-gray-400 font-bold uppercase">
-                    {reaction.targetType === 'GIGS' ? 'ASALTO A TUS GIGS' : 'ATAQUE A TU UNIDAD'}
-                  </span>
-                </div>
+              {canCallInReaction && (
+                <span className="px-1.5 py-0.5 bg-[#FCEE0A]/10 border border-[#FCEE0A]/50 text-[#FCEE0A] rounded-sm text-[9px] font-bold">
+                  👑 Call Leyenda
+                </span>
+              )}
 
-                {/* Objetivo o Blocker asignado */}
-                <div className="text-right">
-                  <span className="text-[9px] text-gray-400 font-bold block uppercase">
-                    {currentBlocker ? '🛡️ INTERCEPTANDO CON (BLOCKER)' : '🎯 OBJETIVO DECLARADO'}
-                  </span>
-                  <span className={`text-sm sm:text-base font-black uppercase block ${currentBlocker ? 'text-[#0dfceb]' : 'text-white'}`}>
-                    {currentBlocker ? currentBlocker.name : reaction.targetName}
-                  </span>
-                  {(() => {
-                    if (currentBlocker) {
-                      const pb = getUnitPowerBreakdown(currentBlocker);
-                      return (
-                        <span
-                          title={pb.tooltip}
-                          className={`text-xs font-mono font-black block ${
-                            pb.status === 'debuffed'
-                              ? 'text-[#FF003C] animate-pulse'
-                              : pb.status === 'buffed'
-                              ? 'text-[#00FF9C]'
-                              : 'text-gray-300'
-                          }`}
-                        >
-                          ⚡ FUERZA: {pb.currentPower}
-                          {pb.deltaBadge ? ` (${pb.deltaBadge} · Base ${pb.basePower})` : ''}
-                        </span>
-                      );
-                    }
-                    return (
-                      <span className="text-xs font-mono font-bold text-gray-300 block">
-                        {reaction.targetType === 'GIGS'
-                          ? `⚠️ Robará ${calculateGigsToSteal(reaction.attackerPower)} Gig(s)`
-                          : `⚡ FUERZA: ${reaction.targetPower}`}
-                      </span>
-                    );
-                  })()}
-                </div>
-              </div>
+              {hasAnyQuickAbilityInReaction && (
+                <span className="px-1.5 py-0.5 bg-white/5 border border-white/25 text-gray-200 rounded-sm text-[9px] font-bold">
+                  ⚡ Habilidad Quick (↷)
+                </span>
+              )}
 
-              {/* Panel de Opciones Tácticas de Respuesta */}
-              <div className="space-y-2.5">
-                {/* Opción 1: Interceptar con Blocker */}
-                <div className="bg-[#000000]/80 border border-gray-800 p-2.5 rounded">
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-[10px] font-black uppercase text-[#0dfceb] flex items-center gap-1.5">
-                      <Shield className="w-3.5 h-3.5 text-[#0dfceb]" />
-                      1. INTERCEPTAR CON BLOCKER (PUEDEN BLOQUEAR AUNQUE TENGAN LAG)
-                    </span>
-                    <span className="text-[9px] text-gray-400">
-                      {currentBlocker ? '1 UNIDAD ASIGNADA' : `${readyBlockers.length} DISPONIBLES`}
-                    </span>
-                  </div>
-                  <p className="text-[9px] text-gray-400 mb-1.5">
-                    Al interceptar con un Bloqueador, el ataque se convierte en una lucha contra él y <strong className="text-[#0dfceb]">NO se roba ningún Gig</strong> aunque el atacante gane.
-                  </p>
-
-                  {readyBlockers.length === 0 ? (
-                    <span className="text-[10px] text-gray-500 italic block">
-                      No tienes unidades listas con la habilidad Blocker para interceptar.
-                    </span>
-                  ) : (
-                    <div className="flex flex-wrap gap-2">
-                      {readyBlockers.map((b) => {
-                        const isAssigned = reaction.blockerUnitId === b.instanceId;
-                        const pb = getUnitPowerBreakdown(b);
-                        return (
-                          <button
-                            key={b.instanceId}
-                            type="button"
-                            title={pb.tooltip}
-                            onClick={() => handleSelectBlocker(b.instanceId)}
-                            style={{ clipPath: CYBER_BUTTON }}
-                            className={`px-3 py-1.5 text-xs font-black uppercase transition-all flex items-center gap-2 cursor-pointer ${
-                              isAssigned
-                                ? 'bg-[#0dfceb] text-black shadow-[0_0_15px_#0dfceb]'
-                                : pb.status === 'debuffed'
-                                ? 'bg-[#070a10] border border-[#FF003C] text-[#FF003C] hover:bg-[#FF003C]/15'
-                                : 'bg-[#070a10] border border-[#0dfceb]/50 text-[#0dfceb] hover:border-[#0dfceb]'
-                            }`}
-                          >
-                            <Shield className="w-3.5 h-3.5" />
-                            <span>
-                              {b.name} (⚡{pb.currentPower}
-                              {pb.deltaBadge ? ` ${pb.deltaBadge}` : ''})
-                            </span>
-                            <span className="text-[9px] underline">
-                              {isAssigned ? '[DESASIGNAR]' : '[BLOQUEAR]'}
-                            </span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-
-                {/* Opción 2: Llamar a una Leyenda */}
-                <div className="bg-[#000000]/80 border border-gray-800 p-2.5 rounded">
-                  <div className="flex items-center justify-between mb-1.5">
-                    <span className="text-[10px] font-black uppercase text-[#FCEE0A] flex items-center gap-1.5">
-                      <Crown className="w-3.5 h-3.5 text-[#FCEE0A]" />
-                      2. LLAMAR A UNA LEYENDA (COSTE: 1 €$)
-                    </span>
-                    <span className="text-[9px] text-gray-400">
-                      {p.hasCalledLegendThisTurn ? 'YA LLAMASTE ESTE TURNO' : `DISPONES DE ${totalEddies} €$`}
-                    </span>
-                  </div>
-
-                  {p.hasCalledLegendThisTurn ? (
-                    <span className="text-[10px] text-gray-500 italic block">
-                      Ya has llamado a una Leyenda este turno (límite oficial: 1 por turno).
-                    </span>
-                  ) : uncalledLegends.length === 0 ? (
-                    <span className="text-[10px] text-gray-500 italic block">
-                      No tienes más Leyendas boca abajo en tu zona de mando.
-                    </span>
-                  ) : totalEddies < 1 ? (
-                    <span className="text-[10px] text-[#FF003C] italic block">
-                      Necesitas 1 €$ para llamar a una Leyenda.
-                    </span>
-                  ) : (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5 my-2">
-                      {uncalledLegends.map((leg) => {
-                        const slotIdx = (p.legends || []).findIndex((l) => l.instanceId === leg.instanceId) + 1;
-
-                        return (
-                          <div
-                            key={leg.instanceId}
-                            className="bg-[#070a10] border border-[#FCEE0A]/40 hover:border-[#FCEE0A] p-2 rounded flex flex-col justify-between transition-all shadow-[0_0_12px_rgba(252,238,10,0.15)] group"
-                          >
-                            <div>
-                              <div className="flex items-start gap-2 mb-1.5">
-                                <div className="w-12 h-16 rounded border border-[#FCEE0A]/70 overflow-hidden shrink-0 bg-black shadow">
-                                  <img
-                                    src="/images/back_leyenda.jpg"
-                                    alt={`Leyenda #${slotIdx} boca abajo`}
-                                    className="w-full h-full object-cover"
-                                  />
-                                </div>
-                                <div className="min-w-0 flex-1">
-                                  <div className="flex items-center justify-between gap-1">
-                                    <span className="text-[8px] px-1 bg-[#FCEE0A] text-black font-black uppercase rounded">
-                                      SLOT #{slotIdx}
-                                    </span>
-                                    <span className={`text-[8px] font-mono font-bold uppercase ${leg.isSpent ? 'text-[#FF003C]' : 'text-[#0dfceb]'}`}>
-                                      {leg.isSpent ? 'GIRADA' : 'LISTA'}
-                                    </span>
-                                  </div>
-                                  <span className="text-[11px] font-black text-white uppercase block truncate mt-0.5">
-                                    LEYENDA #{slotIdx}
-                                  </span>
-                                  <span className="text-[8px] font-bold text-gray-400 block">
-                                    🔒 BOCA ABAJO (OCULTA)
-                                  </span>
-                                </div>
-                              </div>
-
-                              <div className="bg-black/80 border border-gray-800 p-1.5 rounded text-[8px] text-gray-400 font-mono mb-2 leading-tight">
-                                Identidad oculta hasta darle la vuelta. Paga 1 €$ para hacer Call y revelar esta Leyenda.
-                              </div>
-                            </div>
-
-                            <button
-                              type="button"
-                              disabled={p.hasCalledLegendThisTurn || totalEddies < 1}
-                              onClick={() => handleReactionCallLegend(leg.instanceId)}
-                              style={{ clipPath: CYBER_BUTTON }}
-                              className={`w-full py-1.5 px-2 text-[10px] font-black uppercase transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow ${
-                                p.hasCalledLegendThisTurn || totalEddies < 1
-                                  ? 'bg-gray-900 text-gray-500 border border-gray-800 cursor-not-allowed'
-                                  : 'bg-[#FCEE0A] hover:bg-white text-black shadow-[0_0_15px_rgba(252,238,10,0.6)]'
-                              }`}
-                            >
-                              <Crown className="w-3.5 h-3.5" />
-                              <span>VOLTEAR #{slotIdx} (1 €$)</span>
-                            </button>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-
-                  {faceUpLegends.length > 0 && (
-                    <div className="mt-2 pt-2 border-t border-gray-800 flex flex-wrap items-center gap-1.5 text-[9px] text-gray-400">
-                      <span className="font-bold text-gray-500 uppercase">🔒 Ya boca arriba (no se pueden volver a llamar):</span>
-                      {faceUpLegends.map((l) => (
-                        <span key={l.instanceId} className="px-1.5 py-0.5 bg-gray-900 border border-gray-800 text-gray-400 rounded">
-                          {l.name}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                {/* Opción 3: Jugar Cartas con Quick */}
-                <div className="bg-[#000000]/80 border border-gray-800 p-2.5 rounded">
-                  <div className="flex items-center justify-between mb-1.5">
-                    <span className="text-[10px] font-black uppercase text-[#0dfceb] flex items-center gap-1.5">
-                      <Zap className="w-3.5 h-3.5 text-[#0dfceb]" />
-                      3. JUGAR CARTA CON QUICK
-                    </span>
-                    <span className="text-[9px] text-gray-400">
-                      {quickCards.length} CARTAS QUICK PAGABLES
-                    </span>
-                  </div>
-
-                  {quickCards.length === 0 ? (
-                    <span className="text-[10px] text-gray-500 italic block">
-                      No tienes cartas con palabra clave "Quick" pagables en la mano.
-                    </span>
-                  ) : (
-                    <div className="flex flex-wrap gap-2">
-                      {quickCards.map((qc) => (
-                        <button
-                          key={qc.instanceId}
-                          type="button"
-                          onClick={() => handleReactionPlayQuickCard(qc.instanceId)}
-                          style={{ clipPath: CYBER_BUTTON }}
-                          className="px-3 py-1 bg-[#0dfceb]/15 hover:bg-[#0dfceb] text-[#0dfceb] hover:text-black border border-[#0dfceb]/60 text-xs font-black uppercase transition-all flex items-center gap-1.5 cursor-pointer"
-                        >
-                          <Zap className="w-3.5 h-3.5" />
-                          <span>Jugar {qc.name} ({qc.parsedCost || 0} €$)</span>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                {/* Opción 4: Activar Habilidades QUICK (↷) de Leyendas, Unidades o Gears */}
-                {(() => {
-                  const quickAbilitiesList = [];
-                  (p.legends || []).forEach((l) => {
-                    if (l.isFaceUp && !l.isSpent && !l.isOnField && !l.isRemovedFromGame) {
-                      getCardActivatedAbilities(l, 'player', gameState)
-                        .filter((ab) => ab.isQuick)
-                        .forEach((ab) => quickAbilitiesList.push({ card: l, ab, kind: 'LEGEND' }));
-                    }
-                  });
-                  (p.field || []).forEach((u) => {
-                    if (!u.isSpent && !u.isLagging) {
-                      getCardActivatedAbilities(u, 'player', gameState)
-                        .filter((ab) => ab.isQuick)
-                        .forEach((ab) => quickAbilitiesList.push({ card: u, ab, kind: 'UNIT' }));
-                    }
-                    (u.gear || []).forEach((g) => {
-                      if (!g.isSpent) {
-                        getCardActivatedAbilities(g, 'player', gameState)
-                          .filter((ab) => ab.isQuick)
-                          .forEach((ab) => quickAbilitiesList.push({ card: g, ab, kind: 'GEAR' }));
-                      }
-                    });
-                  });
-
-                  if (quickAbilitiesList.length === 0) return null;
-
-                  return (
-                    <div className="bg-[#000000]/80 border border-[#FCEE0A]/40 p-2.5 rounded">
-                      <div className="flex items-center justify-between mb-1.5">
-                        <span className="text-[10px] font-black uppercase text-[#FCEE0A] flex items-center gap-1.5">
-                          <Zap className="w-3.5 h-3.5 text-[#FCEE0A]" />
-                          4. ACTIVAR HABILIDAD QUICK (↷)
-                        </span>
-                        <span className="text-[9px] text-gray-400">
-                          {quickAbilitiesList.length} DISPONIBLE(S)
-                        </span>
-                      </div>
-                      <div className="flex flex-wrap gap-2">
-                        {quickAbilitiesList.map(({ card: qCard, ab, kind }) => (
-                          <button
-                            key={`${qCard.instanceId}-${ab.id}`}
-                            type="button"
-                            disabled={!ab.canActivateNow}
-                            onClick={() => {
-                              if (kind === 'LEGEND') {
-                                handleActivateLegendAbility(qCard.instanceId, ab.id, true);
-                              } else {
-                                handleExecuteActivatedAbility(qCard.instanceId, ab.id, true);
-                              }
-                            }}
-                            style={{ clipPath: CYBER_BUTTON }}
-                            title={ab.canActivateNow ? ab.description : ab.disabledReason}
-                            className={`px-3 py-1 text-xs font-black uppercase transition-all flex items-center gap-1.5 border ${
-                              ab.canActivateNow
-                                ? 'bg-[#FCEE0A]/20 hover:bg-[#FCEE0A] text-[#FCEE0A] hover:text-black border-[#FCEE0A]/60 cursor-pointer'
-                                : 'bg-gray-900 text-gray-500 border-gray-800 cursor-not-allowed opacity-50'
-                            }`}
-                          >
-                            <span>⚡ {qCard.name.split('//')[0].trim()}: {ab.shortTitle || ab.title}</span>
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  );
-                })()}
-              </div>
-
-              {/* Botón de Resolver Combate / Pasar Respuesta */}
-              <div className="pt-2 border-t border-[#FF003C]/30 flex flex-col sm:flex-row items-center justify-between gap-3">
-                <div className="text-[9px] text-gray-400">
-                  {currentBlocker ? (
-                    <span className="text-[#0dfceb] font-bold">
-                      ✓ El ataque será desviado hacia "{currentBlocker.name}". ¡No se robarán Gigs!
-                    </span>
-                  ) : (
-                    <span className="text-gray-400">
-                      Sin bloqueo: el ataque resolverá directamente contra el objetivo.
-                    </span>
-                  )}
-                </div>
-
-                <button
-                  type="button"
-                  onClick={handleResolveReactionCombat}
-                  style={{ clipPath: CYBER_BUTTON }}
-                  className={`w-full sm:w-auto px-6 py-2.5 font-black text-xs uppercase cursor-pointer transition-all shadow-lg flex items-center justify-center gap-2 ${
-                    currentBlocker
-                      ? 'bg-[#0dfceb] hover:bg-white text-black shadow-[0_0_20px_#0dfceb]'
-                      : 'bg-[#FF003C] hover:bg-white text-white hover:text-black shadow-[0_0_20px_#FF003C]'
-                  }`}
-                >
-                  <Swords className="w-4 h-4" />
-                  <span>
-                    {currentBlocker
-                      ? `INTERCEPTAR Y RESOLVER COMBATE (FASE 3)`
-                      : reaction.targetType === 'GIGS'
-                      ? `PASAR RESPUESTA Y RESOLVER ROBO DE GIGS (FASE 4)`
-                      : `PASAR RESPUESTA Y RESOLVER COMBATE (FASE 3)`}
-                  </span>
-                </button>
-              </div>
+              <button
+                type="button"
+                onClick={handleResolveReactionCombat}
+                className="px-2.5 py-0.5 bg-[#FCEE0A] hover:bg-white text-[#070a10] font-black text-[10px] uppercase tracking-wider rounded-sm cursor-pointer shadow-[0_0_14px_rgba(252,238,10,0.65)] transition-colors flex items-center gap-1"
+                title="Pasar reacción y resolver el combate (o pulsa Barra Espaciadora)"
+              >
+                <span>PASAR / RESOLVER</span>
+                <span className="hidden sm:inline px-1 bg-black/20 rounded text-[8px]">SPACE</span>
+              </button>
             </motion.div>
           </div>
         );

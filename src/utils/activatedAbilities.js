@@ -279,8 +279,8 @@ export const ACTIVATED_ABILITIES_CONFIG = {
         }
         card.isSpent = true;
 
-        if (playerKey === 'player' && (opp.field || []).length > 1) {
-          state.pendingTargetSelection = {
+        if (playerKey === 'player' && (opp.field || []).length > 0) {
+          queueTargetSelection(state, {
             actionType: 'TARGET_UNIT',
             sourceCardId: 'CP-033',
             sourceCardName: 'Evelyn Parker // Beautiful Enigma',
@@ -289,7 +289,7 @@ export const ACTIVATED_ABILITIES_CONFIG = {
             prompt: 'Selecciona una Unidad rival: deberá atacar en su próximo turno si puede hacerlo:',
             effectType: 'MUST_ATTACK',
             targetScope: 'RIVAL_UNITS'
-          };
+          });
           state.actionLog.unshift(`💋 [Evelyn Parker] Paga 1 €$ y gira a Evelyn para obligar a una unidad rival a atacar.`);
           return { success: true, requiresModal: true, message: 'Selecciona la unidad rival objetivo.' };
         }
@@ -343,8 +343,8 @@ export const ACTIVATED_ABILITIES_CONFIG = {
           return c <= 4;
         });
 
-        if (playerKey === 'player' && eligibleUnits.length > 1) {
-          state.pendingTargetSelection = {
+        if (playerKey === 'player' && eligibleUnits.length > 0) {
+          queueTargetSelection(state, {
             actionType: 'TARGET_UNIT',
             sourceCardId: 'CP-042',
             sourceCardName: 'Goro Takemura // Vengeful Bodyguard',
@@ -354,7 +354,7 @@ export const ACTIVATED_ABILITIES_CONFIG = {
             effectType: 'GRANT_BLOCKER_TAKEMURA',
             targetScope: 'FRIENDLY_UNITS',
             maxCost: 4
-          };
+          });
           state.actionLog.unshift(`🛡️ [Goro Takemura] Paga 1 €$ y gira a Takemura (QUICK ↷) para conceder BLOCKER a una unidad aliada.`);
           return { success: true, requiresModal: true, message: 'Selecciona la unidad aliada (coste ≤ 4).' };
         }
@@ -970,6 +970,13 @@ export function getCardActivatedAbilities(card, playerKey = 'player', state = nu
   if (!state) return abilities;
 
   return abilities.map((ab) => {
+    if (state.activePlayer !== playerKey && !ab.isQuick) {
+      return {
+        ...ab,
+        canActivateNow: false,
+        disabledReason: 'Solo se pueden activar habilidades Quick durante la Fase de Reacción del rival.'
+      };
+    }
     const check = ab.canActivate(state, playerKey, card);
     return {
       ...ab,
@@ -1013,6 +1020,10 @@ export function executeCardActivatedAbility(state, playerKey, cardInstanceId, ab
 
   if (!chosenAbility) {
     return { success: false, reason: 'Habilidad no encontrada.' };
+  }
+
+  if (state.activePlayer !== playerKey && !chosenAbility.isQuick) {
+    return { success: false, reason: 'Solo se pueden activar habilidades Quick durante la Fase de Reacción del rival.' };
   }
 
   const check = chosenAbility.canActivate(state, playerKey, card);
