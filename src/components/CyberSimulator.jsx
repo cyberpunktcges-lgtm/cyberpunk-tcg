@@ -1262,6 +1262,10 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
       setGameState(prev);
       setSelectedHandCard(null);
       setSelectedFieldUnit(null);
+      setPendingManualPayment(null);
+      setPendingGearEquip(null);
+      setLegendMenuId(null);
+      setUnitActionMenuId(null);
       setHolocall({
         title: 'ACCIÓN DESHECHA',
         message: 'Has deshecho tu última acción. El estado anterior ha sido restaurado.',
@@ -1729,43 +1733,20 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
     const floating = getAvailableEddies(p);
     const totalCap = getTotalAvailableEddies(p);
 
-    // Si los eddies girados son inferiores al coste pero el jugador tiene capacidad suficiente:
+    // Nunca automatizar el pago al activar GO SOLO: dejar siempre elegir exactamente qué Eddies o Leyendas girar
+    // (y así al confirmar en confirmManualPayment se guarda pushHistory() ANTES de girar ningún Eddie, por lo que DESHACER restaura todo limpio)
     if (floating < cost) {
       if (totalCap >= cost) {
-        if (!autoPayEddies) {
-          setLegendMenuId(null);
-          setPendingManualPayment({
-            actionKind: 'GO_SOLO',
-            legendInstanceId,
-            isGoSolo,
-            card: leg,
-            cost,
-            selectedSources: []
-          });
-          return;
-        }
-        let needed = cost - floating;
-        for (const ed of p.eddies || []) {
-          if (needed <= 0) break;
-          if (!ed.isSpent) {
-            ed.isSpent = true;
-            p.floatingEddies = (p.floatingEddies || 0) + 1;
-            needed--;
-          }
-        }
-        if (needed > 0 && isGoSolo && !leg.isSpent) {
-          leg.isSpent = true;
-          p.floatingEddies = (p.floatingEddies || 0) + 1;
-          needed--;
-        }
-        for (const ol of p.legends || []) {
-          if (needed <= 0) break;
-          if (ol.instanceId !== legendInstanceId && !ol.isSpent && !ol.isOnField && !ol.isRemovedFromGame) {
-            ol.isSpent = true;
-            p.floatingEddies = (p.floatingEddies || 0) + 1;
-            needed--;
-          }
-        }
+        setLegendMenuId(null);
+        setPendingManualPayment({
+          actionKind: 'GO_SOLO',
+          legendInstanceId,
+          isGoSolo,
+          card: leg,
+          cost,
+          selectedSources: []
+        });
+        return;
       } else {
         const missing = cost - totalCap;
         setHolocall({
