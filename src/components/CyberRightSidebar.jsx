@@ -131,6 +131,17 @@ export default function CyberRightSidebar({
           </div>
 
           <div className="flex items-center gap-1 shrink-0">
+            {onOpenBugReport && (
+              <button
+                type="button"
+                onClick={onOpenBugReport}
+                className="px-2 py-1.5 rounded border border-[#FF003C]/70 bg-[#FF003C]/15 hover:bg-[#FF003C] text-[#FF003C] hover:text-white font-black text-[10px] uppercase tracking-wider flex items-center gap-1 cursor-pointer transition-colors shadow-[0_0_12px_rgba(255,0,60,0.25)]"
+                title="Reportar un Bug de la Beta (captura automática del estado de la partida)"
+              >
+                <Bug className="w-3.5 h-3.5" />
+                <span>BUG</span>
+              </button>
+            )}
             {onToggleFullscreen && (
               <button
                 type="button"
