@@ -3984,6 +3984,10 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
 
   useEffect(() => {
     if (transientBotArrows.length === 0) return;
+    if (gameState?.activePlayer === 'player' && (gameState?.pendingGigRoll || gameState?.phase === 'START_GIG_SELECT')) {
+      setTransientBotArrows([]);
+      return;
+    }
     // Mientras la ventana paso a paso del Bot esté abierta (salvo FIN DE TURNO), mantenemos las flechas fijas
     if (pendingBotAck && pendingBotAck.actionType !== 'END_BOT_TURN') return;
     const timeoutMs = pendingBotAck?.actionType === 'END_BOT_TURN' ? 1400 : 2800;
@@ -3991,7 +3995,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
       setTransientBotArrows([]);
     }, timeoutMs);
     return () => window.clearTimeout(timer);
-  }, [transientBotArrows, pendingBotAck]);
+  }, [transientBotArrows, pendingBotAck, gameState?.activePlayer, gameState?.pendingGigRoll, gameState?.phase]);
 
   // Turno del bot automático cuando le toque y el jugador ya haya decidido el Mulligan
   // (Pausa durante la Fase de Respuesta si pendingReaction está activo)
@@ -7842,22 +7846,22 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
 
       {/* 2. MODAL MINIMALISTA DE SELECCIÓN DE DADO FIXER (ESTILO CAPTURA 3) */}
       {gameState.mulliganDecided && isMyTurn && (gameState.pendingGigRoll || gameState.phase === 'START_GIG_SELECT') && p.fixerDice.length > 0 && !rollingAnimation && (
-        <div className="fixed inset-0 z-40 bg-black/55 backdrop-blur-xs flex items-center justify-center p-4 font-mono">
+        <div className="fixed inset-0 z-[52] bg-black/55 backdrop-blur-xs flex items-center justify-center p-4 font-mono">
           <div
             style={{ clipPath: CYBER_CLIP }}
             className="max-w-lg w-full bg-[#070c16]/96 border border-[#0dfceb]/50 p-5 sm:p-6 text-center space-y-5 shadow-[0_0_50px_rgba(0,0,0,0.85)]"
           >
             <div className="text-left space-y-0.5 border-b border-white/10 pb-3">
               <span className="text-[9px] text-[#FCEE0A] uppercase tracking-widest block font-bold">
-                CHOOSE A DIE • FASE DE INICIO
+                ELIGE UN DADO • FASE DE INICIO
               </span>
               <h3 className="text-sm sm:text-base font-black text-white uppercase tracking-wider">
-                GAIN A GIG: CHOOSE A FIXER DIE
+                GANA UN GIG: ELIGE UN DADO DEL FIXER
               </h3>
             </div>
 
             <div className="space-y-2">
-              <span className="text-[9px] text-gray-500 uppercase tracking-widest block">YOUR FIXER</span>
+              <span className="text-[9px] text-gray-500 uppercase tracking-widest block">TU FIXER</span>
               <div className="flex flex-wrap items-center justify-center gap-4 py-2">
                 {p.fixerDice.map((d) => {
                   const isD20Disabled = p.fixerDice.length > 1 && d.toLowerCase() === 'd20';
@@ -8722,7 +8726,12 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
               : `⚔️ ${shortAtk}`
           });
         }
-        if (transientBotArrows.length > 0 && !showFullReactionModal) {
+        if (
+          transientBotArrows.length > 0 &&
+          !showFullReactionModal &&
+          !rollingAnimation &&
+          !(isMyTurn && (gameState?.pendingGigRoll || gameState?.phase === 'START_GIG_SELECT'))
+        ) {
           for (const bArr of transientBotArrows) {
             activeArrows.push(bArr);
           }
