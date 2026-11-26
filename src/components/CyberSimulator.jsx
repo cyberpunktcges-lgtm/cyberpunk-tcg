@@ -8684,7 +8684,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                     : '0 0 24px rgba(255,0,60,0.95), -4px 0 0 rgba(252,238,10,0.35)'
                 }}
               >
-                {turnBanner.isPlayer ? 'YOUR TURN' : 'RIVAL TURN'}
+                {turnBanner.isPlayer ? 'TU TURNO' : 'TURNO DEL RIVAL'}
               </span>
             </div>
             <div
@@ -9056,7 +9056,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                 className="bg-[#090d16]/96 border border-[#FF003C]/85 px-3 py-1.5 rounded-sm shadow-[0_0_32px_rgba(255,0,60,0.45)] backdrop-blur-md flex flex-wrap items-center justify-center gap-2"
               >
                 <span className="px-1.5 py-0.5 bg-[#FF003C]/20 border border-[#FF003C] text-[#FF003C] font-black text-[9px] uppercase tracking-widest shrink-0">
-                  {currentBlocker ? "RIVAL'S TURN • COMBAT" : '⚔️ UNDER ATTACK'}
+                  {currentBlocker ? 'TURNO DEL RIVAL • COMBATE' : '⚔️ BAJO ATAQUE'}
                 </span>
 
                 <span className="text-[11px] font-bold text-white whitespace-nowrap">

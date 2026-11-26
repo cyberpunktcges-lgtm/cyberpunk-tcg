@@ -344,12 +344,12 @@ export function CyberRightGigsRail({
         {renderProgressSegments(botGigs.length, '#FF003C')}
       </div>
 
-      {/* 3. BOTÓN PROTAGONISTA CENTRAL: END TURN / PASS / RESOLVING... */}
+      {/* 3. BOTÓN PROTAGONISTA CENTRAL: FINALIZAR TURNO / PASS / RESOLVING... */}
       <button
         type="button"
         disabled={!hasPendingReaction && (!isMyTurn || isBotThinking)}
         onClick={onPrimaryAction}
-        className={`w-full py-3.5 px-3 rounded-sm font-black text-sm uppercase tracking-[0.16em] transition-all shadow-lg ${
+        className={`w-full py-3.5 px-3 rounded-sm font-black text-xs xl:text-sm uppercase tracking-[0.12em] transition-all shadow-lg ${
           hasPendingReaction
             ? 'bg-[#0dfceb] hover:bg-white text-[#070a10] cursor-pointer shadow-[0_0_26px_rgba(13,252,235,0.8)]'
             : isMyTurn && !isBotThinking
@@ -361,7 +361,7 @@ export function CyberRightGigsRail({
           ? 'PASS'
           : isBotThinking || !isMyTurn
           ? 'RESOLVING •••'
-          : 'END TURN'}
+          : 'FINALIZAR TURNO'}
       </button>
 
       {/* 4. TU CAJA DE GIGS */}
