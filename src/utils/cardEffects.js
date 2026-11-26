@@ -1007,22 +1007,60 @@ export function executeProgramEffect(state, playerKey, card) {
   // CP-025: Detonate
   // "QUICK Defeat a rival Gear with power 2 or less."
   if (cardId === 'CP-025' || cardName.toLowerCase() === 'detonate') {
-    let defeated = false;
-    for (const unit of opp.field || []) {
-      if (unit.gear && unit.gear.length > 0) {
-        const idx = unit.gear.findIndex((g) => (g.powerBonus || g.parsedPower || 0) <= 2);
-        if (idx !== -1) {
-          const [gear] = unit.gear.splice(idx, 1);
-          if (!opp.trash) opp.trash = [];
-          opp.trash.push(gear);
-          state.actionLog.unshift(`💥 [Detonate] Destruye el Gear rival "${gear.name}" de "${unit.name}".`);
-          defeated = true;
-          break;
+    const getGearPow = (g) => {
+      if (!g) return 0;
+      if (typeof g.powerBonus === 'number' && !Number.isNaN(g.powerBonus)) return g.powerBonus;
+      if (typeof g.parsedPower === 'number' && !Number.isNaN(g.parsedPower)) return g.parsedPower;
+      const m = String(g.powerVal ?? g.power ?? '0').match(/\d+/);
+      return m ? parseInt(m[0], 10) : 0;
+    };
+    const eligibleRivalGears = [];
+    (opp.field || []).forEach((u) => {
+      (u.gear || []).forEach((g) => {
+        if (getGearPow(g) <= 2) {
+          eligibleRivalGears.push({ gear: g, host: u, isLegend: false, pow: getGearPow(g) });
         }
-      }
-    }
-    if (!defeated) {
+      });
+    });
+    (opp.legends || []).forEach((l) => {
+      (l.gear || []).forEach((g) => {
+        if (getGearPow(g) <= 2) {
+          eligibleRivalGears.push({ gear: g, host: l, isLegend: true, pow: getGearPow(g) });
+        }
+      });
+    });
+
+    if (eligibleRivalGears.length === 0) {
       state.actionLog.unshift(`ℹ️ [Detonate] No se encontraron Gears rivales con poder 2 o menos.`);
+      return { executed: true };
+    }
+
+    if (playerKey === 'player') {
+      queueTargetSelection(state, {
+        actionType: 'TARGET_GEAR',
+        targetScope: 'RIVAL_GEARS',
+        maxGearPower: 2,
+        sourceCardId: 'CP-025',
+        sourceCardName: 'Detonate',
+        sourceCardImage: card.image,
+        title: '💥 DETONATE // DESTRUIR GEAR RIVAL (PODER ≤ 2)',
+        prompt: 'Selecciona el Gear rival (poder 2 o menos) que deseas destruir:'
+      });
+    } else {
+      eligibleRivalGears.sort((a, b) => b.pow - a.pow);
+      const chosen = eligibleRivalGears[0];
+      const gIdx = (chosen.host.gear || []).indexOf(chosen.gear);
+      if (gIdx !== -1) {
+        const [deadGear] = chosen.host.gear.splice(gIdx, 1);
+        if (!chosen.isLegend && chosen.pow > 0) {
+          chosen.host.currentPower = Math.max(0, getNumericUnitPower(chosen.host) - chosen.pow);
+        }
+        if (!opp.trash) opp.trash = [];
+        opp.trash.push(deadGear);
+        state.actionLog.unshift(
+          `💥 [Detonate Rival] Destruye tu Gear "${deadGear.name}" de "${chosen.host.name}"${!chosen.isLegend && chosen.pow > 0 ? ` (Fuerza actual: ${chosen.host.currentPower})` : ''}.`
+        );
+      }
     }
     return { executed: true };
   }

@@ -3211,13 +3211,23 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
         const gIdx = unit.gear.findIndex((g) => g.instanceId === gearInstanceId);
         if (gIdx !== -1) {
           const [sacrificed] = unit.gear.splice(gIdx, 1);
-          const lostBonus = sacrificed.powerBonus || sacrificed.parsedPower || parseCardPower(sacrificed.power) || 0;
-          if (lostBonus > 0) {
-            unit.currentPower = Math.max(0, (unit.currentPower || 0) - lostBonus);
+          const lostBonus =
+            typeof sacrificed.powerBonus === 'number'
+              ? sacrificed.powerBonus
+              : typeof sacrificed.parsedPower === 'number'
+              ? sacrificed.parsedPower
+              : parseCardPower(sacrificed.powerVal ?? sacrificed.power ?? 0) || 0;
+          if (!isLegend && lostBonus > 0) {
+            unit.currentPower = Math.max(0, getNumericUnitPower(unit) - lostBonus);
+            if (gameState.pendingReaction?.attackerUnitId === unit.instanceId) {
+              gameState.pendingReaction.attackerPower = unit.currentPower;
+            }
           }
           if (!targetOwner.trash) targetOwner.trash = [];
           targetOwner.trash.push(sacrificed);
-          gameState.actionLog.unshift(`🔧 [${sel.sourceCardName}] Destruyó el Gear "${sacrificed.name}".`);
+          gameState.actionLog.unshift(
+            `💥 [${sel.sourceCardName}] Destruyó el Gear "${sacrificed.name}" de "${unit.name}"${!isLegend && lostBonus > 0 ? ` (Fuerza actual: ${unit.currentPower})` : ''}.`
+          );
 
           if (sel.gearAction === 'DUMDUM_REWARD') {
             const drawnCards = [];
@@ -7606,29 +7616,38 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                   const baseCardCost = selectedHandCard.parsedCost || 0;
                   const cardCost = getEffectiveCardCost(selectedHandCard, p, gameState);
                   const hasDiscount = cardCost < baseCardCost;
+                  const inReactionWin = Boolean(gameState?.pendingReaction?.attackerPlayerKey === 'bot');
+                  const isSelectedQuick = hasKeyword(selectedHandCard, 'Quick');
+                  const canPlayInWindow = isMyTurn || (inReactionWin && isSelectedQuick);
                   const effectiveEddiesPool = getTotalAvailableEddies(p);
                   const canAfford = effectiveEddiesPool >= cardCost;
                   const missingEddies = Math.max(0, cardCost - effectiveEddiesPool);
-                  const canPlay = isMyTurn && canAfford && (!isGear || hasAnyGearTarget);
+                  const canPlay = canPlayInWindow && canAfford && (!isGear || hasAnyGearTarget);
 
                   let actionLabel = `JUGAR UNIDAD (${cardCost} €$)`;
-                  if (!canAfford) {
+                  if (!canPlayInWindow) {
+                    actionLabel = inReactionWin ? 'SOLO QUICK EN REACCIÓN' : 'ESPERA TU TURNO';
+                  } else if (!canAfford) {
                     actionLabel = `FALTAN ${missingEddies} €$ (GIRAR MÁS)`;
                   } else if (isProgram) {
+                    const quickTag = inReactionWin && isSelectedQuick ? '⚡ QUICK ' : '';
                     actionLabel = hasDiscount
-                      ? `LANZAR PROGRAMA (${cardCost} €$, antes ${baseCardCost})`
-                      : `LANZAR PROGRAMA (${cardCost} €$)`;
+                      ? `${quickTag}LANZAR PROGRAMA (${cardCost} €$, antes ${baseCardCost})`
+                      : `${quickTag}LANZAR PROGRAMA (${cardCost} €$)`;
                   } else if (isGear) {
                     actionLabel = hasAnyGearTarget
-                      ? `EQUIPAR GEAR (${cardCost} €$) — ELEGIR OBJETIVO`
+                      ? `${inReactionWin && isSelectedQuick ? '⚡ QUICK ' : ''}EQUIPAR GEAR (${cardCost} €$) — ELEGIR OBJETIVO`
                       : 'GEAR (SIN OBJETIVO)';
+                  } else if (inReactionWin && isSelectedQuick) {
+                    actionLabel = `⚡ QUICK UNIDAD (${cardCost} €$)`;
                   }
 
                   return (
                     <button
                       type="button"
-                      disabled={isGear && canAfford && !hasAnyGearTarget}
+                      disabled={!canPlayInWindow || (isGear && canAfford && !hasAnyGearTarget)}
                       onClick={() => {
+                        if (!canPlayInWindow) return;
                         if (!canAfford) {
                           setHolocall({
                             title: 'EDDIES INSUFICIENTES',
@@ -7757,7 +7776,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                 return (
                   <motion.div
                     key={card.instanceId}
-                    draggable={isMyTurn}
+                    draggable={isMyTurn || isPlayableReactionQuick}
                     onDragStart={(e) => {
                       if (card.isJustDrawn) delete card.isJustDrawn;
                       e.dataTransfer.setData('text/plain', card.instanceId);
@@ -7815,12 +7834,16 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                       className="w-full h-full object-cover object-center"
                     />
 
-                    {/* Badge destacado de carta recién robada */}
-                    {isJustDrawn && (
+                    {/* Badge destacado de carta recién robada o Quick jugable en Fase de Reacción */}
+                    {isPlayableReactionQuick ? (
+                      <div className="absolute top-0 inset-x-0 bg-[#0dfceb] text-[#070a10] text-[7px] sm:text-[8px] font-black uppercase tracking-wider text-center py-0.5 z-20 shadow-[0_0_10px_#0dfceb]">
+                        ⚡ QUICK ({handEffCost}€$)
+                      </div>
+                    ) : isJustDrawn ? (
                       <div className="absolute top-0 inset-x-0 bg-[#0dfceb] text-[#070a10] text-[7px] sm:text-[8px] font-black uppercase tracking-wider text-center py-0.5 z-20 shadow-[0_0_10px_#0dfceb] animate-bounce">
                         ⚡ ROBADA
                       </div>
-                    )}
+                    ) : null}
 
                     {isCardVendible(card) && (
                       <div className={`lg:hidden absolute ${isJustDrawn ? 'top-3.5' : 'top-0.5'} right-0.5 px-1 bg-[#FCEE0A] text-[#070a10] text-[7px] font-black uppercase z-10`}>
@@ -10208,17 +10231,43 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
         const playerUnits = gameState.player.field || [];
         const botUnits = gameState.bot.field || [];
 
-        // Para selección de Gears
+        // Para selección de Gears (en Unidades y Leyendas)
+        const getGearPowerVal = (g) => {
+          if (!g) return 0;
+          if (typeof g.powerBonus === 'number' && !Number.isNaN(g.powerBonus)) return g.powerBonus;
+          if (typeof g.parsedPower === 'number' && !Number.isNaN(g.parsedPower)) return g.parsedPower;
+          return parseCardPower(g.powerVal ?? g.power ?? 0) || 0;
+        };
+        const matchesGearFilter = (g) =>
+          sel.maxGearPower === undefined || getGearPowerVal(g) <= sel.maxGearPower;
         const allPlayerGears = [];
         playerUnits.forEach((u) => {
           (u.gear || []).forEach((g) => {
-            allPlayerGears.push({ gear: g, unit: u, ownerKey: 'player' });
+            if (matchesGearFilter(g)) {
+              allPlayerGears.push({ gear: g, unit: u, ownerKey: 'player', isLegend: false, gearPower: getGearPowerVal(g) });
+            }
+          });
+        });
+        (gameState.player.legends || []).forEach((l) => {
+          (l.gear || []).forEach((g) => {
+            if (matchesGearFilter(g)) {
+              allPlayerGears.push({ gear: g, unit: l, ownerKey: 'player', isLegend: true, gearPower: getGearPowerVal(g) });
+            }
           });
         });
         const allBotGears = [];
         botUnits.forEach((u) => {
           (u.gear || []).forEach((g) => {
-            allBotGears.push({ gear: g, unit: u, ownerKey: 'bot' });
+            if (matchesGearFilter(g)) {
+              allBotGears.push({ gear: g, unit: u, ownerKey: 'bot', isLegend: false, gearPower: getGearPowerVal(g) });
+            }
+          });
+        });
+        (gameState.bot.legends || []).forEach((l) => {
+          (l.gear || []).forEach((g) => {
+            if (matchesGearFilter(g)) {
+              allBotGears.push({ gear: g, unit: l, ownerKey: 'bot', isLegend: true, gearPower: getGearPowerVal(g) });
+            }
           });
         });
 
@@ -10742,66 +10791,70 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                 </div>
               )}
 
-              {/* SECCIÓN 3: SELECCIÓN DE GEARS (TARGET_GEAR: SACRIFICE, DEFEAT) */}
+              {/* SECCIÓN 3: SELECCIÓN DE GEARS (TARGET_GEAR: DETONATE, SACRIFICE, DEFEAT) */}
               {sel.actionType === 'TARGET_GEAR' && (
                 <div className="space-y-3 py-1">
-                  <div className="bg-[#000000]/80 border border-[#FCEE0A]/40 rounded-xl p-3 space-y-2">
-                    <span className="text-[11px] font-black uppercase text-[#FCEE0A] block pb-1 border-b border-[#FCEE0A]/20">
-                      GEARS EQUIPADOS EN TUS UNIDADES ({allPlayerGears.length}):
-                    </span>
-                    {allPlayerGears.length === 0 ? (
-                      <span className="text-xs text-gray-500 italic block py-2">No tienes ningún Gear equipado actualmente.</span>
-                    ) : (
-                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5">
-                        {allPlayerGears.map((item, gi) => (
-                          <div
-                            key={item.gear.instanceId || gi}
-                            onClick={() => {
-                              handleResolveTargetSelection({
-                                unitInstanceId: item.unit.instanceId,
-                                gearInstanceId: item.gear.instanceId,
-                                ownerKey: 'player'
-                              });
-                            }}
-                            onContextMenu={(e) => handleCardRightClick(e, item.gear)}
-                            className="p-2.5 rounded-lg border-2 border-[#FCEE0A]/60 hover:border-[#0dfceb] hover:bg-[#FCEE0A]/15 transition-all flex flex-col items-center gap-1.5 bg-[#050912] cursor-pointer hover:scale-105 shadow-md group"
-                          >
-                            <img src={item.gear.image} alt={item.gear.name} className="w-16 h-22 object-cover rounded border border-[#FCEE0A]" />
-                            <span className="text-[10px] font-black text-[#FCEE0A] uppercase truncate max-w-full text-center">
-                              🔧 {item.gear.name}
-                            </span>
-                            <span className="text-[8px] text-gray-300 block text-center truncate">
-                              En: {item.unit.name}
-                            </span>
-                            <span className="text-[8px] font-black px-2 py-0.5 rounded uppercase bg-[#FCEE0A] text-black group-hover:bg-[#0dfceb]">
-                              🎯 SACRIFICAR ESTE GEAR
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
+                  {sel.targetScope !== 'RIVAL_GEARS' && (
+                    <div className="bg-[#000000]/80 border border-[#FCEE0A]/40 rounded-xl p-3 space-y-2">
+                      <span className="text-[11px] font-black uppercase text-[#FCEE0A] block pb-1 border-b border-[#FCEE0A]/20">
+                        TUS GEARS EQUIPADOS ({allPlayerGears.length}):
+                      </span>
+                      {allPlayerGears.length === 0 ? (
+                        <span className="text-xs text-gray-500 italic block py-2">No tienes ningún Gear elegible equipado actualmente.</span>
+                      ) : (
+                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5">
+                          {allPlayerGears.map((item, gi) => (
+                            <div
+                              key={item.gear.instanceId || gi}
+                              onClick={() => {
+                                handleResolveTargetSelection({
+                                  unitInstanceId: item.unit.instanceId,
+                                  gearInstanceId: item.gear.instanceId,
+                                  ownerKey: 'player',
+                                  isLegend: item.isLegend
+                                });
+                              }}
+                              onContextMenu={(e) => handleCardRightClick(e, item.gear)}
+                              className="p-2.5 rounded-lg border-2 border-[#FCEE0A]/60 hover:border-[#0dfceb] hover:bg-[#FCEE0A]/15 transition-all flex flex-col items-center gap-1.5 bg-[#050912] cursor-pointer hover:scale-105 shadow-md group"
+                            >
+                              <img src={item.gear.image} alt={item.gear.name} className="w-16 h-22 object-cover rounded border border-[#FCEE0A]" />
+                              <span className="text-[10px] font-black text-[#FCEE0A] uppercase truncate max-w-full text-center">
+                                🔧 {item.gear.name} (+{item.gearPower})
+                              </span>
+                              <span className="text-[8px] text-gray-300 block text-center truncate max-w-full">
+                                En: {item.unit.name}{item.isLegend ? ' (Leyenda)' : ''}
+                              </span>
+                              <span className="text-[8px] font-black px-2 py-0.5 rounded uppercase bg-[#FCEE0A] text-black group-hover:bg-[#0dfceb]">
+                                🎯 SACRIFICAR ESTE GEAR
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
 
-                  {sel.targetScope === 'ALL' && (() => {
-                    const allBotGears = [];
-                    (bot.field || []).forEach((u) => (u.gear || []).forEach((g) => allBotGears.push({ gear: g, unit: u })));
-                    return (
-                      <div className="bg-[#000000]/80 border border-[#FF003C]/40 rounded-xl p-3 space-y-2">
-                        <span className="text-[11px] font-black uppercase text-[#FF003C] block pb-1 border-b border-[#FF003C]/20">
-                          GEARS EQUIPADOS EN UNIDADES RIVALES ({allBotGears.length}):
-                        </span>
-                        {allBotGears.length === 0 ? (
-                          <span className="text-xs text-gray-500 italic block py-2">El rival no tiene ningún Gear equipado actualmente.</span>
-                        ) : (
-                          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5">
-                            {allBotGears.map((item, gi) => (
+                  {(sel.targetScope === 'RIVAL_GEARS' || sel.targetScope === 'ALL') && (
+                    <div className="bg-[#000000]/80 border border-[#FF003C]/40 rounded-xl p-3 space-y-2">
+                      <span className="text-[11px] font-black uppercase text-[#FF003C] block pb-1 border-b border-[#FF003C]/20">
+                        GEARS RIVALES ELEGIBLES ({allBotGears.length}){sel.maxGearPower !== undefined ? ` — PODER ≤ ${sel.maxGearPower}` : ''}:
+                      </span>
+                      {allBotGears.length === 0 ? (
+                        <span className="text-xs text-gray-500 italic block py-2">El rival no tiene ningún Gear elegible equipado actualmente.</span>
+                      ) : (
+                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5">
+                          {allBotGears.map((item, gi) => {
+                            const curPow = !item.isLegend ? getNumericUnitPower(item.unit) : null;
+                            const nextPow = !item.isLegend ? Math.max(0, curPow - item.gearPower) : null;
+                            return (
                               <div
                                 key={item.gear.instanceId || gi}
                                 onClick={() => {
                                   handleResolveTargetSelection({
                                     unitInstanceId: item.unit.instanceId,
                                     gearInstanceId: item.gear.instanceId,
-                                    ownerKey: 'bot'
+                                    ownerKey: 'bot',
+                                    isLegend: item.isLegend
                                   });
                                 }}
                                 onContextMenu={(e) => handleCardRightClick(e, item.gear)}
@@ -10809,21 +10862,21 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                               >
                                 <img src={item.gear.image} alt={item.gear.name} className="w-16 h-22 object-cover rounded border border-[#FF003C]" />
                                 <span className="text-[10px] font-black text-[#FF003C] uppercase truncate max-w-full text-center">
-                                  🔧 {item.gear.name}
+                                  🔧 {item.gear.name} (+{item.gearPower})
                                 </span>
-                                <span className="text-[8px] text-gray-300 block text-center truncate">
-                                  En: {item.unit.name}
+                                <span className="text-[8px] text-gray-300 block text-center truncate max-w-full">
+                                  En: {item.unit.name}{item.isLegend ? ' (Leyenda)' : ` (⚡${curPow} → ⚡${nextPow})`}
                                 </span>
                                 <span className="text-[8px] font-black px-2 py-0.5 rounded uppercase bg-[#FF003C] text-white group-hover:bg-[#FCEE0A] group-hover:text-black">
                                   💥 DESTRUIR GEAR RIVAL
                                 </span>
                               </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })()}
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
 
