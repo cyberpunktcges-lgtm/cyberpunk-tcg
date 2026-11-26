@@ -19,6 +19,7 @@ import {
   executeProgramEffect,
   sendDefeatedUnitToGraveyardOrExile,
   queueTargetSelection,
+  queueCardChoice,
   executeCardSpentTriggers,
   triggerMeredithStoutOnRivalGigModify,
   getGigMaxFace
@@ -683,7 +684,9 @@ export const ACTIVATED_ABILITIES_CONFIG = {
         if (card.isSpent) return { can: false, reason: 'Overwatch ya está girado en este turno.' };
         const p = state[playerKey];
         const opp = state[playerKey === 'player' ? 'bot' : 'player'];
-        if (getTotalAvailableEddies(p) < 1) return { can: false, reason: 'Necesitas 1 €$ para disparar Overwatch.' };
+        if (getSpendableEddiesExcludingCard(p, card.instanceId) < 1) {
+          return { can: false, reason: 'Necesitas al menos 1 €$ para disparar Overwatch.' };
+        }
         if ((p.hand || []).length === 0) return { can: false, reason: 'Necesitas al menos 1 carta en mano para descartar.' };
         const spentOppUnits = (opp.field || []).filter((u) => u.isSpent);
         if (spentOppUnits.length === 0) return { can: false, reason: 'El rival no tiene unidades gastadas (Spent) en el campo.' };
@@ -692,27 +695,83 @@ export const ACTIVATED_ABILITIES_CONFIG = {
       execute: (state, playerKey, card) => {
         const p = state[playerKey];
         const opp = state[playerKey === 'player' ? 'bot' : 'player'];
-        spendEddies(p, 1);
+        const paid = payEddieCostWithAutoTap(p, 1, card.instanceId);
+        if (!paid) {
+          return {
+            success: false,
+            reason: 'Gira primero 1 Eddie o Leyenda para tener 1 €$ en reserva antes de disparar Overwatch.'
+          };
+        }
         card.isSpent = true;
 
-        // Descartar la carta de menor coste de la mano
-        const [discarded] = p.hand.splice(0, 1);
+        if (playerKey === 'player') {
+          queueCardChoice(state, {
+            type: 'OVERWATCH_DISCARD_1',
+            playerKey: 'player',
+            sourceCardId: 'CP-089',
+            sourceCardName: "Overwatch // Panam's Gift",
+            sourceCardImage: card.image,
+            title: "🎯 OVERWATCH // DESCARTA 1 CARTA DE TU MANO",
+            prompt:
+              'Elige qué carta de tu mano descartar al Trash. Después elegirás sobre el tablero una Unidad rival gastada (Spent) con coste igual o menor al de la carta descartada para destruirla:',
+            filterDescription: 'Cualquier carta de tu mano (cuanto mayor sea su coste, mayor coste podrás destruir)',
+            cards: [...(p.hand || [])],
+            eligibleIds: (p.hand || []).map((c) => c.instanceId),
+            maxChoices: 1,
+            minChoices: 1,
+            destination: 'TRASH',
+            remainingDestination: 'HAND'
+          });
+          state.actionLog.unshift(
+            `🎯 [Overwatch // Panam's Gift] Paga 1 €$ y gira el rifle (QUICK ↷): elige 1 carta de tu mano para descartar.`
+          );
+          return {
+            success: true,
+            requiresModal: true,
+            message: 'Elige 1 carta de tu mano para descartar con Overwatch.'
+          };
+        }
+
+        // Bot AI: elegir la carta óptima de la mano para destruir la unidad rival gastada más peligrosa
+        const getNumCost = (c) =>
+          typeof c.parsedCost === 'number'
+            ? c.parsedCost
+            : typeof c.costNum === 'number'
+            ? c.costNum
+            : parseInt(String(c.cost || '').replace(/\D/g, ''), 10) || 0;
+        const spentTargets = (opp.field || [])
+          .filter((u) => u.isSpent)
+          .sort((a, b) => getNumericUnitPower(b) - getNumericUnitPower(a));
+        let chosenHandIdx = 0;
+        let chosenTarget = null;
+        for (const t of spentTargets) {
+          const tCost = getNumCost(t);
+          const matchingHand = (p.hand || [])
+            .map((c, idx) => ({ c, idx, cost: getNumCost(c) }))
+            .filter((x) => x.cost >= tCost)
+            .sort((a, b) => a.cost - b.cost);
+          if (matchingHand.length > 0) {
+            chosenHandIdx = matchingHand[0].idx;
+            chosenTarget = t;
+            break;
+          }
+        }
+        const [discarded] = p.hand.splice(chosenHandIdx, 1);
         if (!p.trash) p.trash = [];
         p.trash.push(discarded);
-        const discCost = discarded.costNum || discarded.parsedCost || 0;
+        const discCost = getNumCost(discarded);
 
-        // Destruir una unidad rival gastada con coste <= discCost
-        const targetIdx = opp.field.findIndex((u) => u.isSpent && (u.costNum || u.parsedCost || 0) <= discCost);
-        if (targetIdx !== -1) {
-          const [dead] = opp.field.splice(targetIdx, 1);
+        if (chosenTarget) {
+          const tIdx = opp.field.indexOf(chosenTarget);
+          const [dead] = opp.field.splice(tIdx, 1);
           sendDefeatedUnitToGraveyardOrExile(opp, dead, state);
           state.actionLog.unshift(
-            `🎯 [Overwatch] Paga 1 €$, gira el rifle, descarta "${discarded.name}" (coste ${discCost}) y destruye a "${dead.name}".`
+            `🎯 [Overwatch Rival] Paga 1 €$, gira el rifle, descarta "${discarded.name}" (coste ${discCost}) y destruye a "${dead.name}".`
           );
           return { success: true, message: `"${dead.name}" destruida por disparo de Overwatch.` };
         } else {
           state.actionLog.unshift(
-            `🎯 [Overwatch] Paga 1 €$, gira el rifle y descarta "${discarded.name}" (coste ${discCost}), pero no había unidades rivales gastadas con coste ≤ ${discCost}.`
+            `🎯 [Overwatch Rival] Paga 1 €$, gira el rifle y descarta "${discarded.name}" (coste ${discCost}), pero no había unidades rivales gastadas con coste ≤ ${discCost}.`
           );
           return { success: true, message: `Descartada "${discarded.name}".` };
         }

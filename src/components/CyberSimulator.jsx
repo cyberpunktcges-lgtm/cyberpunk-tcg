@@ -2193,6 +2193,45 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
       return;
     }
 
+    if (choice.type === 'OVERWATCH_DISCARD_1') {
+      const p = gameState[choice.playerKey || 'player'];
+      const opp = gameState[(choice.playerKey || 'player') === 'player' ? 'bot' : 'player'];
+      const selected = (choice.cards || []).find((c) => selectedCardIds.includes(c.instanceId));
+      clearOrAdvanceCardChoice();
+      if (selected) {
+        const hIdx = (p.hand || []).findIndex((c) => c.instanceId === selected.instanceId);
+        if (hIdx !== -1) {
+          if (!p.trash) p.trash = [];
+          p.trash.push(p.hand.splice(hIdx, 1)[0]);
+        }
+        const discCost = getNumericCost(selected);
+        const eligibleSpent = (opp.field || []).filter((u) => u.isSpent && getNumericCost(u) <= discCost);
+        if (eligibleSpent.length > 0) {
+          gameState.pendingTargetSelection = {
+            actionType: 'TARGET_UNIT',
+            sourceCardId: 'CP-089',
+            sourceCardName: "Overwatch // Panam's Gift",
+            sourceCardImage: choice.sourceCardImage,
+            title: "🎯 OVERWATCH // DESTRUIR UNIDAD GASTADA",
+            prompt: `Descartaste "${selected.name}" (coste ${discCost}). Selecciona una Unidad rival gastada (Spent) con coste ≤ ${discCost} para destruirla:`,
+            effectType: 'DEFEAT',
+            targetScope: 'RIVAL_UNITS',
+            onlySpent: true,
+            maxCost: discCost
+          };
+          gameState.actionLog.unshift(
+            `🎯 [Overwatch] Descartaste "${selected.name}" (coste ${discCost}). Elige una Unidad rival gastada con coste ≤ ${discCost} para destruirla.`
+          );
+        } else {
+          gameState.actionLog.unshift(
+            `🎯 [Overwatch] Descartaste "${selected.name}" (coste ${discCost}), pero el rival no tiene unidades gastadas con coste ≤ ${discCost}.`
+          );
+        }
+      }
+      setGameState({ ...gameState });
+      return;
+    }
+
     if (choice.type === 'PLACIDE_DISCARD_1') {
       const p = gameState[choice.playerKey || 'player'];
       const opp = gameState[(choice.playerKey || 'player') === 'player' ? 'bot' : 'player'];
@@ -9400,17 +9439,20 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
 
                 const selectedCardsList = (choice.cards || []).filter((c) => selectedIds.includes(c.instanceId));
                 const remainingCardsList = (choice.cards || []).filter((c) => !selectedIds.includes(c.instanceId));
-                const isForcedDiscard = choice.type === 'FORCED_DISCARD_HAND';
+                const isHandDiscard =
+                  choice.type === 'FORCED_DISCARD_HAND' ||
+                  choice.type === 'OVERWATCH_DISCARD_1' ||
+                  choice.destination === 'TRASH';
                 const topZoneLabel =
                   choice.destination === 'FIELD'
                     ? 'DESPLEGAR AL CAMPO'
-                    : isForcedDiscard
+                    : isHandDiscard
                     ? '🗑️ DESCARTAR AL TRASH'
                     : 'ROBAR A MANO';
                 const bottomZoneLabel =
                   choice.remainingDestination === 'TRASH'
                     ? 'ENVIAR AL TRASH'
-                    : isForcedDiscard
+                    : choice.remainingDestination === 'HAND' || isHandDiscard
                     ? 'CONSERVAR EN TU MANO'
                     : 'FONDO DEL MAZO • Orden aleatorio';
 
@@ -9514,7 +9556,10 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                 {(() => {
                   const minReq = typeof choice.minChoices === 'number' ? choice.minChoices : 1;
                   const mustPickMore = hasEligible && selectedIds.length < minReq;
-                  const isDiscardModal = choice.type === 'FORCED_DISCARD_HAND' || choice.type === 'TAKEMURA_BLOCKER_LOOT';
+                  const isDiscardModal =
+                    choice.type === 'FORCED_DISCARD_HAND' ||
+                    choice.type === 'TAKEMURA_BLOCKER_LOOT' ||
+                    choice.type === 'OVERWATCH_DISCARD_1';
                   return (
                     <button
                       type="button"
@@ -9532,6 +9577,8 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                       {hasEligible && selectedIds.length > 0
                         ? choice.type === 'FORCED_DISCARD_HAND'
                           ? `🗑️ DESCARTAR (${selectedIds.length})`
+                          : choice.type === 'OVERWATCH_DISCARD_1'
+                          ? `🎯 DESCARTAR Y APUNTAR`
                           : choice.type === 'TAKEMURA_BLOCKER_LOOT'
                           ? `🗑️ DESCARTAR Y ROBAR 1`
                           : `${choice.destination === 'FIELD' ? 'DESPLEGAR AL CAMPO' : 'AÑADIR A LA MANO'} (${selectedIds.length})`
