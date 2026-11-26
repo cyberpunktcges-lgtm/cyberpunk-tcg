@@ -119,7 +119,7 @@ import {
   executeBotReaction,
   resolvePendingAttackAndContinueBot
 } from '../utils/botAi.js';
-import { getCardRulesText, executeUnitAttackTrigger, executeLegendAbility, executeProgramEffect, executeUnitPlayTrigger, getNumericCost, executeCardSpentTriggers, executeOnGigsStolenTriggers, executeKerryGigRollTrigger, triggerMeredithStoutOnRivalGigModify, getGigMaxFace, executeBlockerUsedTrigger, executeUnitDefeatedTrigger } from '../utils/cardEffects.js';
+import { getCardRulesText, executeUnitAttackTrigger, executeLegendAbility, executeProgramEffect, executeUnitPlayTrigger, getNumericCost, executeCardSpentTriggers, executeOnGigsStolenTriggers, executeKerryGigRollTrigger, triggerMeredithStoutOnRivalGigModify, getGigMaxFace, executeBlockerUsedTrigger, executeUnitDefeatedTrigger, executeCallLegendTrigger } from '../utils/cardEffects.js';
 import { getCardActivatedAbilities, executeCardActivatedAbility } from '../utils/activatedAbilities.js';
 
 // =========================================================================
@@ -3164,6 +3164,25 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
       } else {
         finishTargetSelection();
       }
+    } else if (sel.actionType === 'CALL_LEGEND_FREE') {
+      if (targetData?.skip) {
+        gameState.actionLog.unshift(`👑 [${sel.sourceCardName || 'Chrome Reverie'}] Decidiste no llamar a ninguna Leyenda gratis.`);
+      } else {
+        const leg = (p.legends || []).find(
+          (l) => l.instanceId === targetData?.legendInstanceId && !l.isFaceUp && !l.isOnField && !l.isRemovedFromGame
+        );
+        if (leg && !p.hasCalledLegendThisTurn) {
+          leg.isFaceUp = true;
+          p.hasCalledLegendThisTurn = true;
+          gameState.actionLog.unshift(
+            `👑 [${sel.sourceCardName || 'Chrome Reverie'}] ¡Condición de Gig mínimo! Llamas GRATIS a tu Leyenda "${leg.name}" boca arriba.`
+          );
+          executeCallLegendTrigger(gameState, 'player', leg);
+          setPreviewCard(leg);
+          setHoveredCard(leg);
+        }
+      }
+      finishTargetSelection();
     }
   };
 
@@ -4163,7 +4182,8 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
     'ADJUST_GIG',
     'PEACE_OFFERING',
     'SWAP_GIGS',
-    'STEAL_RIVAL_GIG'
+    'STEAL_RIVAL_GIG',
+    'CALL_LEGEND_FREE'
   ]);
   const pendingTriggerQueueList =
     activeTargetSel &&
@@ -4219,6 +4239,11 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
     if (chosen.kind === 'UNIT') {
       setStagedTarget(null);
       handleResolveTargetSelection({ unitInstanceId: chosen.unitInstanceId, ownerKey: chosen.ownerKey });
+      return;
+    }
+    if (chosen.kind === 'LEGEND') {
+      setStagedTarget(null);
+      handleResolveTargetSelection({ legendInstanceId: chosen.legendInstanceId });
       return;
     }
     if (chosen.kind === 'GIG') {
@@ -6919,6 +6944,20 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                               toggleManualPaymentSource('legend', leg.instanceId);
                               return;
                             }
+                            if (
+                              isInlineBoardTargeting &&
+                              activeTargetSel?.actionType === 'CALL_LEGEND_FREE' &&
+                              !leg.isFaceUp &&
+                              !leg.isOnField &&
+                              !leg.isRemovedFromGame
+                            ) {
+                              if (stagedTarget?.kind === 'LEGEND' && stagedTarget.legendInstanceId === leg.instanceId) {
+                                confirmInlineStagedTarget({ kind: 'LEGEND', legendInstanceId: leg.instanceId });
+                              } else {
+                                setStagedTarget({ kind: 'LEGEND', legendInstanceId: leg.instanceId });
+                              }
+                              return;
+                            }
                             if (pendingGearEquip && leg.isFaceUp && !leg.isOnField && !leg.isRemovedFromGame) {
                               if (pendingGearEquip.stagedTargetId === leg.instanceId) {
                                 const { cardInstanceId } = pendingGearEquip;
@@ -6953,6 +6992,10 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                               ? (pendingManualPayment.selectedSources || []).some((s) => s.kind === 'legend' && s.instanceId === leg.instanceId)
                                 ? 'border-2 border-[#FCEE0A] ring-2 ring-[#FCEE0A] shadow-[0_0_24px_rgba(252,238,10,0.9)] -translate-y-1.5 rotate-[10deg] z-30'
                                 : 'border-2 border-[#0dfceb] shadow-[0_0_20px_rgba(13,252,235,0.85)] hover:border-white hover:-translate-y-1 z-20'
+                              : isInlineBoardTargeting && activeTargetSel?.actionType === 'CALL_LEGEND_FREE' && !leg.isFaceUp && !leg.isOnField && !leg.isRemovedFromGame
+                              ? stagedTarget?.kind === 'LEGEND' && stagedTarget.legendInstanceId === leg.instanceId
+                                ? 'border-[#FCEE0A] ring-4 ring-[#FCEE0A] shadow-[0_0_28px_rgba(252,238,10,0.95)] scale-110 z-30'
+                                : 'border-[#0dfceb] ring-2 ring-[#0dfceb] shadow-[0_0_24px_rgba(13,252,235,0.9)] animate-pulse z-20'
                               : pendingGearEquip && leg.isFaceUp && !leg.isOnField && !leg.isRemovedFromGame
                               ? pendingGearEquip.stagedTargetId === leg.instanceId
                                 ? 'border-[#FCEE0A] ring-4 ring-[#FCEE0A] shadow-[0_0_28px_rgba(252,238,10,0.95)] scale-110 z-30'
@@ -8850,7 +8893,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
               )}
               <div className="min-w-0">
                 <span className="text-xs font-black uppercase text-[#0dfceb] tracking-wider block truncate">
-                  {activeTargetSel.sourceCardName || activeTargetSel.title}: CHOOSE A TARGET
+                  {activeTargetSel.sourceCardName || activeTargetSel.title}: ELIGE OBJETIVO
                 </span>
                 <p className="text-[11px] text-gray-300 font-sans leading-snug truncate">
                   {activeTargetSel.prompt}
@@ -8868,7 +8911,16 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                   onClick={() => handleResolveTargetSelection({ gigInfo: null, delta: 0 })}
                   className="px-2.5 py-1.5 bg-black border border-gray-700 hover:border-white text-gray-300 hover:text-white text-[10px] font-bold uppercase rounded-sm cursor-pointer"
                 >
-                  SKIP (0)
+                  OMITIR (0)
+                </button>
+              )}
+              {activeTargetSel.actionType === 'CALL_LEGEND_FREE' && activeTargetSel.allowSkip && (
+                <button
+                  type="button"
+                  onClick={() => handleResolveTargetSelection({ skip: true })}
+                  className="px-2.5 py-1.5 bg-black border border-gray-700 hover:border-white text-gray-300 hover:text-white text-[10px] font-bold uppercase rounded-sm cursor-pointer"
+                >
+                  OMITIR
                 </button>
               )}
               <button
@@ -8876,7 +8928,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                 onClick={handleCancelTargetSelection}
                 className="px-2.5 py-1.5 bg-black border border-gray-700 hover:border-[#FF003C] text-gray-300 hover:text-[#FF003C] text-[10px] font-bold uppercase rounded-sm cursor-pointer"
               >
-                CANCEL
+                CANCELAR
               </button>
               <button
                 type="button"
@@ -8888,7 +8940,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                     : 'bg-white/10 text-gray-500 cursor-not-allowed'
                 }`}
               >
-                CONFIRM
+                CONFIRMAR
               </button>
             </div>
           </motion.div>

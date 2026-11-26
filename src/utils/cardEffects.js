@@ -802,33 +802,51 @@ export function executeProgramEffect(state, playerKey, card) {
     if (eligibleUnits.length === 0) {
       state.actionLog.unshift(`🛑 [Chrome Reverie] El rival no tiene unidades en campo para congelar.`);
     } else if (playerKey === 'player') {
-      if (eligibleUnits.length === 1) {
-        eligibleUnits[0].cannotAttackUntilNextTurn = true;
-        state.actionLog.unshift(`🛑 [Chrome Reverie] "${eligibleUnits[0].name}" no puede atacar hasta tu próximo turno.`);
-      } else {
-        state.pendingTargetSelection = {
-          actionType: 'TARGET_UNIT',
-          sourceCardId: 'CP-018',
-          sourceCardName: 'Chrome Reverie',
-          sourceCardImage: card.image,
-          title: '🛑 CHROME REVERIE // BLOQUEAR ATAQUE',
-          prompt: 'Selecciona una unidad rival: no podrá atacar hasta tu próximo turno:',
-          effectType: 'FREEZE',
-          targetScope: 'RIVAL_UNITS'
-        };
-      }
+      queueTargetSelection(state, {
+        actionType: 'TARGET_UNIT',
+        sourceCardId: 'CP-018',
+        sourceCardName: 'Chrome Reverie',
+        sourceCardImage: card.image,
+        title: '🛑 CHROME REVERIE // BLOQUEAR ATAQUE',
+        prompt: 'Selecciona una unidad rival: no podrá atacar hasta tu próximo turno:',
+        effectType: 'FREEZE',
+        targetScope: 'RIVAL_UNITS'
+      });
     } else {
-      const target = [...eligibleUnits].sort((a,b) => b.currentPower - a.currentPower)[0];
+      const target = [...eligibleUnits].sort((a, b) => (b.currentPower || 0) - (a.currentPower || 0))[0];
       target.cannotAttackUntilNextTurn = true;
       state.actionLog.unshift(`🛑 [Chrome Reverie Rival] "${target.name}" no podrá atacar hasta su próximo turno.`);
     }
-    const hasMinGig = (p.gigs || []).some((g) => g.value === 1);
-    if (hasMinGig) {
-      const faceDownLegend = (p.legends || []).find((l) => !l.isFaceUp);
-      if (faceDownLegend) {
+
+    const hasMinGig = (p.gigs || []).some((g) => Number(g.value) === 1);
+    const faceDownLegends = (p.legends || []).filter(
+      (l) => !l.isFaceUp && !l.isOnField && !l.isRemovedFromGame
+    );
+    if (hasMinGig && !p.hasCalledLegendThisTurn && faceDownLegends.length > 0) {
+      if (playerKey === 'player') {
+        queueTargetSelection(state, {
+          actionType: 'CALL_LEGEND_FREE',
+          sourceCardId: 'CP-018',
+          sourceCardName: 'Chrome Reverie',
+          sourceCardImage: card.image,
+          title: '👑 CHROME REVERIE // CALL GRATIS',
+          prompt:
+            '¡Controlas un Gig mínimo (valor 1)! Haz clic en la Leyenda boca abajo que quieras llamar GRATIS (o pulsa OMITIR):',
+          allowSkip: true
+        });
+      } else {
+        const faceDownLegend = faceDownLegends[0];
         faceDownLegend.isFaceUp = true;
-        state.actionLog.unshift(`👑 [Chrome Reverie] ¡Condición de Gig mínimo! Llama gratis a la Leyenda "${faceDownLegend.name}".`);
+        p.hasCalledLegendThisTurn = true;
+        state.actionLog.unshift(
+          `👑 [Chrome Reverie Rival] ¡Condición de Gig mínimo! Llama gratis a su Leyenda "${faceDownLegend.name}".`
+        );
+        executeCallLegendTrigger(state, 'bot', faceDownLegend);
       }
+    } else if (hasMinGig && p.hasCalledLegendThisTurn && faceDownLegends.length > 0) {
+      state.actionLog.unshift(
+        `👑 [Chrome Reverie] Controlas un Gig mínimo, pero ya llamaste a 1 Leyenda este turno (límite: 1/turno).`
+      );
     }
     return { executed: true };
   }
