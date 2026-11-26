@@ -2244,9 +2244,19 @@ export function passTurn(state) {
     delete u.mustAttackNextTurn;
   });
 
-  // Limpiar TODOS los efectos "hasta el final del turno" ("this turn") en ambos campos
+  // Limpiar TODOS los efectos y contadores "hasta el final del turno" ("this turn" / "each turn") en ambos jugadores
   [state.player, state.bot].forEach((side) => {
-    (side?.field || []).forEach((u) => {
+    if (!side) return;
+    side.hasCalledLegendThisTurn = false;
+    side.hasSoldThisTurn = false;
+    side.programsPlayedThisTurn = 0;
+    side.floatingEddies = 0;
+    delete side.altCunninghamProgramDiscount;
+    delete side.chromeFangProtectionActive;
+    delete side.westbrookProtectionActive;
+    delete side.usedViktorCyberwareDiscountThisTurn;
+    delete side.usedJackiePourOneOutThisTurn;
+    (side.field || []).forEach((u) => {
       // Restaurar fuerza base + bonos de Gear (elimina +X / -X power "this turn" sin deriva)
       const basePower =
         typeof u.parsedPower === 'number' && !Number.isNaN(u.parsedPower)
@@ -2260,6 +2270,8 @@ export function passTurn(state) {
       delete u.tempPowerMod;
       delete u.cannotBeDefeatedThisTurn;
       delete u.hasReadiedThisTurn;
+      delete u.stolenReduction;
+      delete u.canAttackReadyUnits;
       if (u.hasTemporaryAdrenalineThisTurn) {
         delete u.hasTemporaryAdrenalineThisTurn;
         delete u.hasAdrenaline;
