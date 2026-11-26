@@ -134,8 +134,8 @@ function drawCards(player, count, state, sourceName) {
 function discardCards(player, count, state, sourceName, sourceCardImage = null) {
   if (!player.hand || player.hand.length === 0 || count <= 0) return [];
   const actualCount = Math.min(count, player.hand.length);
-  if (state && player === state.player && actualCount < player.hand.length && !state.pendingCardChoice) {
-    state.pendingCardChoice = {
+  if (state && player === state.player && actualCount > 0) {
+    queueCardChoice(state, {
       type: 'FORCED_DISCARD_HAND',
       playerKey: 'player',
       sourceCardName: sourceName || 'Descarte',
@@ -148,7 +148,7 @@ function discardCards(player, count, state, sourceName, sourceCardImage = null) 
       minChoices: actualCount,
       selectedIds: [],
       filterDescription: `Elige exactamente ${actualCount} carta(s) de tu mano para descartar`
-    };
+    });
     state.actionLog.unshift(
       `🗑️ [${sourceName}] ${player.name} debe elegir ${actualCount} carta(s) de su mano para descartar.`
     );
@@ -198,6 +198,22 @@ export function queueTargetSelection(state, selection) {
       state.pendingTargetSelectionQueue = [];
     }
     state.pendingTargetSelectionQueue.push(selection);
+  }
+}
+
+/**
+ * Encola una elección interactiva de cartas (ej: Augmented Negotiators descarte obligatorio,
+ * River Ward, The Relic, Screw, Takemura) para que dos triggers en el mismo combate nunca se pisen.
+ */
+export function queueCardChoice(state, choice) {
+  if (!state || !choice) return;
+  if (!state.pendingCardChoice) {
+    state.pendingCardChoice = choice;
+  } else {
+    if (!Array.isArray(state.pendingCardChoiceQueue)) {
+      state.pendingCardChoiceQueue = [];
+    }
+    state.pendingCardChoiceQueue.push(choice);
   }
 }
 
@@ -3168,7 +3184,7 @@ export function executeUnitDefeatedTrigger(state, ownerKey, defeatedUnit) {
       (c) => (c.officialType === 'UNIT' || c.type?.includes('UNIT')) && c.instanceId !== defeatedUnit.instanceId
     );
     if (ownerKey === 'player') {
-      state.pendingCardChoice = {
+      queueCardChoice(state, {
         type: 'CHOOSE_FROM_TRASH',
         sourceZone: 'TRASH',
         sourceCardId: 'CP-118',
@@ -3184,7 +3200,7 @@ export function executeUnitDefeatedTrigger(state, ownerKey, defeatedUnit) {
         minChoices: eligibleUnits.length > 0 ? 1 : 0,
         filterDescription: 'Solo Unidades de tu Basura (distintas de Screw)',
         destination: 'HAND'
-      };
+      });
     } else {
       if (eligibleUnits.length > 0) {
         const [recovered] = eligibleUnits;
@@ -3240,7 +3256,7 @@ export function executeUnitDefeatedTrigger(state, ownerKey, defeatedUnit) {
 
     if (ownerKey === 'player') {
       if (eligibleUnits.length > 0) {
-        state.pendingCardChoice = {
+        queueCardChoice(state, {
           type: 'CHOOSE_FROM_TRASH',
           sourceZone: 'TRASH',
           sourceCardId: 'CP-128',
@@ -3255,7 +3271,7 @@ export function executeUnitDefeatedTrigger(state, ownerKey, defeatedUnit) {
           filterDescription: 'Solo Unidades en tu Basura con coste ≤ 9 €$',
           destination: 'FIELD',
           triggerPlayEffect: true
-        };
+        });
       }
       state.actionLog.unshift(
         `🧬 [The Relic // Experimental Biochip] "${defeatedUnit.name}" va al fondo del mazo${
@@ -3298,7 +3314,7 @@ export function executeUnitDefeatedTrigger(state, ownerKey, defeatedUnit) {
     if (riverWard) {
       const top2 = (p.deck || []).splice(0, Math.min(2, p.deck?.length || 0));
       if (ownerKey === 'player') {
-        state.pendingCardChoice = {
+        queueCardChoice(state, {
           type: 'SEARCH_AND_CHOOSE',
           sourceZone: 'DECK',
           sourceCardId: 'CP-104',
@@ -3315,7 +3331,7 @@ export function executeUnitDefeatedTrigger(state, ownerKey, defeatedUnit) {
           minChoices: top2.length > 0 ? 1 : 0,
           destination: 'HAND',
           remainingDestination: 'TRASH'
-        };
+        });
       } else {
         const [toHand, toTrash] = top2;
         if (toHand) p.hand.push(toHand);
@@ -3694,10 +3710,15 @@ export function executeBlockerUsedTrigger(state, defenderKey, blockerUnit) {
   const blockerId = resolveCardId(blockerUnit);
 
   // CP-012 Augmented Negotiators: "When this Unit uses BLOCKER, a Rival discards 1."
-  if (blockerId === 'CP-012') {
+  const isAugmentedNegotiators =
+    blockerId === 'CP-012' ||
+    String(blockerUnit.slug || '').toLowerCase().includes('augmented-negotiators') ||
+    String(blockerUnit.name || '').toLowerCase().includes('augmented negotiators');
+
+  if (isAugmentedNegotiators) {
     if (opp.hand && opp.hand.length > 0) {
       if (oppKey === 'player') {
-        state.pendingCardChoice = {
+        queueCardChoice(state, {
           type: 'FORCED_DISCARD_HAND',
           playerKey: 'player',
           sourceCardId: 'CP-012',
@@ -3711,7 +3732,7 @@ export function executeBlockerUsedTrigger(state, defenderKey, blockerUnit) {
           minChoices: 1,
           selectedIds: [],
           filterDescription: 'Elige 1 carta de tu mano para descartar'
-        };
+        });
         state.actionLog.unshift(
           `🛡️ [Augmented Negotiators Rival] ¡Al bloquear! Debes elegir 1 carta de tu mano para descartar.`
         );
@@ -3767,7 +3788,7 @@ export function executeBlockerUsedTrigger(state, defenderKey, blockerUnit) {
   );
   if (takemura && (def.hand || []).length > 0 && (def.deck || []).length > 0) {
     if (defenderKey === 'player') {
-      state.pendingCardChoice = {
+      queueCardChoice(state, {
         type: 'TAKEMURA_BLOCKER_LOOT',
         playerKey: 'player',
         sourceCardId: 'CP-042',
@@ -3781,7 +3802,7 @@ export function executeBlockerUsedTrigger(state, defenderKey, blockerUnit) {
         minChoices: 0,
         selectedIds: [],
         filterDescription: 'Elige 1 carta de tu mano para descartar y robar 1 (opcional)'
-      };
+      });
     } else {
       // Bot AI: descarta 1 carta de mano y roba 1
       const [disc] = def.hand.splice(0, 1);

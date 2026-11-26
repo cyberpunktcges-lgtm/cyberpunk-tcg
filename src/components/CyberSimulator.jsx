@@ -1976,10 +1976,17 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
     });
   };
 
-  // Resolver la elección interactiva de carta (ej: Sketchy Ripper, Viktor Vektor, Three Mouths, All Is Lost, Screw, etc.)
+  // Resolver la elección interactiva de carta (ej: Augmented Negotiators, Sketchy Ripper, Viktor Vektor, Three Mouths, Screw, etc.)
   const handleResolveCardChoice = (selectedCardIds = []) => {
     if (!gameState?.pendingCardChoice) return;
     const choice = gameState.pendingCardChoice;
+    const clearOrAdvanceCardChoice = () => {
+      if (Array.isArray(gameState.pendingCardChoiceQueue) && gameState.pendingCardChoiceQueue.length > 0) {
+        gameState.pendingCardChoice = gameState.pendingCardChoiceQueue.shift();
+      } else {
+        delete gameState.pendingCardChoice;
+      }
+    };
 
     if (choice.type === 'FORCED_DISCARD_HAND') {
       const p = gameState[choice.playerKey || 'player'];
@@ -1993,7 +2000,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
           discardedNames.push(disc.name);
         }
       }
-      delete gameState.pendingCardChoice;
+      clearOrAdvanceCardChoice();
       if (discardedNames.length > 0) {
         gameState.actionLog.unshift(
           `🗑️ [${choice.sourceCardName || 'Descarte'}] Has descartado de tu mano: ${discardedNames.join(', ')}.`
@@ -2012,7 +2019,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
     if (choice.type === 'MEREDITH_TRASH_TO_HAND') {
       const p = gameState[choice.playerKey || 'player'];
       const selected = (choice.cards || []).find((c) => selectedCardIds.includes(c.instanceId));
-      delete gameState.pendingCardChoice;
+      clearOrAdvanceCardChoice();
       if (selected) {
         const tIdx = (p.trash || []).findIndex((c) => c.instanceId === selected.instanceId);
         if (tIdx !== -1) p.trash.splice(tIdx, 1);
@@ -2032,7 +2039,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
     if (choice.type === 'ALT_CUNNINGHAM_PLAY_TRASH_PROGRAM') {
       const p = gameState[choice.playerKey || 'player'];
       const selected = (choice.cards || []).find((c) => selectedCardIds.includes(c.instanceId));
-      delete gameState.pendingCardChoice;
+      clearOrAdvanceCardChoice();
       if (selected) {
         const finalCost = getEffectiveCardCost(selected, p, gameState);
         const paid = payEddieCostWithAutoTap(p, finalCost, null);
@@ -2083,7 +2090,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
           `🍸 [Pepe Najarro] ¡ATTACK! Has enderezado ${readiedNames.length} Leyenda(s) MERC: ${readiedNames.join(', ')}.`
         );
       }
-      delete gameState.pendingCardChoice;
+      clearOrAdvanceCardChoice();
       const pendingAttack = gameState.pendingAttackContinuation;
       delete gameState.pendingAttackContinuation;
       if (pendingAttack) {
@@ -2097,7 +2104,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
     if (choice.type === 'TAKEMURA_BLOCKER_LOOT') {
       const p = gameState[choice.playerKey || 'player'];
       const selected = (choice.cards || []).find((c) => selectedCardIds.includes(c.instanceId));
-      delete gameState.pendingCardChoice;
+      clearOrAdvanceCardChoice();
       if (selected) {
         const hIdx = (p.hand || []).findIndex((c) => c.instanceId === selected.instanceId);
         if (hIdx !== -1) {
@@ -2122,7 +2129,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
     if (choice.type === 'LIZZY_WIZZY_PLAY_FREE_PROGRAM') {
       const p = gameState[choice.playerKey || 'player'];
       const selected = (choice.cards || []).find((c) => selectedCardIds.includes(c.instanceId));
-      delete gameState.pendingCardChoice;
+      clearOrAdvanceCardChoice();
       if (selected) {
         if (selected._lizzyZone === 'HAND') {
           const hIdx = (p.hand || []).findIndex((c) => c.instanceId === selected.instanceId);
@@ -2153,7 +2160,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
       const p = gameState[choice.playerKey || 'player'];
       const opp = gameState[(choice.playerKey || 'player') === 'player' ? 'bot' : 'player'];
       const selected = (choice.cards || []).filter((c) => selectedCardIds.includes(c.instanceId));
-      delete gameState.pendingCardChoice;
+      clearOrAdvanceCardChoice();
       if (selected.length === 2) {
         selected.forEach((sc) => {
           const hIdx = (p.hand || []).findIndex((c) => c.instanceId === sc.instanceId);
@@ -2193,7 +2200,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
       const p = gameState[choice.playerKey || 'player'];
       const opp = gameState[(choice.playerKey || 'player') === 'player' ? 'bot' : 'player'];
       const selected = (choice.cards || []).find((c) => selectedCardIds.includes(c.instanceId));
-      delete gameState.pendingCardChoice;
+      clearOrAdvanceCardChoice();
       if (selected) {
         const hIdx = (p.hand || []).findIndex((c) => c.instanceId === selected.instanceId);
         if (hIdx !== -1) {
@@ -2235,7 +2242,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
     if (choice.type === 'VIKTOR_PLAY_TRASH_GEAR') {
       const p = gameState[choice.playerKey || 'player'];
       const selected = (choice.cards || []).find((c) => selectedCardIds.includes(c.instanceId));
-      delete gameState.pendingCardChoice;
+      clearOrAdvanceCardChoice();
       if (selected) {
         const tIdx = (p.trash || []).findIndex((c) => c.instanceId === selected.instanceId);
         if (tIdx !== -1) p.trash.splice(tIdx, 1);
@@ -2271,7 +2278,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
     if (choice.type === 'YORINOBU_PLAY_FREE_UNIT') {
       const p = gameState[choice.playerKey || 'player'];
       const selected = (choice.cards || []).find((c) => selectedCardIds.includes(c.instanceId));
-      delete gameState.pendingCardChoice;
+      clearOrAdvanceCardChoice();
       if (selected) {
         if (selected._yorinobuZone === 'HAND') {
           const hIdx = (p.hand || []).findIndex((c) => c.instanceId === selected.instanceId);
@@ -2318,7 +2325,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
           );
         }
       });
-      delete gameState.pendingCardChoice;
+      clearOrAdvanceCardChoice();
       setGameState({ ...gameState });
       return;
     }
@@ -2380,7 +2387,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
     }
 
     const pendingAttack = gameState.pendingAttackContinuation;
-    delete gameState.pendingCardChoice;
+    clearOrAdvanceCardChoice();
     delete gameState.pendingAttackContinuation;
 
     if (pendingAttack) {
@@ -9601,18 +9608,19 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
 
                 const selectedCardsList = (choice.cards || []).filter((c) => selectedIds.includes(c.instanceId));
                 const remainingCardsList = (choice.cards || []).filter((c) => !selectedIds.includes(c.instanceId));
+                const isForcedDiscard = choice.type === 'FORCED_DISCARD_HAND';
                 const topZoneLabel =
                   choice.destination === 'FIELD'
-                    ? 'DEPLOY'
-                    : choice.type === 'FORCED_DISCARD_HAND'
-                    ? 'TRASH'
-                    : 'DRAW';
+                    ? 'DESPLEGAR AL CAMPO'
+                    : isForcedDiscard
+                    ? '🗑️ DESCARTAR AL TRASH'
+                    : 'ROBAR A MANO';
                 const bottomZoneLabel =
                   choice.remainingDestination === 'TRASH'
-                    ? 'SEND TO TRASH'
-                    : choice.type === 'FORCED_DISCARD_HAND'
-                    ? 'KEEP IN HAND'
-                    : 'BOTTOM OF DECK • Random order';
+                    ? 'ENVIAR AL TRASH'
+                    : isForcedDiscard
+                    ? 'CONSERVAR EN TU MANO'
+                    : 'FONDO DEL MAZO • Orden aleatorio';
 
                 const renderChoiceCard = (card, inTopZone) => {
                   const isEligible = eligibleIds.has(card.instanceId);
@@ -9711,25 +9719,40 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                 <span className="text-[10px] text-gray-400">
                   {selectedIds.length} de {choice.maxChoices} seleccionada(s)
                 </span>
-                <button
-                  type="button"
-                  disabled={hasEligible && selectedIds.length === 0}
-                  onClick={() => handleResolveCardChoice(selectedIds)}
-                  style={{ clipPath: CYBER_BUTTON }}
-                  className={`px-5 py-2 font-mono font-black text-xs uppercase transition-all cursor-pointer ${
-                    hasEligible && selectedIds.length === 0
-                      ? 'bg-gray-800 text-gray-500 cursor-not-allowed border border-gray-700'
-                      : 'bg-[#0dfceb] hover:bg-white text-black shadow-[0_0_20px_rgba(13,252,235,0.7)]'
-                  }`}
-                >
-                  {hasEligible && selectedIds.length > 0
-                    ? `${choice.destination === 'FIELD' ? 'DESPLEGAR AL CAMPO' : 'AÑADIR A LA MANO'} (${selectedIds.length})`
-                    : hasEligible
-                    ? 'SELECCIONA UNA CARTA'
-                    : (choice.cards || []).length === 0
-                    ? 'CONTINUAR (0 CARTAS)'
-                    : 'NO HAY COINCIDENCIAS // CONTINUAR'}
-                </button>
+                {(() => {
+                  const minReq = typeof choice.minChoices === 'number' ? choice.minChoices : 1;
+                  const mustPickMore = hasEligible && selectedIds.length < minReq;
+                  const isDiscardModal = choice.type === 'FORCED_DISCARD_HAND' || choice.type === 'TAKEMURA_BLOCKER_LOOT';
+                  return (
+                    <button
+                      type="button"
+                      disabled={mustPickMore}
+                      onClick={() => handleResolveCardChoice(selectedIds)}
+                      style={{ clipPath: CYBER_BUTTON }}
+                      className={`px-5 py-2 font-mono font-black text-xs uppercase transition-all cursor-pointer ${
+                        mustPickMore
+                          ? 'bg-gray-800 text-gray-500 cursor-not-allowed border border-gray-700'
+                          : isDiscardModal && selectedIds.length > 0
+                          ? 'bg-[#FF003C] hover:bg-white text-white hover:text-black shadow-[0_0_20px_rgba(255,0,60,0.75)]'
+                          : 'bg-[#0dfceb] hover:bg-white text-black shadow-[0_0_20px_rgba(13,252,235,0.7)]'
+                      }`}
+                    >
+                      {hasEligible && selectedIds.length > 0
+                        ? choice.type === 'FORCED_DISCARD_HAND'
+                          ? `🗑️ DESCARTAR (${selectedIds.length})`
+                          : choice.type === 'TAKEMURA_BLOCKER_LOOT'
+                          ? `🗑️ DESCARTAR Y ROBAR 1`
+                          : `${choice.destination === 'FIELD' ? 'DESPLEGAR AL CAMPO' : 'AÑADIR A LA MANO'} (${selectedIds.length})`
+                        : mustPickMore
+                        ? `SELECCIONA ${minReq} CARTA(S)`
+                        : hasEligible && minReq === 0
+                        ? 'OMITIR // CONTINUAR'
+                        : (choice.cards || []).length === 0
+                        ? 'CONTINUAR (0 CARTAS)'
+                        : 'NO HAY COINCIDENCIAS // CONTINUAR'}
+                    </button>
+                  );
+                })()}
               </div>
             </motion.div>
           </div>
