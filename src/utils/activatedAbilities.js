@@ -11,7 +11,8 @@ import {
   payEddieCostWithAutoTap,
   getEffectiveCardCost,
   spendEddies,
-  hasKeyword
+  hasKeyword,
+  getNumericUnitPower
 } from './cyberpunkEngine.js';
 
 import {
@@ -237,7 +238,7 @@ export const ACTIVATED_ABILITIES_CONFIG = {
         const target = [...(p.field || [])].sort((a, b) => (b.gear?.length || 0) - (a.gear?.length || 0))[0];
         const gearCount = target?.gear ? target.gear.length : 0;
         if (target) {
-          target.currentPower = (target.currentPower || target.power || 0) + gearCount;
+          target.currentPower = getNumericUnitPower(target) + gearCount;
           state.actionLog.unshift(
             `💉 [Dum Dum] Paga 1 €$ y gira a Dum Dum: Otorga +${gearCount} de Fuerza este turno a "${target.name}" (${gearCount} Gear(s) equipado(s)). Fuerza actual: ${target.currentPower}.`
           );
@@ -364,7 +365,7 @@ export const ACTIVATED_ABILITIES_CONFIG = {
         const values = (p.gigs || []).map((g) => Number(g.value));
         const hasPair = new Set(values).size < values.length;
         if (hasPair) {
-          target.currentPower = (target.currentPower || target.power || 0) + 1;
+          target.currentPower = getNumericUnitPower(target) + 1;
         }
         state.actionLog.unshift(
           `🛡️ [Goro Takemura] Paga 1 €$ y gira a Takemura: Otorga BLOCKER este turno a "${target.name}"${hasPair ? ' y +1 de Fuerza (por pareja de Gigs)' : ''}.`
@@ -476,7 +477,7 @@ export const ACTIVATED_ABILITIES_CONFIG = {
 
         const isRocker = (target.traits || target.cardType || '').toUpperCase().includes('ROCKER');
         if (isRocker) {
-          target.currentPower = (target.currentPower || target.power || 0) + 2;
+          target.currentPower = getNumericUnitPower(target) + 2;
         }
 
         state.actionLog.unshift(
@@ -884,9 +885,9 @@ export const ACTIVATED_ABILITIES_CONFIG = {
         spendEddies(p, 2);
         card.isSpent = true;
 
-        const debuffAmount = card.currentPower || card.power || 5;
-        const target = [...opp.field].sort((a, b) => (b.currentPower || 0) - (a.currentPower || 0))[0];
-        target.currentPower = Math.max(0, (target.currentPower || target.power || 0) - debuffAmount);
+        const debuffAmount = getNumericUnitPower(card);
+        const target = [...opp.field].sort((a, b) => getNumericUnitPower(b) - getNumericUnitPower(a))[0];
+        target.currentPower = Math.max(0, getNumericUnitPower(target) - debuffAmount);
 
         state.actionLog.unshift(
           `🍸 [Rogue Amendiares] Paga 2 €$ y gira a Rogue: Reduce la Fuerza de "${target.name}" en -${debuffAmount} (Fuerza actual: ${target.currentPower}).`

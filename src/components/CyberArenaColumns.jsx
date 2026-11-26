@@ -255,95 +255,109 @@ export function CyberRightGigsRail({
       </div>
 
       {/* 2. CAJA DE GIGS DEL RIVAL */}
-      <div
-        data-arrow-anchor="bot-gigs"
-        className={`flex-1 rounded-lg border p-3 flex flex-col justify-between relative transition-all min-h-[145px] ${
-          canAttackGigs
-            ? 'bg-[#210914]/90 border-[#FF003C] shadow-[0_0_28px_rgba(255,0,60,0.4)]'
-            : 'bg-[#120710]/75 border-[#FF003C]/35'
-        }`}
-      >
-        <div className="flex items-center justify-between text-xs font-black uppercase">
-          <span className="text-gray-400">
-            GIGS <span className="text-white text-sm">{botGigs.length}</span>
-            <span className="text-gray-500">/7</span>
-          </span>
-          <span className="text-[#FCEE0A] text-sm">★ {botStreetCred}</span>
-        </div>
-
-        {/* Botón ATTACK GIGS amarillo eléctrico centrado sobre la caja (EXACTO A CAPTURA 2) */}
-        {canAttackGigs && (
-          <button
-            type="button"
-            onClick={onAttackGigs}
-            className="my-1 w-full py-2 bg-[#FCEE0A] hover:bg-white text-[#070a10] font-black text-xs uppercase tracking-widest cursor-pointer shadow-[0_0_22px_rgba(252,238,10,0.9)] transition-colors rounded-sm"
+      {(() => {
+        const hasEligibleBotGigs = botGigs.some((gig, idx) => Boolean(targetGigInfo?.isBotGigEligible?.(gig, idx)));
+        return (
+          <div
+            data-arrow-anchor="bot-gigs"
+            className={`flex-1 rounded-lg border p-3 flex flex-col justify-between relative transition-all min-h-[145px] ${
+              hasEligibleBotGigs
+                ? 'bg-[#081a24]/92 border-[#0dfceb] shadow-[0_0_28px_rgba(13,252,235,0.45)]'
+                : canAttackGigs
+                ? 'bg-[#210914]/90 border-[#FF003C] shadow-[0_0_28px_rgba(255,0,60,0.4)]'
+                : 'bg-[#120710]/75 border-[#FF003C]/35'
+            }`}
           >
-            ATTACK GIGS {gigsToSteal > 0 ? `(${gigsToSteal})` : ''}
-          </button>
-        )}
+            <div className="flex items-center justify-between text-xs font-black uppercase gap-1">
+              <span className="text-gray-400">
+                GIGS <span className="text-white text-sm">{botGigs.length}</span>
+                <span className="text-gray-500">/7</span>
+              </span>
+              {hasEligibleBotGigs && (
+                <span className="px-1.5 py-0.5 bg-[#0dfceb]/20 border border-[#0dfceb] text-[#0dfceb] text-[8px] font-black tracking-wider rounded-sm animate-pulse">
+                  🎯 ELIGE GIG
+                </span>
+              )}
+              <span className="text-[#FCEE0A] text-sm">★ {botStreetCred}</span>
+            </div>
 
-        <div className="flex flex-wrap items-center justify-center gap-2 my-auto py-1">
-          {botGigs.length === 0 ? (
-            <span className="text-[10px] text-gray-600 italic">—</span>
-          ) : (
-            botGigs.map((gig, idx) => {
-              const isTargetEligible = Boolean(targetGigInfo?.isBotGigEligible?.(gig, idx));
-              const isTargetSelected =
-                targetGigInfo?.selectedGig?.owner === 'bot' &&
-                targetGigInfo?.selectedGig?.gigIndex === idx;
-              const isInteractive = Boolean(canAttackGigs || isTargetEligible);
-              return (
-                <button
-                  key={`bg-${idx}`}
-                  type="button"
-                  onClick={() => {
-                    if (isTargetEligible && targetGigInfo?.onSelectGig) {
-                      targetGigInfo.onSelectGig('bot', gig, idx);
-                    } else if (canAttackGigs && onStealSpecificDie) {
-                      onStealSpecificDie(gig.die.toLowerCase());
-                    }
-                  }}
-                  className={
-                    isInteractive
-                      ? `cursor-pointer hover:scale-115 transition-transform rounded p-0.5 ${
+            {/* Botón ATTACK GIGS amarillo eléctrico centrado sobre la caja (EXACTO A CAPTURA 2) */}
+            {canAttackGigs && !hasEligibleBotGigs && (
+              <button
+                type="button"
+                onClick={onAttackGigs}
+                className="my-1 w-full py-2 bg-[#FCEE0A] hover:bg-white text-[#070a10] font-black text-xs uppercase tracking-widest cursor-pointer shadow-[0_0_22px_rgba(252,238,10,0.9)] transition-colors rounded-sm"
+              >
+                ATTACK GIGS {gigsToSteal > 0 ? `(${gigsToSteal})` : ''}
+              </button>
+            )}
+
+            <div className="flex flex-wrap items-center justify-center gap-2 my-auto py-1">
+              {botGigs.length === 0 ? (
+                <span className="text-[10px] text-gray-600 italic">—</span>
+              ) : (
+                botGigs.map((gig, idx) => {
+                  const isTargetEligible = Boolean(targetGigInfo?.isBotGigEligible?.(gig, idx));
+                  const isTargetSelected =
+                    targetGigInfo?.selectedGig?.owner === 'bot' &&
+                    targetGigInfo?.selectedGig?.gigIndex === idx;
+                  const isInteractive = Boolean(canAttackGigs || isTargetEligible);
+                  return (
+                    <button
+                      key={`bg-${idx}`}
+                      data-arrow-anchor={`bot-gig-${idx}`}
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (isTargetEligible && targetGigInfo?.onSelectGig) {
+                          targetGigInfo.onSelectGig('bot', gig, idx);
+                        } else if (canAttackGigs && onStealSpecificDie) {
+                          onStealSpecificDie(gig.die.toLowerCase());
+                        }
+                      }}
+                      className={
+                        isInteractive
+                          ? `cursor-pointer hover:scale-115 transition-transform rounded p-0.5 ${
+                              isTargetSelected
+                                ? 'ring-2 ring-[#FCEE0A] bg-[#FCEE0A]/15 scale-110'
+                                : isTargetEligible
+                                ? 'ring-2 ring-[#0dfceb] bg-[#0dfceb]/15 animate-pulse'
+                                : ''
+                            }`
+                          : 'cursor-default'
+                      }
+                      title={
+                        isTargetEligible
+                          ? `Clic para seleccionar Gig Rival ${gig.die.toUpperCase()} (Valor ${gig.value})`
+                          : `Gig Rival ${gig.die.toUpperCase()} (Valor ${gig.value})`
+                      }
+                    >
+                      <CyberDieShape
+                        dieType={gig.die}
+                        value={gig.value}
+                        size={40}
+                        color={
                           isTargetSelected
-                            ? 'ring-2 ring-[#FCEE0A] bg-[#FCEE0A]/15 scale-110'
+                            ? '#FCEE0A'
                             : isTargetEligible
-                            ? 'ring-2 ring-[#0dfceb] bg-[#0dfceb]/10 animate-pulse'
-                            : ''
-                        }`
-                      : 'cursor-default'
-                  }
-                  title={
-                    isTargetEligible
-                      ? `Clic para seleccionar Gig Rival ${gig.die.toUpperCase()} (Valor ${gig.value})`
-                      : `Gig Rival ${gig.die.toUpperCase()} (Valor ${gig.value})`
-                  }
-                >
-                  <CyberDieShape
-                    dieType={gig.die}
-                    value={gig.value}
-                    size={40}
-                    color={
-                      isTargetSelected
-                        ? '#FCEE0A'
-                        : isTargetEligible
-                        ? '#0dfceb'
-                        : gig.stolenFrom
-                        ? '#0dfceb'
-                        : '#FF003C'
-                    }
-                    selected={canAttackGigs || isTargetEligible || isTargetSelected}
-                    showProgressBar
-                  />
-                </button>
-              );
-            })
-          )}
-        </div>
+                            ? '#0dfceb'
+                            : gig.stolenFrom
+                            ? '#0dfceb'
+                            : '#FF003C'
+                        }
+                        selected={canAttackGigs || isTargetEligible || isTargetSelected}
+                        showProgressBar
+                      />
+                    </button>
+                  );
+                })
+              )}
+            </div>
 
-        {renderProgressSegments(botGigs.length, '#FF003C')}
-      </div>
+            {renderProgressSegments(botGigs.length, '#FF003C')}
+          </div>
+        );
+      })()}
 
       {/* 3. BOTÓN PROTAGONISTA CENTRAL: FINALIZAR TURNO / PASS / RESOLVING... */}
       <button
@@ -370,79 +384,93 @@ export function CyberRightGigsRail({
       </button>
 
       {/* 4. TU CAJA DE GIGS */}
-      <div
-        data-arrow-anchor="player-gigs"
-        className={`flex-1 rounded-lg border p-3 flex flex-col justify-between relative transition-all min-h-[145px] ${
-          hasPendingReaction && !hasBlockerAssigned
-            ? 'bg-[#210914]/85 border-[#FF003C] shadow-[0_0_28px_rgba(255,0,60,0.55)]'
-            : 'bg-[#061218]/75 border-[#0dfceb]/35'
-        }`}
-      >
-        <div className="flex items-center justify-between text-xs font-black uppercase">
-          <span className="text-gray-400">
-            GIGS <span className="text-white text-sm">{playerGigs.length}</span>
-            <span className="text-gray-500">/7</span>
-          </span>
-          <span className="text-[#FCEE0A] text-sm">★ {playerStreetCred}</span>
-        </div>
+      {(() => {
+        const hasEligiblePlayerGigs = playerGigs.some((gig, idx) => Boolean(targetGigInfo?.isPlayerGigEligible?.(gig, idx)));
+        return (
+          <div
+            data-arrow-anchor="player-gigs"
+            className={`flex-1 rounded-lg border p-3 flex flex-col justify-between relative transition-all min-h-[145px] ${
+              hasEligiblePlayerGigs
+                ? 'bg-[#081a24]/92 border-[#0dfceb] shadow-[0_0_28px_rgba(13,252,235,0.45)]'
+                : hasPendingReaction && !hasBlockerAssigned
+                ? 'bg-[#210914]/85 border-[#FF003C] shadow-[0_0_28px_rgba(255,0,60,0.55)]'
+                : 'bg-[#061218]/75 border-[#0dfceb]/35'
+            }`}
+          >
+            <div className="flex items-center justify-between text-xs font-black uppercase gap-1">
+              <span className="text-gray-400">
+                GIGS <span className="text-white text-sm">{playerGigs.length}</span>
+                <span className="text-gray-500">/7</span>
+              </span>
+              {hasEligiblePlayerGigs && (
+                <span className="px-1.5 py-0.5 bg-[#0dfceb]/20 border border-[#0dfceb] text-[#0dfceb] text-[8px] font-black tracking-wider rounded-sm animate-pulse">
+                  🎯 ELIGE GIG
+                </span>
+              )}
+              <span className="text-[#FCEE0A] text-sm">★ {playerStreetCred}</span>
+            </div>
 
-        <div className="flex flex-wrap items-center justify-center gap-2 my-auto py-1">
-          {playerGigs.length === 0 ? (
-            <span className="text-[10px] text-gray-600 italic">—</span>
-          ) : (
-            playerGigs.map((gig, idx) => {
-              const isTargetEligible = Boolean(targetGigInfo?.isPlayerGigEligible?.(gig, idx));
-              const isTargetSelected =
-                targetGigInfo?.selectedGig?.owner === 'player' &&
-                targetGigInfo?.selectedGig?.gigIndex === idx;
-              return (
-                <button
-                  key={`pg-${idx}`}
-                  type="button"
-                  onClick={() => {
-                    if (isTargetEligible && targetGigInfo?.onSelectGig) {
-                      targetGigInfo.onSelectGig('player', gig, idx);
-                    }
-                  }}
-                  className={
-                    isTargetEligible
-                      ? `cursor-pointer hover:scale-115 transition-transform rounded p-0.5 ${
+            <div className="flex flex-wrap items-center justify-center gap-2 my-auto py-1">
+              {playerGigs.length === 0 ? (
+                <span className="text-[10px] text-gray-600 italic">—</span>
+              ) : (
+                playerGigs.map((gig, idx) => {
+                  const isTargetEligible = Boolean(targetGigInfo?.isPlayerGigEligible?.(gig, idx));
+                  const isTargetSelected =
+                    targetGigInfo?.selectedGig?.owner === 'player' &&
+                    targetGigInfo?.selectedGig?.gigIndex === idx;
+                  return (
+                    <button
+                      key={`pg-${idx}`}
+                      data-arrow-anchor={`player-gig-${idx}`}
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (isTargetEligible && targetGigInfo?.onSelectGig) {
+                          targetGigInfo.onSelectGig('player', gig, idx);
+                        }
+                      }}
+                      className={
+                        isTargetEligible
+                          ? `cursor-pointer hover:scale-115 transition-transform rounded p-0.5 ${
+                              isTargetSelected
+                                ? 'ring-2 ring-[#FCEE0A] bg-[#FCEE0A]/15 scale-110'
+                                : 'ring-2 ring-[#0dfceb] bg-[#0dfceb]/15 animate-pulse'
+                            }`
+                          : 'cursor-default'
+                      }
+                      title={
+                        isTargetEligible
+                          ? `Clic para seleccionar tu Gig ${gig.die.toUpperCase()} (Valor ${gig.value})`
+                          : `Tu Gig ${gig.die.toUpperCase()} (Valor ${gig.value})`
+                      }
+                    >
+                      <CyberDieShape
+                        dieType={gig.die}
+                        value={gig.value}
+                        size={40}
+                        color={
                           isTargetSelected
-                            ? 'ring-2 ring-[#FCEE0A] bg-[#FCEE0A]/15 scale-110'
-                            : 'ring-2 ring-[#0dfceb] bg-[#0dfceb]/10 animate-pulse'
-                        }`
-                      : 'cursor-default'
-                  }
-                  title={
-                    isTargetEligible
-                      ? `Clic para seleccionar tu Gig ${gig.die.toUpperCase()} (Valor ${gig.value})`
-                      : `Tu Gig ${gig.die.toUpperCase()} (Valor ${gig.value})`
-                  }
-                >
-                  <CyberDieShape
-                    dieType={gig.die}
-                    value={gig.value}
-                    size={40}
-                    color={
-                      isTargetSelected
-                        ? '#FCEE0A'
-                        : isTargetEligible
-                        ? '#0dfceb'
-                        : gig.stolenFrom
-                        ? '#FF003C'
-                        : '#0dfceb'
-                    }
-                    selected={isTargetEligible || isTargetSelected}
-                    showProgressBar
-                  />
-                </button>
-              );
-            })
-          )}
-        </div>
+                            ? '#FCEE0A'
+                            : isTargetEligible
+                            ? '#0dfceb'
+                            : gig.stolenFrom
+                            ? '#FF003C'
+                            : '#0dfceb'
+                        }
+                        selected={isTargetEligible || isTargetSelected}
+                        showProgressBar
+                      />
+                    </button>
+                  );
+                })
+              )}
+            </div>
 
-        {renderProgressSegments(playerGigs.length, '#0dfceb')}
-      </div>
+            {renderProgressSegments(playerGigs.length, '#0dfceb')}
+          </div>
+        );
+      })()}
 
       {/* 5. TU FIXER (CLICABLE PARA TIRAR DADO AL INICIO DEL TURNO) */}
       <div

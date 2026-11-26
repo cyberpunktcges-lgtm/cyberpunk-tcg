@@ -100,6 +100,7 @@ import {
   rollDie,
   rollSecureD20,
   parseCardPower,
+  getNumericUnitPower,
   parseCardCost,
   getUnitPowerBreakdown,
   isCardVendible,
@@ -2998,17 +2999,17 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
           sendDefeatedUnitToGraveyardOrExile(targetOwner, dead, gameState);
           gameState.actionLog.unshift(`💥 [${sel.sourceCardName}] Destruyó a la unidad "${dead.name}".`);
         } else if (sel.effectType === 'BUFF') {
-          unit.currentPower = (unit.currentPower || unit.power || 0) + (sel.amount || 2);
+          unit.currentPower = getNumericUnitPower(unit) + (sel.amount || 2);
           gameState.actionLog.unshift(`⚡ [${sel.sourceCardName}] Otorgó +${sel.amount || 2} de poder a "${unit.name}" (Poder actual: ${unit.currentPower}).`);
         } else if (sel.effectType === 'BUFF_PER_GEAR') {
           const gCount = unit.gear ? unit.gear.length : 0;
           const mult = sel.multiplier || 1;
           const bonus = gCount * mult;
-          unit.currentPower = (unit.currentPower || unit.power || 0) + bonus;
+          unit.currentPower = getNumericUnitPower(unit) + bonus;
           gameState.actionLog.unshift(`💉 [${sel.sourceCardName}] Otorgó +${bonus} de Fuerza este turno a "${unit.name}" (${gCount} Gear(s) × ${mult}). Fuerza actual: ${unit.currentPower}.`);
         } else if (sel.effectType === 'GUNPOINT_BUFF') {
           const amt = sel.amount || 3;
-          unit.currentPower = (unit.currentPower || unit.power || 0) + amt;
+          unit.currentPower = getNumericUnitPower(unit) + amt;
           unit.canAttackReadyUnits = true;
           gameState.actionLog.unshift(`🔫 [${sel.sourceCardName}] "${unit.name}" gana +${amt} de poder (actual: ${unit.currentPower}) y puede atacar a unidades Ready este turno.`);
         } else if (sel.effectType === 'REDUCE_STEAL') {
@@ -3025,7 +3026,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
           gameState.actionLog.unshift(`📡 [${sel.sourceCardName}] "${unit.name}" roba ${red} Gig menos este turno.${extraMsg}`);
         } else if (sel.effectType === 'DEBUFF') {
           const amt = sel.amount || 2;
-          unit.currentPower = Math.max(0, (unit.currentPower || unit.power || 0) - amt);
+          unit.currentPower = Math.max(0, getNumericUnitPower(unit) - amt);
           gameState.actionLog.unshift(`🔻 [${sel.sourceCardName}] Redujo el poder de "${unit.name}" en ${amt} (Poder actual: ${unit.currentPower}).`);
           if (sel.chainBottomDeckZero && (opp.field || []).some((u) => (u.currentPower ?? u.power ?? 0) === 0)) {
             if (!Array.isArray(gameState.pendingTargetSelectionQueue)) gameState.pendingTargetSelectionQueue = [];
@@ -3060,7 +3061,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
           const values = (p.gigs || []).map((g) => Number(g.value));
           const hasPair = new Set(values).size < values.length;
           if (hasPair) {
-            unit.currentPower = (unit.currentPower || unit.power || 0) + 1;
+            unit.currentPower = getNumericUnitPower(unit) + 1;
           }
           gameState.actionLog.unshift(
             `🛡️ [${sel.sourceCardName}] Otorgó BLOCKER este turno a "${unit.name}"${hasPair ? ' y +1 de Fuerza (pareja de Gigs)' : ''}.`
@@ -4209,7 +4210,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
     if (!activeTargetSel || activeTargetSel.actionType !== 'TARGET_UNIT') return false;
     if (ownerKey === 'player' && activeTargetSel.targetScope !== 'FRIENDLY_UNITS' && activeTargetSel.targetScope !== 'ALL') return false;
     if (ownerKey === 'bot' && activeTargetSel.targetScope !== 'RIVAL_UNITS' && activeTargetSel.targetScope !== 'ALL') return false;
-    const uPower = unit.currentPower ?? unit.power ?? 0;
+    const uPower = getNumericUnitPower(unit);
     if (activeTargetSel.maxPower !== undefined && uPower > activeTargetSel.maxPower) return false;
     if (activeTargetSel.maxCost !== undefined && getNumericCost(unit) > activeTargetSel.maxCost) return false;
     if (activeTargetSel.onlyUnequipped && unit.gear && unit.gear.length > 0) return false;
@@ -5560,35 +5561,67 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                       Sin Gigs en juego aún
                     </span>
                   ) : (
-                    bot.gigs.map((gig, idx) => (
-                      <div
-                        key={idx}
-                        onClick={() => {
-                          if (canAttackGigs) {
-                            handleStealSpecificDie(gig.die.toLowerCase());
+                    bot.gigs.map((gig, idx) => {
+                      const isMobGigEligible = isInlineBoardTargeting && isGigEligibleForInlineTarget('bot', gig, idx);
+                      const isMobGigSelected = stagedTarget?.kind === 'GIG' && stagedTarget.owner === 'bot' && stagedTarget.gigIndex === idx;
+                      return (
+                        <div
+                          key={idx}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (isMobGigEligible) {
+                              const nextSpec = {
+                                kind: 'GIG',
+                                owner: 'bot',
+                                die: String(gig.die).toLowerCase(),
+                                value: gig.value,
+                                gigIndex: idx,
+                                maxFace: getGigMaxFace(gig)
+                              };
+                              const act = activeTargetSel?.actionType;
+                              const directPicker =
+                                act === 'ADJUST_GIG' &&
+                                ((activeTargetSel.maxDelta || 1) > 1 ||
+                                  (activeTargetSel.canIncrease && activeTargetSel.canDecrease) ||
+                                  Boolean(activeTargetSel.allowZero));
+                              if (directPicker || isMobGigSelected) {
+                                setStagedTarget(nextSpec);
+                                confirmInlineStagedTarget(nextSpec);
+                              } else {
+                                setStagedTarget(nextSpec);
+                              }
+                            } else if (canAttackGigs) {
+                              handleStealSpecificDie(gig.die.toLowerCase());
+                            }
+                          }}
+                          className={`transition-all duration-200 ${
+                            isMobGigSelected
+                              ? 'cursor-pointer scale-115 ring-2 ring-[#FCEE0A] bg-[#FCEE0A]/15 rounded p-0.5'
+                              : isMobGigEligible
+                              ? 'cursor-pointer hover:scale-120 ring-2 ring-[#0dfceb] bg-[#0dfceb]/15 animate-pulse rounded p-0.5'
+                              : canAttackGigs
+                              ? 'cursor-pointer hover:scale-120 ring-1 ring-[#FCEE0A]/80 rounded p-0.5'
+                              : ''
+                          }`}
+                          title={
+                            isMobGigEligible
+                              ? `¡Haz clic para seleccionar Gig Rival ${gig.die.toUpperCase()} (Valor: ${gig.value})!`
+                              : canAttackGigs
+                              ? `¡Haz clic para robar este dado ${gig.die.toUpperCase()} (Valor: ${gig.value})!`
+                              : `Dado ${gig.die.toUpperCase()} del Rival (Valor: ${gig.value})`
                           }
-                        }}
-                        className={`transition-all duration-200 ${
-                          canAttackGigs
-                            ? 'cursor-pointer hover:scale-120 ring-1 ring-[#FCEE0A]/80 rounded p-0.5'
-                            : ''
-                        }`}
-                        title={
-                          canAttackGigs
-                            ? `¡Haz clic para robar este dado ${gig.die.toUpperCase()} (Valor: ${gig.value})!`
-                            : `Dado ${gig.die.toUpperCase()} del Rival (Valor: ${gig.value})`
-                        }
-                      >
-                        <CyberDieShape
-                          dieType={gig.die}
-                          value={gig.value}
-                          size={canAttackGigs ? 32 : 28}
-                          color={gig.stolenFrom ? '#0dfceb' : '#FF003C'}
-                          selected={Boolean(canAttackGigs)}
-                          showProgressBar
-                        />
-                      </div>
-                    ))
+                        >
+                          <CyberDieShape
+                            dieType={gig.die}
+                            value={gig.value}
+                            size={canAttackGigs || isMobGigEligible ? 32 : 28}
+                            color={isMobGigSelected ? '#FCEE0A' : isMobGigEligible ? '#0dfceb' : gig.stolenFrom ? '#0dfceb' : '#FF003C'}
+                            selected={Boolean(canAttackGigs || isMobGigEligible || isMobGigSelected)}
+                            showProgressBar
+                          />
+                        </div>
+                      );
+                    })
                   )}
                   <span className="text-xs font-mono font-black text-[#FCEE0A] ml-1.5">
                     ⭐ {botStreetCred}
@@ -6484,16 +6517,20 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                     <div
                       key={d}
                       onClick={() => {
-                        if (canAttackGigs && activeGig) {
+                        const activeIdx = activeGig ? (bot.gigs || []).indexOf(activeGig) : -1;
+                        if (activeGig && isInlineBoardTargeting && isGigEligibleForInlineTarget('bot', activeGig, activeIdx)) {
+                          const nextSpec = {
+                            kind: 'GIG',
+                            owner: 'bot',
+                            die: d,
+                            value: activeGig.value,
+                            gigIndex: activeIdx,
+                            maxFace: getGigMaxFace(activeGig)
+                          };
+                          setStagedTarget(nextSpec);
+                          confirmInlineStagedTarget(nextSpec);
+                        } else if (canAttackGigs && activeGig) {
                           handleStealSpecificDie(d);
-                        } else if (gameState.pendingTargetSelection) {
-                          const sel = gameState.pendingTargetSelection;
-                          const activeIdx = activeGig ? (bot.gigs || []).indexOf(activeGig) : -1;
-                          if (sel.actionType === 'PEACE_OFFERING' && activeGig) {
-                            handleResolveTargetSelection({ owner: 'bot', die: d, value: activeGig.value, gigIndex: activeIdx });
-                          } else if (sel.actionType === 'SWAP_GIGS' && sel.step === 2 && activeGig) {
-                            handleResolveTargetSelection({ owner: 'bot', die: d, value: activeGig.value, gigIndex: activeIdx });
-                          }
                         }
                       }}
                       className={`transition-all duration-150 rounded ${
@@ -7745,7 +7782,17 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                       gigIndex: idx,
                       maxFace: getGigMaxFace(gig)
                     };
-                    if (stagedTarget?.kind === 'GIG' && stagedTarget.owner === owner && stagedTarget.gigIndex === idx) {
+                    const act = activeTargetSel?.actionType;
+                    const opensNumberPickerDirectly =
+                      act === 'ADJUST_GIG' &&
+                      ((activeTargetSel.maxDelta || 1) > 1 ||
+                        (activeTargetSel.canIncrease && activeTargetSel.canDecrease) ||
+                        Boolean(activeTargetSel.allowZero));
+                    if (
+                      opensNumberPickerDirectly ||
+                      (stagedTarget?.kind === 'GIG' && stagedTarget.owner === owner && stagedTarget.gigIndex === idx)
+                    ) {
+                      setStagedTarget(nextSpec);
                       confirmInlineStagedTarget(nextSpec);
                     } else {
                       setStagedTarget(nextSpec);
@@ -8821,6 +8868,18 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
             label: `👑 ${shortSrc}`
           });
         }
+        if (isInlineBoardTargeting && stagedTarget?.kind === 'GIG') {
+          const shortSrc = String(activeTargetSel?.sourceCardName || 'GIG').split('//')[0].trim().slice(0, 18);
+          const gigAnchor = `${stagedTarget.owner}-gig-${stagedTarget.gigIndex}`;
+          activeArrows.push({
+            id: 'player-inline-gig-arrow',
+            fromAnchor: ['player-trash', 'player-field', 'player-pill'],
+            toAnchor: [gigAnchor, stagedTarget.owner === 'bot' ? 'bot-gigs' : 'player-gigs'],
+            color: '#0dfceb',
+            dashed: false,
+            label: `🎲 ${shortSrc}`
+          });
+        }
         if (pendingGearEquip?.stagedTargetId) {
           const shortGear = String(pendingGearEquip.card?.name || 'GEAR').split('//')[0].trim().slice(0, 18);
           activeArrows.push({
@@ -9012,9 +9071,21 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
       <CyberNumberPickerModal
         isOpen={Boolean(pendingGigNumberPick && activeTargetSel)}
         sourceCardName={activeTargetSel?.sourceCardName || activeTargetSel?.title || ""}
-        sourceCardImage={activeTargetSel?.sourceCardImage || ""}
+        sourceCardImage={
+          resolveSourceCardMeta(
+            activeTargetSel?.sourceCardId,
+            activeTargetSel?.sourceCardName || activeTargetSel?.title,
+            activeTargetSel?.sourceCardImage
+          ).image
+        }
         prompt={activeTargetSel?.prompt || ""}
-        gigLabel={pendingGigNumberPick ? String(pendingGigNumberPick.gigInfo.die || "").toUpperCase() : ""}
+        gigLabel={
+          pendingGigNumberPick
+            ? `${String(pendingGigNumberPick.gigInfo.die || '').toUpperCase()} (${
+                pendingGigNumberPick.gigInfo.owner === 'bot' ? 'DEL RIVAL' : 'TUYO'
+              })`
+            : ""
+        }
         currentValue={pendingGigNumberPick?.gigInfo?.value || 1}
         maxFace={pendingGigNumberPick?.maxFace || 6}
         canIncrease={Boolean(activeTargetSel?.canIncrease)}
@@ -10421,7 +10492,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5">
                           {playerUnits.map((u) => {
                             const isEligible =
-                              (sel.maxPower === undefined || (u.currentPower || u.power || 0) <= sel.maxPower) &&
+                              (sel.maxPower === undefined || getNumericUnitPower(u) <= sel.maxPower) &&
                               (sel.maxCost === undefined || getNumericCost(u) <= sel.maxCost) &&
                               (!sel.onlyUnequipped || !u.gear || u.gear.length === 0) &&
                               (!sel.excludeInstanceId || u.instanceId !== sel.excludeInstanceId);
@@ -10474,7 +10545,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5">
                           {botUnits.map((u) => {
                             const isEligible =
-                              (sel.maxPower === undefined || (u.currentPower || u.power || 0) <= sel.maxPower) &&
+                              (sel.maxPower === undefined || getNumericUnitPower(u) <= sel.maxPower) &&
                               (sel.maxCost === undefined || getNumericCost(u) <= sel.maxCost) &&
                               (!sel.onlyUnequipped || !u.gear || u.gear.length === 0) &&
                               (!sel.excludeInstanceId || u.instanceId !== sel.excludeInstanceId);

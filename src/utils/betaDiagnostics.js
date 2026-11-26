@@ -160,7 +160,8 @@ export function buildSimulatorDiagnosticSnapshot(gameState, extraMeta = {}) {
 
   const pendingTarget = gs.pendingTargetSelection
     ? {
-        type: gs.pendingTargetSelection.type || '',
+        type: gs.pendingTargetSelection.actionType || gs.pendingTargetSelection.type || '',
+        targetScope: gs.pendingTargetSelection.targetScope || '',
         sourceCardName: gs.pendingTargetSelection.sourceCardName || gs.pendingTargetSelection.cardName || '',
         prompt: gs.pendingTargetSelection.prompt || ''
       }

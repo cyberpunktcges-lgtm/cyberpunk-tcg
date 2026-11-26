@@ -77,10 +77,10 @@ export default function CyberNumberPickerModal({
           )}
           <div className="min-w-0 flex-1">
             <span className="text-[9px] text-[#FCEE0A] uppercase tracking-widest block font-bold">
-              CHOOSE A NUMBER
+              ELIGE UN NÚMERO
             </span>
             <h3 className="text-sm font-black text-white uppercase tracking-wide mt-0.5">
-              {sourceCardName}: CHOOSE A NUMBER
+              {sourceCardName}: ELIGE UN NÚMERO
             </h3>
             {prompt && (
               <p className="text-[11px] text-gray-300 font-sans leading-snug mt-1">
@@ -161,13 +161,22 @@ export default function CyberNumberPickerModal({
         </div>
 
         {/* Confirmación */}
-        <div className="flex justify-end pt-1">
+        <div className="flex items-center justify-between gap-2 pt-1">
+          {onCancel && (
+            <button
+              type="button"
+              onClick={onCancel}
+              className="px-3.5 py-2.5 bg-[#151c29] hover:bg-[#1e283b] border border-white/20 text-gray-300 hover:text-white font-black text-[11px] uppercase tracking-wider rounded-sm cursor-pointer transition-colors"
+            >
+              ← OTRO DADO
+            </button>
+          )}
           <button
             type="button"
             onClick={() => onConfirm && onConfirm(delta)}
-            className="px-6 py-2.5 bg-[#FCEE0A] hover:bg-white text-[#070a10] font-black text-xs uppercase tracking-widest rounded-sm cursor-pointer shadow-[0_0_20px_rgba(252,238,10,0.5)] transition-colors"
+            className="ml-auto px-6 py-2.5 bg-[#FCEE0A] hover:bg-white text-[#070a10] font-black text-xs uppercase tracking-widest rounded-sm cursor-pointer shadow-[0_0_20px_rgba(252,238,10,0.5)] transition-colors"
           >
-            CONFIRM {canDecrease ? formatDelta(delta) : Math.abs(delta)}
+            CONFIRMAR ({canDecrease ? formatDelta(delta) : Math.abs(delta)})
           </button>
         </div>
       </motion.div>

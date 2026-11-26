@@ -10,6 +10,15 @@ import { executeCardActivatedAbility, getCardActivatedAbilities } from './activa
 
 export const CARD_RULES_TEXT = allCardRules;
 
+function getNumericUnitPower(unit) {
+  if (!unit) return 0;
+  if (typeof unit.currentPower === 'number' && !Number.isNaN(unit.currentPower)) return unit.currentPower;
+  const raw = unit.currentPower ?? unit.powerVal ?? unit.power ?? 0;
+  if (typeof raw === 'number') return Number.isNaN(raw) ? 0 : raw;
+  const m = String(raw).match(/\d+/);
+  return m ? parseInt(m[0], 10) : 0;
+}
+
 /**
  * Retorna el texto de reglas oficial de una carta según su ID, slug o nombre.
  */
@@ -725,7 +734,7 @@ export function executeProgramEffect(state, playerKey, card) {
   // CP-013: Bonnie and Clyde
   // "Defeat a rival Unit with power 4 or less. You may defeat 2 instead if a Rival controls at least 2 Gigs more than you."
   if (cardId === 'CP-013') {
-    const eligibleUnits = (opp.field || []).filter((u) => (u.currentPower || u.power || 0) <= 4);
+    const eligibleUnits = (opp.field || []).filter((u) => getNumericUnitPower(u) <= 4);
     if (eligibleUnits.length === 0) {
       state.actionLog.unshift(`ℹ️ [Bonnie and Clyde] El rival no tiene unidades con poder 4 o menos.`);
       return { executed: true };
@@ -908,7 +917,7 @@ export function executeProgramEffect(state, playerKey, card) {
     } else {
       const target = [...eligible].sort((a, b) => (b.gear?.length || 0) - (a.gear?.length || 0))[0];
       const bonus = target.gear.length * 3;
-      target.currentPower = (target.currentPower || target.power || 0) + bonus;
+      target.currentPower = getNumericUnitPower(target) + bonus;
       state.actionLog.unshift(`⚡ [Cyberpsychosis Rival] "${target.name}" gana +${bonus} de poder este turno.`);
     }
     return { executed: true };

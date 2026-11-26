@@ -401,10 +401,21 @@ export function parseCardCost(costStr) {
  * Parsea el poder numérico de una carta (ej: "6 FUERZA" -> 6)
  */
 export function parseCardPower(powerStr) {
-  if (typeof powerStr === 'number') return powerStr;
+  if (typeof powerStr === 'number') return Number.isNaN(powerStr) ? 0 : powerStr;
   if (!powerStr) return 0;
   const match = String(powerStr).match(/\d+/);
   return match ? parseInt(match[0], 10) : 0;
+}
+
+/**
+ * Devuelve siempre la fuerza numérica real de una unidad en mesa (evita que 0 sea falsy y concatene strings como "0 FUERZA1").
+ */
+export function getNumericUnitPower(unit) {
+  if (!unit) return 0;
+  if (typeof unit.currentPower === 'number' && !Number.isNaN(unit.currentPower)) {
+    return unit.currentPower;
+  }
+  return parseCardPower(unit.currentPower ?? unit.powerVal ?? unit.power ?? 0);
 }
 
 /**
