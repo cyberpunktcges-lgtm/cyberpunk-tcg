@@ -2988,6 +2988,11 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
       }
       finishTargetSelection();
     } else if (sel.actionType === 'TARGET_UNIT') {
+      if (targetData?.skip) {
+        gameState.actionLog.unshift(`ℹ️ [${sel.sourceCardName}] Decidiste omitir el objetivo opcional.`);
+        finishTargetSelection();
+        return;
+      }
       const { unitInstanceId, ownerKey } = targetData;
       const targetOwner = ownerKey === 'player' ? p : opp;
       const unit = (targetOwner.field || []).find((u) => u.instanceId === unitInstanceId);
@@ -2997,7 +3002,24 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
           const idx = targetOwner.field.indexOf(unit);
           const [dead] = targetOwner.field.splice(idx, 1);
           sendDefeatedUnitToGraveyardOrExile(targetOwner, dead, gameState);
+          executeUnitDefeatedTrigger(gameState, ownerKey, dead);
           gameState.actionLog.unshift(`💥 [${sel.sourceCardName}] Destruyó a la unidad "${dead.name}".`);
+          if (sel.remainingDefeats && sel.remainingDefeats > 0) {
+            const remainingEligible = (targetOwner.field || []).filter(
+              (u) =>
+                (sel.maxPower === undefined || getNumericUnitPower(u) <= sel.maxPower) &&
+                (sel.maxCost === undefined || getNumericCost(u) <= sel.maxCost)
+            );
+            if (remainingEligible.length > 0) {
+              gameState.pendingTargetSelection = {
+                ...sel,
+                remainingDefeats: sel.remainingDefeats - 1,
+                allowSkip: true,
+                prompt: `Selecciona una 2ª unidad rival para destruir (Poder ≤ ${sel.maxPower ?? '∞'}) u OMITIR:`
+              };
+              keepSelectionForMoreSpends = true;
+            }
+          }
         } else if (sel.effectType === 'BUFF') {
           unit.currentPower = getNumericUnitPower(unit) + (sel.amount || 2);
           gameState.actionLog.unshift(`⚡ [${sel.sourceCardName}] Otorgó +${sel.amount || 2} de poder a "${unit.name}" (Poder actual: ${unit.currentPower}).`);
@@ -9002,7 +9024,8 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
         const isKerryReroll = activeTargetSel.actionType === 'KERRY_REROLL';
         const hasAdjustSkip = activeTargetSel.actionType === 'ADJUST_GIG' && activeTargetSel.allowZero;
         const hasLegendSkip = activeTargetSel.actionType === 'CALL_LEGEND_FREE' && activeTargetSel.allowSkip;
-        const hasOptionalSkip = Boolean(hasAdjustSkip || hasLegendSkip);
+        const hasUnitSkip = activeTargetSel.actionType === 'TARGET_UNIT' && activeTargetSel.allowSkip;
+        const hasOptionalSkip = Boolean(hasAdjustSkip || hasLegendSkip || hasUnitSkip);
         const stepActionLabel = isKerryReroll
           ? `TIRADA ${String(activeTargetSel.die || 'D20').toUpperCase()} (${activeTargetSel.rolledValue}/${activeTargetSel.maxFace})`
           : activeTargetSel.step
@@ -9026,7 +9049,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
             onSecondary={
               hasAdjustSkip
                 ? () => handleResolveTargetSelection({ gigInfo: null, delta: 0 })
-                : hasLegendSkip
+                : hasLegendSkip || hasUnitSkip
                 ? () => handleResolveTargetSelection({ skip: true })
                 : null
             }

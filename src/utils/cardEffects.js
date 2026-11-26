@@ -735,6 +735,8 @@ export function executeProgramEffect(state, playerKey, card) {
   // "Defeat a rival Unit with power 4 or less. You may defeat 2 instead if a Rival controls at least 2 Gigs more than you."
   if (cardId === 'CP-013') {
     const eligibleUnits = (opp.field || []).filter((u) => getNumericUnitPower(u) <= 4);
+    const rivalGigLead = (opp.gigs || []).length - (p.gigs || []).length;
+    const canDefeatTwo = rivalGigLead >= 2;
     if (eligibleUnits.length === 0) {
       state.actionLog.unshift(`ℹ️ [Bonnie and Clyde] El rival no tiene unidades con poder 4 o menos.`);
       return { executed: true };
@@ -745,19 +747,36 @@ export function executeProgramEffect(state, playerKey, card) {
         sourceCardId: 'CP-013',
         sourceCardName: 'Bonnie and Clyde',
         sourceCardImage: card.image,
-        title: '🔫 BONNIE AND CLYDE // DESTRUIR UNIDAD',
-        prompt: 'Selecciona la unidad rival que deseas destruir (Poder ≤ 4):',
+        title: canDefeatTwo
+          ? '🔫 BONNIE AND CLYDE // DESTRUIR HASTA 2 UNIDADES'
+          : '🔫 BONNIE AND CLYDE // DESTRUIR UNIDAD',
+        prompt: canDefeatTwo
+          ? '¡El rival controla 2+ Gigs más que tú! Selecciona la 1ª unidad rival que deseas destruir (Poder ≤ 4 — podrás destruir hasta 2):'
+          : 'Selecciona la unidad rival que deseas destruir (Poder ≤ 4):',
         effectType: 'DEFEAT',
         targetScope: 'RIVAL_UNITS',
-        maxPower: 4
+        maxPower: 4,
+        remainingDefeats: canDefeatTwo ? 1 : 0
       });
     } else {
-      const target = [...eligibleUnits].sort((a,b) => b.currentPower - a.currentPower)[0];
-      const idx = opp.field.indexOf(target);
-      const [dead] = opp.field.splice(idx, 1);
-      if (!opp.trash) opp.trash = [];
-      opp.trash.push(dead);
-      state.actionLog.unshift(`💥 [Bonnie and Clyde Rival] Destruye a tu unidad "${dead.name}".`);
+      const defeatsCount = canDefeatTwo ? Math.min(2, eligibleUnits.length) : 1;
+      const sorted = [...eligibleUnits].sort((a, b) => getNumericUnitPower(b) - getNumericUnitPower(a));
+      const defeatedNames = [];
+      for (let i = 0; i < defeatsCount; i++) {
+        const target = sorted[i];
+        if (!target) break;
+        const idx = opp.field.indexOf(target);
+        if (idx !== -1) {
+          const [dead] = opp.field.splice(idx, 1);
+          sendDefeatedUnitToGraveyardOrExile(opp, dead, state);
+          defeatedNames.push(dead.name);
+        }
+      }
+      if (defeatedNames.length > 0) {
+        state.actionLog.unshift(
+          `💥 [Bonnie and Clyde Rival]${canDefeatTwo && defeatedNames.length > 1 ? ' (¡+2 Gigs de ventaja rival!)' : ''} Destruye a ${defeatedNames.map((n) => `"${n}"`).join(' y ')}.`
+        );
+      }
     }
     return { executed: true };
   }
