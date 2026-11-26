@@ -203,6 +203,7 @@ export function CyberRightGigsRail({
   onStealSpecificDie,
   isMyTurn = true,
   isBotThinking = false,
+  isResolving = false,
   hasPendingReaction = false,
   hasBlockerAssigned = false,
   onPrimaryAction,
@@ -347,17 +348,21 @@ export function CyberRightGigsRail({
       {/* 3. BOTÓN PROTAGONISTA CENTRAL: FINALIZAR TURNO / PASS / RESOLVING... */}
       <button
         type="button"
-        disabled={!hasPendingReaction && (!isMyTurn || isBotThinking)}
+        disabled={isResolving || (!hasPendingReaction && (!isMyTurn || isBotThinking))}
         onClick={onPrimaryAction}
         className={`w-full py-3.5 px-3 rounded-sm font-black text-xs xl:text-sm uppercase tracking-[0.12em] transition-all shadow-lg ${
-          hasPendingReaction
+          isResolving
+            ? 'bg-[#0c111c] border border-white/15 text-gray-400 cursor-not-allowed'
+            : hasPendingReaction
             ? 'bg-[#0dfceb] hover:bg-white text-[#070a10] cursor-pointer shadow-[0_0_26px_rgba(13,252,235,0.8)]'
             : isMyTurn && !isBotThinking
             ? 'bg-[#FCEE0A] hover:bg-white text-[#070a10] cursor-pointer shadow-[0_0_24px_rgba(252,238,10,0.55)]'
             : 'bg-[#0c111c] border border-white/10 text-gray-500 cursor-not-allowed'
         }`}
       >
-        {hasPendingReaction
+        {isResolving
+          ? 'RESOLVING •••'
+          : hasPendingReaction
           ? 'PASS'
           : isBotThinking || !isMyTurn
           ? 'RESOLVING •••'

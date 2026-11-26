@@ -46,6 +46,7 @@ import { CyberLeftTelemetryRail, CyberRightGigsRail } from './CyberArenaColumns.
 import CyberNumberPickerModal from './CyberNumberPickerModal.jsx';
 import CyberResolveQueueModal from './CyberResolveQueueModal.jsx';
 import CyberUnitActionPopover from './CyberUnitActionPopover.jsx';
+import CyberInlineTargetBar from './CyberInlineTargetBar.jsx';
 import {
   getRivalById,
   getRivalByStage,
@@ -4162,6 +4163,28 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
     bot.gigs.length > 0;
   const gigsToSteal = canAttackGigs ? calculateGigsToSteal(selectedFieldUnit.currentPower) : 0;
 
+  // Resolver imagen y texto oficial completo de la carta origen del trigger/habilidad
+  const resolveSourceCardMeta = (cardId, cardName, fallbackImage = '') => {
+    const cleanId = cardId ? String(cardId).toUpperCase().trim() : '';
+    const cleanName = cardName ? String(cardName).toLowerCase().trim() : '';
+    const baseCleanName = cleanName.split('//')[0].split(':')[0].trim();
+    const match =
+      (cleanId && (initialCards || []).find((c) => String(c.id || '').toUpperCase() === cleanId)) ||
+      (cleanName &&
+        (initialCards || []).find((c) => {
+          const cn = String(c.name || '').toLowerCase();
+          const cBase = cn.split('//')[0].trim();
+          return cn === cleanName || (baseCleanName && (cBase === baseCleanName || cn.startsWith(baseCleanName)));
+        })) ||
+      null;
+    return {
+      card: match,
+      image: fallbackImage || match?.image || '',
+      name: match?.name || cardName || '',
+      rulesText: match ? getCardRulesText(match) : ''
+    };
+  };
+
   // Helpers para fijación de objetivos DIRECTAMENTE SOBRE EL TABLERO (estilo Capturas 1, 3, 4 y 5)
   const activeTargetSel = gameState?.pendingTargetSelection || null;
   const INLINE_TARGET_ACTIONS = new Set([
@@ -4170,7 +4193,8 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
     'PEACE_OFFERING',
     'SWAP_GIGS',
     'STEAL_RIVAL_GIG',
-    'CALL_LEGEND_FREE'
+    'CALL_LEGEND_FREE',
+    'KERRY_REROLL'
   ]);
   const pendingTriggerQueueList =
     activeTargetSel &&
@@ -7696,6 +7720,14 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
           onStealSpecificDie={(d) => handleStealSpecificDie(d)}
           isMyTurn={isMyTurn}
           isBotThinking={isBotThinking}
+          isResolving={Boolean(
+            isInlineBoardTargeting ||
+            isChoosingTriggerOrder ||
+            pendingGearEquip ||
+            pendingManualPayment ||
+            gameState?.pendingModalChoice ||
+            gameState?.pendingCardChoice
+          )}
           hasPendingReaction={Boolean(gameState?.pendingReaction && gameState.pendingReaction.attackerPlayerKey === 'bot')}
           hasBlockerAssigned={Boolean(gameState?.pendingReaction?.blockerUnitId)}
           targetGigInfo={
@@ -8900,75 +8932,81 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
         />
       )}
 
-      {/* BARRA INLINE DE FIJACIÓN DE OBJETIVOS SOBRE EL TABLERO (ESTILO CAPTURAS 1, 3 Y 5) */}
-      {isInlineBoardTargeting && !pendingGigNumberPick && (
-        <div className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-[46] w-[92vw] max-w-2xl pointer-events-auto font-mono select-none">
-          <motion.div
-            initial={{ opacity: 0, y: -8, scale: 0.96 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            className="bg-[#070c16]/96 border border-[#0dfceb]/80 rounded-md px-3.5 py-2.5 shadow-[0_0_40px_rgba(0,0,0,0.9)] backdrop-blur-md flex items-center justify-between gap-3"
-          >
-            <div className="flex items-center gap-2.5 min-w-0 flex-1">
-              {activeTargetSel.sourceCardImage && (
-                <div className="w-9 h-12 rounded border border-[#0dfceb]/60 overflow-hidden bg-black shrink-0">
-                  <img src={activeTargetSel.sourceCardImage} alt={activeTargetSel.sourceCardName} className="w-full h-full object-cover" />
-                </div>
-              )}
-              <div className="min-w-0">
-                <span className="text-xs font-black uppercase text-[#0dfceb] tracking-wider block truncate">
-                  {activeTargetSel.sourceCardName || activeTargetSel.title}: ELIGE OBJETIVO
-                </span>
-                <p className="text-[11px] text-gray-300 font-sans leading-snug truncate">
-                  {activeTargetSel.prompt}
-                </p>
-              </div>
-            </div>
+      {/* VENTANA CENTRAL COMPACTA DE TRIGGERS Y OBJETIVOS SOBRE EL TABLERO */}
+      {isInlineBoardTargeting && !pendingGigNumberPick && (() => {
+        const meta = resolveSourceCardMeta(
+          activeTargetSel.sourceCardId,
+          activeTargetSel.sourceCardName || activeTargetSel.title,
+          activeTargetSel.sourceCardImage
+        );
+        const inspectPayload = meta.card || (meta.image ? { name: meta.name, image: meta.image, text: meta.rulesText } : null);
+        const isKerryReroll = activeTargetSel.actionType === 'KERRY_REROLL';
+        const hasAdjustSkip = activeTargetSel.actionType === 'ADJUST_GIG' && activeTargetSel.allowZero;
+        const hasLegendSkip = activeTargetSel.actionType === 'CALL_LEGEND_FREE' && activeTargetSel.allowSkip;
+        const hasOptionalSkip = Boolean(hasAdjustSkip || hasLegendSkip);
+        const stepActionLabel = isKerryReroll
+          ? `TIRADA ${String(activeTargetSel.die || 'D20').toUpperCase()} (${activeTargetSel.rolledValue}/${activeTargetSel.maxFace})`
+          : activeTargetSel.step
+          ? `PASO ${activeTargetSel.step}/2 · ELIGE OBJETIVO`
+          : 'ELIGE OBJETIVO';
 
-            <div className="flex items-center gap-2 shrink-0">
-              <span className="text-xs font-black text-white px-1.5">
-                <span className={stagedTarget ? "text-[#FCEE0A]" : "text-gray-400"}>{stagedTarget ? 1 : 0}</span>/1
-              </span>
-              {activeTargetSel.actionType === 'ADJUST_GIG' && activeTargetSel.allowZero && (
-                <button
-                  type="button"
-                  onClick={() => handleResolveTargetSelection({ gigInfo: null, delta: 0 })}
-                  className="px-2.5 py-1.5 bg-black border border-gray-700 hover:border-white text-gray-300 hover:text-white text-[10px] font-bold uppercase rounded-sm cursor-pointer"
-                >
-                  OMITIR (0)
-                </button>
-              )}
-              {activeTargetSel.actionType === 'CALL_LEGEND_FREE' && activeTargetSel.allowSkip && (
-                <button
-                  type="button"
-                  onClick={() => handleResolveTargetSelection({ skip: true })}
-                  className="px-2.5 py-1.5 bg-black border border-gray-700 hover:border-white text-gray-300 hover:text-white text-[10px] font-bold uppercase rounded-sm cursor-pointer"
-                >
-                  OMITIR
-                </button>
-              )}
-              <button
-                type="button"
-                onClick={handleCancelTargetSelection}
-                className="px-2.5 py-1.5 bg-black border border-gray-700 hover:border-[#FF003C] text-gray-300 hover:text-[#FF003C] text-[10px] font-bold uppercase rounded-sm cursor-pointer"
-              >
-                CANCELAR
-              </button>
-              <button
-                type="button"
-                disabled={!stagedTarget}
-                onClick={() => confirmInlineStagedTarget()}
-                className={`px-4 py-1.5 text-xs font-black uppercase tracking-wider rounded-sm transition-all ${
-                  stagedTarget
-                    ? 'bg-[#FCEE0A] hover:bg-white text-[#070a10] cursor-pointer shadow-[0_0_18px_rgba(252,238,10,0.65)]'
-                    : 'bg-white/10 text-gray-500 cursor-not-allowed'
-                }`}
-              >
-                CONFIRMAR
-              </button>
-            </div>
-          </motion.div>
-        </div>
-      )}
+        return (
+          <CyberInlineTargetBar
+            cardImage={meta.image}
+            cardName={meta.name || activeTargetSel.sourceCardName || activeTargetSel.title}
+            actionLabel={stepActionLabel}
+            rulesText={meta.rulesText}
+            promptText={activeTargetSel.prompt}
+            selectedCount={stagedTarget ? 1 : 0}
+            requiredCount={1}
+            showCounter={!isKerryReroll}
+            canConfirm={Boolean(stagedTarget)}
+            confirmLabel="CONFIRMAR"
+            onConfirm={isKerryReroll ? null : () => confirmInlineStagedTarget()}
+            secondaryLabel={hasOptionalSkip ? 'OMITIR' : null}
+            onSecondary={
+              hasAdjustSkip
+                ? () => handleResolveTargetSelection({ gigInfo: null, delta: 0 })
+                : hasLegendSkip
+                ? () => handleResolveTargetSelection({ skip: true })
+                : null
+            }
+            cancelLabel={!isKerryReroll && !hasOptionalSkip ? 'CANCELAR' : null}
+            onCancel={!isKerryReroll && !hasOptionalSkip ? handleCancelTargetSelection : null}
+            onInspectCard={() => {
+              if (inspectPayload) setInspectedCard(inspectPayload);
+            }}
+            onHoverCard={(entering) => {
+              if (entering && inspectPayload) {
+                setHoveredCard(inspectPayload);
+                setPreviewCard(inspectPayload);
+              } else if (!entering) {
+                setHoveredCard(null);
+              }
+            }}
+            customActions={
+              isKerryReroll ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => handleResolveTargetSelection({ reroll: false })}
+                    className="px-3 py-1.5 bg-[#151c29] hover:bg-[#0dfceb] border border-[#0dfceb]/60 text-[#0dfceb] hover:text-black text-[10px] sm:text-[11px] font-black uppercase tracking-wider rounded-[2px] cursor-pointer transition-colors"
+                  >
+                    MANTENER ({activeTargetSel.rolledValue})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleResolveTargetSelection({ reroll: true })}
+                    className="px-3.5 py-1.5 bg-[#FCEE0A] hover:bg-white text-[#070a10] text-[10px] sm:text-[11px] font-black uppercase tracking-wider rounded-[2px] cursor-pointer shadow-[0_0_16px_rgba(252,238,10,0.6)] transition-all"
+                  >
+                    🎲 REPETIR
+                  </button>
+                </>
+              ) : null
+            }
+          />
+        );
+      })()}
 
       {/* MODAL MINIMALISTA CHOOSE A NUMBER (ESTILO CAPTURA 4 — LA LLORONA / ADJUST GIG) */}
       <CyberNumberPickerModal
@@ -8992,64 +9030,43 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
         }}
       />
 
-      {/* BARRA INLINE DE EQUIPAR GEAR: SIEMPRE PERMITE ELEGIR OBJETIVO EN MESA (AUNQUE SOLO HAYA 1) */}
-      {pendingGearEquip && (
-        <div className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-[46] w-[92vw] max-w-2xl pointer-events-auto font-mono select-none">
-          <motion.div
-            initial={{ opacity: 0, y: -8, scale: 0.96 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            className="bg-[#070c16]/96 border border-[#0dfceb]/80 rounded-md px-3.5 py-2.5 shadow-[0_0_40px_rgba(0,0,0,0.9)] backdrop-blur-md flex items-center justify-between gap-3"
-          >
-            <div className="flex items-center gap-2.5 min-w-0 flex-1">
-              {pendingGearEquip.card?.image && (
-                <div className="w-9 h-12 rounded border border-[#FCEE0A]/70 overflow-hidden bg-black shrink-0">
-                  <img src={pendingGearEquip.card.image} alt={pendingGearEquip.card.name} className="w-full h-full object-cover" />
-                </div>
-              )}
-              <div className="min-w-0">
-                <span className="text-xs font-black uppercase text-[#0dfceb] tracking-wider block truncate">
-                  EQUIP {pendingGearEquip.card?.name}: CHOOSE A TARGET
-                </span>
-                <p className="text-[11px] text-gray-300 font-sans leading-snug truncate">
-                  Haz clic en la Unidad aliada o Leyenda boca arriba iluminada a la que quieres equipar ({pendingGearEquip.cost} €$).
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2 shrink-0">
-              <span className="text-xs font-black text-white px-1.5">
-                <span className={pendingGearEquip.stagedTargetId ? "text-[#FCEE0A]" : "text-gray-400"}>
-                  {pendingGearEquip.stagedTargetId ? 1 : 0}
-                </span>/1
-              </span>
-              <button
-                type="button"
-                onClick={() => setPendingGearEquip(null)}
-                className="px-2.5 py-1.5 bg-black border border-gray-700 hover:border-[#FF003C] text-gray-300 hover:text-[#FF003C] text-[10px] font-bold uppercase rounded-sm cursor-pointer"
-              >
-                CANCEL
-              </button>
-              <button
-                type="button"
-                disabled={!pendingGearEquip.stagedTargetId}
-                onClick={() => {
-                  const { cardInstanceId, stagedTargetId } = pendingGearEquip;
-                  if (!stagedTargetId) return;
-                  setPendingGearEquip(null);
-                  handlePlayCard(cardInstanceId, stagedTargetId);
-                }}
-                className={`px-4 py-1.5 text-xs font-black uppercase tracking-wider rounded-sm transition-all ${
-                  pendingGearEquip.stagedTargetId
-                    ? 'bg-[#FCEE0A] hover:bg-white text-[#070a10] cursor-pointer shadow-[0_0_18px_rgba(252,238,10,0.65)]'
-                    : 'bg-white/10 text-gray-500 cursor-not-allowed'
-                }`}
-              >
-                CONFIRM
-              </button>
-            </div>
-          </motion.div>
-        </div>
-      )}
+      {/* BARRA INLINE DE EQUIPAR GEAR: MISMA VENTANA COMPACTA CENTRAL */}
+      {pendingGearEquip && (() => {
+        const gCard = pendingGearEquip.card;
+        const gRules = gCard ? getCardRulesText(gCard) : '';
+        return (
+          <CyberInlineTargetBar
+            cardImage={gCard?.image || ''}
+            cardName={gCard?.name || 'GEAR'}
+            actionLabel={`EQUIPAR (${pendingGearEquip.cost} €$) · ELIGE OBJETIVO`}
+            rulesText={gRules}
+            promptText="Haz clic en la Unidad aliada o Leyenda boca arriba iluminada para equipar este Gear."
+            selectedCount={pendingGearEquip.stagedTargetId ? 1 : 0}
+            requiredCount={1}
+            canConfirm={Boolean(pendingGearEquip.stagedTargetId)}
+            confirmLabel="CONFIRMAR"
+            cancelLabel="CANCELAR"
+            onCancel={() => setPendingGearEquip(null)}
+            onConfirm={() => {
+              const { cardInstanceId, stagedTargetId } = pendingGearEquip;
+              if (!stagedTargetId) return;
+              setPendingGearEquip(null);
+              handlePlayCard(cardInstanceId, stagedTargetId);
+            }}
+            onInspectCard={() => {
+              if (gCard) setInspectedCard(gCard);
+            }}
+            onHoverCard={(entering) => {
+              if (entering && gCard) {
+                setHoveredCard(gCard);
+                setPreviewCard(gCard);
+              } else if (!entering) {
+                setHoveredCard(null);
+              }
+            }}
+          />
+        );
+      })()}
 
       {/* BARRA INTERACTIVA DE PAGO MANUAL "PAY X €$" (EXACTA A CAPTURA DE KERRY) */}
       {pendingManualPayment && (() => {
