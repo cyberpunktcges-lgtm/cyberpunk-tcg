@@ -4405,6 +4405,20 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
 
             <button
               type="button"
+              onClick={toggleFullscreen}
+              style={{ clipPath: CYBER_BUTTON }}
+              className={`p-1.5 bg-[#000000] border cursor-pointer transition-all ${
+                isFullscreen
+                  ? 'border-[#FCEE0A] text-[#FCEE0A] bg-[#FCEE0A]/15'
+                  : 'border-[#0dfceb]/50 text-[#0dfceb] hover:text-white hover:border-[#0dfceb]'
+              }`}
+              title={isFullscreen ? 'Salir de Pantalla Completa' : 'Pantalla Completa'}
+            >
+              {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+            </button>
+
+            <button
+              type="button"
               onClick={() => setIsMobileMenuOpen(true)}
               style={{ clipPath: CYBER_BUTTON }}
               className="px-2.5 py-1.5 bg-[#FCEE0A] text-[#070a10] font-black uppercase flex items-center gap-1 text-[10px] cursor-pointer shadow-[0_0_12px_rgba(252,238,10,0.4)] whitespace-nowrap"
@@ -7709,6 +7723,8 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
           }
           botLegends={bot.legends || []}
           onHoverCard={setHoveredCard}
+          isFullscreen={isFullscreen}
+          onToggleFullscreen={toggleFullscreen}
           actionLog={gameState.actionLog || []}
           hoveredCard={hoveredCard}
           displayCard={rawDisplayCard}

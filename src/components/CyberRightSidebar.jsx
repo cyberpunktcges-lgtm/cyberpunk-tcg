@@ -10,6 +10,7 @@ import {
   Hand,
   X,
   Maximize2,
+  Minimize2,
   Settings,
   Trophy,
   BookOpen,
@@ -66,6 +67,8 @@ export default function CyberRightSidebar({
   onOpenLeaderboard,
   onOpenDeckSelector,
   onOpenBugReport,
+  isFullscreen = false,
+  onToggleFullscreen,
   isOpenMobile = false,
   onCloseMobile
 }) {
@@ -128,6 +131,20 @@ export default function CyberRightSidebar({
           </div>
 
           <div className="flex items-center gap-1 shrink-0">
+            {onToggleFullscreen && (
+              <button
+                type="button"
+                onClick={onToggleFullscreen}
+                className={`p-1.5 rounded border cursor-pointer transition-colors ${
+                  isFullscreen
+                    ? 'border-[#FCEE0A] text-[#FCEE0A] bg-[#FCEE0A]/15 shadow-[0_0_12px_rgba(252,238,10,0.35)]'
+                    : 'border-[#0dfceb]/40 text-[#0dfceb] hover:text-white hover:border-[#0dfceb] bg-[#0dfceb]/5'
+                }`}
+                title={isFullscreen ? 'Salir de Pantalla Completa' : 'Pantalla Completa'}
+              >
+                {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+              </button>
+            )}
             <button
               type="button"
               onClick={() => setMenuOpen((v) => !v)}
@@ -154,6 +171,23 @@ export default function CyberRightSidebar({
           {/* Menú desplegable compacto de utilidades */}
           {menuOpen && (
             <div className="absolute right-3 top-13 z-50 w-56 bg-[#070b14] border border-[#0dfceb]/50 rounded-md shadow-2xl p-1.5 space-y-1">
+              {onToggleFullscreen && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMenuOpen(false);
+                    onToggleFullscreen();
+                  }}
+                  className="w-full px-2.5 py-2 rounded text-left text-[11px] font-bold text-gray-200 hover:bg-white/10 hover:text-[#0dfceb] flex items-center gap-2 cursor-pointer"
+                >
+                  {isFullscreen ? (
+                    <Minimize2 className="w-3.5 h-3.5 text-[#FCEE0A]" />
+                  ) : (
+                    <Maximize2 className="w-3.5 h-3.5 text-[#0dfceb]" />
+                  )}
+                  <span>{isFullscreen ? 'Salir Pantalla Completa' : 'Pantalla Completa'}</span>
+                </button>
+              )}
               {onOpenDeckSelector && (
                 <button
                   type="button"
