@@ -121,7 +121,7 @@ import {
   executeBotReaction,
   resolvePendingAttackAndContinueBot
 } from '../utils/botAi.js';
-import { getCardRulesText, executeUnitAttackTrigger, executeLegendAbility, executeProgramEffect, executeUnitPlayTrigger, getNumericCost, executeCardSpentTriggers, executeOnGigsStolenTriggers, executeKerryGigRollTrigger, triggerMeredithStoutOnRivalGigModify, getGigMaxFace, executeBlockerUsedTrigger, executeUnitDefeatedTrigger, executeCallLegendTrigger } from '../utils/cardEffects.js';
+import { getCardRulesText, executeUnitAttackTrigger, executeLegendAbility, executeProgramEffect, executeUnitPlayTrigger, getNumericCost, executeCardSpentTriggers, executeOnGigsStolenTriggers, executeKerryGigRollTrigger, triggerMeredithStoutOnRivalGigModify, getGigMaxFace, executeBlockerUsedTrigger, executeUnitDefeatedTrigger, executeCallLegendTrigger, isArasakaOrGoSoloLegend } from '../utils/cardEffects.js';
 import { getCardActivatedAbilities, executeCardActivatedAbility } from '../utils/activatedAbilities.js';
 
 // =========================================================================
@@ -2785,11 +2785,51 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
       }
     }
 
+    // Arasaka Emergency Radioport (CP-011): tras mirar Leyenda boca abajo
+    if (optionId === 'RADIOPORT_CALL_FREE') {
+      const leg = (p.legends || []).find(
+        (l) => l.instanceId === choice.peekLegendId && !l.isFaceUp && !l.isOnField && !l.isRemovedFromGame
+      );
+      delete gameState.pendingModalChoice;
+      if (leg && !p.hasCalledLegendThisTurn) {
+        leg.isFaceUp = true;
+        p.hasCalledLegendThisTurn = true;
+        gameState.actionLog.unshift(
+          `📡 [Arasaka Emergency Radioport] Llamas GRATIS a tu Leyenda "${leg.name}" boca arriba (ARASAKA / GO SOLO).`
+        );
+        executeCallLegendTrigger(gameState, 'player', leg);
+        setPreviewCard(leg);
+        setHoveredCard(leg);
+      }
+      const pendingAttack = gameState.pendingAttackContinuation;
+      if (
+        pendingAttack &&
+        !gameState.pendingTargetSelection &&
+        !gameState.pendingCardChoice &&
+        !gameState.pendingModalChoice
+      ) {
+        delete gameState.pendingAttackContinuation;
+        continueAttackAfterTrigger(pendingAttack);
+      } else {
+        setGameState({ ...gameState });
+      }
+      return;
+    } else if (optionId === 'RADIOPORT_KEEP_DOWN') {
+      gameState.actionLog.unshift(
+        `📡 [Arasaka Emergency Radioport] Miraste tu Leyenda boca abajo y decidiste mantenerla oculta.`
+      );
+    }
+
     const pendingAttack = gameState.pendingAttackContinuation;
     delete gameState.pendingModalChoice;
-    delete gameState.pendingAttackContinuation;
 
-    if (pendingAttack) {
+    if (
+      pendingAttack &&
+      !gameState.pendingTargetSelection &&
+      !gameState.pendingCardChoice &&
+      !gameState.pendingModalChoice
+    ) {
+      delete gameState.pendingAttackContinuation;
       continueAttackAfterTrigger(pendingAttack);
     } else {
       setGameState({ ...gameState });
@@ -3225,11 +3265,55 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
       }
     } else if (sel.actionType === 'CALL_LEGEND_FREE') {
       if (targetData?.skip) {
-        gameState.actionLog.unshift(`👑 [${sel.sourceCardName || 'Chrome Reverie'}] Decidiste no llamar a ninguna Leyenda gratis.`);
+        gameState.actionLog.unshift(
+          sel.radioportMode
+            ? `📡 [${sel.sourceCardName || 'Arasaka Emergency Radioport'}] Decidiste no mirar ninguna Leyenda boca abajo.`
+            : `👑 [${sel.sourceCardName || 'Chrome Reverie'}] Decidiste no llamar a ninguna Leyenda gratis.`
+        );
+        finishTargetSelection();
       } else {
         const leg = (p.legends || []).find(
           (l) => l.instanceId === targetData?.legendInstanceId && !l.isFaceUp && !l.isOnField && !l.isRemovedFromGame
         );
+        if (sel.radioportMode && leg) {
+          const check = isArasakaOrGoSoloLegend(leg);
+          const canCallNow = check.eligible && !p.hasCalledLegendThisTurn;
+          const matchTags = [check.isArasaka ? 'ARASAKA' : null, check.hasGoSolo ? 'GO SOLO' : null].filter(Boolean).join(' + ');
+          const ineligibleReason = p.hasCalledLegendThisTurn
+            ? 'Ya has llamado a 1 Leyenda este turno (límite: 1/turno).'
+            : 'Esta Leyenda no es ARASAKA ni tiene GO SOLO.';
+          delete gameState.pendingTargetSelection;
+          gameState.pendingModalChoice = {
+            sourceCardId: 'CP-011',
+            sourceCardName: 'Arasaka Emergency Radioport',
+            sourceCardImage: sel.sourceCardImage,
+            peekLegendId: leg.instanceId,
+            revealedCards: [leg],
+            title: '📡 ARASAKA EMERGENCY RADIOPORT // LEYENDA MIRADA',
+            prompt: canCallNow
+              ? `Has mirado tu Leyenda boca abajo: "${leg.name}" (${matchTags}). ¿Quieres hacerle CALL gratis ahora?`
+              : `Has mirado tu Leyenda boca abajo: "${leg.name}". ${ineligibleReason}`,
+            options: [
+              {
+                id: 'RADIOPORT_CALL_FREE',
+                title: `👑 HACER CALL GRATIS A ${String(leg.name || 'LEYENDA').split('//')[0].trim()}`,
+                description: canCallNow
+                  ? `Voltea boca arriba esta Leyenda (${matchTags}) sin pagar Eddies y dispara su habilidad CALL.`
+                  : ineligibleReason,
+                isEligible: canCallNow,
+                ineligibleReason
+              },
+              {
+                id: 'RADIOPORT_KEEP_DOWN',
+                title: '🔒 DEJAR BOCA ABAJO',
+                description: 'Mantén esta Leyenda oculta boca abajo en tu zona de mando y continúa.',
+                isEligible: true
+              }
+            ]
+          };
+          setGameState({ ...gameState });
+          return;
+        }
         if (leg && !p.hasCalledLegendThisTurn) {
           leg.isFaceUp = true;
           p.hasCalledLegendThisTurn = true;
@@ -3240,8 +3324,8 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
           setPreviewCard(leg);
           setHoveredCard(leg);
         }
+        finishTargetSelection();
       }
-      finishTargetSelection();
     }
   };
 

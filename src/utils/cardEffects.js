@@ -268,7 +268,26 @@ export function triggerMeredithStoutOnRivalGigModify(state, affectedOwnerKey) {
 }
 
 /**
+ * Comprueba si una Leyenda tiene clasificación ARASAKA o palabra clave GO SOLO
+ * (para CP-011 Arasaka Emergency Radioport).
+ */
+export function isArasakaOrGoSoloLegend(leg) {
+  if (!leg) return { isArasaka: false, hasGoSolo: false, eligible: false };
+  const id = resolveCardId(leg);
+  const rules = (id && allCardRules[id]) || {};
+  const classList = Array.isArray(rules.classification) ? rules.classification : [];
+  const isArasaka =
+    classList.some((c) => /arasaka/i.test(String(c))) ||
+    /arasaka/i.test(`${leg.name || ''} ${leg.traits || ''} ${leg.faction || ''}`);
+  const hasGoSolo =
+    (Array.isArray(rules.keywords) && rules.keywords.some((k) => String(k).toLowerCase() === 'go solo')) ||
+    /\bGO\s+SOLO\b/i.test(`${leg.rulesText || ''} ${leg.text || ''}`);
+  return { isArasaka, hasGoSolo, eligible: isArasaka || hasGoSolo };
+}
+
+/**
  * Disparadores cuando una Unidad o Leyenda aliada es girada (spent):
+ * - CP-011 Arasaka Emergency Radioport: "When this Unit or Legend is spent, you may look at a friendly face-down Legend. If that Legend is ARASAKA or has GO SOLO, you may Call it for free."
  * - CP-151 Zetatech Faceplate: "When this Unit or Legend is spent, adjust a Gig by up to 1. Then, if you control 3 or more Gigs with different values, draw 1."
  * - CP-007 Alt Cunningham // Mother of Daemons: "When a friendly equipped Unit or Legend is spent, draw 1."
  */
@@ -286,6 +305,49 @@ export function executeCardSpentTriggers(state, playerKey, spentCard) {
       drawCards(p, 1, state, 'Alt Cunningham // Mother of Daemons');
     });
   }
+
+  // CP-011 Arasaka Emergency Radioport (en los gears equipados a la carta girada)
+  const radioports = equippedGears.filter((g) => resolveCardId(g) === 'CP-011');
+  radioports.forEach((gearCard) => {
+    const faceDownLegends = (p.legends || []).filter(
+      (l) => !l.isFaceUp && !l.isOnField && !l.isRemovedFromGame
+    );
+    if (faceDownLegends.length === 0) {
+      state.actionLog.unshift(
+        `📡 [Arasaka Emergency Radioport] "${spentCard.name}" fue girada, pero no hay Leyendas boca abajo para mirar.`
+      );
+      return;
+    }
+    if (playerKey === 'player') {
+      queueTargetSelection(state, {
+        actionType: 'CALL_LEGEND_FREE',
+        radioportMode: true,
+        sourceCardId: 'CP-011',
+        sourceCardName: 'Arasaka Emergency Radioport',
+        sourceCardImage: gearCard.image || spentCard.image,
+        title: '📡 ARASAKA EMERGENCY RADIOPORT // MIRAR LEYENDA',
+        prompt: `"${spentCard.name}" fue girada. Elige 1 de tus Leyendas boca abajo para mirarla (si es ARASAKA o tiene GO SOLO podrás hacerle CALL gratis) u OMITIR:`,
+        allowSkip: true
+      });
+    } else {
+      // Bot AI: busca una Leyenda boca abajo ARASAKA o GO SOLO si aún no ha hecho Call este turno
+      if (!p.hasCalledLegendThisTurn) {
+        const eligibleLeg = faceDownLegends.find((l) => isArasakaOrGoSoloLegend(l).eligible);
+        if (eligibleLeg) {
+          eligibleLeg.isFaceUp = true;
+          p.hasCalledLegendThisTurn = true;
+          state.actionLog.unshift(
+            `📡 [Arasaka Emergency Radioport Rival] Al girar "${spentCard.name}", mira una Leyenda boca abajo y llama GRATIS a "${eligibleLeg.name}" (ARASAKA / GO SOLO).`
+          );
+          executeCallLegendTrigger(state, playerKey, eligibleLeg);
+          return;
+        }
+      }
+      state.actionLog.unshift(
+        `📡 [Arasaka Emergency Radioport Rival] Al girar "${spentCard.name}", mira 1 de sus Leyendas boca abajo y la deja boca abajo.`
+      );
+    }
+  });
 
   // CP-151 Zetatech Faceplate (en los gears equipados a la carta girada)
   const faceplates = equippedGears.filter((g) => resolveCardId(g) === 'CP-151');
