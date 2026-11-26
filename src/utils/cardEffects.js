@@ -1473,9 +1473,12 @@ export function executeProgramEffect(state, playerKey, card) {
       const highestVal = Math.max(...allGigs.map((g) => g.value || 0));
       const sourceObj = allGigs.find((g) => (g.value || 0) === highestVal);
 
-      const lowestFriendly = [...allFriendly].sort((a, b) => (a.value || 0) - (b.value || 0))[0];
-      if (lowestFriendly && sourceObj && (lowestFriendly.value || 0) < highestVal) {
-        targetGig = lowestFriendly;
+      const upgradableFriendly = [...allFriendly]
+        .filter((g) => (g.value || 1) < getGigMaxFace(g))
+        .sort((a, b) => (Math.min(getGigMaxFace(b), highestVal) - (b.value || 1)) - (Math.min(getGigMaxFace(a), highestVal) - (a.value || 1)));
+      const bestFriendly = upgradableFriendly[0] || [...allFriendly].sort((a, b) => (a.value || 0) - (b.value || 0))[0];
+      if (bestFriendly && sourceObj && (bestFriendly.value || 0) < Math.min(getGigMaxFace(bestFriendly), highestVal)) {
+        targetGig = bestFriendly;
         sourceGig = sourceObj;
       } else if (allFriendly.length >= 2) {
         targetGig = allFriendly[1];
@@ -1483,9 +1486,11 @@ export function executeProgramEffect(state, playerKey, card) {
       }
 
       if (targetGig && sourceGig) {
-        targetGig.value = sourceGig.value;
+        const maxFace = getGigMaxFace(targetGig);
+        const newVal = Math.max(1, Math.min(maxFace, Number(sourceGig.value) || 1));
+        targetGig.value = newVal;
         state.actionLog.unshift(
-          `🕊️ [Peace Offering Rival] El rival igualó su Gig ${targetGig.die.toUpperCase()} al valor ${sourceGig.value} del ${sourceGig.die.toUpperCase()}.`
+          `🕊️ [Peace Offering Rival] El rival igualó su Gig ${targetGig.die.toUpperCase()} al valor ${newVal}${newVal !== sourceGig.value ? ` (tope máximo de ${targetGig.die.toUpperCase()})` : ''} del ${sourceGig.die.toUpperCase()}.`
         );
       }
 
