@@ -186,115 +186,28 @@ export function getCardKeywordsArray(card) {
 }
 
 // =========================================================================
-// COMPONENTE DADO POLIÉDRICO SVG (D4, D6, D8, D10, D12, D20)
+// COMPONENTE DADO POLIÉDRICO 3D (D4, D6, D8, D10, D12, D20)
 // =========================================================================
 function PolyhedralDie({
   type = 'd6',
   value = null,
   isWaiting = false,
   isStolen = false,
-  size = 40,
+  size = 48,
   label = '',
   colorScheme = null // 'yellow' | 'red' | null
 }) {
   const normType = (type || 'd6').toLowerCase();
-
-  let strokeColor = isWaiting
-    ? '#374151'
-    : isStolen
-    ? '#FF003C'
-    : '#0dfceb';
-  let fillColor = isWaiting
-    ? '#090d16'
-    : isStolen
-    ? 'rgba(255, 0, 60, 0.25)'
-    : 'rgba(13, 252, 235, 0.20)';
-  let textColor = isWaiting ? '#6b7280' : isStolen ? '#ffffff' : '#FCEE0A';
-
-  if (colorScheme === 'yellow') {
-    strokeColor = '#FCEE0A';
-    fillColor = 'rgba(252, 238, 10, 0.22)';
-    textColor = '#FCEE0A';
-  } else if (colorScheme === 'red') {
-    strokeColor = '#FF003C';
-    fillColor = 'rgba(255, 0, 60, 0.25)';
-    textColor = '#FF003C';
-  }
-
-  const renderShape = () => {
-    switch (normType) {
-      case 'd4': // Triángulo
-        return (
-          <polygon
-            points="25,6 45,42 5,42"
-            fill={fillColor}
-            stroke={strokeColor}
-            strokeWidth="2.5"
-            strokeLinejoin="round"
-          />
-        );
-      case 'd6': // Cubo / Hexágono
-        return (
-          <polygon
-            points="25,5 44,15 44,35 25,45 6,35 6,15"
-            fill={fillColor}
-            stroke={strokeColor}
-            strokeWidth="2.5"
-            strokeLinejoin="round"
-          />
-        );
-      case 'd8': // Diamante / Octaedro
-        return (
-          <polygon
-            points="25,4 45,25 25,46 5,25"
-            fill={fillColor}
-            stroke={strokeColor}
-            strokeWidth="2.5"
-            strokeLinejoin="round"
-          />
-        );
-      case 'd10': // Decaedro / Escudo
-        return (
-          <polygon
-            points="25,4 46,18 38,44 12,44 4,18"
-            fill={fillColor}
-            stroke={strokeColor}
-            strokeWidth="2.5"
-            strokeLinejoin="round"
-          />
-        );
-      case 'd12': // Dodecaedro / Pentágono
-        return (
-          <polygon
-            points="25,4 46,19 38,44 12,44 4,19"
-            fill={fillColor}
-            stroke={strokeColor}
-            strokeWidth="2.5"
-            strokeLinejoin="round"
-          />
-        );
-      case 'd20': // Icosaedro facetado
-      default:
-        return (
-          <g>
-            <polygon
-              points="25,3 46,14 46,36 25,47 4,36 4,14"
-              fill={fillColor}
-              stroke={strokeColor}
-              strokeWidth="2.5"
-              strokeLinejoin="round"
-            />
-            <polygon
-              points="25,12 37,33 13,33"
-              fill="none"
-              stroke={strokeColor}
-              strokeWidth="1.2"
-              strokeDasharray="2 1"
-            />
-          </g>
-        );
-    }
-  };
+  const color =
+    colorScheme === 'yellow'
+      ? '#FCEE0A'
+      : colorScheme === 'red'
+      ? '#FF003C'
+      : isWaiting
+      ? '#6b7280'
+      : isStolen
+      ? '#FF003C'
+      : '#0dfceb';
 
   return (
     <div
@@ -304,41 +217,25 @@ function PolyhedralDie({
         value !== null ? `Resultado: ${value} ⭐` : 'En espera en el Fixer'
       }`}
     >
-      <div className="relative" style={{ width: size, height: size }}>
-        <svg
-          viewBox="0 0 50 50"
-          className={`w-full h-full ${
-            colorScheme === 'yellow'
-              ? 'drop-shadow-[0_0_12px_rgba(252,238,10,0.75)]'
-              : colorScheme === 'red'
-              ? 'drop-shadow-[0_0_12px_rgba(255,0,60,0.75)]'
-              : !isWaiting
-              ? isStolen
-                ? 'drop-shadow-[0_0_8px_rgba(255,0,60,0.7)]'
-                : 'drop-shadow-[0_0_8px_rgba(13,252,235,0.6)]'
-              : ''
-          }`}
-        >
-          {renderShape()}
-        </svg>
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-          {value !== null ? (
-            <span
-              className={`font-mono font-black drop-shadow-[0_0_4px_#000] ${size >= 80 ? 'text-2xl sm:text-3xl' : 'text-xs sm:text-sm'}`}
-              style={{ color: textColor }}
-            >
-              {value}
-            </span>
-          ) : (
-            <span className="font-mono font-bold text-[8px] sm:text-[9px] text-gray-500">
-              {normType.toUpperCase()}
-            </span>
-          )}
-        </div>
-      </div>
+      <CyberDieShape
+        dieType={normType}
+        value={value}
+        size={size}
+        color={color}
+        selected={colorScheme === 'yellow' || colorScheme === 'red'}
+        dimmed={isWaiting}
+      />
       <span
-        className={`text-[8px] font-mono font-bold uppercase tracking-tight mt-0.5 leading-none ${
-          isWaiting ? 'text-gray-600' : isStolen ? 'text-[#FF003C]' : 'text-[#0dfceb]'
+        className={`text-[8.5px] font-mono font-bold uppercase tracking-tight mt-0.5 leading-none ${
+          colorScheme === 'yellow'
+            ? 'text-[#FCEE0A]'
+            : colorScheme === 'red'
+            ? 'text-[#FF003C]'
+            : isWaiting
+            ? 'text-gray-600'
+            : isStolen
+            ? 'text-[#FF003C]'
+            : 'text-[#0dfceb]'
         }`}
       >
         {label || normType}
@@ -479,7 +376,7 @@ function CyberD20RollModal({ selection, onConfirmStarter, onReroll }) {
               <PolyhedralDie
                 type="d20"
                 value={displayPlayerRoll}
-                size={110}
+                size={132}
                 isWaiting={false}
                 isStolen={false}
                 colorScheme="yellow"
@@ -557,7 +454,7 @@ function CyberD20RollModal({ selection, onConfirmStarter, onReroll }) {
               <PolyhedralDie
                 type="d20"
                 value={displayBotRoll}
-                size={110}
+                size={132}
                 isWaiting={false}
                 isStolen={false}
                 colorScheme="red"
@@ -6026,7 +5923,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                           <CyberDieShape
                             dieType={gig.die}
                             value={gig.value}
-                            size={canAttackGigs || isMobGigEligible ? 32 : 28}
+                            size={canAttackGigs || isMobGigEligible ? 38 : 34}
                             color={isMobGigSelected ? '#FCEE0A' : isMobGigEligible ? '#0dfceb' : gig.stolenFrom ? '#0dfceb' : '#FF003C'}
                             selected={Boolean(canAttackGigs || isMobGigEligible || isMobGigSelected)}
                             showProgressBar
@@ -7150,7 +7047,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                         <CyberDieShape
                           dieType={gig.die}
                           value={gig.value}
-                          size={28}
+                          size={34}
                           color={gig.stolenFrom ? '#FCEE0A' : '#0dfceb'}
                           showProgressBar
                         />
@@ -8524,7 +8421,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                     >
                       <CyberDieShape
                         dieType={d}
-                        size={56}
+                        size={72}
                         color="#0dfceb"
                         dimmed={isD20Disabled}
                       />
@@ -8573,7 +8470,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
               <PolyhedralDie
                 type={rollingAnimation.dieType}
                 value={rollingAnimation.currentValue}
-                size={120}
+                size={144}
                 isWaiting={false}
                 isStolen={false}
               />
@@ -10381,7 +10278,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                       <CyberDieShape
                         dieType={dieKey}
                         value={gig.value}
-                        size={52}
+                        size={64}
                         color={isSelected ? '#FCEE0A' : '#0dfceb'}
                         selected={isSelected}
                         showLabelBelow
@@ -10779,7 +10676,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                       type={String(sel.die || 'd20').toLowerCase()}
                       value={sel.rolledValue}
                       isWaiting={false}
-                      size={56}
+                      size={68}
                     />
                     <div>
                       <span className="text-sm font-black text-[#FCEE0A] uppercase block">
@@ -10840,7 +10737,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                               : 'border-gray-800 opacity-35 cursor-not-allowed'
                           }`}
                         >
-                          <PolyhedralDie type={dieKey} value={gig.value} isWaiting={false} isStolen={Boolean(gig.stolenFrom)} size={40} />
+                          <PolyhedralDie type={dieKey} value={gig.value} isWaiting={false} isStolen={Boolean(gig.stolenFrom)} size={54} />
                           <div className="text-center">
                             <span className="text-xs font-black text-white uppercase block">{gig.die.toUpperCase()}</span>
                             <span className="text-[11px] text-[#FF003C] font-black block">VALOR: {gig.value}</span>
@@ -10910,7 +10807,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                                   value={gig.value}
                                   isWaiting={false}
                                   isStolen={Boolean(gig.stolenFrom)}
-                                  size={40}
+                                  size={54}
                                 />
                                 <div className="text-center">
                                   <span className="text-xs font-black text-white uppercase block">
@@ -11032,7 +10929,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                                   value={gig.value}
                                   isWaiting={false}
                                   isStolen={Boolean(gig.stolenFrom)}
-                                  size={40}
+                                  size={54}
                                 />
                                 <div className="text-center">
                                   <span className="text-xs font-black text-white uppercase block">

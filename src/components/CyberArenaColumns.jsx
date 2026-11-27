@@ -252,21 +252,21 @@ export function CyberRightGigsRail({
   );
 
   return (
-    <div className="hidden lg:flex w-52 xl:w-60 flex-col justify-between py-3 px-2.5 gap-2.5 bg-transparent font-mono shrink-0 select-none">
+    <div className="hidden lg:flex w-56 xl:w-64 flex-col justify-between py-3 px-2.5 gap-2.5 bg-transparent font-mono shrink-0 select-none">
       {/* 1. FIXER DEL RIVAL */}
-      <div className="bg-[#090d16]/70 border border-white/10 rounded-md px-2.5 py-2 space-y-1.5">
+      <div className="bg-[#090d16]/70 border border-white/10 rounded-md px-2 py-2 space-y-1.5">
         <div className="flex items-center justify-between text-[9px] font-black uppercase tracking-widest text-gray-500">
           <span>FIXER</span>
           <span>{botFixerSet.size === 0 ? 'EMPTY' : ''}</span>
         </div>
-        <div className="flex flex-wrap items-center gap-1.5">
+        <div className="flex flex-wrap items-center justify-between gap-1">
           {FIXER_ORDER.map((d) => {
             const avail = botFixerSet.has(d);
             return (
               <CyberDieShape
                 key={`bf-${d}`}
                 dieType={d}
-                size={27}
+                size={31}
                 color="#FF003C"
                 dimmed={!avail}
               />
@@ -356,7 +356,7 @@ export function CyberRightGigsRail({
                       <CyberDieShape
                         dieType={gig.die}
                         value={gig.value}
-                        size={40}
+                        size={54}
                         color={
                           isTargetSelected
                             ? '#FCEE0A'
@@ -486,7 +486,7 @@ export function CyberRightGigsRail({
                       <CyberDieShape
                         dieType={gig.die}
                         value={gig.value}
-                        size={40}
+                        size={54}
                         color={
                           isTargetSelected
                             ? '#FCEE0A'
@@ -524,7 +524,7 @@ export function CyberRightGigsRail({
           </span>
           <span className="text-gray-600">{playerFixerSet.size === 0 ? 'EMPTY' : ''}</span>
         </div>
-        <div className="flex flex-wrap items-center gap-1.5">
+        <div className="flex flex-wrap items-center justify-between gap-1">
           {FIXER_ORDER.map((d) => {
             const avail = playerFixerSet.has(d);
             const isEligible = canRollFixerNow && eligibleSet.has(d);
@@ -549,7 +549,7 @@ export function CyberRightGigsRail({
               >
                 <CyberDieShape
                   dieType={d}
-                  size={27}
+                  size={31}
                   color="#0dfceb"
                   selected={isEligible}
                   dimmed={!avail}
