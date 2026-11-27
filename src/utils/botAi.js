@@ -33,6 +33,7 @@ import {
   parseCardCost,
   parseCardPower,
   canUnitAttack,
+  canUnitBeBlocked,
   executeStartPhase
 } from './cyberpunkEngine.js';
 import {
@@ -841,9 +842,14 @@ function tryActivateBotAbilities(gameState, bot, player) {
  * Decide si el bot desea interceptar un ataque del jugador usando una de sus unidades con Blocker.
  * Respeta la regla de Johnny Silverhand (CP-054) contra unidades CORPO.
  */
-export function decideBotBlocker(botState, attackerPower, isGigAttack = false, attackerUnit = null) {
+export function decideBotBlocker(botState, attackerPower, isGigAttack = false, attackerUnit = null, gameState = null) {
+  // Reglas de imbloqueable (ej: CP-081 MT0D12 Flathead cuando el atacante tiene menor Street Cred)
+  if (gameState && attackerUnit && !canUnitBeBlocked(attackerUnit, 'player', gameState)) {
+    return null;
+  }
+
   const readyBlockers = (botState.field || []).filter(
-    (u) => !u.isSpent && hasKeyword(u, 'Blocker')
+    (u) => !u.isSpent && hasKeyword(u, 'Blocker') && !u.cannotBlock && !u.cannotBlockThisTurn
   );
   if (readyBlockers.length === 0) return null;
 
@@ -893,8 +899,9 @@ export function executeBotReaction(gameState, attackerUnit, targetType, targetUn
   const bot = gameState.bot;
   const isGigAttack = targetType === 'GIGS';
 
-  // 1. Evaluar Blocker primero (respetando Johnny vs CORPO)
-  const chosenBlocker = decideBotBlocker(bot, attackerUnit.currentPower || 0, isGigAttack, attackerUnit);
+  // 1. Evaluar Blocker primero (respetando Johnny vs CORPO y MT0D12 Flathead imbloqueable)
+  const attackerIsUnblockable = !canUnitBeBlocked(attackerUnit, 'player', gameState);
+  const chosenBlocker = decideBotBlocker(bot, attackerUnit.currentPower || 0, isGigAttack, attackerUnit, gameState);
   const willFight = Boolean(chosenBlocker || targetType === 'UNIT');
 
   // 2. Evaluar cartas Quick útiles para ESTA situación concreta
@@ -969,6 +976,10 @@ export function executeBotReaction(gameState, attackerUnit, targetType, targetUn
     });
     gameState.actionLog.unshift(
       `🛡️ [FASE 2: REACCIÓN] ¡BLOCKER! El rival gira a "${chosenBlocker.name}" [Fuerza: ${chosenBlocker.currentPower}] para interceptar el ataque.`
+    );
+  } else if (attackerIsUnblockable) {
+    gameState.actionLog.unshift(
+      `👻 [FASE 2: REACCIÓN] "${attackerUnit.name}" NO PUEDE SER BLOQUEADA (tu Street Cred es inferior al del rival).`
     );
   } else {
     gameState.actionLog.unshift(
@@ -1423,10 +1434,11 @@ export async function runBotTurn(gameState, updateCallback, delayMs = 1450, paus
     // 4.B: Destruir unidades enemigas giradas (Spent) donde el bot gana limpiamente (o Johnny vs CORPO)
     // Si podemos robar 2+ Gigs (o llegar a 7 Gigs) libremente sin Blocker que nos frene, no desperdiciar
     // un atacante gigante matando una unidad girada débil (ej. Delamain fuerza 0) en lugar de asaltar Gigs.
+    const unitIsUnblockable = !canUnitBeBlocked(unit, 'bot', gameState);
     const canStealBigGigs =
       (player.gigs || []).length > 0 &&
       canUnitAttack(unit, bot, gameState, 'GIGS') &&
-      playerReadyBlockers.length === 0 &&
+      (unitIsUnblockable || playerReadyBlockers.length === 0) &&
       (gigsToSteal >= 2 || (bot.gigs?.length || 0) + gigsToSteal >= 7);
 
     const killableSpentEnemy = [...(player.field || [])]
@@ -1475,6 +1487,7 @@ export async function runBotTurn(gameState, updateCallback, delayMs = 1450, paus
     // 4.C: Atacar los Gigs del jugador (evitar suicidarse contra un Blocker más grande salvo si hay más atacantes o mustAttack)
     if (player.gigs && player.gigs.length > 0 && canUnitAttack(unit, bot, gameState, 'GIGS')) {
       const blockedByStronger =
+        !unitIsUnblockable &&
         playerReadyBlockers.length > 0 &&
         maxPlayerBlockerPower > unitPower &&
         !(isBotJohnny && playerReadyBlockers.every(isCorpoUnit));

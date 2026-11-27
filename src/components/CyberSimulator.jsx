@@ -111,6 +111,7 @@ import {
   playLegendToField,
   canLegendDeployToField,
   canUnitAttack,
+  canUnitBeBlocked,
   getUnitAttackRestriction,
   sendDefeatedUnitToGraveyardOrExile,
   sendUnitToBottomDeck,
@@ -3470,8 +3471,11 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
     const reaction = gameState.pendingReaction;
     if (reaction.blockerUnitId) return; // Ya hay un Blocker asignado para este ataque
 
+    const botAttacker = (gameState.bot?.field || []).find((u) => u.instanceId === reaction.attackerUnitId);
+    if (botAttacker && !canUnitBeBlocked(botAttacker, 'bot', gameState)) return;
+
     const blocker = (gameState.player?.field || []).find((u) => u.instanceId === blockerUnitId);
-    if (!blocker || blocker.isSpent || !hasKeyword(blocker, 'Blocker')) return;
+    if (!blocker || blocker.isSpent || !hasKeyword(blocker, 'Blocker') || blocker.cannotBlock || blocker.cannotBlockThisTurn) return;
 
     pushHistory();
     blocker.isSpent = true;
@@ -6234,8 +6238,13 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                           })()}
 
                           {/* Insignias de estado táctico en unidad rival (DEBE ATACAR / CONGELADA) */}
-                          {(unit.mustAttackNextTurn || unit.cannotAttackUntilNextTurn || (typeof unit.cannotAttackUntilTurn === 'number' && gameState.turnNumber < unit.cannotAttackUntilTurn)) && (
+                          {(unit.mustAttackNextTurn || !canUnitBeBlocked(unit, 'bot', gameState) || unit.cannotAttackUntilNextTurn || (typeof unit.cannotAttackUntilTurn === 'number' && gameState.turnNumber < unit.cannotAttackUntilTurn)) && (
                             <div className="pointer-events-none absolute top-1 left-1 right-1 flex flex-col items-end gap-0.5 z-20">
+                              {!canUnitBeBlocked(unit, 'bot', gameState) && !unit.isSpent && (
+                                <span className="px-1 py-0.5 bg-cyan-500/95 text-[#070a10] font-mono font-black text-[7px] sm:text-[7.5px] uppercase shadow border border-white/70">
+                                  👻 IMBLOQUEABLE
+                                </span>
+                              )}
                               {unit.mustAttackNextTurn && !unit.isSpent && (
                                 <span className="px-1 py-0.5 bg-amber-500 text-black font-mono font-black text-[7px] sm:text-[7.5px] uppercase shadow animate-pulse border border-yellow-200">
                                   💢 DEBE ATACAR
@@ -6511,11 +6520,19 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                     const isSelected = selectedFieldUnit?.instanceId === unit.instanceId;
                     const canAttack = isMyTurn && canUnitAttack(unit, p, gameState);
                     const attackRestriction = (!unit.isSpent && !unit.isLagging) ? getUnitAttackRestriction(unit, p, gameState) : null;
+                    const reactionBotAttacker =
+                      gameState.pendingReaction?.attackerPlayerKey === 'bot'
+                        ? (bot.field || []).find((u) => u.instanceId === gameState.pendingReaction.attackerUnitId)
+                        : null;
+                    const attackerCanBeBlocked = !reactionBotAttacker || canUnitBeBlocked(reactionBotAttacker, 'bot', gameState);
                     const isEligibleBlocker = Boolean(
                       gameState.pendingReaction &&
                       gameState.pendingReaction.attackerPlayerKey === 'bot' &&
                       !gameState.pendingReaction.blockerUnitId &&
+                      attackerCanBeBlocked &&
                       !unit.isSpent &&
+                      !unit.cannotBlock &&
+                      !unit.cannotBlockThisTurn &&
                       hasKeyword(unit, 'Blocker')
                     );
                     const isCurrentBlocker = Boolean(
@@ -6730,6 +6747,11 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                             {hasKeyword(unit, 'Blocker') && !isCurrentBlocker && !isEligibleBlocker && (
                               <span className="w-6 h-6 rounded-full bg-[#070a10]/90 border border-[#0dfceb] flex items-center justify-center shadow-[0_0_10px_rgba(13,252,235,0.5)]">
                                 <Shield className="w-3.5 h-3.5 text-[#0dfceb]" />
+                              </span>
+                            )}
+                            {!canUnitBeBlocked(unit, 'player', gameState) && !unit.isSpent && (
+                              <span className="px-1 py-0.5 bg-cyan-400 text-[#070a10] font-mono font-black text-[7px] sm:text-[7.5px] uppercase shadow-[0_0_10px_#0dfceb] border border-white">
+                                👻 IMBLOQUEABLE
                               </span>
                             )}
                             {unit.cannotBeDefeatedThisTurn && (
@@ -9644,10 +9666,14 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
         const reaction = gameState.pendingReaction;
         const liveAttacker = (bot.field || []).find((u) => u.instanceId === reaction.attackerUnitId);
         const liveAttackerPower = liveAttacker?.currentPower ?? reaction.attackerPower ?? 0;
-        // REGLA OFICIAL: Las unidades con Blocker pueden bloquear aunque tengan Lag (solo deben estar Ready/no giradas)
-        const readyBlockers = (p.field || []).filter(
-          (u) => !u.isSpent && hasKeyword(u, 'Blocker')
-        );
+        // REGLA OFICIAL: Las unidades con Blocker pueden bloquear aunque tengan Lag (solo deben estar Ready/no giradas),
+        // salvo que el atacante sea imbloqueable (ej: CP-081 MT0D12 Flathead con menor Street Cred).
+        const attackerIsUnblockable = Boolean(liveAttacker && !canUnitBeBlocked(liveAttacker, 'bot', gameState));
+        const readyBlockers = attackerIsUnblockable
+          ? []
+          : (p.field || []).filter(
+              (u) => !u.isSpent && hasKeyword(u, 'Blocker') && !u.cannotBlock && !u.cannotBlockThisTurn
+            );
         const currentBlocker = (p.field || []).find((u) => u.instanceId === reaction.blockerUnitId);
         const uncalledLegends = (p.legends || []).filter((l) => !l.isFaceUp);
         const faceUpLegends = (p.legends || []).filter((l) => l.isFaceUp);
@@ -9688,6 +9714,15 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                     : String(reaction.targetName || '').split('//')[0].trim()}
                 </span>
               </span>
+
+              {!currentBlocker && attackerIsUnblockable && (
+                <span
+                  className="px-2 py-0.5 bg-cyan-500/15 border border-cyan-400/70 text-cyan-300 rounded-sm text-[10px] font-black uppercase"
+                  title="Esta unidad no puede ser bloqueada (menor Street Cred que tú)"
+                >
+                  👻 IMBLOQUEABLE
+                </span>
+              )}
 
               {!currentBlocker && readyBlockers.length > 0 && (
                 <button

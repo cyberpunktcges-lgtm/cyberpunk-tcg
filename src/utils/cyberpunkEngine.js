@@ -280,6 +280,29 @@ export function canUnitAttack(unit, playerState = null, gameState = null, target
 }
 
 /**
+ * Comprueba si una unidad atacante puede ser bloqueada por un BLOCKER en este instante.
+ * - CP-081 MT0D12 Flathead: "If you have less ☆ (Street Cred) than a Rival, this Unit can't be blocked."
+ */
+export function canUnitBeBlocked(attackerUnit, attackerPlayerKey, gameState) {
+  if (!attackerUnit || !gameState || !attackerPlayerKey) return true;
+  if (attackerUnit.cannotBeBlockedThisTurn) return false;
+  const cid = String(attackerUnit.id || '').toUpperCase();
+  const slug = String(attackerUnit.slug || '').toLowerCase();
+  const name = String(attackerUnit.name || '').toLowerCase();
+  const isFlathead = cid === 'CP-081' || slug.includes('flathead') || name.includes('flathead');
+  if (isFlathead) {
+    const attacker = gameState[attackerPlayerKey];
+    const defender = gameState[attackerPlayerKey === 'player' ? 'bot' : 'player'];
+    const myCred = calculateStreetCred(attacker?.gigs || []);
+    const oppCred = calculateStreetCred(defender?.gigs || []);
+    if (myCred < oppCred) {
+      return false;
+    }
+  }
+  return true;
+}
+
+/**
  * Devuelve el motivo por el cual una Unidad no puede atacar (para mensajes UI / Holocall)
  */
 export function getUnitAttackRestriction(unit, playerState = null, gameState = null, targetType = null) {
@@ -1567,9 +1590,9 @@ export function attackRivalGigs(
   }
 
   // FASE 2: Intercepción por BLOCKER (si fue asignado en la Fase de Reacción):
-  if (blockerUnitId) {
+  if (blockerUnitId && canUnitBeBlocked(unit, attackerPlayerKey, state)) {
     const blocker = defender.field.find((u) => u.instanceId === blockerUnitId);
-    if (blocker && hasKeyword(blocker, 'Blocker')) {
+    if (blocker && hasKeyword(blocker, 'Blocker') && !blocker.cannotBlock && !blocker.cannotBlockThisTurn) {
       blocker.isSpent = true;
       state.actionLog.unshift(
         `🛡️ [FASE 2: REACCIÓN] ¡BLOCKER! ${defender.name} gira a "${blocker.name}" para interceptar el asalto a sus Gigs. ¡El combate se convierte en lucha contra el bloqueador y NO se roba ningún Gig!`
@@ -2056,9 +2079,9 @@ export function fightRivalUnit(
   }
 
   // Intercepción por Blocker
-  if (blockerUnitId) {
+  if (blockerUnitId && canUnitBeBlocked(attUnit, attackerPlayerKey, state)) {
     const blocker = defender.field.find((u) => u.instanceId === blockerUnitId);
-    if (blocker && (blockerAlreadyCommitted || hasKeyword(blocker, 'Blocker'))) {
+    if (blocker && (blockerAlreadyCommitted || (hasKeyword(blocker, 'Blocker') && !blocker.cannotBlock && !blocker.cannotBlockThisTurn))) {
       if (!blockerAlreadyCommitted) {
         blocker.isSpent = true;
         state.actionLog.unshift(
