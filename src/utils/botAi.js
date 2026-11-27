@@ -856,6 +856,7 @@ export function decideBotBlocker(botState, attackerPower, isGigAttack = false, a
   const attIsJohnny = isJohnnyUnit(attackerUnit);
 
   const canBlockerWin = (b) => {
+    if (attackerUnit?.cannotBeDefeatedThisTurn) return false; // No puede ser derrotada en combate este turno
     if (attIsJohnny && isCorpoUnit(b)) return false; // Johnny siempre gana a CORPO
     if (isJohnnyUnit(b) && isCorpoUnit(attackerUnit)) return true;
     return (b.currentPower || 0) > attackerPower;
@@ -1444,6 +1445,7 @@ export async function runBotTurn(gameState, updateCallback, delayMs = 1450, paus
     const killableSpentEnemy = [...(player.field || [])]
       .filter((pu) => {
         if (!pu.isSpent) return false;
+        if (pu.cannotBeDefeatedThisTurn) return false; // Inmune en combate este turno (ej. Muamar Reyes): no malgastar ataque
         if (canStealBigGigs && (pu.currentPower || 0) <= 2 && !hasKeyword(pu, 'Blocker')) return false;
         if (isBotJohnny && isCorpoUnit(pu)) return true;
         if (isJohnnyUnit(pu) && botUnitIsCorpo) return false;
@@ -1534,6 +1536,7 @@ export async function runBotTurn(gameState, updateCallback, delayMs = 1450, paus
     const tieEnemy = (player.field || []).find(
       (pu) =>
         pu.isSpent &&
+        !pu.cannotBeDefeatedThisTurn &&
         !(isJohnnyUnit(pu) && botUnitIsCorpo) &&
         ((pu.currentPower || 0) === unitPower && (pu.currentPower || 0) >= 5 || unit.mustAttackNextTurn)
     );
