@@ -2211,6 +2211,12 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
         });
         const rivalUnequipped = (opp.field || []).filter((u) => !u.gear || u.gear.length === 0);
         if (rivalUnequipped.length > 0) {
+          if (gameState.pendingTargetSelection) {
+            if (!Array.isArray(gameState.pendingTargetSelectionQueue)) {
+              gameState.pendingTargetSelectionQueue = [];
+            }
+            gameState.pendingTargetSelectionQueue.unshift(gameState.pendingTargetSelection);
+          }
           gameState.pendingTargetSelection = {
             actionType: 'TARGET_UNIT',
             sourceCardId: 'CP-067',
@@ -2221,7 +2227,8 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
             prompt: 'Selecciona la Unidad rival sin Gear equipado para enviarla al fondo de su mazo:',
             effectType: 'BOTTOM_DECK',
             targetScope: 'RIVAL_UNITS',
-            onlyUnequipped: true
+            onlyUnequipped: true,
+            _chosenToResolveNow: true
           };
         }
       } else {
@@ -2284,6 +2291,12 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
         }
         const oppUnits = opp.field || [];
         if (oppUnits.length > 0) {
+          if (gameState.pendingTargetSelection) {
+            if (!Array.isArray(gameState.pendingTargetSelectionQueue)) {
+              gameState.pendingTargetSelectionQueue = [];
+            }
+            gameState.pendingTargetSelectionQueue.unshift(gameState.pendingTargetSelection);
+          }
           gameState.pendingTargetSelection = {
             actionType: 'TARGET_UNIT',
             sourceCardId: 'CP-096',
@@ -2293,7 +2306,8 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
             title: '📡 PLACIDE // ENVIAR AL FONDO DEL MAZO',
             prompt: 'Selecciona una Unidad rival para enviarla al fondo de su mazo:',
             effectType: 'BOTTOM_DECK',
-            targetScope: 'RIVAL_UNITS'
+            targetScope: 'RIVAL_UNITS',
+            _chosenToResolveNow: true
           };
         }
       } else {
@@ -2318,6 +2332,12 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
         if (tIdx !== -1) p.trash.splice(tIdx, 1);
         const otherUnits = (p.field || []).filter((u) => u.instanceId !== choice.excludeUnitId);
         if (otherUnits.length > 0) {
+          if (gameState.pendingTargetSelection) {
+            if (!Array.isArray(gameState.pendingTargetSelectionQueue)) {
+              gameState.pendingTargetSelectionQueue = [];
+            }
+            gameState.pendingTargetSelectionQueue.unshift(gameState.pendingTargetSelection);
+          }
           gameState.pendingTargetSelection = {
             actionType: 'TARGET_UNIT',
             sourceCardId: 'CP-142',
@@ -2329,7 +2349,8 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
             effectType: 'EQUIP_GEAR',
             gearToEquip: selected,
             targetScope: 'FRIENDLY_UNITS',
-            excludeInstanceId: choice.excludeUnitId
+            excludeInstanceId: choice.excludeUnitId,
+            _chosenToResolveNow: true
           };
         }
       }
@@ -2574,7 +2595,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
     // Dexter DeShawn
     if (optionId === 'DEXTER_BUFF') {
       if ((p.field || []).length > 0) {
-        gameState.pendingTargetSelection = {
+        enqueueModalTargetSelection({
           actionType: 'TARGET_UNIT',
           effectType: 'BUFF',
           amount: 2,
@@ -2584,7 +2605,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
           sourceCardName: 'Dexter DeShawn',
           sourceCardImage: choice.sourceCardImage,
           sourceUnitId: choice.sourceUnitId || null
-        };
+        });
         delete gameState.pendingModalChoice;
         setGameState({ ...gameState });
         return;
@@ -2617,7 +2638,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
       });
 
       if (allPlayerGears.length > 1) {
-        gameState.pendingTargetSelection = {
+        enqueueModalTargetSelection({
           actionType: 'TARGET_GEAR',
           gearAction: 'DUMDUM_REWARD',
           title: '💉 DUM DUM // SACRIFICAR GEAR',
@@ -2625,7 +2646,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
           sourceCardName: 'Dum Dum',
           sourceCardImage: choice.sourceCardImage,
           sourceUnitId: choice.sourceUnitId || null
-        };
+        });
         delete gameState.pendingModalChoice;
         setGameState({ ...gameState });
         return;
@@ -4452,8 +4473,9 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
     !activeTargetSel._chosenToResolveNow
       ? [activeTargetSel, ...(gameState.pendingTargetSelectionQueue || [])]
       : [];
-  const isChoosingTriggerOrder = pendingTriggerQueueList.length >= 2;
-  const isInlineBoardTargeting = Boolean(!isChoosingTriggerOrder && activeTargetSel && INLINE_TARGET_ACTIONS.has(activeTargetSel.actionType));
+  const hasBlockingChoiceModal = Boolean(gameState?.pendingCardChoice || gameState?.pendingModalChoice);
+  const isChoosingTriggerOrder = !hasBlockingChoiceModal && pendingTriggerQueueList.length >= 2;
+  const isInlineBoardTargeting = Boolean(!hasBlockingChoiceModal && !isChoosingTriggerOrder && activeTargetSel && INLINE_TARGET_ACTIONS.has(activeTargetSel.actionType));
 
   const isUnitEligibleForInlineTarget = (unit, ownerKey) => {
     if (!activeTargetSel || activeTargetSel.actionType !== 'TARGET_UNIT') return false;

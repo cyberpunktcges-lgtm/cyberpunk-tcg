@@ -239,7 +239,7 @@ export const ACTIVATED_ABILITIES_CONFIG = {
         card.isSpent = true;
 
         if (playerKey === 'player' && (p.field || []).length > 1) {
-          state.pendingTargetSelection = {
+          queueTargetSelection(state, {
             actionType: 'TARGET_UNIT',
             sourceCardId: 'CP-029',
             sourceCardName: 'Dum Dum // Maelstrom Triggerman',
@@ -248,7 +248,7 @@ export const ACTIVATED_ABILITIES_CONFIG = {
             prompt: 'Selecciona una Unidad aliada: ganará +1 de Fuerza este turno por cada Gear que tenga equipado:',
             effectType: 'BUFF_PER_GEAR',
             targetScope: 'FRIENDLY_UNITS'
-          };
+          });
           state.actionLog.unshift(`💉 [Dum Dum] Paga 1 €$ y gira a Dum Dum (QUICK ↷) para potenciar una unidad aliada según sus Gears.`);
           return { success: true, requiresModal: true, message: 'Selecciona la unidad aliada a potenciar.' };
         }

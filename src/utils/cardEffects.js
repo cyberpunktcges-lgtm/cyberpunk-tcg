@@ -2414,7 +2414,7 @@ function _executeUnitPlayTrigger(state, playerKey, unitInstance) {
       state.actionLog.unshift(`🔫 [Gilded Matón] ¡PLAY activado! No controlas ningún Gear aliado para sacrificar.`);
       notifyTrigger('🔫 GILDED MATÓN // PLAY', 'Habilidad PLAY activada, pero no tienes ningún Gear equipado para sacrificar.', 'info');
     } else if (playerKey === 'player') {
-      state.pendingTargetSelection = {
+      queueTargetSelection(state, {
         actionType: 'TARGET_GEAR',
         gearAction: 'GILDED_MATON_REWARD',
         targetScope: 'FRIENDLY_GEARS',
@@ -2423,7 +2423,7 @@ function _executeUnitPlayTrigger(state, playerKey, unitInstance) {
         sourceCardImage: unitInstance.image,
         title: '🔫 GILDED MATÓN // HABILIDAD PLAY',
         prompt: 'Puedes destruir 1 Gear aliado. Si lo haces, podrás destruir una Unidad rival con coste ≤ 3 €$. (Pulsa Cancelar para omitir)'
-      };
+      });
     } else {
       const targetOpp = (opp.field || []).find((u) => getNumericCost(u) <= 3);
       if (targetOpp) {
@@ -2528,7 +2528,7 @@ function _executeUnitPlayTrigger(state, playerKey, unitInstance) {
       state.actionLog.unshift(`🩺 [Heywood Ripperdoc] ¡PLAY activado! No hay ningún Gear equipado en juego.`);
       notifyTrigger('🩺 HEYWOOD RIPPERDOC // PLAY', 'Habilidad PLAY activada, pero no hay ningún Gear equipado en el campo de batalla.', 'info');
     } else if (playerKey === 'player') {
-      state.pendingTargetSelection = {
+      queueTargetSelection(state, {
         actionType: 'TARGET_GEAR',
         gearAction: 'HEYWOOD_RIPPERDOC_REWARD',
         targetScope: 'ALL',
@@ -2537,7 +2537,7 @@ function _executeUnitPlayTrigger(state, playerKey, unitInstance) {
         sourceCardImage: unitInstance.image,
         title: '🩺 HEYWOOD RIPPERDOC // HABILIDAD PLAY',
         prompt: 'Puedes destruir cualquier Gear en juego (tuyo o del rival). Si su coste coincide con el valor de uno de tus Gigs, robas 1 carta.'
-      };
+      });
     } else {
       const rivalGear = allGears.find((item) => item.ownerKey === oppKey);
       if (rivalGear) {
@@ -2562,7 +2562,7 @@ function _executeUnitPlayTrigger(state, playerKey, unitInstance) {
   if (cardId === 'CP-053') {
     const friendlyUnits = p.field || [];
     if (playerKey === 'player' && friendlyUnits.length > 1) {
-      state.pendingTargetSelection = {
+      queueTargetSelection(state, {
         actionType: 'TARGET_UNIT',
         sourceCardId: 'CP-053',
         sourceCardName: 'Japantown Jonin',
@@ -2572,7 +2572,7 @@ function _executeUnitPlayTrigger(state, playerKey, unitInstance) {
         effectType: 'BUFF',
         amount: 2,
         targetScope: 'FRIENDLY_UNITS'
-      };
+      });
     } else {
       const target = friendlyUnits[0] || unitInstance;
       target.currentPower = (target.currentPower || 0) + 2;
@@ -2954,7 +2954,7 @@ function _executeUnitPlayTrigger(state, playerKey, unitInstance) {
         'info'
       );
     } else if (playerKey === 'player' && pairs < readyOppUnits.length) {
-      state.pendingTargetSelection = {
+      queueTargetSelection(state, {
         actionType: 'TARGET_UNIT',
         sourceCardId: 'CP-113',
         sourceCardName: 'Sandayu Oda // Hanako\'s Guardian',
@@ -2964,7 +2964,7 @@ function _executeUnitPlayTrigger(state, playerKey, unitInstance) {
         effectType: 'SPEND',
         targetScope: 'RIVAL_UNITS',
         remainingSpends: pairs - 1
-      };
+      });
     } else {
       const toSpend = readyOppUnits.slice(0, pairs);
       toSpend.forEach((u) => { u.isSpent = true; });
@@ -3015,7 +3015,7 @@ function _executeUnitPlayTrigger(state, playerKey, unitInstance) {
       state.actionLog.unshift(`🏎️ [Valentino Street Racer] ¡PLAY activado! No tienes otra Unidad aliada con coste ≤ 5 €$.`);
       notifyTrigger('🏎️ VALENTINO STREET RACER // PLAY', 'No controlas otra unidad aliada con coste ≤ 5 €$.', 'info');
     } else if (playerKey === 'player' && eligible.length > 1) {
-      state.pendingTargetSelection = {
+      queueTargetSelection(state, {
         actionType: 'TARGET_UNIT',
         sourceCardId: 'CP-139',
         sourceCardName: 'Valentino Street Racer',
@@ -3026,7 +3026,7 @@ function _executeUnitPlayTrigger(state, playerKey, unitInstance) {
         targetScope: 'FRIENDLY_UNITS',
         maxCost: 5,
         excludeInstanceId: unitInstance.instanceId
-      };
+      });
     } else {
       const otherUnit = eligible[0];
       otherUnit.isLagging = false;
