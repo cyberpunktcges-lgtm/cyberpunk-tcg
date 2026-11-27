@@ -91,6 +91,7 @@ import {
   attackRivalGigs,
   fightRivalUnit,
   passTurn,
+  executeStartPhase,
   mulliganHand,
   keepHand,
   hasKeyword,
@@ -975,10 +976,12 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
   const lastBotSpotlightIdRef = useRef(null);
   const [turnBanner, setTurnBanner] = useState(null); // { isPlayer: bool, turnNumber: number }
   const prevTurnBannerKeyRef = useRef(null);
+  const [delayingFixerModal, setDelayingFixerModal] = useState(false);
 
   useEffect(() => {
     if (showLobby || !gameState || gameState.isGameOver || !gameState.mulliganDecided) {
       setTurnBanner(null);
+      setDelayingFixerModal(false);
       return;
     }
     const key = `${gameState.matchId}-${gameState.turnNumber}-${gameState.activePlayer}`;
@@ -991,14 +994,47 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
     });
   }, [gameState?.matchId, gameState?.turnNumber, gameState?.activePlayer, gameState?.mulliganDecided, gameState?.isGameOver, showLobby]);
 
-  // Auto-cierre garantizado del banner de turno (dura ~1.9s para leerse con claridad antes de cambiar de fase)
+  // Coreografía de cambio de turno:
+  // 1) Sale la animación de turno con TODO el tablero congelado (1.8s)
+  // 2) Al desaparecer la animación, se ejecuta executeStartPhase (enderezar cartas, robar carta, tirar dado)
+  // 3) Si es tu turno, se dejan 650ms para ver el enderezado y el robo antes de abrir "ELIGE UN DADO"
   useEffect(() => {
     if (!turnBanner) return;
+    const isPlayerTurnBanner = turnBanner.isPlayer;
     const t = window.setTimeout(() => {
       setTurnBanner(null);
-    }, 1900);
+      if (isPlayerTurnBanner) {
+        setDelayingFixerModal(true);
+      }
+      setGameState((prev) => {
+        if (!prev || !prev.pendingStartPhase || prev.isGameOver) return prev;
+        executeStartPhase(prev, prev.activePlayer);
+        return { ...prev };
+      });
+    }, 1800);
     return () => window.clearTimeout(t);
   }, [turnBanner]);
+
+  useEffect(() => {
+    if (!delayingFixerModal) return;
+    const t = window.setTimeout(() => setDelayingFixerModal(false), 650);
+    return () => window.clearTimeout(t);
+  }, [delayingFixerModal]);
+
+  // Red de seguridad: si tras recargar partida quedó pendingStartPhase sin banner activo, arrancarlo limpiamente
+  useEffect(() => {
+    if (showLobby || !gameState || gameState.isGameOver || !gameState.pendingStartPhase || turnBanner) return;
+    const key = `${gameState.matchId}-${gameState.turnNumber}-${gameState.activePlayer}`;
+    if (prevTurnBannerKeyRef.current !== key) return;
+    const t = window.setTimeout(() => {
+      setGameState((prev) => {
+        if (!prev || !prev.pendingStartPhase || prev.isGameOver) return prev;
+        executeStartPhase(prev, prev.activePlayer);
+        return { ...prev };
+      });
+    }, 250);
+    return () => window.clearTimeout(t);
+  }, [gameState?.pendingStartPhase, turnBanner, showLobby, gameState?.isGameOver, gameState?.matchId, gameState?.turnNumber, gameState?.activePlayer]);
   const [stagedTarget, setStagedTarget] = useState(null);
   const [pendingGigNumberPick, setPendingGigNumberPick] = useState(null);
   const [pendingManualPayment, setPendingManualPayment] = useState(null);
@@ -4200,6 +4236,8 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
 
     if (
       gameState.activePlayer === 'bot' &&
+      !gameState.pendingStartPhase &&
+      !turnBanner &&
       !isBotThinking &&
       !gameState.pendingReaction &&
       !gameState.pendingModalChoice &&
@@ -4223,12 +4261,14 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
   }, [
     gameState?.activePlayer,
     gameState?.turnNumber,
+    gameState?.pendingStartPhase,
     gameState?.isGameOver,
     gameState?.mulliganDecided,
     gameState?.pendingReaction,
     gameState?.pendingModalChoice,
     gameState?.pendingCardChoice,
     gameState?.pendingTargetSelection,
+    turnBanner,
     showLobby
   ]);
 
@@ -7970,7 +8010,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                   setSelectedHandCard(null);
                   setSelectedFieldUnit(null);
                   setHistory([]);
-                  passTurn(gameState);
+                  passTurn(gameState, { deferStartPhase: true });
                   setGameState({ ...gameState });
                 }}
                 style={{ clipPath: CYBER_BUTTON }}
@@ -8083,7 +8123,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
             setSelectedHandCard(null);
             setSelectedFieldUnit(null);
             setHistory([]);
-            passTurn(gameState);
+            passTurn(gameState, { deferStartPhase: true });
             setGameState({ ...gameState });
           }}
         />
@@ -8224,13 +8264,15 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
         </div>
       )}
 
-      {/* 2. MODAL MINIMALISTA DE SELECCIÓN DE DADO FIXER (espera a que termine la animación de TU TURNO sin parpadeo) */}
+      {/* 2. MODAL MINIMALISTA DE SELECCIÓN DE DADO FIXER (espera a que termine TU TURNO y el enderezado) */}
       {gameState.mulliganDecided &&
         isMyTurn &&
+        !gameState.pendingStartPhase &&
         (gameState.pendingGigRoll || gameState.phase === 'START_GIG_SELECT') &&
         p.fixerDice.length > 0 &&
         !rollingAnimation &&
         !turnBanner &&
+        !delayingFixerModal &&
         prevTurnBannerKeyRef.current === `${gameState.matchId}-${gameState.turnNumber}-${gameState.activePlayer}` && (
         <div className="fixed inset-0 z-[52] bg-black/55 backdrop-blur-xs flex items-center justify-center p-4 font-mono">
           <div

@@ -914,7 +914,7 @@ export function executeBotReaction(gameState, attackerUnit, targetType, targetUn
  * hasta que el jugador pulsa "OK" para revisar exactamente qué ha ocurrido.
  */
 export async function runBotTurn(gameState, updateCallback, delayMs = 1450, pauseForAck = null) {
-  if (gameState.isGameOver || gameState.activePlayer !== 'bot') return;
+  if (gameState.isGameOver || gameState.activePlayer !== 'bot' || gameState.pendingStartPhase) return;
 
   const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
   const bot = gameState.bot;
@@ -968,10 +968,10 @@ export async function runBotTurn(gameState, updateCallback, delayMs = 1450, paus
     return true;
   };
 
-  // Dejar terminar limpiamente la animación de "TURNO DEL RIVAL" (~1.9s) al inicio del turno antes de empezar a jugar cartas
+  // Tras enderezar cartas y lanzar el dado del Bot, esperar un respiro visual (~950ms) antes de su primera jugada
   if (gameState._botIntroWaitedTurn !== gameState.turnNumber) {
     gameState._botIntroWaitedTurn = gameState.turnNumber;
-    await wait(1950);
+    await wait(950);
     if (gameState.isGameOver || gameState.activePlayer !== 'bot') return;
   }
 
@@ -1053,7 +1053,7 @@ export async function runBotTurn(gameState, updateCallback, delayMs = 1450, paus
         'El rival ha terminado su Turno 1. Revisa la mesa y pulsa «EMPEZAR MI TURNO» para robar carta y lanzar tu dado de Gig.'
       );
       if (!contEnd1) return;
-      passTurn(gameState);
+      passTurn(gameState, { deferStartPhase: true });
       updateCallback({ ...gameState });
       return;
     }
@@ -1480,7 +1480,7 @@ export async function runBotTurn(gameState, updateCallback, delayMs = 1450, paus
       'El rival ha terminado sus acciones. Revisa tranquilamente la mesa y pulsa «EMPEZAR MI TURNO» cuando estés listo para robar y tirar tu dado de Gig.'
     );
     if (!contEnd) return;
-    passTurn(gameState);
+    passTurn(gameState, { deferStartPhase: true });
     updateCallback({ ...gameState });
   }
 }
@@ -1556,6 +1556,7 @@ export async function resolvePendingAttackAndContinueBot(gameState, updateCallba
         logs: combatLogs
       });
       if (ack?.cancelled || gameState.isGameOver || gameState.activePlayer !== 'bot') return;
+      if (ack?.autoSkipped) await wait(Math.max(1250, delayMs));
     } else {
       await wait(delayMs);
     }
@@ -1571,10 +1572,11 @@ export async function resolvePendingAttackAndContinueBot(gameState, updateCallba
         logs: combatLogs
       });
       if (ack?.cancelled || gameState.isGameOver || gameState.activePlayer !== 'bot') return;
+      if (ack?.autoSkipped) await wait(Math.max(1150, Math.round(delayMs * 0.85)));
     } else {
       await wait(delayMs);
     }
-    passTurn(gameState);
+    passTurn(gameState, { deferStartPhase: true });
     updateCallback({ ...gameState });
   }
 }

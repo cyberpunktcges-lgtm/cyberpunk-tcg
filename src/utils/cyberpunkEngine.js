@@ -2113,6 +2113,7 @@ export function rollInGig(state, playerKey, dieType, specificRollValue = null) {
  *    - Para el Bot: elige un dado elegible y lo rueda automáticamente.
  */
 export function executeStartPhase(state, playerKey) {
+  delete state.pendingStartPhase;
   const p = state[playerKey];
 
   state.actionLog.unshift(
@@ -2233,7 +2234,7 @@ export function executeStartPhase(state, playerKey) {
 /**
  * Finaliza el turno actual y pasa el control al siguiente jugador ejecutando su Start Phase.
  */
-export function passTurn(state) {
+export function passTurn(state, options = {}) {
   if (state.isGameOver) return state;
 
   // Disparar habilidades de fin de turno (End of Turn Triggers)
@@ -2288,6 +2289,11 @@ export function passTurn(state) {
   const nextPlayerKey = state.activePlayer === 'player' ? 'bot' : 'player';
   state.activePlayer = nextPlayerKey;
   state.turnNumber += 1;
+
+  if (options && options.deferStartPhase) {
+    state.pendingStartPhase = true;
+    return state;
+  }
 
   return executeStartPhase(state, nextPlayerKey);
 }
