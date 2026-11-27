@@ -280,6 +280,18 @@ export function canUnitAttack(unit, playerState = null, gameState = null, target
 }
 
 /**
+ * Comprueba si una Unidad tiene el enderezado bloqueado (CP-074 Memory Relapse, CP-090 Pacifica Netrunner):
+ * "It can't ready until your next turn."
+ */
+export function isUnitReadyLocked(unit, gameState = null) {
+  if (!unit) return false;
+  if (typeof unit.cannotReadyUntilTurn === 'number' && gameState) {
+    return gameState.turnNumber < unit.cannotReadyUntilTurn;
+  }
+  return Boolean(unit.cannotReadyUntilNextTurn);
+}
+
+/**
  * Comprueba si una unidad atacante puede ser bloqueada por un BLOCKER en este instante.
  * - CP-081 MT0D12 Flathead: "If you have less ☆ (Street Cred) than a Rival, this Unit can't be blocked."
  */
@@ -2220,11 +2232,35 @@ export function executeStartPhase(state, playerKey) {
     });
   }
 
-  // Enderezar Unidades y limpiar Lag (respetando Pacifica Netrunner: cannotReadyUntilNextTurn)
+  // Expirar primero los bloqueos de enderezado ("can't ready until your next turn") cuyo turno de expiración ya llegó
+  [state.player, state.bot].forEach((side) => {
+    (side?.field || []).forEach((u) => {
+      const readyExpiredByTurn =
+        typeof u.cannotReadyUntilTurn === 'number' && state.turnNumber >= u.cannotReadyUntilTurn;
+      const readyExpiredByLegacy =
+        u.cannotReadyUntilNextTurn &&
+        typeof u.cannotReadyUntilTurn !== 'number' &&
+        u.cannotReadyByPlayerKey &&
+        u.cannotReadyByPlayerKey === playerKey;
+      if (readyExpiredByTurn || readyExpiredByLegacy) {
+        delete u.cannotReadyUntilNextTurn;
+        delete u.cannotReadyUntilTurn;
+        delete u.cannotReadyByPlayerKey;
+      }
+    });
+  });
+
+  // Enderezar Unidades y limpiar Lag (respetando CP-074 Memory Relapse / CP-090 Pacifica Netrunner)
   p.field.forEach((u) => {
-    if (u.cannotReadyUntilNextTurn) {
-      delete u.cannotReadyUntilNextTurn;
-      state.actionLog.unshift(`💻 "${u.name}" no se endereza en esta Fase de Inicio (efecto de bloqueo de enderezado).`);
+    if (isUnitReadyLocked(u, state)) {
+      u.isSpent = true;
+      // Si era un flag heredado sin cannotReadyUntilTurn, liberarlo tras impedir este Start Phase
+      if (typeof u.cannotReadyUntilTurn !== 'number') {
+        delete u.cannotReadyUntilNextTurn;
+      }
+      state.actionLog.unshift(
+        `🔒 "${u.name}" no se endereza en esta Fase de Inicio (bloqueada por efecto hasta el siguiente turno del lanzador).`
+      );
     } else {
       u.isSpent = false;
     }

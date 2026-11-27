@@ -3183,8 +3183,11 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
           unit.mustAttackNextTurn = true;
           gameState.actionLog.unshift(`⚡ [${sel.sourceCardName}] "${unit.name}" deberá atacar en su próximo turno si puede.`);
         } else if (sel.effectType === 'CANNOT_READY') {
+          const casterIsActive = gameState.activePlayer === 'player';
           unit.cannotReadyUntilNextTurn = true;
-          gameState.actionLog.unshift(`💻 [${sel.sourceCardName}] "${unit.name}" no podrá enderezarse hasta tu próximo turno.`);
+          unit.cannotReadyUntilTurn = gameState.turnNumber + (casterIsActive ? 2 : 1);
+          unit.cannotReadyByPlayerKey = 'player';
+          gameState.actionLog.unshift(`🔒 [${sel.sourceCardName}] "${unit.name}" no podrá enderezarse hasta tu próximo turno.`);
         } else if (sel.effectType === 'ADRENALINE') {
           unit.isLagging = false;
           unit.hasAdrenaline = true;
@@ -3209,8 +3212,17 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
           gameState.actionLog.unshift(`💉 [${sel.sourceCardName}] Equipó "${sel.gearToEquip.name}" a "${unit.name}" (+${bonus} Fuerza).`);
         } else if (sel.effectType === 'SPEND') {
           unit.isSpent = true;
-          if (sel.cannotReady) unit.cannotReadyUntilNextTurn = true;
-          gameState.actionLog.unshift(`✝️ [${sel.sourceCardName}] Giró a la unidad rival "${unit.name}".`);
+          if (sel.cannotReady) {
+            const casterIsActive = gameState.activePlayer === 'player';
+            unit.cannotReadyUntilNextTurn = true;
+            unit.cannotReadyUntilTurn = gameState.turnNumber + (casterIsActive ? 2 : 1);
+            unit.cannotReadyByPlayerKey = 'player';
+          }
+          gameState.actionLog.unshift(
+            sel.cannotReady
+              ? `🧠 [${sel.sourceCardName}] Giró a "${unit.name}" (no podrá enderezarse hasta tu próximo turno).`
+              : `✝️ [${sel.sourceCardName}] Giró a la unidad rival "${unit.name}".`
+          );
           const remainingReady = (opp.field || []).filter((u) => !u.isSpent);
           if (sel.remainingSpends && sel.remainingSpends > 0 && remainingReady.length > 0) {
             gameState.pendingTargetSelection = {
@@ -6266,8 +6278,14 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                           })()}
 
                           {/* Insignias de estado táctico en unidad rival (DEBE ATACAR / CONGELADA) */}
-                          {(unit.mustAttackNextTurn || !canUnitBeBlocked(unit, 'bot', gameState) || unit.cannotAttackUntilNextTurn || (typeof unit.cannotAttackUntilTurn === 'number' && gameState.turnNumber < unit.cannotAttackUntilTurn)) && (
+                          {(unit.mustAttackNextTurn || !canUnitBeBlocked(unit, 'bot', gameState) || unit.cannotReadyUntilNextTurn || (typeof unit.cannotReadyUntilTurn === 'number' && gameState.turnNumber < unit.cannotReadyUntilTurn) || unit.cannotAttackUntilNextTurn || (typeof unit.cannotAttackUntilTurn === 'number' && gameState.turnNumber < unit.cannotAttackUntilTurn)) && (
                             <div className="pointer-events-none absolute top-1 left-1 right-1 flex flex-col items-end gap-0.5 z-20">
+                              {((typeof unit.cannotReadyUntilTurn === 'number' && gameState.turnNumber < unit.cannotReadyUntilTurn) ||
+                                (unit.cannotReadyUntilNextTurn && typeof unit.cannotReadyUntilTurn !== 'number')) && (
+                                <span className="px-1 py-0.5 bg-purple-600/95 text-white font-mono font-bold text-[7px] sm:text-[7.5px] uppercase shadow border border-purple-300">
+                                  🔒 NO ENDEREZA
+                                </span>
+                              )}
                               {!canUnitBeBlocked(unit, 'bot', gameState) && !unit.isSpent && (
                                 <span className="px-1 py-0.5 bg-cyan-500/95 text-[#070a10] font-mono font-black text-[7px] sm:text-[7.5px] uppercase shadow border border-white/70">
                                   👻 IMBLOQUEABLE

@@ -1398,27 +1398,31 @@ export function executeProgramEffect(state, playerKey, card) {
   // CP-074: Memory Relapse
   // "Spend a rival Unit. It can't ready until your next turn. If your Street Cred is an even number, draw 1."
   if (cardId === 'CP-074') {
-    const eligibleUnits = (opp.field || []).filter((u) => !u.isSpent);
-    if (eligibleUnits.length === 0) {
-      state.actionLog.unshift(`🧠 [Memory Relapse] El rival no tiene unidades enderezadas para girar.`);
+    const oppUnits = opp.field || [];
+    if (oppUnits.length === 0) {
+      state.actionLog.unshift(`🧠 [Memory Relapse] El rival no tiene unidades en el campo.`);
     } else if (playerKey === 'player') {
       queueTargetSelection(state, {
         actionType: 'TARGET_UNIT',
         sourceCardId: 'CP-074',
         sourceCardName: 'Memory Relapse',
         sourceCardImage: card.image,
-        title: '🧠 MEMORY RELAPSE // GIRAR UNIDAD RIVAL',
-        prompt: 'Selecciona la unidad rival que deseas girar (no podrá enderezarse en su turno):',
+        title: '🧠 MEMORY RELAPSE // GIRAR Y BLOQUEAR UNIDAD RIVAL',
+        prompt: 'Selecciona una Unidad rival para girarla (no podrá enderezarse hasta tu próximo turno):',
         effectType: 'SPEND',
         cannotReady: true,
-        onlyReady: true,
         targetScope: 'RIVAL_UNITS'
       });
     } else {
-      const target = eligibleUnits[0];
+      const readyFirst = oppUnits.filter((u) => !u.isSpent);
+      const pool = readyFirst.length > 0 ? readyFirst : oppUnits;
+      const target = [...pool].sort((a, b) => (b.currentPower || 0) - (a.currentPower || 0))[0];
+      const casterIsActive = state.activePlayer === playerKey;
       target.isSpent = true;
       target.cannotReadyUntilNextTurn = true;
-      state.actionLog.unshift(`🧠 [Memory Relapse Rival] Gira a "${target.name}".`);
+      target.cannotReadyUntilTurn = state.turnNumber + (casterIsActive ? 2 : 1);
+      target.cannotReadyByPlayerKey = playerKey;
+      state.actionLog.unshift(`🧠 [Memory Relapse Rival] Gira a "${target.name}" (no podrá enderezarse hasta su próximo turno).`);
     }
     const streetCred = (p.gigs || []).reduce((sum, g) => sum + (g.value || 0), 0);
     if (streetCred % 2 === 0) {
@@ -2908,7 +2912,10 @@ function _executeUnitPlayTrigger(state, playerKey, unitInstance) {
         targetScope: 'RIVAL_UNITS'
       });
     } else {
+      const casterIsActive = state.activePlayer === playerKey;
       oppUnits[0].cannotReadyUntilNextTurn = true;
+      oppUnits[0].cannotReadyUntilTurn = state.turnNumber + (casterIsActive ? 2 : 1);
+      oppUnits[0].cannotReadyByPlayerKey = playerKey;
       state.actionLog.unshift(`💻 [Pacifica Netrunner Rival] ¡PLAY! Tu unidad "${oppUnits[0].name}" no podrá enderezarse.`);
     }
     return;
@@ -3490,10 +3497,16 @@ export function executeCombatWinTrigger(state, winnerPlayerKey, winningUnit, def
 
   // CP-054: Johnny Silverhand // Never Stop Fighting
   if (cardId === 'CP-054' || winningUnit.name.includes('Never Stop Fighting')) {
-    if (!winningUnit.hasReadiedThisTurn) {
+    const readyBlocked =
+      typeof winningUnit.cannotReadyUntilTurn === 'number'
+        ? state.turnNumber < winningUnit.cannotReadyUntilTurn
+        : Boolean(winningUnit.cannotReadyUntilNextTurn);
+    if (!winningUnit.hasReadiedThisTurn && !readyBlocked) {
       winningUnit.isSpent = false;
       winningUnit.hasReadiedThisTurn = true;
       state.actionLog.unshift(`🎸 [Johnny Silverhand] "Never Stop Fighting": ¡Gana el combate y se ENDEREZA!`);
+    } else if (!winningUnit.hasReadiedThisTurn && readyBlocked) {
+      state.actionLog.unshift(`🔒 [Johnny Silverhand] No puede enderezarse (bloqueado por Memory Relapse / Pacifica Netrunner).`);
     }
   }
 
@@ -4142,8 +4155,16 @@ export function executeEndOfTurnTriggers(state, playerKey) {
   // CP-114: Sandevistan (endereza al portador) y CP-030: Dying Night (si el portador se llama "V", endereza 2 Eddies)
   for (const unit of p.field || []) {
     if ((unit.gear || []).some((g) => resolveCardId(g) === 'CP-114')) {
-      unit.isSpent = false;
-      state.actionLog.unshift(`⚡ [Sandevistan] Endereza a "${unit.name}" al final del turno.`);
+      const readyBlocked =
+        typeof unit.cannotReadyUntilTurn === 'number'
+          ? state.turnNumber < unit.cannotReadyUntilTurn
+          : Boolean(unit.cannotReadyUntilNextTurn);
+      if (readyBlocked) {
+        state.actionLog.unshift(`🔒 [Sandevistan] "${unit.name}" no puede enderezarse al final del turno (bloqueada por Memory Relapse / Pacifica Netrunner).`);
+      } else {
+        unit.isSpent = false;
+        state.actionLog.unshift(`⚡ [Sandevistan] Endereza a "${unit.name}" al final del turno.`);
+      }
     }
     const dyingNights = (unit.gear || []).filter((g) => resolveCardId(g) === 'CP-030');
     const isNamedV = /^V(\s|$|\/\/)/i.test(String(unit.name || '').trim());

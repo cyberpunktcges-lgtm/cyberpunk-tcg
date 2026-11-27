@@ -913,10 +913,18 @@ export const ACTIVATED_ABILITIES_CONFIG = {
         const targetUnit = (p.field || []).find((u) => !u.gear || u.gear.length === 0);
         if (!targetUnit.gear) targetUnit.gear = [];
         targetUnit.gear.push(transferredGear);
-        targetUnit.isSpent = false; // Endereza la unidad
+        const readyBlocked =
+          typeof targetUnit.cannotReadyUntilTurn === 'number'
+            ? state.turnNumber < targetUnit.cannotReadyUntilTurn
+            : Boolean(targetUnit.cannotReadyUntilNextTurn);
+        if (!readyBlocked) {
+          targetUnit.isSpent = false; // Endereza la unidad
+        }
 
         state.actionLog.unshift(
-          `🌵 [Panam Palmer] Paga 2 €$, gira a Panam, transfiere el Gear "${transferredGear.name}" a "${targetUnit.name}" y la endereza.`
+          readyBlocked
+            ? `🌵 [Panam Palmer] Transfiere el Gear "${transferredGear.name}" a "${targetUnit.name}", pero no puede enderezarse (bloqueada).`
+            : `🌵 [Panam Palmer] Paga 2 €$, gira a Panam, transfiere el Gear "${transferredGear.name}" a "${targetUnit.name}" y la endereza.`
         );
         return { success: true, message: `Gear transferido a "${targetUnit.name}" y unidad enderezada.` };
       }
