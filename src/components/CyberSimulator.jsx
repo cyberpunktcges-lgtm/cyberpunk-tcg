@@ -975,17 +975,28 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
   const prevTurnBannerKeyRef = useRef(null);
 
   useEffect(() => {
-    if (showLobby || !gameState || gameState.isGameOver || !gameState.mulliganDecided) return;
+    if (showLobby || !gameState || gameState.isGameOver || !gameState.mulliganDecided) {
+      setTurnBanner(null);
+      return;
+    }
     const key = `${gameState.matchId}-${gameState.turnNumber}-${gameState.activePlayer}`;
     if (prevTurnBannerKeyRef.current === key) return;
     prevTurnBannerKeyRef.current = key;
     setTurnBanner({
       isPlayer: gameState.activePlayer === 'player',
-      turnNumber: gameState.turnNumber || 1
+      turnNumber: gameState.turnNumber || 1,
+      id: `${key}-${Date.now()}`
     });
-    const t = window.setTimeout(() => setTurnBanner(null), 1150);
-    return () => window.clearTimeout(t);
   }, [gameState?.matchId, gameState?.turnNumber, gameState?.activePlayer, gameState?.mulliganDecided, gameState?.isGameOver, showLobby]);
+
+  // Auto-cierre garantizado del banner de turno (imposible que se quede congelado en pantalla)
+  useEffect(() => {
+    if (!turnBanner) return;
+    const t = window.setTimeout(() => {
+      setTurnBanner(null);
+    }, 1150);
+    return () => window.clearTimeout(t);
+  }, [turnBanner]);
   const [stagedTarget, setStagedTarget] = useState(null);
   const [pendingGigNumberPick, setPendingGigNumberPick] = useState(null);
   const [pendingManualPayment, setPendingManualPayment] = useState(null);
@@ -3429,13 +3440,18 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
     setLegendMenuId(null);
     setSelectedHandCard(null);
     setIsBotThinking(true);
-    await resolvePendingAttackAndContinueBot(
-      gameState,
-      (updated) => setGameState({ ...updated }),
-      650,
-      waitForBotAck
-    );
-    setIsBotThinking(false);
+    try {
+      await resolvePendingAttackAndContinueBot(
+        gameState,
+        (updated) => setGameState({ ...updated }),
+        650,
+        waitForBotAck
+      );
+    } catch (err) {
+      console.error('Error resolviendo ataque del bot:', err);
+    } finally {
+      setIsBotThinking(false);
+    }
   };
 
   useEffect(() => {
@@ -4169,9 +4185,13 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
       !gameState.pendingTargetSelection
     ) {
       setIsBotThinking(true);
-      runBotTurn(gameState, (updated) => setGameState({ ...updated }), 650, waitForBotAck).then(() => {
-        setIsBotThinking(false);
-      });
+      runBotTurn(gameState, (updated) => setGameState({ ...updated }), 650, waitForBotAck)
+        .catch((err) => {
+          console.error('Error ejecutando turno del bot:', err);
+        })
+        .finally(() => {
+          setIsBotThinking(false);
+        });
     }
   }, [
     gameState?.activePlayer,
