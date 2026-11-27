@@ -5924,8 +5924,8 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                             dieType={gig.die}
                             value={gig.value}
                             size={canAttackGigs || isMobGigEligible ? 38 : 34}
-                            color={isMobGigSelected ? '#FCEE0A' : isMobGigEligible ? '#0dfceb' : gig.stolenFrom ? '#0dfceb' : '#FF003C'}
-                            selected={Boolean(canAttackGigs || isMobGigEligible || isMobGigSelected)}
+                            color={isMobGigSelected ? '#FCEE0A' : isMobGigEligible ? '#0dfceb' : gig.rolledAtTurn === gameState.turnNumber ? '#FCEE0A' : gig.stolenFrom ? '#0dfceb' : '#FF003C'}
+                            selected={Boolean(canAttackGigs || isMobGigEligible || isMobGigSelected || gig.rolledAtTurn === gameState.turnNumber)}
                             showProgressBar
                           />
                         </div>
@@ -7048,7 +7048,8 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                           dieType={gig.die}
                           value={gig.value}
                           size={34}
-                          color={gig.stolenFrom ? '#FCEE0A' : '#0dfceb'}
+                          color={gig.rolledAtTurn === gameState.turnNumber ? '#FCEE0A' : gig.stolenFrom ? '#FCEE0A' : '#0dfceb'}
+                          selected={gig.rolledAtTurn === gameState.turnNumber}
                           showProgressBar
                         />
                       </div>
@@ -8133,6 +8134,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
 
         {/* FRANJA 3 (DESKTOP): COLUMNA DE GIGS + FIXER + BOTÓN PROTAGONISTA END TURN / PASS */}
         <CyberRightGigsRail
+          turnNumber={gameState.turnNumber || 1}
           botGigs={bot.gigs || []}
           botStreetCred={botStreetCred}
           botFixerDice={bot.fixerDice || []}

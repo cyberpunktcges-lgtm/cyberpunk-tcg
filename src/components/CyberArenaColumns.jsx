@@ -207,6 +207,7 @@ export function CyberLeftTelemetryRail({
 }
 
 export function CyberRightGigsRail({
+  turnNumber = 1,
   botGigs = [],
   botStreetCred = 0,
   botFixerDice = [],
@@ -322,6 +323,7 @@ export function CyberRightGigsRail({
                   const isTargetSelected =
                     targetGigInfo?.selectedGig?.owner === 'bot' &&
                     targetGigInfo?.selectedGig?.gigIndex === idx;
+                  const isRolledThisTurn = Boolean(gig.rolledAtTurn && gig.rolledAtTurn === turnNumber);
                   const isInteractive = Boolean(canAttackGigs || isTargetEligible);
                   return (
                     <button
@@ -336,23 +338,30 @@ export function CyberRightGigsRail({
                           onStealSpecificDie(gig.die.toLowerCase());
                         }
                       }}
-                      className={
-                        isInteractive
-                          ? `cursor-pointer hover:scale-115 transition-transform rounded p-0.5 ${
-                              isTargetSelected
-                                ? 'ring-2 ring-[#FCEE0A] bg-[#FCEE0A]/15 scale-110'
-                                : isTargetEligible
-                                ? 'ring-2 ring-[#0dfceb] bg-[#0dfceb]/15 animate-pulse'
-                                : ''
-                            }`
-                          : 'cursor-default'
-                      }
+                      className={`relative rounded-md p-0.5 transition-all ${
+                        isInteractive ? 'cursor-pointer hover:scale-115' : 'cursor-default'
+                      } ${
+                        isTargetSelected
+                          ? 'ring-2 ring-[#FCEE0A] bg-[#FCEE0A]/15 scale-110'
+                          : isTargetEligible
+                          ? 'ring-2 ring-[#0dfceb] bg-[#0dfceb]/15 animate-pulse'
+                          : isRolledThisTurn
+                          ? 'ring-2 ring-[#FCEE0A]/90 bg-[#FCEE0A]/12 shadow-[0_0_20px_rgba(252,238,10,0.65)]'
+                          : ''
+                      }`}
                       title={
                         isTargetEligible
                           ? `Clic para seleccionar Gig Rival ${gig.die.toUpperCase()} (Valor ${gig.value})`
+                          : isRolledThisTurn
+                          ? `🎲 Recién lanzado este turno: ${gig.die.toUpperCase()} (Valor ${gig.value})`
                           : `Gig Rival ${gig.die.toUpperCase()} (Valor ${gig.value})`
                       }
                     >
+                      {isRolledThisTurn && !isTargetSelected && (
+                        <span className="pointer-events-none absolute -top-2 left-1/2 -translate-x-1/2 z-20 px-1 py-0.2 bg-[#FCEE0A] text-[#070a10] font-mono font-black text-[7px] uppercase tracking-wider rounded-sm shadow-[0_0_10px_#FCEE0A] whitespace-nowrap animate-pulse">
+                          ★ T{turnNumber}
+                        </span>
+                      )}
                       <CyberDieShape
                         dieType={gig.die}
                         value={gig.value}
@@ -366,7 +375,7 @@ export function CyberRightGigsRail({
                             ? '#0dfceb'
                             : '#FF003C'
                         }
-                        selected={canAttackGigs || isTargetEligible || isTargetSelected}
+                        selected={canAttackGigs || isTargetEligible || isTargetSelected || isRolledThisTurn}
                         showProgressBar
                       />
                     </button>
@@ -457,6 +466,7 @@ export function CyberRightGigsRail({
                   const isTargetSelected =
                     targetGigInfo?.selectedGig?.owner === 'player' &&
                     targetGigInfo?.selectedGig?.gigIndex === idx;
+                  const isRolledThisTurn = Boolean(gig.rolledAtTurn && gig.rolledAtTurn === turnNumber);
                   return (
                     <button
                       key={`pg-${idx}`}
@@ -468,21 +478,30 @@ export function CyberRightGigsRail({
                           targetGigInfo.onSelectGig('player', gig, idx);
                         }
                       }}
-                      className={
-                        isTargetEligible
-                          ? `cursor-pointer hover:scale-115 transition-transform rounded p-0.5 ${
-                              isTargetSelected
-                                ? 'ring-2 ring-[#FCEE0A] bg-[#FCEE0A]/15 scale-110'
-                                : 'ring-2 ring-[#0dfceb] bg-[#0dfceb]/15 animate-pulse'
-                            }`
-                          : 'cursor-default'
-                      }
+                      className={`relative rounded-md p-0.5 transition-all ${
+                        isTargetEligible ? 'cursor-pointer hover:scale-115' : 'cursor-default'
+                      } ${
+                        isTargetSelected
+                          ? 'ring-2 ring-[#FCEE0A] bg-[#FCEE0A]/15 scale-110'
+                          : isTargetEligible
+                          ? 'ring-2 ring-[#0dfceb] bg-[#0dfceb]/15 animate-pulse'
+                          : isRolledThisTurn
+                          ? 'ring-2 ring-[#FCEE0A]/90 bg-[#FCEE0A]/12 shadow-[0_0_20px_rgba(252,238,10,0.65)]'
+                          : ''
+                      }`}
                       title={
                         isTargetEligible
                           ? `Clic para seleccionar tu Gig ${gig.die.toUpperCase()} (Valor ${gig.value})`
+                          : isRolledThisTurn
+                          ? `🎲 Recién lanzado este turno: ${gig.die.toUpperCase()} (Valor ${gig.value})`
                           : `Tu Gig ${gig.die.toUpperCase()} (Valor ${gig.value})`
                       }
                     >
+                      {isRolledThisTurn && !isTargetSelected && (
+                        <span className="pointer-events-none absolute -top-2 left-1/2 -translate-x-1/2 z-20 px-1 py-0.2 bg-[#FCEE0A] text-[#070a10] font-mono font-black text-[7px] uppercase tracking-wider rounded-sm shadow-[0_0_10px_#FCEE0A] whitespace-nowrap animate-pulse">
+                          ★ T{turnNumber}
+                        </span>
+                      )}
                       <CyberDieShape
                         dieType={gig.die}
                         value={gig.value}
@@ -496,7 +515,7 @@ export function CyberRightGigsRail({
                             ? '#FF003C'
                             : '#0dfceb'
                         }
-                        selected={isTargetEligible || isTargetSelected}
+                        selected={isTargetEligible || isTargetSelected || isRolledThisTurn}
                         showProgressBar
                       />
                     </button>

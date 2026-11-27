@@ -2153,6 +2153,8 @@ export function rollInGig(state, playerKey, dieType, specificRollValue = null) {
   const gigEntry = {
     die: normDie,
     value: rollValue,
+    rolledAtTurn: state.turnNumber,
+    rolledBy: playerKey,
     stolenFrom: null,
     id: `${playerKey}-gig-${normDie}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`
   };
