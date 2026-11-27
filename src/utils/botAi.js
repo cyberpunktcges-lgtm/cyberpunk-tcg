@@ -428,7 +428,8 @@ function captureBotActionSnapshot(gameState) {
       name: u.name || 'Unidad',
       currentPower: Number(u.currentPower ?? u.parsedPower ?? 0),
       isSpent: Boolean(u.isSpent),
-      cannotReadyNextTurn: Boolean(u.cannotReadyNextTurn),
+      cannotReadyNextTurn: Boolean(u.cannotReadyUntilNextTurn || u.cannotReadyNextTurn),
+      cannotAttackUntilNextTurn: Boolean(u.cannotAttackUntilNextTurn),
       cannotBlock: Boolean(u.cannotBlock || u.cannotBlockThisTurn),
       mustAttackNextTurn: Boolean(u.mustAttackNextTurn),
       gearCount: (u.gear || []).length
@@ -536,7 +537,11 @@ function recordBotActionArrows(
           label: `⚡ ${labelBase} (-${prevU.currentPower - curPow})`,
           targetPlayerUnitId: curU.instanceId
         });
-      } else if ((!prevU.isSpent && curU.isSpent) || (!prevU.cannotReadyNextTurn && curU.cannotReadyNextTurn)) {
+      } else if (
+        (!prevU.isSpent && curU.isSpent) ||
+        (!prevU.cannotReadyNextTurn && Boolean(curU.cannotReadyUntilNextTurn || curU.cannotReadyNextTurn)) ||
+        (!prevU.cannotAttackUntilNextTurn && Boolean(curU.cannotAttackUntilNextTurn))
+      ) {
         arrows.push({
           fromAnchor: sourceCandidates,
           toAnchor: curU.instanceId,
@@ -1386,6 +1391,7 @@ export async function runBotTurn(gameState, updateCallback, delayMs = 1450, paus
     if (canOvertimeWin) {
       const snapBeforeAtk = captureBotActionSnapshot(gameState);
       unit.isSpent = true;
+      delete unit.mustAttackNextTurn;
       unit.hasTriggeredAttackThisDeclaration = true;
       executeCardSpentTriggers(gameState, 'bot', unit);
       executeUnitAttackTrigger(gameState, 'bot', unit);
@@ -1427,6 +1433,7 @@ export async function runBotTurn(gameState, updateCallback, delayMs = 1450, paus
     if (killableSpentEnemy && canUnitAttack(unit, bot, gameState, 'UNIT')) {
       const snapBeforeAtk = captureBotActionSnapshot(gameState);
       unit.isSpent = true;
+      delete unit.mustAttackNextTurn;
       unit.hasTriggeredAttackThisDeclaration = true;
       executeCardSpentTriggers(gameState, 'bot', unit);
       executeUnitAttackTrigger(gameState, 'bot', unit);
@@ -1469,6 +1476,7 @@ export async function runBotTurn(gameState, updateCallback, delayMs = 1450, paus
         if (gigsToSteal > 0 || ['CP-034', 'CP-121'].includes(resolveCardId(unit)) || unit.mustAttackNextTurn) {
           const snapBeforeAtk = captureBotActionSnapshot(gameState);
           unit.isSpent = true;
+          delete unit.mustAttackNextTurn;
           unit.hasTriggeredAttackThisDeclaration = true;
           executeCardSpentTriggers(gameState, 'bot', unit);
           executeUnitAttackTrigger(gameState, 'bot', unit);
@@ -1510,6 +1518,7 @@ export async function runBotTurn(gameState, updateCallback, delayMs = 1450, paus
     if (tieEnemy && canUnitAttack(unit, bot, gameState, 'UNIT')) {
       const snapBeforeAtk = captureBotActionSnapshot(gameState);
       unit.isSpent = true;
+      delete unit.mustAttackNextTurn;
       unit.hasTriggeredAttackThisDeclaration = true;
       executeCardSpentTriggers(gameState, 'bot', unit);
       executeUnitAttackTrigger(gameState, 'bot', unit);
@@ -1537,6 +1546,53 @@ export async function runBotTurn(gameState, updateCallback, delayMs = 1450, paus
       );
       updateCallback({ ...gameState });
       return;
+    }
+
+    // 4.E: Garantía absoluta para unidades provocadas (Mox Inciters / Evelyn Parker: mustAttackNextTurn)
+    // Si sigue lista y existe cualquier objetivo legal (Gigs o cualquier unidad atacable), DEBE atacar.
+    if (unit.mustAttackNextTurn) {
+      const canHitGigs = (player.gigs || []).length > 0 && canUnitAttack(unit, bot, gameState, 'GIGS');
+      const fallbackUnitTarget = canUnitAttack(unit, bot, gameState, 'UNIT')
+        ? [...(player.field || [])]
+            .filter((pu) => pu.isSpent || unit.canAttackReadyUnits)
+            .sort((a, b) => (a.currentPower || 0) - (b.currentPower || 0))[0] || null
+        : null;
+
+      if (canHitGigs || fallbackUnitTarget) {
+        const snapBeforeAtk = captureBotActionSnapshot(gameState);
+        unit.isSpent = true;
+        delete unit.mustAttackNextTurn;
+        unit.hasTriggeredAttackThisDeclaration = true;
+        executeCardSpentTriggers(gameState, 'bot', unit);
+        executeUnitAttackTrigger(gameState, 'bot', unit);
+        recordBotActionArrows(snapBeforeAtk, gameState, {
+          actionType: 'ATTACK_TRIGGER',
+          card: unit,
+          sourceAnchor: unit.instanceId
+        });
+
+        const attackingUnitTarget = !canHitGigs && Boolean(fallbackUnitTarget);
+        gameState.pendingReaction = {
+          attackerPlayerKey: 'bot',
+          attackerUnitId: unit.instanceId,
+          attackerName: unit.name,
+          attackerPower: unit.currentPower,
+          attackerImage: unit.image,
+          targetType: attackingUnitTarget ? 'UNIT' : 'GIGS',
+          targetUnitId: attackingUnitTarget ? fallbackUnitTarget.instanceId : null,
+          targetName: attackingUnitTarget ? fallbackUnitTarget.name : 'Tus Gigs',
+          targetPower: attackingUnitTarget ? fallbackUnitTarget.currentPower : null,
+          targetImage: attackingUnitTarget ? fallbackUnitTarget.image : null,
+          blockerUnitId: null
+        };
+        gameState.actionLog.unshift(
+          attackingUnitTarget
+            ? `⚔️ [FASE 1: ATAQUE OBLIGATORIO] "${unit.name}" [Fuerza: ${unit.currentPower}] (provocada) ataca a "${fallbackUnitTarget.name}". Se activa tu Fase de Reacción.`
+            : `⚔️ [FASE 1: ATAQUE OBLIGATORIO] "${unit.name}" [Fuerza: ${unit.currentPower}] (provocada) asalta tus Gigs. Se activa tu Fase de Reacción.`
+        );
+        updateCallback({ ...gameState });
+        return;
+      }
     }
   }
 

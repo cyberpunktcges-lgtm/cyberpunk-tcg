@@ -3189,7 +3189,11 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
             });
           }
         } else if (sel.effectType === 'FREEZE') {
+          const casterIsActive = gameState.activePlayer === 'player';
           unit.cannotAttackUntilNextTurn = true;
+          unit.frozenAtTurn = gameState.turnNumber;
+          unit.cannotAttackUntilTurn = gameState.turnNumber + (casterIsActive ? 2 : 1);
+          unit.frozenByPlayerKey = 'player';
           gameState.actionLog.unshift(`🛑 [${sel.sourceCardName}] "${unit.name}" no podrá atacar hasta tu próximo turno.`);
         } else if (sel.effectType === 'MUST_ATTACK') {
           unit.mustAttackNextTurn = true;
@@ -6200,6 +6204,23 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                               </div>
                             );
                           })()}
+
+                          {/* Insignias de estado táctico en unidad rival (DEBE ATACAR / CONGELADA) */}
+                          {(unit.mustAttackNextTurn || unit.cannotAttackUntilNextTurn || (typeof unit.cannotAttackUntilTurn === 'number' && gameState.turnNumber < unit.cannotAttackUntilTurn)) && (
+                            <div className="pointer-events-none absolute top-1 left-1 right-1 flex flex-col items-end gap-0.5 z-20">
+                              {unit.mustAttackNextTurn && !unit.isSpent && (
+                                <span className="px-1 py-0.5 bg-amber-500 text-black font-mono font-black text-[7px] sm:text-[7.5px] uppercase shadow animate-pulse border border-yellow-200">
+                                  💢 DEBE ATACAR
+                                </span>
+                              )}
+                              {((typeof unit.cannotAttackUntilTurn === 'number' && gameState.turnNumber < unit.cannotAttackUntilTurn) ||
+                                (unit.cannotAttackUntilNextTurn && typeof unit.cannotAttackUntilTurn !== 'number')) && (
+                                <span className="px-1 py-0.5 bg-red-600/95 text-white font-mono font-bold text-[7px] sm:text-[7.5px] uppercase shadow border border-red-300">
+                                  🛑 NO ATACA
+                                </span>
+                              )}
+                            </div>
+                          )}
 
                           {/* Sello zZ LAG si acaba de entrar al campo */}
                           {unit.isLagging && !unit.isSpent && (

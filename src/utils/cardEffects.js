@@ -963,7 +963,11 @@ export function executeProgramEffect(state, playerKey, card) {
       });
     } else {
       const target = [...eligibleUnits].sort((a, b) => (b.currentPower || 0) - (a.currentPower || 0))[0];
+      const casterIsActive = state.activePlayer === playerKey;
       target.cannotAttackUntilNextTurn = true;
+      target.frozenAtTurn = state.turnNumber;
+      target.cannotAttackUntilTurn = state.turnNumber + (casterIsActive ? 2 : 1);
+      target.frozenByPlayerKey = playerKey;
       state.actionLog.unshift(`🛑 [Chrome Reverie Rival] "${target.name}" no podrá atacar hasta su próximo turno.`);
     }
 

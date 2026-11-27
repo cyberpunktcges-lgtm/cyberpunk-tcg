@@ -213,8 +213,9 @@ export function canUnitAttack(unit, playerState = null, gameState = null, target
   }
 
   // 2. Efectos temporales de congelación (Chrome Reverie, Nocturne Op55N1, etc.)
-  if (unit.cannotAttackUntilNextTurn) return false;
-  if (unit.cannotAttackUntilTurn && gameState && gameState.turnNumber < unit.cannotAttackUntilTurn) {
+  if (typeof unit.cannotAttackUntilTurn === 'number' && gameState) {
+    if (gameState.turnNumber < unit.cannotAttackUntilTurn) return false;
+  } else if (unit.cannotAttackUntilNextTurn) {
     return false;
   }
 
@@ -285,7 +286,11 @@ export function getUnitAttackRestriction(unit, playerState = null, gameState = n
   if (!unit) return 'Unidad no válida.';
   if (unit.isSpent) return 'La unidad ya está girada (Spent).';
   if (unit.isLagging) return 'La unidad tiene Lag (no puede atacar el turno en que entra en juego).';
-  if (unit.cannotAttackUntilNextTurn) {
+  if (typeof unit.cannotAttackUntilTurn === 'number' && gameState) {
+    if (gameState.turnNumber < unit.cannotAttackUntilTurn) {
+      return 'Esta unidad tiene el ataque bloqueado hasta el próximo turno del oponente.';
+    }
+  } else if (unit.cannotAttackUntilNextTurn) {
     return 'Esta unidad tiene el ataque bloqueado hasta tu próximo turno.';
   }
 
@@ -2160,11 +2165,27 @@ export function executeStartPhase(state, playerKey) {
     u.isLagging = false;
     delete u.canAttackSpentUnitsTurnPlayed;
     delete u.usedGorillaArmsThisTurn;
-    // Si la congelación expiró en este turno
-    if (u.cannotAttackUntilNextTurn && u.frozenAtTurn && state.turnNumber > u.frozenAtTurn) {
-      delete u.cannotAttackUntilNextTurn;
-      delete u.frozenAtTurn;
-    }
+  });
+
+  // Expirar efectos "no puede atacar hasta tu próximo turno" (Chrome Reverie / Nocturne Op55N1)
+  // en ambos bandos cuando llega el próximo turno del lanzador (cannotAttackUntilTurn <= turnNumber)
+  [state.player, state.bot].forEach((side) => {
+    (side?.field || []).forEach((u) => {
+      const expiredByTurn =
+        typeof u.cannotAttackUntilTurn === 'number' && state.turnNumber >= u.cannotAttackUntilTurn;
+      const expiredByLegacyFlag =
+        u.cannotAttackUntilNextTurn &&
+        typeof u.cannotAttackUntilTurn !== 'number' &&
+        (u.frozenByPlayerKey
+          ? u.frozenByPlayerKey === playerKey
+          : !u.frozenAtTurn || state.turnNumber >= u.frozenAtTurn + 2);
+      if (expiredByTurn || expiredByLegacyFlag) {
+        delete u.cannotAttackUntilNextTurn;
+        delete u.cannotAttackUntilTurn;
+        delete u.frozenAtTurn;
+        delete u.frozenByPlayerKey;
+      }
+    });
   });
 
   p.hasSoldThisTurn = false;
