@@ -79,33 +79,57 @@ export default function CyberRightSidebar({
 
   return (
     <>
-      {/* Hover Zoom GRANDE y nítido flotando sobre el borde derecho del tablero (exacto a capturas) */}
+      {/* ESCÁNER KIROSHI flotante a la IZQUIERDA (mismo tamaño grande y nítido, sin tapar Gigs ni FINALIZAR TURNO) */}
       {hoveredCard && hoveredCard.image && activeTab === 'log' && (
-        <div className="hidden lg:block fixed right-[19rem] xl:right-[21.5rem] top-10 z-[44] w-72 pointer-events-none select-none">
-          <div className="bg-[#060a12]/96 border border-[#0dfceb]/70 rounded-xl overflow-hidden shadow-[0_0_50px_rgba(0,0,0,0.95)] backdrop-blur-md">
-            <div className="relative aspect-[5/7] w-full bg-black overflow-hidden">
-              <img
-                src={hoveredCard.image}
-                alt={hoveredCard.name || 'Carta'}
-                className="w-full h-full object-cover object-center"
-              />
-            </div>
-            <div className="p-3 border-t border-white/10 space-y-1 font-mono bg-[#060911]">
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-xs font-black text-white uppercase truncate">
-                  {hoveredCard.name}
+        <div className="hidden lg:block fixed left-3 xl:left-4 top-1/2 -translate-y-1/2 z-[44] w-64 xl:w-72 pointer-events-none select-none">
+          <div
+            style={{
+              clipPath: 'polygon(0 0, calc(100% - 14px) 0, 100% 14px, 100% 100%, 14px 100%, 0 calc(100% - 14px))'
+            }}
+            className="p-[1.5px] bg-gradient-to-b from-[#0dfceb]/85 via-[#0dfceb]/45 to-[#FCEE0A]/75 shadow-[0_0_45px_rgba(0,0,0,0.95)]"
+          >
+            <div
+              style={{
+                clipPath: 'polygon(0 0, calc(100% - 13px) 0, 100% 13px, 100% 100%, 13px 100%, 0 calc(100% - 13px))'
+              }}
+              className="bg-[#060a12]/97 overflow-hidden backdrop-blur-md"
+            >
+              {/* Cabecera clásica Escáner Kiroshi */}
+              <div className="px-3 py-1.5 bg-[#04070e] border-b border-[#0dfceb]/25 flex items-center justify-between font-mono">
+                <span className="text-[9px] font-black uppercase tracking-[0.18em] text-[#0dfceb] flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#0dfceb] animate-ping" />
+                  <span>ESCÁNER KIROSHI</span>
                 </span>
-                {hoveredCard.currentPower !== undefined && hoveredCard.currentPower !== null && (
-                  <span className="text-xs font-black text-[#0dfceb] shrink-0">
-                    Power {hoveredCard.currentPower}
-                  </span>
-                )}
+                <span className="text-[8px] font-bold uppercase tracking-widest text-[#FCEE0A]/85">
+                  OBJETIVO FIJADO
+                </span>
               </div>
-              <div className="flex items-center gap-1.5 text-[10px] text-gray-400 uppercase flex-wrap">
-                <span>{hoveredCard.officialType || hoveredCard.type || 'CARTA'}</span>
-                {hoveredCard.color && <span>• {hoveredCard.color}</span>}
-                {hoveredCard.isSpent && <span className="text-[#FF003C]">• Spent</span>}
-                {hoveredCard.isLagging && <span className="text-[#0dfceb]">• Lag</span>}
+
+              <div className="relative aspect-[5/7] w-full bg-black overflow-hidden">
+                <img
+                  src={hoveredCard.image}
+                  alt={hoveredCard.name || 'Carta'}
+                  className="w-full h-full object-cover object-center"
+                />
+              </div>
+
+              <div className="p-3 border-t border-white/10 space-y-1 font-mono bg-[#060911]">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-xs font-black text-white uppercase truncate">
+                    {hoveredCard.name}
+                  </span>
+                  {hoveredCard.currentPower !== undefined && hoveredCard.currentPower !== null && (
+                    <span className="text-xs font-black text-[#0dfceb] shrink-0">
+                      ⚡ {hoveredCard.currentPower}
+                    </span>
+                  )}
+                </div>
+                <div className="flex items-center gap-1.5 text-[10px] text-gray-400 uppercase flex-wrap">
+                  <span>{hoveredCard.officialType || hoveredCard.type || 'CARTA'}</span>
+                  {hoveredCard.color && <span>• {hoveredCard.color}</span>}
+                  {hoveredCard.isSpent && <span className="text-[#FF003C]">• Gastada</span>}
+                  {hoveredCard.isLagging && <span className="text-[#0dfceb]">• Lag</span>}
+                </div>
               </div>
             </div>
           </div>

@@ -8922,53 +8922,100 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
         </div>
       )}
 
-      {/* BANNER CYBERPUNK A PANTALLA COMPLETA AL CAMBIAR DE TURNO (EXACTO AL VÍDEO 04m32s) */}
+      {/* PROYECCIÓN HOLOGRÁFICA HUD ORIGINAL AL CAMBIAR DE TURNO (DISEÑO PROPIO KIROSHI/NETWATCH) */}
       <AnimatePresence>
-        {turnBanner && (
-          <motion.div
-            key={`turn-banner-${turnBanner.turnNumber}-${turnBanner.isPlayer ? 'p' : 'b'}`}
-            initial={{ opacity: 0, scaleY: 0.7 }}
-            animate={{ opacity: 1, scaleY: 1 }}
-            exit={{ opacity: 0, scaleY: 0.75 }}
-            transition={{ duration: 0.18 }}
-            className="fixed inset-x-0 top-1/2 -translate-y-1/2 z-[60] pointer-events-none select-none font-mono"
-          >
-            <div
-              className="h-2 w-full"
-              style={{
-                backgroundImage:
-                  'repeating-linear-gradient(-45deg, #FCEE0A 0px, #FCEE0A 10px, #070a10 10px, #070a10 20px)'
-              }}
-            />
-            <div
-              className={`w-full py-3.5 sm:py-4 flex items-center justify-center relative overflow-hidden backdrop-blur-sm ${
-                turnBanner.isPlayer
-                  ? 'bg-[#04141d]/90 shadow-[0_0_50px_rgba(13,252,235,0.35)]'
-                  : 'bg-[#1a050d]/90 shadow-[0_0_50px_rgba(255,0,60,0.4)]'
-              }`}
+        {turnBanner && (() => {
+          const accent = turnBanner.isPlayer ? '#0dfceb' : '#FF003C';
+          const clipOct = 'polygon(18px 0, 100% 0, 100% calc(100% - 18px), calc(100% - 18px) 100%, 0 100%, 0 18px)';
+          return (
+            <motion.div
+              key={`turn-banner-${turnBanner.turnNumber}-${turnBanner.isPlayer ? 'p' : 'b'}`}
+              initial={{ opacity: 0, scale: 0.9, y: -12 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 1.04, y: 8 }}
+              transition={{ duration: 0.22, ease: 'easeOut' }}
+              className="fixed left-1/2 top-[46%] -translate-x-1/2 -translate-y-1/2 z-[60] pointer-events-none select-none font-mono w-[88vw] max-w-md"
             >
-              <span
-                className={`text-2xl sm:text-4xl font-black uppercase tracking-[0.28em] ${
-                  turnBanner.isPlayer ? 'text-[#0dfceb]' : 'text-[#ff4f7a]'
-                }`}
+              <div
                 style={{
-                  textShadow: turnBanner.isPlayer
-                    ? '0 0 24px rgba(13,252,235,0.9), -4px 0 0 rgba(252,238,10,0.28)'
-                    : '0 0 24px rgba(255,0,60,0.95), -4px 0 0 rgba(252,238,10,0.35)'
+                  filter: turnBanner.isPlayer
+                    ? 'drop-shadow(0 0 26px rgba(13,252,235,0.45)) drop-shadow(0 16px 36px rgba(0,0,0,0.9))'
+                    : 'drop-shadow(0 0 26px rgba(255,0,60,0.48)) drop-shadow(0 16px 36px rgba(0,0,0,0.9))'
                 }}
+                className="relative"
               >
-                {turnBanner.isPlayer ? 'TU TURNO' : 'TURNO DEL RIVAL'}
-              </span>
-            </div>
-            <div
-              className="h-2 w-full"
-              style={{
-                backgroundImage:
-                  'repeating-linear-gradient(-45deg, #FCEE0A 0px, #FCEE0A 10px, #070a10 10px, #070a10 20px)'
-              }}
-            />
-          </motion.div>
-        )}
+                {/* Esquinas tácticas de mira Kiroshi */}
+                <span className="absolute -top-1.5 -left-1.5 w-4 h-4 border-t-2 border-l-2 z-20" style={{ borderColor: accent }} />
+                <span className="absolute -top-1.5 -right-1.5 w-4 h-4 border-t-2 border-r-2 z-20" style={{ borderColor: accent }} />
+                <span className="absolute -bottom-1.5 -left-1.5 w-4 h-4 border-b-2 border-l-2 z-20" style={{ borderColor: accent }} />
+                <span className="absolute -bottom-1.5 -right-1.5 w-4 h-4 border-b-2 border-r-2 z-20" style={{ borderColor: accent }} />
+
+                {/* Marco octogonal translúcido con barrido láser */}
+                <div style={{ clipPath: clipOct, background: `linear-gradient(135deg, ${accent}, rgba(255,255,255,0.18), ${accent})` }} className="p-[1.5px]">
+                  <div
+                    style={{
+                      clipPath: clipOct,
+                      backgroundImage:
+                        'repeating-linear-gradient(0deg, rgba(255,255,255,0.03) 0px, rgba(255,255,255,0.03) 1px, transparent 1px, transparent 4px)'
+                    }}
+                    className={`relative overflow-hidden px-6 py-4 flex flex-col items-center justify-center text-center backdrop-blur-md ${
+                      turnBanner.isPlayer ? 'bg-[#04101a]/94' : 'bg-[#16050c]/94'
+                    }`}
+                  >
+                    {/* Barrido holográfico animado */}
+                    <motion.div
+                      initial={{ x: '-140%' }}
+                      animate={{ x: '220%' }}
+                      transition={{ duration: 0.75, ease: 'easeInOut' }}
+                      className="absolute inset-y-0 w-1/3 skew-x-[-24deg] pointer-events-none"
+                      style={{
+                        background: `linear-gradient(90deg, transparent, ${turnBanner.isPlayer ? 'rgba(13,252,235,0.22)' : 'rgba(255,0,60,0.24)'}, transparent)`
+                      }}
+                    />
+
+                    {/* Micro-cabecera técnica */}
+                    <span
+                      className="text-[10px] font-black uppercase tracking-[0.3em] mb-1 opacity-90"
+                      style={{ color: accent }}
+                    >
+                      {turnBanner.isPlayer
+                        ? `// ENLACE NEURAL · TURNO ${String(turnBanner.turnNumber || 1).padStart(2, '0')} //`
+                        : `// SEÑAL HOSTIL · TURNO ${String(turnBanner.turnNumber || 1).padStart(2, '0')} //`}
+                    </span>
+
+                    {/* Título principal */}
+                    <span
+                      className="text-2xl sm:text-3xl font-black uppercase tracking-[0.22em] text-white"
+                      style={{
+                        textShadow: turnBanner.isPlayer
+                          ? '0 0 18px rgba(13,252,235,0.85)'
+                          : '0 0 18px rgba(255,0,60,0.9)'
+                      }}
+                    >
+                      {turnBanner.isPlayer ? 'TU TURNO' : 'TURNO DEL RIVAL'}
+                    </span>
+
+                    {/* Línea de pulso central que se expande */}
+                    <motion.div
+                      initial={{ scaleX: 0 }}
+                      animate={{ scaleX: 1 }}
+                      transition={{ duration: 0.35, ease: 'easeOut' }}
+                      className="w-40 h-[2px] mt-2 origin-center rounded-full"
+                      style={{ backgroundColor: accent, boxShadow: `0 0 10px ${accent}` }}
+                    />
+
+                    {/* Subtítulo táctico */}
+                    <span className="text-[9px] text-gray-300/85 uppercase tracking-[0.22em] mt-1.5">
+                      {turnBanner.isPlayer
+                        ? 'SISTEMAS ACTIVOS · FASE DE INICIO'
+                        : 'PROTOCOLO DEFENSIVO · REACCIÓN LISTA'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          );
+        })()}
       </AnimatePresence>
 
       {/* FLECHAS SVG ANIMADAS DE ATAQUE Y BLOQUEO EN TIEMPO REAL SOBRE EL TABLERO */}
