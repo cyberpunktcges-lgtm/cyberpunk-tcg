@@ -227,6 +227,49 @@ export function queueCardChoice(state, choice) {
 }
 
 /**
+ * Estampa automáticamente el `sourceUnitId` exacto (`instanceId`) en cualquier selección/modal
+ * creada durante un disparador de carta, asegurando que las flechas partan únicamente desde
+ * la instancia concreta que disparó el efecto (incluso si hay dos copias homónimas en mesa).
+ */
+function withTriggerSource(state, sourceInstanceId, fn) {
+  if (!state || !sourceInstanceId) return fn();
+  const prevTargetSel = state.pendingTargetSelection;
+  const prevTargetQueueLen = Array.isArray(state.pendingTargetSelectionQueue)
+    ? state.pendingTargetSelectionQueue.length
+    : 0;
+  const prevCardChoice = state.pendingCardChoice;
+  const prevCardChoiceQueueLen = Array.isArray(state.pendingCardChoiceQueue)
+    ? state.pendingCardChoiceQueue.length
+    : 0;
+  const prevModalChoice = state.pendingModalChoice;
+
+  const result = fn();
+
+  if (state.pendingTargetSelection && state.pendingTargetSelection !== prevTargetSel && !state.pendingTargetSelection.sourceUnitId) {
+    state.pendingTargetSelection.sourceUnitId = sourceInstanceId;
+  }
+  if (Array.isArray(state.pendingTargetSelectionQueue) && state.pendingTargetSelectionQueue.length > prevTargetQueueLen) {
+    for (let i = prevTargetQueueLen; i < state.pendingTargetSelectionQueue.length; i++) {
+      const item = state.pendingTargetSelectionQueue[i];
+      if (item && !item.sourceUnitId) item.sourceUnitId = sourceInstanceId;
+    }
+  }
+  if (state.pendingCardChoice && state.pendingCardChoice !== prevCardChoice && !state.pendingCardChoice.sourceUnitId) {
+    state.pendingCardChoice.sourceUnitId = state.pendingCardChoice.hostUnitId || sourceInstanceId;
+  }
+  if (Array.isArray(state.pendingCardChoiceQueue) && state.pendingCardChoiceQueue.length > prevCardChoiceQueueLen) {
+    for (let i = prevCardChoiceQueueLen; i < state.pendingCardChoiceQueue.length; i++) {
+      const item = state.pendingCardChoiceQueue[i];
+      if (item && !item.sourceUnitId) item.sourceUnitId = item.hostUnitId || sourceInstanceId;
+    }
+  }
+  if (state.pendingModalChoice && state.pendingModalChoice !== prevModalChoice && !state.pendingModalChoice.sourceUnitId) {
+    state.pendingModalChoice.sourceUnitId = sourceInstanceId;
+  }
+  return result;
+}
+
+/**
  * CP-075 Meredith Stout // Stone-Cold Corpo:
  * "When a Rival adjusts or swaps 1 or more friendly Gigs, you may add a card from your trash to your hand."
  */
@@ -292,6 +335,10 @@ export function isArasakaOrGoSoloLegend(leg) {
  * - CP-007 Alt Cunningham // Mother of Daemons: "When a friendly equipped Unit or Legend is spent, draw 1."
  */
 export function executeCardSpentTriggers(state, playerKey, spentCard) {
+  return withTriggerSource(state, spentCard?.instanceId, () => _executeCardSpentTriggers(state, playerKey, spentCard));
+}
+
+function _executeCardSpentTriggers(state, playerKey, spentCard) {
   if (!state || !spentCard) return;
   const p = state[playerKey];
   const opp = state[playerKey === 'player' ? 'bot' : 'player'];
@@ -420,6 +467,7 @@ export function executeOnGigsStolenTriggers(state, attackerPlayerKey, attackerUn
           sourceCardId: 'CP-136',
           sourceCardName: 'V // Roamer of the Badlands',
           sourceCardImage: attackerUnit.image,
+          sourceUnitId: attackerUnit.instanceId,
           title: '🏜️ V // ROAMER OF THE BADLANDS — AUMENTAR GIG ROBADO',
           prompt: `¡V ha robado el dado ${String(stolenDie.die).toUpperCase()} (Valor actual: ${stolenDie.value}/${maxFace})! Elige cuánto aumentarlo (hasta +5, o déjalo igual):`,
           canIncrease: true,
@@ -453,6 +501,7 @@ export function executeOnGigsStolenTriggers(state, attackerPlayerKey, attackerUn
             sourceCardId: 'CP-001',
             sourceCardName: '6th Street Recruits',
             sourceCardImage: recruit.image,
+            sourceUnitId: recruit.instanceId,
             title: '🔫 6TH STREET RECRUITS // ROBO DE D6 (+HASTA 6)',
             prompt: '¡Una Unidad aliada robó un D6! Elige cualquier Gig en juego (tuyo o del rival) para aumentar su valor en hasta +6 (o déjalo igual):',
             canIncrease: true,
@@ -496,6 +545,7 @@ export function executeOnGigsStolenTriggers(state, attackerPlayerKey, attackerUn
           sourceCardId: 'CP-039',
           sourceCardName: 'Gorilla Arms',
           sourceCardImage: gorillaGear.image || attackerUnit.image,
+          sourceUnitId: attackerUnit.instanceId,
           title: '🦾 GORILLA ARMS // ROBO EXTRA DE GIG',
           prompt: `¡Primera vez este turno que "${attackerUnit.name}" roba un Gig! Elige 1 Gig del rival con un valor que NO compartas con tus Gigs para robarlo:`,
           eligibleGigIndices: eligibleIndices,
@@ -559,6 +609,7 @@ export function executeJackiePourOneOutTrigger(state, playerKey, playedCard) {
       sourceCardId: 'CP-051',
       sourceCardName: 'Jackie Welles // Pour One Out for Me',
       sourceCardImage: jackie.image,
+      sourceUnitId: jackie.instanceId,
       title: '🥃 JACKIE WELLES // POUR ONE OUT FOR ME',
       prompt: `¡Primera Unidad o Gear Azul del turno ("${playedCard.name}")! Puedes reducir 1 de TUS Gigs en -1 o -2 (si pasa a ser Gig mínimo [valor 1], robas 1 carta):`,
       targetScope: 'FRIENDLY_GIGS',
@@ -2166,6 +2217,10 @@ export function sendUnitToBottomDeck(playerState, unit, state = null) {
 }
 
 export function executeUnitPlayTrigger(state, playerKey, unitInstance) {
+  return withTriggerSource(state, unitInstance?.instanceId, () => _executeUnitPlayTrigger(state, playerKey, unitInstance));
+}
+
+function _executeUnitPlayTrigger(state, playerKey, unitInstance) {
   if (!state || !unitInstance) return;
   const p = state[playerKey];
   const oppKey = playerKey === 'player' ? 'bot' : 'player';
@@ -3109,6 +3164,10 @@ export function executeUnitPlayTrigger(state, playerKey, unitInstance) {
 // =========================================================================
 
 export function executeUnitAttackTrigger(state, playerKey, attackerUnit) {
+  return withTriggerSource(state, attackerUnit?.instanceId, () => _executeUnitAttackTrigger(state, playerKey, attackerUnit));
+}
+
+function _executeUnitAttackTrigger(state, playerKey, attackerUnit) {
   if (!state || !attackerUnit) return;
   const p = state[playerKey];
   const oppKey = playerKey === 'player' ? 'bot' : 'player';
@@ -3628,6 +3687,10 @@ export function executeUnitDefeatedTrigger(state, ownerKey, defeatedUnit) {
 // =========================================================================
 
 export function executeCallLegendTrigger(state, playerKey, legendCard) {
+  return withTriggerSource(state, legendCard?.instanceId, () => _executeCallLegendTrigger(state, playerKey, legendCard));
+}
+
+function _executeCallLegendTrigger(state, playerKey, legendCard) {
   if (!state || !legendCard) return;
   const p = state[playerKey];
   const oppKey = playerKey === 'player' ? 'bot' : 'player';
@@ -3984,6 +4047,10 @@ export function executeEndOfTurnTriggers(state, playerKey) {
  * - CP-012 Augmented Negotiators: "When this Unit uses BLOCKER, a Rival discards 1."
  */
 export function executeBlockerUsedTrigger(state, defenderKey, blockerUnit) {
+  return withTriggerSource(state, blockerUnit?.instanceId, () => _executeBlockerUsedTrigger(state, defenderKey, blockerUnit));
+}
+
+function _executeBlockerUsedTrigger(state, defenderKey, blockerUnit) {
   if (!state || !blockerUnit) return;
   const def = state[defenderKey];
   const oppKey = defenderKey === 'player' ? 'bot' : 'player';

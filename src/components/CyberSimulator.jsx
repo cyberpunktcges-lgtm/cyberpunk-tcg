@@ -2215,6 +2215,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
             sourceCardId: 'CP-067',
             sourceCardName: 'Maman Brigitte',
             sourceCardImage: choice.sourceCardImage,
+            sourceUnitId: choice.sourceUnitId || choice.hostUnitId || null,
             title: '🕯️ MAMAN BRIGITTE // ENVIAR AL FONDO DEL MAZO',
             prompt: 'Selecciona la Unidad rival sin Gear equipado para enviarla al fondo de su mazo:',
             effectType: 'BOTTOM_DECK',
@@ -2287,6 +2288,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
             sourceCardId: 'CP-096',
             sourceCardName: 'Placide',
             sourceCardImage: choice.sourceCardImage,
+            sourceUnitId: choice.sourceUnitId || choice.hostUnitId || null,
             title: '📡 PLACIDE // ENVIAR AL FONDO DEL MAZO',
             prompt: 'Selecciona una Unidad rival para enviarla al fondo de su mazo:',
             effectType: 'BOTTOM_DECK',
@@ -2320,6 +2322,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
             sourceCardId: 'CP-142',
             sourceCardName: 'Viktor Vektor',
             sourceCardImage: choice.sourceCardImage,
+            sourceUnitId: choice.sourceUnitId || choice.excludeUnitId || null,
             title: '💉 VIKTOR VEKTOR // EQUIPAR GEAR DE BASURA',
             prompt: `Selecciona OTRA Unidad aliada para equiparle gratis "${selected.name}":`,
             effectType: 'EQUIP_GEAR',
@@ -2578,7 +2581,8 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
           title: '💼 DEXTER DESHAWN // MEJORAR FUERZA',
           prompt: 'Selecciona una unidad amiga para otorgarle +2 de poder este turno:',
           sourceCardName: 'Dexter DeShawn',
-          sourceCardImage: choice.sourceCardImage
+          sourceCardImage: choice.sourceCardImage,
+          sourceUnitId: choice.sourceUnitId || null
         };
         delete gameState.pendingModalChoice;
         setGameState({ ...gameState });
@@ -2618,7 +2622,8 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
           title: '💉 DUM DUM // SACRIFICAR GEAR',
           prompt: 'Selecciona el Gear aliado (en Unidad o Leyenda) que deseas destruir para robar 2 cartas:',
           sourceCardName: 'Dum Dum',
-          sourceCardImage: choice.sourceCardImage
+          sourceCardImage: choice.sourceCardImage,
+          sourceUnitId: choice.sourceUnitId || null
         };
         delete gameState.pendingModalChoice;
         setGameState({ ...gameState });
@@ -2670,7 +2675,8 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
           title: '🚗 MUAMAR REYES // INMUNIDAD EN COMBATE',
           prompt: 'Selecciona una unidad amiga: no podrá ser derrotada en combate este turno:',
           sourceCardName: 'Muamar Reyes',
-          sourceCardImage: choice.sourceCardImage
+          sourceCardImage: choice.sourceCardImage,
+          sourceUnitId: choice.sourceUnitId || null
         });
         delete gameState.pendingModalChoice;
         setGameState({ ...gameState });
@@ -2698,7 +2704,8 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
           title: '✝️ PADRE // GIRAR UNIDAD RIVAL',
           prompt: 'Selecciona la unidad rival que deseas girar (Spend):',
           sourceCardName: 'Padre',
-          sourceCardImage: choice.sourceCardImage
+          sourceCardImage: choice.sourceCardImage,
+          sourceUnitId: choice.sourceUnitId || null
         });
         delete gameState.pendingModalChoice;
         setGameState({ ...gameState });
@@ -2726,7 +2733,8 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
           title: '🌸 WAKAKO OKADA // REDUCIR FUERZA',
           prompt: 'Selecciona la unidad rival a la que deseas reducir 2 de poder este turno:',
           sourceCardName: 'Wakako Okada',
-          sourceCardImage: choice.sourceCardImage
+          sourceCardImage: choice.sourceCardImage,
+          sourceUnitId: choice.sourceUnitId || null
         });
         delete gameState.pendingModalChoice;
         setGameState({ ...gameState });
@@ -4169,10 +4177,11 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
       return;
     }
     const batch = gameState.lastBotActionArrows;
-    if (!batch || !batch.batchId || !Array.isArray(batch.arrows) || batch.arrows.length === 0) return;
+    if (!batch || !batch.batchId || !Array.isArray(batch.arrows)) return;
     if (lastBotArrowBatchRef.current === batch.batchId) return;
     lastBotArrowBatchRef.current = batch.batchId;
     setTransientBotArrows(batch.arrows);
+    if (batch.arrows.length === 0) return;
 
     // Resaltar también el borde neón rojo de las unidades del jugador que hayan sido objetivo
     const targetedUnitIds = batch.arrows
@@ -5556,7 +5565,6 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                             (unit) => unit.legendInstanceId === leg.instanceId || unit.instanceId === leg.unitInstanceId
                           );
                           if (u) {
-                            setSelectedFieldUnit(u);
                             setInspectedCard(u);
                           }
                         }}
@@ -9216,7 +9224,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
           const shortSrc = String(activeTargetSel?.sourceCardName || 'CALL').split('//')[0].trim().slice(0, 18);
           activeArrows.push({
             id: 'player-inline-legend-arrow',
-            fromAnchor: ['player-trash', 'player-field', 'player-pill'],
+            fromAnchor: [activeTargetSel?.sourceUnitId, 'player-trash', 'player-field', 'player-pill'].filter(Boolean),
             toAnchor: [stagedTarget.legendInstanceId, 'player-field'],
             color: '#FCEE0A',
             dashed: false,
@@ -9228,7 +9236,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
           const gigAnchor = `${stagedTarget.owner}-gig-${stagedTarget.gigIndex}`;
           activeArrows.push({
             id: 'player-inline-gig-arrow',
-            fromAnchor: ['player-trash', 'player-field', 'player-pill'],
+            fromAnchor: [activeTargetSel?.sourceUnitId, 'player-trash', 'player-field', 'player-pill'].filter(Boolean),
             toAnchor: [gigAnchor, stagedTarget.owner === 'bot' ? 'bot-gigs' : 'player-gigs'],
             color: '#0dfceb',
             dashed: false,
@@ -9252,14 +9260,30 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
           !(isMyTurn && (gameState?.pendingGigRoll || gameState?.phase === 'START_GIG_SELECT'))
         ) {
           for (const bArr of transientBotArrows) {
+            // Si hay un ataque del bot en curso (pendingReaction), nunca mezclar flechas
+            // residuales de otra carta/copia anterior con el ataque actual.
+            if (r && r.attackerPlayerKey === 'bot' && r.attackerUnitId) {
+              const fromList = Array.isArray(bArr.fromAnchor) ? bArr.fromAnchor : [bArr.fromAnchor];
+              const sameAttacker =
+                bArr.sourceInstanceId === r.attackerUnitId || fromList.includes(r.attackerUnitId);
+              if (!sameAttacker) continue;
+            }
             activeArrows.push(bArr);
           }
         }
+        const selectedBelongsToPlayer = Boolean(
+          selectedFieldUnit && (p.field || []).some((u) => u.instanceId === selectedFieldUnit.instanceId)
+        );
         const liveAttackAnchor =
           isMyTurn &&
-          selectedFieldUnit &&
+          selectedBelongsToPlayer &&
           !selectedFieldUnit.isSpent &&
           !selectedFieldUnit.isLagging &&
+          !isInlineBoardTargeting &&
+          !pendingGearEquip &&
+          !gameState?.pendingTargetSelection &&
+          !gameState?.pendingCardChoice &&
+          !gameState?.pendingModalChoice &&
           !gameState?.pendingReaction &&
           !gameState?.isGameOver
             ? selectedFieldUnit.instanceId

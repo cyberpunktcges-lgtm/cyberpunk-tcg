@@ -429,6 +429,8 @@ function captureBotActionSnapshot(gameState) {
       currentPower: Number(u.currentPower ?? u.parsedPower ?? 0),
       isSpent: Boolean(u.isSpent),
       cannotReadyNextTurn: Boolean(u.cannotReadyNextTurn),
+      cannotBlock: Boolean(u.cannotBlock || u.cannotBlockThisTurn),
+      mustAttackNextTurn: Boolean(u.mustAttackNextTurn),
       gearCount: (u.gear || []).length
     })),
     playerGigsSig: (p.gigs || []).map((g) => `${g.die}:${g.value}`).join('|'),
@@ -452,6 +454,17 @@ function captureBotActionSnapshot(gameState) {
   };
 }
 
+function findBotGearHostInstanceId(botState, gearInstanceId) {
+  if (!botState || !gearInstanceId) return null;
+  for (const u of botState.field || []) {
+    if ((u.gear || []).some((g) => g.instanceId === gearInstanceId)) return u.instanceId;
+  }
+  for (const l of botState.legends || []) {
+    if ((l.gear || []).some((g) => g.instanceId === gearInstanceId)) return l.instanceId;
+  }
+  return null;
+}
+
 function recordBotActionArrows(
   beforeSnap,
   gameState,
@@ -464,9 +477,13 @@ function recordBotActionArrows(
 
   let sourceCandidates = ['bot-trash', 'bot-pill', 'bot-field'];
   if (sourceAnchor) {
-    sourceCandidates = Array.isArray(sourceAnchor)
-      ? [...sourceAnchor, 'bot-trash', 'bot-pill']
-      : [sourceAnchor, 'bot-trash', 'bot-pill'];
+    const rawList = Array.isArray(sourceAnchor) ? sourceAnchor : [sourceAnchor];
+    const resolvedList = rawList.flatMap((anc) => {
+      if (!anc) return [];
+      const hostId = findBotGearHostInstanceId(b, anc);
+      return hostId ? [hostId, anc] : [anc];
+    });
+    sourceCandidates = [...new Set([...resolvedList, 'bot-trash', 'bot-pill'])];
   } else if (card) {
     if (actionType === 'GEAR') {
       sourceCandidates = ['bot-pill', 'bot-trash', 'bot-field'];
@@ -476,15 +493,26 @@ function recordBotActionArrows(
       const matchingFieldUnit = (b.field || []).find(
         (u) => u.instanceId === card.instanceId || u.legendInstanceId === card.instanceId
       );
+      const gearHostId = findBotGearHostInstanceId(b, card.instanceId);
       sourceCandidates = [
-        matchingFieldUnit?.instanceId,
-        card.instanceId,
-        'bot-trash',
-        'bot-pill',
-        'bot-field'
-      ].filter(Boolean);
+        ...new Set(
+          [
+            matchingFieldUnit?.instanceId,
+            gearHostId,
+            card.instanceId,
+            'bot-trash',
+            'bot-pill',
+            'bot-field'
+          ].filter(Boolean)
+        )
+      ];
     }
   }
+
+  const primarySourceId =
+    sourceCandidates.find((c) => c && !['bot-trash', 'bot-pill', 'bot-field'].includes(c)) ||
+    card?.instanceId ||
+    null;
 
   const arrows = [...extraArrows];
   const afterPlayerField = p.field || [];
@@ -492,11 +520,13 @@ function recordBotActionArrows(
   const afterPlayerTrashIds = new Set((p.trash || []).map((c) => c.instanceId));
   const afterPlayerHandIds = new Set((p.hand || []).map((c) => c.instanceId));
 
-  // 1. Cambios sobre unidades del jugador (debuff, giro/congelado, quitar gear, destrucción/bounce)
+  // 1. Cambios sobre unidades del jugador (debuff, giro/congelado, cannotBlock, mustAttack, quitar gear, destrucción/bounce)
   for (const prevU of beforeSnap.playerField) {
     const curU = afterPlayerFieldMap.get(prevU.instanceId);
     if (curU) {
       const curPow = Number(curU.currentPower ?? curU.parsedPower ?? 0);
+      const curCannotBlock = Boolean(curU.cannotBlock || curU.cannotBlockThisTurn);
+      const curMustAttack = Boolean(curU.mustAttackNextTurn);
       if (curPow < prevU.currentPower) {
         arrows.push({
           fromAnchor: sourceCandidates,
@@ -513,6 +543,15 @@ function recordBotActionArrows(
           color: '#ff4fd8',
           dashed: true,
           label: `🔒 ${labelBase}`,
+          targetPlayerUnitId: curU.instanceId
+        });
+      } else if ((!prevU.cannotBlock && curCannotBlock) || (!prevU.mustAttackNextTurn && curMustAttack)) {
+        arrows.push({
+          fromAnchor: sourceCandidates,
+          toAnchor: curU.instanceId,
+          color: '#ff4fd8',
+          dashed: true,
+          label: !prevU.cannotBlock && curCannotBlock ? `🚫 ${labelBase}` : `🎯 ${labelBase}`,
           targetPlayerUnitId: curU.instanceId
         });
       } else if ((curU.gear || []).length < prevU.gearCount) {
@@ -645,48 +684,79 @@ function recordBotActionArrows(
     });
   }
 
-  // 9. Respaldo por log recién añadido (captura flags especiales como cannotBlock, mustAttack o debuff sobre poder 0)
+  // 9. Respaldo por log recién añadido (solo para efectos que no cambian stats/flags rastreados;
+  // evita falsos positivos con cartas homónimas desplegadas por el rival o duplicadas en mesa)
   if (arrows.length === 0 && typeof beforeSnap.logLen === 'number') {
     const newCount = Math.max(0, (gameState.actionLog || []).length - beforeSnap.logLen);
     if (newCount > 0) {
-      const recentLogsText = (gameState.actionLog || []).slice(0, newCount).join(' \n ');
-      for (const pu of afterPlayerField) {
-        const puName = String(pu.name || '').trim();
-        const puShort = puName.split(':')[0].trim();
-        if (
-          (puName && recentLogsText.includes(puName)) ||
-          (puShort && puShort.length >= 4 && recentLogsText.includes(puShort))
-        ) {
+      const rawRecentLogs = (gameState.actionLog || []).slice(0, newCount);
+      const effectLogs = rawRecentLogs
+        .filter((line) => {
+          const txt = String(line || '');
+          // Ignorar líneas de despliegue/venta/llamada/declaración que solo nombran la carta jugada por el rival
+          if (/paga\s+\d+\s+€\$\s+y\s+(despliega|lleva\s+a\s+su\s+Leyenda|juega)/i.test(txt)) return false;
+          if (/FASE 1: DECLARACIÓN DE ATAQUE|FASE 2: REACCIÓN|vende\s+"/i.test(txt)) return false;
+          return true;
+        })
+        .map((line) => String(line || '').replace(/\[[^\]]+\]/g, '').trim());
+
+      const effectLogsText = effectLogs.join(' \n ');
+      if (effectLogsText) {
+        const isAoELog = /todas\s+las\s+unidades|a\s+todas|all\s+rival/i.test(effectLogsText);
+        for (const pu of afterPlayerField) {
+          const puName = String(pu.name || '').trim();
+          const puShort = puName.split('//')[0].split(':')[0].trim();
+          if (
+            (puName && effectLogsText.includes(`"${puName}"`)) ||
+            (puName && effectLogsText.includes(puName)) ||
+            (puShort && puShort.length >= 5 && effectLogsText.includes(`"${puShort}`))
+          ) {
+            arrows.push({
+              fromAnchor: sourceCandidates,
+              toAnchor: pu.instanceId,
+              color: '#ff4fd8',
+              dashed: true,
+              label: `⚡ ${labelBase}`,
+              targetPlayerUnitId: pu.instanceId
+            });
+            // Si hay varias copias con el mismo nombre y el efecto no es global (AoE),
+            // apuntar como máximo a 1 instancia y nunca duplicar flechas por nombre.
+            if (!isAoELog) break;
+          }
+        }
+        if (arrows.length === 0 && /tus gigs|gig rival|roba.*gig|reduce.*gig/i.test(effectLogsText)) {
           arrows.push({
             fromAnchor: sourceCandidates,
-            toAnchor: pu.instanceId,
-            color: '#ff4fd8',
+            toAnchor: ['player-gigs', 'player-field'],
+            color: '#FF003C',
             dashed: true,
-            label: `⚡ ${labelBase}`,
-            targetPlayerUnitId: pu.instanceId
+            label: `🎲 ${labelBase}`
           });
         }
-      }
-      if (arrows.length === 0 && /tus gigs|gig rival|roba.*gig|reduce.*gig/i.test(recentLogsText)) {
-        arrows.push({
-          fromAnchor: sourceCandidates,
-          toAnchor: ['player-gigs', 'player-field'],
-          color: '#FF003C',
-          dashed: true,
-          label: `🎲 ${labelBase}`
-        });
       }
     }
   }
 
+  const batchId = `bot-arr-${Date.now()}-${botArrowBatchSeq++}`;
   if (arrows.length > 0) {
-    const batchId = `bot-arr-${Date.now()}-${botArrowBatchSeq++}`;
     gameState.lastBotActionArrows = {
       batchId,
+      actionType,
+      sourceInstanceId: primarySourceId,
       arrows: arrows.map((a, idx) => ({
         ...a,
+        sourceInstanceId: a.sourceInstanceId || primarySourceId,
         id: `${batchId}-${idx}`
       }))
+    };
+  } else if (actionType !== 'COMBAT_RESULT') {
+    // Limpiar explícitamente flechas de acciones previas para que nunca convivan
+    // flechas viejas de una copia anterior con la nueva acción/ataque de otra copia.
+    gameState.lastBotActionArrows = {
+      batchId,
+      actionType,
+      sourceInstanceId: primarySourceId,
+      arrows: []
     };
   }
   return arrows;

@@ -1143,6 +1143,16 @@ export function executeCardActivatedAbility(state, playerKey, cardInstanceId, ab
 
   const wasSpentBefore = Boolean(card.isSpent);
   const wasHostSpentBefore = Boolean(gearHost?.isSpent);
+  const prevTargetSel = state.pendingTargetSelection;
+  const prevTargetQueueLen = Array.isArray(state.pendingTargetSelectionQueue)
+    ? state.pendingTargetSelectionQueue.length
+    : 0;
+  const prevCardChoice = state.pendingCardChoice;
+  const prevCardChoiceQueueLen = Array.isArray(state.pendingCardChoiceQueue)
+    ? state.pendingCardChoiceQueue.length
+    : 0;
+  const prevModalChoice = state.pendingModalChoice;
+
   const res = chosenAbility.execute(state, playerKey, card);
   if (res && res.success) {
     if (gearHost && !wasHostSpentBefore && gearHost.isSpent) {
@@ -1150,6 +1160,34 @@ export function executeCardActivatedAbility(state, playerKey, cardInstanceId, ab
     } else if (!gearHost && !wasSpentBefore && card.isSpent) {
       executeCardSpentTriggers(state, playerKey, card);
     }
+
+    // Estampar siempre el instanceId exacto de la carta (o su portador si es Gear) para que las flechas
+    // partan únicamente desde la copia concreta que activó la habilidad.
+    const exactSourceId = gearHost?.instanceId || card.instanceId || null;
+    if (exactSourceId) {
+      if (state.pendingTargetSelection && state.pendingTargetSelection !== prevTargetSel && !state.pendingTargetSelection.sourceUnitId) {
+        state.pendingTargetSelection.sourceUnitId = exactSourceId;
+      }
+      if (Array.isArray(state.pendingTargetSelectionQueue) && state.pendingTargetSelectionQueue.length > prevTargetQueueLen) {
+        for (let i = prevTargetQueueLen; i < state.pendingTargetSelectionQueue.length; i++) {
+          const item = state.pendingTargetSelectionQueue[i];
+          if (item && !item.sourceUnitId) item.sourceUnitId = exactSourceId;
+        }
+      }
+      if (state.pendingCardChoice && state.pendingCardChoice !== prevCardChoice && !state.pendingCardChoice.sourceUnitId) {
+        state.pendingCardChoice.sourceUnitId = state.pendingCardChoice.hostUnitId || exactSourceId;
+      }
+      if (Array.isArray(state.pendingCardChoiceQueue) && state.pendingCardChoiceQueue.length > prevCardChoiceQueueLen) {
+        for (let i = prevCardChoiceQueueLen; i < state.pendingCardChoiceQueue.length; i++) {
+          const item = state.pendingCardChoiceQueue[i];
+          if (item && !item.sourceUnitId) item.sourceUnitId = item.hostUnitId || exactSourceId;
+        }
+      }
+      if (state.pendingModalChoice && state.pendingModalChoice !== prevModalChoice && !state.pendingModalChoice.sourceUnitId) {
+        state.pendingModalChoice.sourceUnitId = exactSourceId;
+      }
+    }
+
     if (state.pendingTargetSelection || state.pendingCardChoice) {
       res.requiresModal = true;
     }
