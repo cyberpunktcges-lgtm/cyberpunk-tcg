@@ -266,19 +266,15 @@ function CyberD20RollModal({ selection, onConfirmStarter, onReroll }) {
     const startTime = Date.now();
     const duration = 1300; // ~1.3 segundos de rodaje enérgico
 
-    let tickIdx = 0;
+    playDiceRoll();
     // Barajeo rápido de números con entropía criptográfica uniforme rollSecureD20()
     const shuffleInterval = setInterval(() => {
-      tickIdx++;
       setDisplayPlayerRoll(rollSecureD20());
       setDisplayBotRoll(rollSecureD20());
 
       const elapsed = Date.now() - startTime;
       const progressPercent = Math.min(100, Math.floor((elapsed / duration) * 100));
       setRollProgress(progressPercent);
-      if (tickIdx % 2 === 1) {
-        playDiceTick(Math.max(0.45, 1.1 - progressPercent / 130));
-      }
     }, 65);
 
     // Detención e impacto final exactamente en los valores calculados
@@ -1328,7 +1324,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
       isFinished: false
     });
 
-    playDiceTick(1.1);
+    playDiceRoll();
     let count = 0;
     const interval = setInterval(() => {
       count++;
@@ -1339,9 +1335,6 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
           currentValue: Math.floor(Math.random() * config.max) + 1
         };
       });
-      if (count < 16 && (count <= 8 ? count % 2 === 0 : count % 3 === 0)) {
-        playDiceTick(Math.max(0.42, 1.05 - count / 22));
-      }
 
       if (count >= 16) {
         clearInterval(interval);
@@ -3191,6 +3184,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
       const gig = (p.gigs || [])[sel.gigIndex];
       if (gig) {
         if (targetData.reroll) {
+          playDiceRoll();
           const oldVal = gig.value;
           const newVal = rollDie(sel.die);
           gig.value = newVal;

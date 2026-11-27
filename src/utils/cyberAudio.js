@@ -7,10 +7,76 @@
 
 const STORAGE_KEY_ENABLED = 'cyberpunk_tcg_sfx_enabled';
 
+const SOUND_SAMPLES = {
+  diceRoll: '/sounds/dice-rolling.mp3',
+  victory: '/sounds/you_win.mp3',
+  defeat: '/sounds/you_lose.mp3'
+};
+
 let audioCtx = null;
 let sfxEnabled = true;
 let noiseBufferCache = null;
 const lastPlayedAt = new Map();
+const samplePool = new Map();
+
+function getSampleAudio(key) {
+  if (typeof window === 'undefined' || typeof Audio === 'undefined') return null;
+  const src = SOUND_SAMPLES[key];
+  if (!src) return null;
+  let audio = samplePool.get(key);
+  if (!audio) {
+    try {
+      audio = new Audio(src);
+      audio.preload = 'auto';
+      samplePool.set(key, audio);
+    } catch {
+      return null;
+    }
+  }
+  return audio;
+}
+
+function preloadSamples() {
+  if (typeof window === 'undefined' || typeof Audio === 'undefined') return;
+  Object.keys(SOUND_SAMPLES).forEach((key) => {
+    getSampleAudio(key);
+  });
+}
+
+function stopAllSamples() {
+  samplePool.forEach((audio) => {
+    try {
+      audio.pause();
+      audio.currentTime = 0;
+    } catch {
+      // Ignorar
+    }
+  });
+}
+
+function playSample(key, { volume = 0.85, fallback = null } = {}) {
+  if (!sfxEnabled) return false;
+  const baseAudio = getSampleAudio(key);
+  if (!baseAudio) {
+    if (typeof fallback === 'function') fallback();
+    return false;
+  }
+  try {
+    baseAudio.pause();
+    baseAudio.currentTime = 0;
+    baseAudio.volume = Math.max(0, Math.min(1, volume));
+    const p = baseAudio.play();
+    if (p && typeof p.catch === 'function') {
+      p.catch(() => {
+        if (typeof fallback === 'function') fallback();
+      });
+    }
+    return true;
+  } catch {
+    if (typeof fallback === 'function') fallback();
+    return false;
+  }
+}
 
 // Cargar preferencia guardada en cliente
 if (typeof window !== 'undefined') {
@@ -37,6 +103,8 @@ export function setSfxEnabled(enabled) {
   }
   if (sfxEnabled) {
     unlockAudio();
+  } else {
+    stopAllSamples();
   }
   return sfxEnabled;
 }
@@ -63,6 +131,7 @@ export function unlockAudio() {
   if (ctx && ctx.state === 'suspended') {
     ctx.resume().catch(() => {});
   }
+  preloadSamples();
 }
 
 function canPlay(key, cooldownMs = 90) {
@@ -189,11 +258,7 @@ export function playDiceTick(intensity = 1) {
   });
 }
 
-/**
- * Ráfaga completa de 5 rebotes decrecientes de dado (para tiradas automáticas del Bot).
- */
-export function playDiceRoll() {
-  if (!canPlay('diceRoll', 260)) return;
+function playDiceRollSynthFallback() {
   const ctx = getAudioContext();
   if (!ctx) return;
   const t = ctx.currentTime;
@@ -230,6 +295,14 @@ export function playDiceRoll() {
     gain: 0.08,
     attack: 0.006
   });
+}
+
+/**
+ * Sonido real de tirada de dados (/sounds/dice-rolling.mp3) con respaldo sintetizado Web Audio.
+ */
+export function playDiceRoll() {
+  if (!canPlay('diceRoll', 240)) return;
+  playSample('diceRoll', { volume: 0.82, fallback: playDiceRollSynthFallback });
 }
 
 /**
@@ -581,8 +654,7 @@ export function playInvalidTarget() {
   playTone(ctx, { type: 'sawtooth', freq: 185, endFreq: 135, startTime: t + 0.085, duration: 0.095, gain: 0.065, attack: 0.004 });
 }
 
-export function playVictory() {
-  if (!canPlay('gameOver', 800)) return;
+function playVictorySynthFallback() {
   const ctx = getAudioContext();
   if (!ctx) return;
   const t = ctx.currentTime;
@@ -599,8 +671,7 @@ export function playVictory() {
   });
 }
 
-export function playDefeat() {
-  if (!canPlay('gameOver', 800)) return;
+function playDefeatSynthFallback() {
   const ctx = getAudioContext();
   if (!ctx) return;
   const t = ctx.currentTime;
@@ -616,4 +687,14 @@ export function playDefeat() {
       attack: 0.01
     });
   });
+}
+
+export function playVictory() {
+  if (!canPlay('gameOver', 800)) return;
+  playSample('victory', { volume: 0.88, fallback: playVictorySynthFallback });
+}
+
+export function playDefeat() {
+  if (!canPlay('gameOver', 800)) return;
+  playSample('defeat', { volume: 0.88, fallback: playDefeatSynthFallback });
 }
