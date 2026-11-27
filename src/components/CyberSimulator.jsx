@@ -1256,7 +1256,11 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
   };
 
   const handleUndo = () => {
-    if (history.length > 0 && gameState?.activePlayer === 'player' && !gameState?.isGameOver) {
+    const canUndoWindow = Boolean(
+      gameState?.activePlayer === 'player' ||
+      gameState?.pendingReaction?.attackerPlayerKey === 'bot'
+    );
+    if (history.length > 0 && canUndoWindow && !gameState?.isGameOver) {
       const prev = history[0];
       setHistory([]); // Queda agotado el Deshacer (solo se puede deshacer 1 sola vez)
       setGameState(prev);
@@ -1264,6 +1268,8 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
       setSelectedFieldUnit(null);
       setPendingManualPayment(null);
       setPendingGearEquip(null);
+      setStagedTarget(null);
+      setPendingGigNumberPick(null);
       setLegendMenuId(null);
       setUnitActionMenuId(null);
       setHolocall({
@@ -7936,6 +7942,8 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
           )}
           hasPendingReaction={Boolean(gameState?.pendingReaction && gameState.pendingReaction.attackerPlayerKey === 'bot')}
           hasBlockerAssigned={Boolean(gameState?.pendingReaction?.blockerUnitId)}
+          canUndo={Boolean(history.length > 0 && !gameState?.isGameOver && (isMyTurn || gameState?.pendingReaction?.attackerPlayerKey === 'bot'))}
+          onUndo={handleUndo}
           targetGigInfo={
             isInlineBoardTargeting && activeTargetSel?.actionType !== 'TARGET_UNIT'
               ? {
@@ -8036,7 +8044,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
             setBotStepPauseEnabled(next);
             botStepPauseEnabledRef.current = next;
           }}
-          canUndo={history.length > 0 && isMyTurn}
+          canUndo={Boolean(history.length > 0 && !gameState?.isGameOver && (isMyTurn || gameState?.pendingReaction?.attackerPlayerKey === 'bot'))}
           onUndo={handleUndo}
           onGoHome={() => {
             handleCancelPendingBotAck();

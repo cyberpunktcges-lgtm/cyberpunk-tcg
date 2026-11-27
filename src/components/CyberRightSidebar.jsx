@@ -493,10 +493,15 @@ export default function CyberRightSidebar({
               type="button"
               disabled={!canUndo}
               onClick={onUndo}
-              className="p-1.5 rounded border border-gray-700 bg-black text-gray-300 hover:border-[#FCEE0A] hover:text-[#FCEE0A] disabled:opacity-25 cursor-pointer transition-colors"
-              title="Deshacer última acción"
+              className={`px-2 py-1.5 rounded border text-[10px] font-black uppercase flex items-center gap-1 transition-colors ${
+                canUndo
+                  ? 'border-[#0dfceb]/75 bg-[#0dfceb]/15 text-[#0dfceb] hover:bg-[#0dfceb] hover:text-black cursor-pointer shadow-[0_0_10px_rgba(13,252,235,0.28)]'
+                  : 'border-gray-800 bg-black text-gray-600 opacity-40 cursor-not-allowed'
+              }`}
+              title="Deshacer último movimiento"
             >
               <Undo2 className="w-3.5 h-3.5" />
+              <span>UNDO</span>
             </button>
           </div>
 

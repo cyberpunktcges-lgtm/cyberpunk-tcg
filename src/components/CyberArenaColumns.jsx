@@ -207,6 +207,8 @@ export function CyberRightGigsRail({
   hasPendingReaction = false,
   hasBlockerAssigned = false,
   onPrimaryAction,
+  canUndo = false,
+  onUndo,
   targetGigInfo = null, // { isBotGigEligible: (gig, idx)=>bool, isPlayerGigEligible: (gig, idx)=>bool, selectedGig: { owner, gigIndex }|null, onSelectGig: (owner, gig, idx)=>void }
   recentHighlightBotGigs = false,
   recentHighlightPlayerGigs = false
@@ -359,29 +361,46 @@ export function CyberRightGigsRail({
         );
       })()}
 
-      {/* 3. BOTÓN PROTAGONISTA CENTRAL: FINALIZAR TURNO / PASS / RESOLVING... */}
-      <button
-        type="button"
-        disabled={isResolving || (!hasPendingReaction && (!isMyTurn || isBotThinking))}
-        onClick={onPrimaryAction}
-        className={`w-full py-3.5 px-3 rounded-sm font-black text-xs xl:text-sm uppercase tracking-[0.12em] transition-all shadow-lg ${
-          isResolving
-            ? 'bg-[#0c111c] border border-white/15 text-gray-400 cursor-not-allowed'
+      {/* 3. BOTÓN PROTAGONISTA CENTRAL: FINALIZAR TURNO / PASS / RESOLVING... + BOTÓN DESHACER (UNDO) */}
+      <div className="flex flex-col gap-1.5">
+        <button
+          type="button"
+          disabled={isResolving || (!hasPendingReaction && (!isMyTurn || isBotThinking))}
+          onClick={onPrimaryAction}
+          className={`w-full py-3.5 px-3 rounded-sm font-black text-xs xl:text-sm uppercase tracking-[0.12em] transition-all shadow-lg ${
+            isResolving
+              ? 'bg-[#0c111c] border border-white/15 text-gray-400 cursor-not-allowed'
+              : hasPendingReaction
+              ? 'bg-[#0dfceb] hover:bg-white text-[#070a10] cursor-pointer shadow-[0_0_26px_rgba(13,252,235,0.8)]'
+              : isMyTurn && !isBotThinking
+              ? 'bg-[#FCEE0A] hover:bg-white text-[#070a10] cursor-pointer shadow-[0_0_24px_rgba(252,238,10,0.55)]'
+              : 'bg-[#0c111c] border border-white/10 text-gray-500 cursor-not-allowed'
+          }`}
+        >
+          {isResolving
+            ? 'RESOLVING •••'
             : hasPendingReaction
-            ? 'bg-[#0dfceb] hover:bg-white text-[#070a10] cursor-pointer shadow-[0_0_26px_rgba(13,252,235,0.8)]'
-            : isMyTurn && !isBotThinking
-            ? 'bg-[#FCEE0A] hover:bg-white text-[#070a10] cursor-pointer shadow-[0_0_24px_rgba(252,238,10,0.55)]'
-            : 'bg-[#0c111c] border border-white/10 text-gray-500 cursor-not-allowed'
-        }`}
-      >
-        {isResolving
-          ? 'RESOLVING •••'
-          : hasPendingReaction
-          ? 'PASS'
-          : isBotThinking || !isMyTurn
-          ? 'RESOLVING •••'
-          : 'FINALIZAR TURNO'}
-      </button>
+            ? 'PASS'
+            : isBotThinking || !isMyTurn
+            ? 'RESOLVING •••'
+            : 'FINALIZAR TURNO'}
+        </button>
+
+        <button
+          type="button"
+          disabled={!canUndo}
+          onClick={onUndo}
+          className={`w-full py-1.5 px-2.5 rounded-sm border font-black text-[10px] uppercase tracking-[0.14em] flex items-center justify-center gap-1.5 transition-all ${
+            canUndo
+              ? 'bg-[#081520] hover:bg-[#0dfceb] border-[#0dfceb]/70 text-[#0dfceb] hover:text-[#070a10] cursor-pointer shadow-[0_0_14px_rgba(13,252,235,0.28)]'
+              : 'bg-[#090d16]/60 border-white/10 text-gray-600 opacity-45 cursor-not-allowed'
+          }`}
+          title="Deshacer el último movimiento"
+        >
+          <span>↩</span>
+          <span>DESHACER (UNDO)</span>
+        </button>
+      </div>
 
       {/* 4. TU CAJA DE GIGS */}
       {(() => {
