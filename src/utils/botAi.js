@@ -1421,9 +1421,18 @@ export async function runBotTurn(gameState, updateCallback, delayMs = 1450, paus
     }
 
     // 4.B: Destruir unidades enemigas giradas (Spent) donde el bot gana limpiamente (o Johnny vs CORPO)
+    // Si podemos robar 2+ Gigs (o llegar a 7 Gigs) libremente sin Blocker que nos frene, no desperdiciar
+    // un atacante gigante matando una unidad girada débil (ej. Delamain fuerza 0) en lugar de asaltar Gigs.
+    const canStealBigGigs =
+      (player.gigs || []).length > 0 &&
+      canUnitAttack(unit, bot, gameState, 'GIGS') &&
+      playerReadyBlockers.length === 0 &&
+      (gigsToSteal >= 2 || (bot.gigs?.length || 0) + gigsToSteal >= 7);
+
     const killableSpentEnemy = [...(player.field || [])]
       .filter((pu) => {
         if (!pu.isSpent) return false;
+        if (canStealBigGigs && (pu.currentPower || 0) <= 2 && !hasKeyword(pu, 'Blocker')) return false;
         if (isBotJohnny && isCorpoUnit(pu)) return true;
         if (isJohnnyUnit(pu) && botUnitIsCorpo) return false;
         return (pu.currentPower || 0) < unitPower;

@@ -104,6 +104,7 @@ import {
   getNumericUnitPower,
   parseCardCost,
   getUnitPowerBreakdown,
+  syncRoyceTurnPassiveBonus,
   isCardVendible,
   toggleEddieSpent,
   toggleLegendSpent,
@@ -2639,6 +2640,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
           if (!entry.isLegend) {
             const lostBonus = sacrificed.powerBonus || sacrificed.parsedPower || parseCardPower(sacrificed.power) || 0;
             if (lostBonus > 0) entry.unit.currentPower = Math.max(0, (entry.unit.currentPower || 0) - lostBonus);
+            syncRoyceTurnPassiveBonus(entry.unit, gameState.activePlayer === 'player');
           }
           if (!p.trash) p.trash = [];
           p.trash.push(sacrificed);
@@ -3221,6 +3223,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
           unit.gear.push(sel.gearToEquip);
           const bonus = sel.gearToEquip.powerBonus || sel.gearToEquip.parsedPower || parseCardPower(sel.gearToEquip.power) || 1;
           unit.currentPower = (unit.currentPower || 0) + bonus;
+          syncRoyceTurnPassiveBonus(unit, gameState.activePlayer === ownerKey);
           gameState.actionLog.unshift(`💉 [${sel.sourceCardName}] Equipó "${sel.gearToEquip.name}" a "${unit.name}" (+${bonus} Fuerza).`);
         } else if (sel.effectType === 'SPEND') {
           unit.isSpent = true;
@@ -3266,8 +3269,11 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
               : typeof sacrificed.parsedPower === 'number'
               ? sacrificed.parsedPower
               : parseCardPower(sacrificed.powerVal ?? sacrificed.power ?? 0) || 0;
-          if (!isLegend && lostBonus > 0) {
-            unit.currentPower = Math.max(0, getNumericUnitPower(unit) - lostBonus);
+          if (!isLegend) {
+            if (lostBonus > 0) {
+              unit.currentPower = Math.max(0, getNumericUnitPower(unit) - lostBonus);
+            }
+            syncRoyceTurnPassiveBonus(unit, gameState.activePlayer === ownerKey);
             if (gameState.pendingReaction?.attackerUnitId === unit.instanceId) {
               gameState.pendingReaction.attackerPower = unit.currentPower;
             }

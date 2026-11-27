@@ -3771,15 +3771,54 @@ function _executeCallLegendTrigger(state, playerKey, legendCard) {
         ]
       };
     } else {
-      if (hasGear) {
-        for (const u of p.field || []) {
-          if (u.gear && u.gear.length > 0) {
-            const [g] = u.gear.splice(0, 1);
-            if (!p.trash) p.trash = [];
-            p.trash.push(g);
-            break;
+      // Bot AI: priorizar sacrificar un Gear en Leyenda o unidad agotada/con lag; evitar sabotear
+      // un atacante listo (especialmente Royce CP-109) si perder el Gear le baja de 10 de fuerza (2 Gigs)
+      const gearCandidates = [];
+      (p.legends || []).forEach((l) => {
+        if (l.isFaceUp && !l.isOnField && !l.isRemovedFromGame && l.gear?.length) {
+          l.gear.forEach((g, idx) => gearCandidates.push({ host: l, isLegend: true, gear: g, idx, priority: 1 }));
+        }
+      });
+      (p.field || []).forEach((u) => {
+        if (!u.gear?.length) return;
+        const isRoyce = resolveCardId(u) === 'CP-109';
+        const isReadyAttacker = !u.isSpent && !u.isLagging;
+        u.gear.forEach((g, idx) => {
+          const gPow = Number(g.powerBonus ?? g.parsedPower ?? parseInt(g.powerVal || g.power || '0', 10)) || 0;
+          const totalLoss = gPow + (isRoyce && state.activePlayer === playerKey ? 2 : 0);
+          const curPow = Number(u.currentPower || 0);
+          const dropsBelow10 = isReadyAttacker && curPow >= 10 && curPow - totalLoss < 10;
+          if (!dropsBelow10) {
+            gearCandidates.push({
+              host: u,
+              isLegend: false,
+              gear: g,
+              idx,
+              priority: isReadyAttacker ? 3 + totalLoss : 2 + totalLoss
+            });
+          }
+        });
+      });
+
+      gearCandidates.sort((a, b) => a.priority - b.priority);
+      const chosenSac = gearCandidates[0];
+      if (chosenSac) {
+        const [sacGear] = chosenSac.host.gear.splice(chosenSac.idx, 1);
+        if (!p.trash) p.trash = [];
+        p.trash.push(sacGear);
+        if (!chosenSac.isLegend) {
+          const gPow = Number(sacGear.powerBonus ?? sacGear.parsedPower ?? parseInt(sacGear.powerVal || sacGear.power || '0', 10)) || 0;
+          if (gPow > 0) chosenSac.host.currentPower = Math.max(0, (chosenSac.host.currentPower || 0) - gPow);
+          if (resolveCardId(chosenSac.host) === 'CP-109' && Number(chosenSac.host._royceTurnGearBonus || 0) > 0) {
+            const desired = state.activePlayer === playerKey ? chosenSac.host.gear.length * 2 : 0;
+            const prevApplied = Number(chosenSac.host._royceTurnGearBonus || 0);
+            chosenSac.host.currentPower = Math.max(0, (chosenSac.host.currentPower || 0) - prevApplied + desired);
+            chosenSac.host._royceTurnGearBonus = desired;
           }
         }
+        state.actionLog.unshift(
+          `💉 [Dum Dum Rival] Destruye su Gear "${sacGear.name}" de "${chosenSac.host.name}" para robar 2 cartas.`
+        );
         drawCards(p, 2, state, cardName);
       } else {
         drawCards(p, 1, state, cardName);

@@ -430,6 +430,30 @@ export function getNumericUnitPower(unit) {
  * - tempDelta: modificadores temporales de este turno (ej. -4 de Pyramid Song, +2 de Dexter)
  * - status: 'debuffed' | 'buffed' | 'normal'
  */
+export function isRoycePsychoOnTheEdge(unit) {
+  if (!unit) return false;
+  const cid = String(unit.id || '').toUpperCase();
+  const slug = String(unit.slug || '').toLowerCase();
+  const name = String(unit.name || '').toLowerCase();
+  return cid === 'CP-109' || slug.includes('psycho-on-the-edge') || name.includes('psycho on the edge');
+}
+
+/**
+ * Sincroniza la habilidad pasiva oficial de CP-109 Royce // Psycho on the Edge:
+ * "During your turn, this Legend has +2 power for each of its equipped Gear."
+ */
+export function syncRoyceTurnPassiveBonus(unit, isOwnersTurn) {
+  if (!isRoycePsychoOnTheEdge(unit)) return 0;
+  const gearCount = Array.isArray(unit.gear) ? unit.gear.length : 0;
+  const desired = isOwnersTurn ? gearCount * 2 : 0;
+  const prevApplied = Number(unit._royceTurnGearBonus || 0);
+  if (desired !== prevApplied) {
+    unit.currentPower = Math.max(0, Number(unit.currentPower || 0) - prevApplied + desired);
+    unit._royceTurnGearBonus = desired;
+  }
+  return desired;
+}
+
 export function getUnitPowerBreakdown(unit) {
   if (!unit) {
     return {
@@ -1214,6 +1238,10 @@ export function playGearCard(state, playerKey, cardInstanceId, targetInstanceId 
   if (powerBonus && target.currentPower !== undefined) {
     target.currentPower = Math.max(0, target.currentPower + powerBonus);
   }
+  // CP-109 Royce // Psycho on the Edge: +2 de fuerza adicional por cada Gear equipado durante tu turno
+  if (targetType === 'unit') {
+    syncRoyceTurnPassiveBonus(target, state.activePlayer === playerKey);
+  }
 
   // CP-004 Adrenaline Converter: solo concede ADRENALINE si el rival controla al menos 2 Gigs más que tú
   const opp = state[playerKey === 'player' ? 'bot' : 'player'];
@@ -1463,6 +1491,9 @@ export function playLegendToField(state, playerKey, legendInstanceId, isGoSolo =
   };
 
   leg.unitInstanceId = unitInstance.instanceId;
+
+  // CP-109 Royce // Psycho on the Edge: +2 de fuerza por cada Gear equipado durante tu turno
+  syncRoyceTurnPassiveBonus(unitInstance, state.activePlayer === playerKey);
 
   if (!p.field) p.field = [];
   p.field.push(unitInstance);
@@ -2165,6 +2196,8 @@ export function executeStartPhase(state, playerKey) {
     u.isLagging = false;
     delete u.canAttackSpentUnitsTurnPlayed;
     delete u.usedGorillaArmsThisTurn;
+    // CP-109 Royce // Psycho on the Edge: activa +2 fuerza por cada Gear equipado al iniciar tu turno
+    syncRoyceTurnPassiveBonus(u, true);
   });
 
   // Expirar efectos "no puede atacar hasta tu próximo turno" (Chrome Reverie / Nocturne Op55N1)
@@ -2289,6 +2322,7 @@ export function passTurn(state, options = {}) {
         0
       );
       u.currentPower = Math.max(0, basePower + gearBonus);
+      delete u._royceTurnGearBonus;
       delete u.tempPowerMod;
       delete u.cannotBeDefeatedThisTurn;
       delete u.hasReadiedThisTurn;
