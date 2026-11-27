@@ -5534,7 +5534,14 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                               setHoveredCard(g);
                               setPreviewCard(g);
                             }}
-                            onMouseLeave={() => setHoveredCard(null)}
+                            onMouseLeave={() => {
+                              if (leg.isFaceUp) {
+                                setHoveredCard(leg);
+                                setPreviewCard(leg);
+                              } else {
+                                setHoveredCard(null);
+                              }
+                            }}
                             onClick={(e) => {
                               e.stopPropagation();
                               setInspectedCard(g);
@@ -5974,7 +5981,10 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                                 setHoveredCard(g);
                                 setPreviewCard(g);
                               }}
-                              onMouseLeave={() => setHoveredCard(null)}
+                              onMouseLeave={() => {
+                                setHoveredCard(unit);
+                                setPreviewCard(unit);
+                              }}
                               onClick={(e) => {
                                 e.stopPropagation();
                                 setInspectedCard(g);
@@ -6398,7 +6408,10 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                                 setHoveredCard(g);
                                 setPreviewCard(g);
                               }}
-                              onMouseLeave={() => setHoveredCard(null)}
+                              onMouseLeave={() => {
+                                setHoveredCard(unit);
+                                setPreviewCard(unit);
+                              }}
                               onClick={(e) => {
                                 e.stopPropagation();
                                 setInspectedCard(g);
@@ -7227,7 +7240,14 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                                   setHoveredCard(g);
                                   setPreviewCard(g);
                                 }}
-                                onMouseLeave={() => setHoveredCard(null)}
+                                onMouseLeave={() => {
+                                  if (leg.isFaceUp) {
+                                    setHoveredCard(leg);
+                                    setPreviewCard(leg);
+                                  } else {
+                                    setHoveredCard(null);
+                                  }
+                                }}
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   setInspectedCard(g);
