@@ -1269,6 +1269,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
       setSelectedFieldUnit(null);
       setPendingManualPayment(null);
       setPendingGearEquip(null);
+      setPendingGigTheft(null);
       setStagedTarget(null);
       setPendingGigNumberPick(null);
       setLegendMenuId(null);
@@ -1871,7 +1872,81 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
           }
         }
       } else {
-        attackRivalGigs(gameState, 'player', attackerUnit.instanceId, null, preferredDice);
+        const botGigs = gameState.bot?.gigs || [];
+        const liveGigsToSteal = calculateGigsToSteal(attackerUnit.currentPower || 0);
+        const isAttackerLegend =
+          attackerUnit.officialType === 'LEGEND' ||
+          attackerUnit.isLegendUnit ||
+          Boolean(attackerUnit.isLegend);
+        const isGigStealable = (g) => {
+          if (gameState.bot?.chromeFangProtectionActive && (g.value || 0) > (attackerUnit.currentPower || 0)) return false;
+          if (gameState.bot?.westbrookProtectionActive && isAttackerLegend && (g.value || 0) < (attackerUnit.currentPower || 0)) return false;
+          return true;
+        };
+        const stealableEntries = botGigs
+          .map((gig, idx) => ({ gig, idx }))
+          .filter(({ gig }) => isGigStealable(gig));
+        const countToSteal = Math.min(liveGigsToSteal, stealableEntries.length);
+
+        const initialSelected = [];
+        const usedIds = new Set();
+        for (const pref of (preferredDice || [])) {
+          if (initialSelected.length >= countToSteal) break;
+          let match = null;
+          if (pref && typeof pref === 'object') {
+            match = stealableEntries.find(({ gig, idx }) => {
+              const id = gig.id || `bot-idx-${idx}`;
+              if (usedIds.has(id)) return false;
+              if (pref.id && gig.id === pref.id) return true;
+              return (
+                String(gig.die || '').toLowerCase() === String(pref.die || '').toLowerCase() &&
+                (pref.value === undefined || gig.value === pref.value)
+              );
+            });
+          } else if (pref) {
+            const targetDie = String(pref).toLowerCase();
+            const matching = stealableEntries
+              .filter(({ gig, idx }) => !usedIds.has(gig.id || `bot-idx-${idx}`) && String(gig.die || '').toLowerCase() === targetDie)
+              .sort((a, b) => (b.gig.value || 0) - (a.gig.value || 0));
+            match = matching[0] || null;
+          }
+          if (match) {
+            const id = match.gig.id || `bot-idx-${match.idx}`;
+            usedIds.add(id);
+            initialSelected.push({
+              id,
+              die: String(match.gig.die || '').toLowerCase(),
+              value: match.gig.value
+            });
+          }
+        }
+
+        // FASE 4: Abrir selector de robo de Gigs DESPUÉS de Fase 1 (WHEN SPENT / ATTACK) y Fase 2 (Reacción del Rival)
+        const needsManualGigChoice =
+          countToSteal > 0 &&
+          stealableEntries.length > countToSteal &&
+          (initialSelected.length < countToSteal || Boolean(attackParams.hadPhase1Prompt));
+
+        if (needsManualGigChoice) {
+          setPendingGigTheft({
+            countToSteal,
+            selectedDice: initialSelected,
+            attackerUnit,
+            attackerUnitId: attackerUnit.instanceId,
+            phase4Ready: true
+          });
+          setSelectedFieldUnit(null);
+          setGameState({ ...gameState });
+          return;
+        }
+
+        attackRivalGigs(
+          gameState,
+          'player',
+          attackerUnit.instanceId,
+          null,
+          initialSelected.length > 0 ? initialSelected : preferredDice
+        );
       }
     } else if (targetType === 'UNIT') {
       const fightRes = fightRivalUnit(
@@ -1963,7 +2038,8 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
         targetType,
         targetUnitId,
         preferredDice,
-        attackerUnitId: selectedFieldUnit.instanceId
+        attackerUnitId: selectedFieldUnit.instanceId,
+        hadPhase1Prompt: true
       };
       setGameState({ ...gameState });
       return;
@@ -2874,8 +2950,12 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
     }
     delete gameState.pendingTargetSelection;
     const pendingAttack = gameState.pendingAttackContinuation;
-    delete gameState.pendingAttackContinuation;
-    if (pendingAttack) {
+    if (
+      pendingAttack &&
+      !gameState.pendingCardChoice &&
+      !gameState.pendingModalChoice
+    ) {
+      delete gameState.pendingAttackContinuation;
       continueAttackAfterTrigger(pendingAttack);
     } else {
       setGameState({ ...gameState });
@@ -3423,16 +3503,8 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
   const handleStealSpecificDie = (dieName) => {
     if (!selectedFieldUnit || selectedFieldUnit.isSpent || selectedFieldUnit.isLagging) return;
     if (!gameState.bot.gigs || gameState.bot.gigs.length === 0) return;
-    const gigsToSteal = calculateGigsToSteal(selectedFieldUnit.currentPower);
-    if (gigsToSteal > 1 && gameState.bot.gigs.length > 1) {
-      setPendingGigTheft({
-        countToSteal: Math.min(gigsToSteal, gameState.bot.gigs.length),
-        selectedDice: [dieName],
-        attackerUnit: selectedFieldUnit
-      });
-    } else {
-      handlePlayerAttack('GIGS', null, [dieName]);
-    }
+    // Declarar siempre Fase 1 primero (WHEN SPENT / ATTACK) -> Fase 2 (Reacción Rival) -> Fase 4 (Elegir Gigs a robar)
+    handlePlayerAttack('GIGS', null, [dieName]);
   };
 
   // Declarar Blocker inmediatamente durante la Fase de Respuesta del Jugador:
@@ -5852,17 +5924,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                     <button
                       type="button"
                       onClick={() => {
-                        if (gigsToSteal <= 0) {
-                          handlePlayerAttack('GIGS', null, []);
-                        } else if (bot.gigs.length > 1) {
-                          setPendingGigTheft({
-                            countToSteal: Math.min(gigsToSteal, bot.gigs.length),
-                            selectedDice: [],
-                            attackerUnit: selectedFieldUnit
-                          });
-                        } else if (bot.gigs.length === 1) {
-                          handlePlayerAttack('GIGS', null, [bot.gigs[0].die.toLowerCase()]);
-                        }
+                        handlePlayerAttack('GIGS', null, []);
                       }}
                       style={{ clipPath: CYBER_BUTTON }}
                       className="px-2.5 py-0.5 bg-[#FCEE0A] hover:bg-white text-[#070a10] font-mono font-black text-[10px] sm:text-[11px] uppercase tracking-wider cursor-pointer shadow-[0_0_18px_rgba(252,238,10,0.85)] animate-pulse shrink-0"
@@ -6486,17 +6548,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                       type="button"
                       disabled={!hasGigs}
                       onClick={() => {
-                        if (gigsToSteal <= 0) {
-                          handlePlayerAttack('GIGS', null, []);
-                        } else if (bot.gigs.length > 1) {
-                          setPendingGigTheft({
-                            countToSteal: Math.min(gigsToSteal, bot.gigs.length),
-                            selectedDice: [],
-                            attackerUnit: selectedFieldUnit
-                          });
-                        } else {
-                          handlePlayerAttack('GIGS', null, [bot.gigs[0].die.toLowerCase()]);
-                        }
+                        handlePlayerAttack('GIGS', null, []);
                       }}
                       style={{ clipPath: CYBER_BUTTON }}
                       className="px-3 py-1 bg-[#FF003C] hover:bg-[#FCEE0A] hover:text-[#070a10] text-white font-black text-xs uppercase animate-pulse cursor-pointer shadow-[0_0_20px_rgba(255,0,60,0.85)] transition-colors disabled:opacity-40"
@@ -8166,17 +8218,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
           gigsToSteal={gigsToSteal}
           onAttackGigs={() => {
             if (!selectedFieldUnit) return;
-            if (gigsToSteal <= 0) {
-              handlePlayerAttack('GIGS', null, []);
-            } else if ((bot.gigs || []).length > 1) {
-              setPendingGigTheft({
-                countToSteal: Math.min(gigsToSteal, bot.gigs.length),
-                selectedDice: [],
-                attackerUnit: selectedFieldUnit
-              });
-            } else if ((bot.gigs || []).length === 1) {
-              handlePlayerAttack('GIGS', null, [bot.gigs[0].die.toLowerCase()]);
-            }
+            handlePlayerAttack('GIGS', null, []);
           }}
           onStealSpecificDie={(d) => handleStealSpecificDie(d)}
           isMyTurn={isMyTurn}
@@ -8186,6 +8228,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
             isChoosingTriggerOrder ||
             pendingGearEquip ||
             pendingManualPayment ||
+            pendingGigTheft ||
             gameState?.pendingModalChoice ||
             gameState?.pendingCardChoice
           )}
@@ -10210,10 +10253,22 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
         );
       })()}
 
-      {/* 5.7. MODAL INTERACTIVO PARA ELEGIR GIGS A ROBAR DEL RIVAL */}
+      {/* 5.7. MODAL INTERACTIVO PARA ELEGIR GIGS A ROBAR DEL RIVAL (FASE 4 OFICIAL) */}
       {pendingGigTheft && (() => {
-        const { countToSteal, selectedDice, attackerUnit } = pendingGigTheft;
+        const { countToSteal, selectedDice, attackerUnit, attackerUnitId, phase4Ready } = pendingGigTheft;
         const availableGigs = bot.gigs || [];
+        const isAttackerLegend =
+          attackerUnit?.officialType === 'LEGEND' ||
+          attackerUnit?.isLegendUnit ||
+          Boolean(attackerUnit?.isLegend);
+        const isGigStealable = (g) => {
+          if (bot?.chromeFangProtectionActive && (g.value || 0) > (attackerUnit?.currentPower || 0)) return false;
+          if (bot?.westbrookProtectionActive && isAttackerLegend && (g.value || 0) < (attackerUnit?.currentPower || 0)) return false;
+          return true;
+        };
+        const stealableTotal = availableGigs.filter(isGigStealable).length;
+        const requiredSelection = Math.min(countToSteal, stealableTotal);
+        const canConfirmSteal = requiredSelection > 0 ? selectedDice.length === requiredSelection : true;
 
         return (
           <div className="fixed inset-0 z-50 bg-[#000000]/90 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 font-mono select-none">
@@ -10232,7 +10287,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                   </span>
                 </div>
                 <span className="text-[10px] text-[#FF003C] uppercase font-bold tracking-widest">
-                  FASE DE ROBO
+                  FASE 4 // ROBO DE GIGS
                 </span>
               </div>
 
@@ -10251,10 +10306,10 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                     {attackerUnit.name} (Fuerza {attackerUnit.currentPower})
                   </span>
                   <p className="text-[11px] text-gray-300 mt-0.5">
-                    Según tu poder, puedes arrebatar <strong className="text-[#FCEE0A]">{countToSteal} Gig(s)</strong> al rival.
+                    Sin bloqueador rival. Según tu poder actual, arrebatas <strong className="text-[#FCEE0A]">{requiredSelection} Gig(s)</strong> al rival.
                   </p>
                   <span className="text-[9px] text-[#0dfceb] block mt-1">
-                    Haz clic en los dados que deseas llevarte a tu área ({selectedDice.length}/{countToSteal} seleccionados):
+                    Haz clic en los dados que deseas llevarte a tu área ({selectedDice.length}/{requiredSelection} seleccionados):
                   </span>
                 </div>
               </div>
@@ -10264,7 +10319,8 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                 {availableGigs.map((gig, idx) => {
                   const dieKey = gig.die.toLowerCase();
                   const dieSpec = { id: gig.id || `bot-idx-${idx}`, die: dieKey, value: gig.value };
-                  const isSelected = selectedDice.some((d) =>
+                  const stealable = isGigStealable(gig);
+                  const isSelected = stealable && selectedDice.some((d) =>
                     typeof d === 'object' ? d.id === dieSpec.id : d === dieKey
                   );
 
@@ -10272,14 +10328,15 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                     <div
                       key={gig.id || idx}
                       onClick={() => {
+                        if (!stealable) return;
                         let next;
                         if (isSelected) {
                           next = selectedDice.filter((d) =>
                             typeof d === 'object' ? d.id !== dieSpec.id : d !== dieKey
                           );
                         } else {
-                          if (selectedDice.length >= countToSteal) {
-                            next = countToSteal === 1 ? [dieSpec] : selectedDice;
+                          if (selectedDice.length >= requiredSelection) {
+                            next = requiredSelection === 1 ? [dieSpec] : selectedDice;
                           } else {
                             next = [...selectedDice, dieSpec];
                           }
@@ -10289,17 +10346,19 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                           selectedDice: next
                         }));
                       }}
-                      className={`p-3 rounded-xl border-2 transition-all flex flex-col items-center gap-2 cursor-pointer w-full bg-[#000000] ${
-                        isSelected
-                          ? 'border-[#0dfceb] bg-[#0dfceb]/15 shadow-[0_0_20px_rgba(13,252,235,0.7)] scale-105'
-                          : 'border-gray-800 hover:border-[#FCEE0A] hover:bg-[#FCEE0A]/5'
+                      className={`p-3 rounded-xl border-2 transition-all flex flex-col items-center gap-2 w-full bg-[#000000] ${
+                        !stealable
+                          ? 'border-gray-900 opacity-45 cursor-not-allowed'
+                          : isSelected
+                          ? 'border-[#0dfceb] bg-[#0dfceb]/15 shadow-[0_0_20px_rgba(13,252,235,0.7)] scale-105 cursor-pointer'
+                          : 'border-gray-800 hover:border-[#FCEE0A] hover:bg-[#FCEE0A]/5 cursor-pointer'
                       }`}
                     >
                       <CyberDieShape
                         dieType={dieKey}
                         value={gig.value}
                         size={64}
-                        color={isSelected ? '#FCEE0A' : '#0dfceb'}
+                        color={!stealable ? '#4b5563' : isSelected ? '#FCEE0A' : '#0dfceb'}
                         selected={isSelected}
                         showLabelBelow
                       />
@@ -10312,9 +10371,13 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                         </span>
                       </div>
                       <span className={`text-[8px] font-black px-2 py-0.5 rounded uppercase ${
-                        isSelected ? 'bg-[#0dfceb] text-black font-black' : 'bg-gray-800 text-gray-400'
+                        !stealable
+                          ? 'bg-red-950/70 text-red-300 border border-red-700/40'
+                          : isSelected
+                          ? 'bg-[#0dfceb] text-black font-black'
+                          : 'bg-gray-800 text-gray-400'
                       }`}>
-                        {isSelected ? '✓ SELECCIONADO' : 'ELEGIR'}
+                        {!stealable ? '🔒 PROTEGIDO' : isSelected ? '✓ SELECCIONADO' : 'ELEGIR'}
                       </span>
                     </div>
                   );
@@ -10322,30 +10385,46 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
               </div>
 
               {/* Botones de acción */}
-              <div className="pt-2 border-t border-[#FCEE0A]/40 flex items-center justify-between">
+              <div className="pt-2 border-t border-[#FCEE0A]/40 flex items-center justify-between gap-2">
+                {phase4Ready ? (
+                  <span className="text-[10px] text-gray-400 uppercase font-bold">
+                    Ataque confirmado (Fase 4)
+                  </span>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setPendingGigTheft(null)}
+                    className="px-3 py-1.5 text-xs text-gray-400 hover:text-white font-bold uppercase cursor-pointer"
+                  >
+                    ✕ CANCELAR
+                  </button>
+                )}
                 <button
                   type="button"
-                  onClick={() => setPendingGigTheft(null)}
-                  className="px-3 py-1.5 text-xs text-gray-400 hover:text-white font-bold uppercase cursor-pointer"
-                >
-                  ✕ CANCELAR
-                </button>
-                <button
-                  type="button"
-                  disabled={selectedDice.length === 0}
+                  disabled={!canConfirmSteal}
                   onClick={() => {
                     const chosen = [...selectedDice];
+                    const isPhase4 = Boolean(phase4Ready);
+                    const unitId = attackerUnitId || attackerUnit?.instanceId;
                     setPendingGigTheft(null);
-                    handlePlayerAttack('GIGS', null, chosen);
+                    if (isPhase4 && unitId) {
+                      attackRivalGigs(gameState, 'player', unitId, null, chosen);
+                      setSelectedFieldUnit(null);
+                      setGameState({ ...gameState });
+                    } else {
+                      handlePlayerAttack('GIGS', null, chosen);
+                    }
                   }}
                   style={{ clipPath: CYBER_BUTTON }}
-                  className={`px-5 py-2 font-mono font-black text-xs uppercase transition-all cursor-pointer ${
-                    selectedDice.length === 0
+                  className={`px-5 py-2 font-mono font-black text-xs uppercase transition-all ${
+                    !canConfirmSteal
                       ? 'bg-gray-800 text-gray-500 cursor-not-allowed border border-gray-700'
-                      : 'bg-[#FCEE0A] hover:bg-white text-black shadow-[0_0_20px_rgba(252,238,10,0.8)]'
+                      : 'bg-[#FCEE0A] hover:bg-white text-black shadow-[0_0_20px_rgba(252,238,10,0.8)] cursor-pointer'
                   }`}
                 >
-                  ⚡ ROBAR {selectedDice.length} GIG(S)
+                  {canConfirmSteal
+                    ? `⚡ ROBAR ${selectedDice.length} GIG(S)`
+                    : `ELIGE ${requiredSelection - selectedDice.length} GIG(S) MÁS`}
                 </button>
               </div>
             </motion.div>
