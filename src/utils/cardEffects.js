@@ -3050,19 +3050,33 @@ function _executeUnitPlayTrigger(state, playerKey, unitInstance) {
       notifyTrigger("🐯 TYGER'S WHISPER // PLAY", 'Ya has llamado a una Leyenda este turno (límite oficial: 1 vez por turno).', 'info');
       return;
     }
-    const faceDownLegends = (p.legends || []).filter((l) => !l.isFaceUp);
+    const faceDownLegends = (p.legends || []).filter(
+      (l) => !l.isFaceUp && !l.isOnField && !l.isRemovedFromGame
+    );
     if (faceDownLegends.length === 0) {
       state.actionLog.unshift(`🐯 [Tyger's Whisper] ¡PLAY activado! Todas tus Leyendas ya están boca arriba.`);
       notifyTrigger("🐯 TYGER'S WHISPER // PLAY", 'Todas tus Leyendas ya están boca arriba.', 'info');
+    } else if (playerKey === 'player') {
+      queueTargetSelection(state, {
+        actionType: 'CALL_LEGEND_FREE',
+        sourceCardId: 'CP-133',
+        sourceCardName: "Tyger's Whisper",
+        sourceCardImage: unitInstance.image,
+        sourceUnitId: unitInstance.instanceId,
+        title: "🐯 TYGER'S WHISPER // CALL LEYENDA GRATIS",
+        prompt:
+          'Haz clic en la Leyenda boca abajo que deseas llamar GRATIS (y confirma) o pulsa OMITIR:',
+        allowSkip: true
+      });
     } else {
-      const targetLeg = faceDownLegends[0];
+      // Bot AI: elige una de sus Leyendas boca abajo (priorizando las ya giradas para no gastar una lista, y si hay empate al azar entre ellas)
+      const spentFaceDown = faceDownLegends.filter((l) => l.isSpent);
+      const pool = spentFaceDown.length > 0 ? spentFaceDown : faceDownLegends;
+      const targetLeg = pool[Math.floor(Math.random() * pool.length)];
       targetLeg.isFaceUp = true;
       p.hasCalledLegendThisTurn = true;
-      state.actionLog.unshift(`🐯 [Tyger's Whisper] ¡PLAY! Llama GRATIS a la Leyenda "${targetLeg.name}" boca arriba.`);
+      state.actionLog.unshift(`🐯 [Tyger's Whisper Rival] ¡PLAY! Llama GRATIS a su Leyenda "${targetLeg.name}" boca arriba.`);
       executeCallLegendTrigger(state, playerKey, targetLeg);
-      if (!state.pendingModalChoice && !state.pendingCardChoice && !state.pendingTargetSelection) {
-        notifyTrigger("🐯 TYGER'S WHISPER // PLAY", `Has llamado gratis a la Leyenda "${targetLeg.name}".`, 'success');
-      }
     }
     return;
   }

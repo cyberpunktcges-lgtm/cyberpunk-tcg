@@ -3407,7 +3407,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
         gameState.actionLog.unshift(
           sel.radioportMode
             ? `📡 [${sel.sourceCardName || 'Arasaka Emergency Radioport'}] Decidiste no mirar ninguna Leyenda boca abajo.`
-            : `👑 [${sel.sourceCardName || 'Chrome Reverie'}] Decidiste no llamar a ninguna Leyenda gratis.`
+            : `${sel.sourceCardId === 'CP-133' ? '🐯' : '👑'} [${sel.sourceCardName || 'CALL GRATIS'}] Decidiste no llamar a ninguna Leyenda gratis.`
         );
         finishTargetSelection();
       } else {
@@ -3456,9 +3456,13 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
         if (leg && !p.hasCalledLegendThisTurn) {
           leg.isFaceUp = true;
           p.hasCalledLegendThisTurn = true;
-          gameState.actionLog.unshift(
-            `👑 [${sel.sourceCardName || 'Chrome Reverie'}] ¡Condición de Gig mínimo! Llamas GRATIS a tu Leyenda "${leg.name}" boca arriba.`
-          );
+          const callLog =
+            sel.sourceCardId === 'CP-133'
+              ? `🐯 [${sel.sourceCardName || "Tyger's Whisper"}] ¡PLAY! Llamas GRATIS a tu Leyenda "${leg.name}" boca arriba.`
+              : sel.sourceCardId === 'CP-018'
+              ? `👑 [${sel.sourceCardName || 'Chrome Reverie'}] ¡Condición de Gig mínimo! Llamas GRATIS a tu Leyenda "${leg.name}" boca arriba.`
+              : `👑 [${sel.sourceCardName || 'CALL GRATIS'}] Llamas GRATIS a tu Leyenda "${leg.name}" boca arriba.`;
+          gameState.actionLog.unshift(callLog);
           executeCallLegendTrigger(gameState, 'player', leg);
           setPreviewCard(leg);
           setHoveredCard(leg);
@@ -4340,7 +4344,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
       playAttackDeclare();
     } else if (/AI Netrunner \(Bot\) lanza su dado/i.test(recent)) {
       playDiceRoll();
-    } else if (/llama a su Leyenda|lleva a su Leyenda|Llama GRATIS a/i.test(recent)) {
+    } else if (/llama a su Leyenda|lleva a su Leyenda|Llamas? GRATIS a/i.test(recent)) {
       playCallLegend();
     } else if (/equipa el Gear/i.test(recent)) {
       playGearEquip();

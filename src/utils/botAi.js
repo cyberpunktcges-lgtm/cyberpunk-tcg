@@ -449,6 +449,10 @@ function captureBotActionSnapshot(gameState) {
       currentPower: Number(u.currentPower ?? u.parsedPower ?? 0),
       gearCount: (u.gear || []).length
     })),
+    botLegends: (b.legends || []).map((l) => ({
+      instanceId: l.instanceId,
+      isFaceUp: Boolean(l.isFaceUp)
+    })),
     botGigsSig: (b.gigs || []).map((g) => `${g.die}:${g.value}`).join('|'),
     botGigsCount: (b.gigs || []).length,
     hadModalChoice: Boolean(gameState?.pendingModalChoice),
@@ -664,6 +668,23 @@ function recordBotActionArrows(
         dashed: true,
         label: `⚡ ${labelBase} (+${curPow - prevB.currentPower})`
       });
+    }
+  }
+
+  // 6.B. Leyenda propia volteada gratis por PLAY/Programa (ej: Tyger's Whisper, Chrome Reverie)
+  if (actionType !== 'CALL_LEGEND' && Array.isArray(beforeSnap.botLegends)) {
+    const afterBotLegendsMap = new Map((b.legends || []).map((l) => [l.instanceId, l]));
+    for (const prevBL of beforeSnap.botLegends) {
+      const curBL = afterBotLegendsMap.get(prevBL.instanceId);
+      if (curBL && !prevBL.isFaceUp && curBL.isFaceUp) {
+        arrows.push({
+          fromAnchor: sourceCandidates,
+          toAnchor: [curBL.instanceId, 'bot-field'],
+          color: '#FCEE0A',
+          dashed: true,
+          label: `👑 ${labelBase}`
+        });
+      }
     }
   }
 
