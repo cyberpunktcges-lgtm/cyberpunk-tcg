@@ -1922,14 +1922,50 @@ export function executeProgramEffect(state, playerKey, card) {
   // CP-134: Unlikely Bond
   // "Bottom-deck a ready friendly Unit. If you do, bottom-deck a spent rival Unit."
   if (cardId === 'CP-134') {
-    const readyIdx = (p.field || []).findIndex((u) => !u.isSpent);
-    const spentRivalIdx = (opp.field || []).findIndex((u) => u.isSpent);
-    if (readyIdx !== -1 && spentRivalIdx !== -1) {
-      const [fUnit] = p.field.splice(readyIdx, 1);
-      p.deck.push(fUnit);
-      const [rUnit] = opp.field.splice(spentRivalIdx, 1);
-      opp.deck.push(rUnit);
-      state.actionLog.unshift(`🤝 [Unlikely Bond] Envía a "${fUnit.name}" y a la rival "${rUnit.name}" al fondo de sus mazos.`);
+    const readyFriendly = (p.field || []).filter((u) => !u.isSpent);
+    const spentRival = (opp.field || []).filter((u) => u.isSpent);
+    if (readyFriendly.length === 0) {
+      state.actionLog.unshift(`ℹ️ [Unlikely Bond] No tienes ninguna Unidad enderezada (Ready) para enviar al fondo del mazo.`);
+      return { executed: true };
+    }
+    if (playerKey === 'player') {
+      queueTargetSelection(state, {
+        actionType: 'TARGET_UNIT',
+        sourceCardId: 'CP-134',
+        sourceCardName: 'Unlikely Bond',
+        sourceCardImage: card.image,
+        title: '🤝 UNLIKELY BOND // PASO 1: TU UNIDAD READY',
+        prompt: 'Selecciona 1 de TUS Unidades enderezadas (Ready) para enviarla al fondo de tu mazo:',
+        effectType: 'BOTTOM_DECK',
+        targetScope: 'FRIENDLY_UNITS',
+        onlyReady: true,
+        _chosenToResolveNow: true
+      });
+      if (spentRival.length > 0) {
+        queueTargetSelection(state, {
+          actionType: 'TARGET_UNIT',
+          sourceCardId: 'CP-134',
+          sourceCardName: 'Unlikely Bond',
+          sourceCardImage: card.image,
+          title: '🤝 UNLIKELY BOND // PASO 2: UNIDAD RIVAL SPENT',
+          prompt: 'Ahora selecciona 1 Unidad rival girada (Spent) para enviarla al fondo de su mazo:',
+          effectType: 'BOTTOM_DECK',
+          targetScope: 'RIVAL_UNITS',
+          onlySpent: true
+        });
+      }
+    } else if (spentRival.length > 0) {
+      const fTarget = [...readyFriendly].sort((a, b) => (a.currentPower || 0) - (b.currentPower || 0))[0];
+      const rTarget = [...spentRival].sort((a, b) => (b.currentPower || 0) - (a.currentPower || 0))[0];
+      const fIdx = p.field.indexOf(fTarget);
+      const rIdx = opp.field.indexOf(rTarget);
+      if (fIdx !== -1 && rIdx !== -1) {
+        const [fUnit] = p.field.splice(fIdx, 1);
+        sendUnitToBottomDeck(p, fUnit, state);
+        const [rUnit] = opp.field.splice(rIdx, 1);
+        sendUnitToBottomDeck(opp, rUnit, state);
+        state.actionLog.unshift(`🤝 [Unlikely Bond Rival] Envía a "${fUnit.name}" y a tu unidad "${rUnit.name}" al fondo de sus mazos.`);
+      }
     }
     return { executed: true };
   }
@@ -1977,14 +2013,35 @@ export function executeProgramEffect(state, playerKey, card) {
   // CP-146: Wild in the Streets
   // "Defeat a spent Unit."
   if (cardId === 'CP-146') {
-    const spentIdx = (opp.field || []).findIndex((u) => u.isSpent);
-    if (spentIdx !== -1) {
-      const [dead] = opp.field.splice(spentIdx, 1);
-      if (!opp.trash) opp.trash = [];
-      opp.trash.push(dead);
-      state.actionLog.unshift(`🔥 [Wild in the Streets] Destruye a la unidad rival girada "${dead.name}".`);
-    } else {
-      state.actionLog.unshift(`ℹ️ [Wild in the Streets] No hay unidades rivales giradas.`);
+    const spentOppUnits = (opp.field || []).filter((u) => u.isSpent);
+    const spentAllUnits = [...spentOppUnits, ...(p.field || []).filter((u) => u.isSpent)];
+    if (spentAllUnits.length === 0) {
+      state.actionLog.unshift(`ℹ️ [Wild in the Streets] No hay unidades giradas (Spent) en juego.`);
+      return { executed: true };
+    }
+    if (playerKey === 'player') {
+      queueTargetSelection(state, {
+        actionType: 'TARGET_UNIT',
+        sourceCardId: 'CP-146',
+        sourceCardName: 'Wild in the Streets',
+        sourceCardImage: card.image,
+        title: '🔥 WILD IN THE STREETS // DESTRUIR UNIDAD GIRADA',
+        prompt: 'Selecciona la Unidad girada (Spent) que deseas destruir:',
+        effectType: 'DEFEAT',
+        targetScope: 'ALL',
+        onlySpent: true
+      });
+    } else if (spentOppUnits.length > 0) {
+      const target = [...spentOppUnits].sort((a, b) => (b.currentPower || 0) - (a.currentPower || 0))[0];
+      const idx = opp.field.indexOf(target);
+      if (idx !== -1) {
+        const [dead] = opp.field.splice(idx, 1);
+        const outcome = sendDefeatedUnitToGraveyardOrExile(opp, dead, state);
+        if (!outcome?.intercepted) {
+          executeUnitDefeatedTrigger(state, oppKey, dead);
+        }
+        state.actionLog.unshift(`🔥 [Wild in the Streets Rival] Destruye a tu unidad girada "${dead.name}".`);
+      }
     }
     return { executed: true };
   }
