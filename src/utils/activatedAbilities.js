@@ -26,6 +26,24 @@ import {
 } from './cardEffects.js';
 
 /**
+ * Busca la Unidad o Leyenda aliada que lleva equipado un Gear concreto.
+ */
+function findEquippedGearHost(playerState, gearInstanceId) {
+  if (!playerState || !gearInstanceId) return { host: null, isLegend: false };
+  for (const u of playerState.field || []) {
+    if ((u.gear || []).some((g) => g.instanceId === gearInstanceId)) {
+      return { host: u, isLegend: false };
+    }
+  }
+  for (const l of playerState.legends || []) {
+    if ((l.gear || []).some((g) => g.instanceId === gearInstanceId)) {
+      return { host: l, isLegend: true };
+    }
+  }
+  return { host: null, isLegend: false };
+}
+
+/**
  * Diccionario de configuración de todas las habilidades activadas oficiales (↷)
  */
 export const ACTIVATED_ABILITIES_CONFIG = {
@@ -674,18 +692,32 @@ export const ACTIVATED_ABILITIES_CONFIG = {
       id: 'CP-089-TAP',
       abilityIndex: 0,
       isQuick: true,
-      title: 'QUICK 1 €$, ↷ Francotirador Overwatch (Descartar 1 para destruir)',
-      shortTitle: '1 €$, ↷ Snipe',
-      badgeText: '1 €$, ↷ SNIPE',
-      description: 'Paga 1 €$, gira Overwatch y descarta 1 carta: Destruye una Unidad rival gastada con coste ≤ al de la carta descartada.',
+      title: 'QUICK 1 €$, ↷ Overwatch (Girar portador + descartar 1)',
+      shortTitle: '1 €$, ↷ Overwatch',
+      badgeText: '1 €$, ↷ OVERWATCH',
+      description: 'QUICK: Paga 1 €$, gira la Unidad/Leyenda equipada y descarta 1 carta de tu mano: Destruye una Unidad rival gastada con coste ≤ al de la carta descartada.',
       costEddie: 1,
       requiresTap: true,
       canActivate: (state, playerKey, card) => {
-        if (card.isSpent) return { can: false, reason: 'Overwatch ya está girado en este turno.' };
         const p = state[playerKey];
         const opp = state[playerKey === 'player' ? 'bot' : 'player'];
-        if (getSpendableEddiesExcludingCard(p, card.instanceId) < 1) {
-          return { can: false, reason: 'Necesitas al menos 1 €$ para disparar Overwatch.' };
+        const { host, isLegend } = findEquippedGearHost(p, card.instanceId);
+        if (host) {
+          if (isLegend && !host.isFaceUp) {
+            return { can: false, reason: 'La Leyenda equipada debe estar boca arriba.' };
+          }
+          if (host.isSpent) {
+            return { can: false, reason: `"${host.name}" ya está girada (Spent) en este turno.` };
+          }
+          if (!isLegend && host.isLagging) {
+            return { can: false, reason: `"${host.name}" tiene Lag este turno y no puede girarse para Overwatch.` };
+          }
+        } else if (card.isSpent) {
+          return { can: false, reason: 'Overwatch ya está girado en este turno.' };
+        }
+        const excludeId = host ? host.instanceId : card.instanceId;
+        if (getSpendableEddiesExcludingCard(p, excludeId) < 1) {
+          return { can: false, reason: 'Necesitas al menos 1 €$ adicional para disparar Overwatch.' };
         }
         if ((p.hand || []).length === 0) return { can: false, reason: 'Necesitas al menos 1 carta en mano para descartar.' };
         const spentOppUnits = (opp.field || []).filter((u) => u.isSpent);
@@ -695,12 +727,18 @@ export const ACTIVATED_ABILITIES_CONFIG = {
       execute: (state, playerKey, card) => {
         const p = state[playerKey];
         const opp = state[playerKey === 'player' ? 'bot' : 'player'];
-        const paid = payEddieCostWithAutoTap(p, 1, card.instanceId);
+        const { host } = findEquippedGearHost(p, card.instanceId);
+        const excludeId = host ? host.instanceId : card.instanceId;
+        const paid = payEddieCostWithAutoTap(p, 1, excludeId);
         if (!paid) {
           return {
             success: false,
             reason: 'Gira primero 1 Eddie o Leyenda para tener 1 €$ en reserva antes de disparar Overwatch.'
           };
+        }
+        // REGLA OFICIAL: La habilidad ↷ del Gear gira a la Unidad o Leyenda portadora
+        if (host) {
+          host.isSpent = true;
         }
         card.isSpent = true;
 
@@ -711,9 +749,10 @@ export const ACTIVATED_ABILITIES_CONFIG = {
             sourceCardId: 'CP-089',
             sourceCardName: "Overwatch // Panam's Gift",
             sourceCardImage: card.image,
+            hostUnitId: host?.instanceId || null,
             title: "🎯 OVERWATCH // DESCARTA 1 CARTA DE TU MANO",
             prompt:
-              'Elige qué carta de tu mano descartar al Trash. Después elegirás sobre el tablero una Unidad rival gastada (Spent) con coste igual o menor al de la carta descartada para destruirla:',
+              'Elige qué carta de tu mano descartar al Trash. Después harás objetivo sobre el tablero a una Unidad rival gastada (Spent) con coste igual o menor al de la carta descartada para destruirla:',
             filterDescription: 'Cualquier carta de tu mano (cuanto mayor sea su coste, mayor coste podrás destruir)',
             cards: [...(p.hand || [])],
             eligibleIds: (p.hand || []).map((c) => c.instanceId),
@@ -723,7 +762,7 @@ export const ACTIVATED_ABILITIES_CONFIG = {
             remainingDestination: 'HAND'
           });
           state.actionLog.unshift(
-            `🎯 [Overwatch // Panam's Gift] Paga 1 €$ y gira el rifle (QUICK ↷): elige 1 carta de tu mano para descartar.`
+            `🎯 [Overwatch // Panam's Gift] Paga 1 €$ y gira a "${host?.name || 'la unidad equipada'}" (QUICK ↷): elige 1 carta de tu mano para descartar.`
           );
           return {
             success: true,
@@ -1053,15 +1092,26 @@ export function executeCardActivatedAbility(state, playerKey, cardInstanceId, ab
   if (!state) return { success: false, reason: 'Estado no válido' };
   const p = state[playerKey];
 
-  // Buscar la carta en leyendas, campo o gears
+  // Buscar la carta en leyendas, campo o gears (tanto en unidades como en leyendas)
   let card = (p.legends || []).find((l) => l.instanceId === cardInstanceId);
+  let gearHost = null;
   if (!card) card = (p.field || []).find((u) => u.instanceId === cardInstanceId);
   if (!card) {
-    // Buscar en gears anexados
     for (const u of p.field || []) {
       const g = (u.gear || []).find((gear) => gear.instanceId === cardInstanceId);
       if (g) {
         card = g;
+        gearHost = u;
+        break;
+      }
+    }
+  }
+  if (!card) {
+    for (const l of p.legends || []) {
+      const g = (l.gear || []).find((gear) => gear.instanceId === cardInstanceId);
+      if (g) {
+        card = g;
+        gearHost = l;
         break;
       }
     }
@@ -1092,9 +1142,14 @@ export function executeCardActivatedAbility(state, playerKey, cardInstanceId, ab
   }
 
   const wasSpentBefore = Boolean(card.isSpent);
+  const wasHostSpentBefore = Boolean(gearHost?.isSpent);
   const res = chosenAbility.execute(state, playerKey, card);
-  if (res && res.success && !wasSpentBefore && card.isSpent) {
-    executeCardSpentTriggers(state, playerKey, card);
+  if (res && res.success) {
+    if (gearHost && !wasHostSpentBefore && gearHost.isSpent) {
+      executeCardSpentTriggers(state, playerKey, gearHost);
+    } else if (!gearHost && !wasSpentBefore && card.isSpent) {
+      executeCardSpentTriggers(state, playerKey, card);
+    }
     if (state.pendingTargetSelection || state.pendingCardChoice) {
       res.requiresModal = true;
     }

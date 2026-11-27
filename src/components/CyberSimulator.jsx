@@ -121,7 +121,7 @@ import {
   executeBotReaction,
   resolvePendingAttackAndContinueBot
 } from '../utils/botAi.js';
-import { getCardRulesText, executeUnitAttackTrigger, executeLegendAbility, executeProgramEffect, executeUnitPlayTrigger, getNumericCost, executeCardSpentTriggers, executeOnGigsStolenTriggers, executeKerryGigRollTrigger, triggerMeredithStoutOnRivalGigModify, getGigMaxFace, executeBlockerUsedTrigger, executeUnitDefeatedTrigger, executeCallLegendTrigger, isArasakaOrGoSoloLegend } from '../utils/cardEffects.js';
+import { getCardRulesText, executeUnitAttackTrigger, executeLegendAbility, executeProgramEffect, executeUnitPlayTrigger, getNumericCost, executeCardSpentTriggers, executeOnGigsStolenTriggers, executeKerryGigRollTrigger, triggerMeredithStoutOnRivalGigModify, getGigMaxFace, executeBlockerUsedTrigger, executeUnitDefeatedTrigger, executeCallLegendTrigger, isArasakaOrGoSoloLegend, queueTargetSelection } from '../utils/cardEffects.js';
 import { getCardActivatedAbilities, executeCardActivatedAbility } from '../utils/activatedAbilities.js';
 
 // =========================================================================
@@ -2194,18 +2194,19 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
         const discCost = getNumericCost(selected);
         const eligibleSpent = (opp.field || []).filter((u) => u.isSpent && getNumericCost(u) <= discCost);
         if (eligibleSpent.length > 0) {
-          gameState.pendingTargetSelection = {
+          queueTargetSelection(gameState, {
             actionType: 'TARGET_UNIT',
             sourceCardId: 'CP-089',
             sourceCardName: "Overwatch // Panam's Gift",
             sourceCardImage: choice.sourceCardImage,
+            sourceUnitId: choice.hostUnitId || null,
             title: "🎯 OVERWATCH // DESTRUIR UNIDAD GASTADA",
-            prompt: `Descartaste "${selected.name}" (coste ${discCost}). Selecciona una Unidad rival gastada (Spent) con coste ≤ ${discCost} para destruirla:`,
+            prompt: `Descartaste "${selected.name}" (coste ${discCost}). Haz clic en la Unidad rival gastada (Spent) con coste ≤ ${discCost} que deseas destruir:`,
             effectType: 'DEFEAT',
             targetScope: 'RIVAL_UNITS',
             onlySpent: true,
             maxCost: discCost
-          };
+          });
           gameState.actionLog.unshift(
             `🎯 [Overwatch] Descartaste "${selected.name}" (coste ${discCost}). Elige una Unidad rival gastada con coste ≤ ${discCost} para destruirla.`
           );
@@ -6248,14 +6249,25 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
               <div className="flex items-center gap-2">
                 {/* Habilidades activadas (↷) de la Unidad seleccionada */}
                 {selectedFieldUnit && (() => {
-                  const unitAbilities = getCardActivatedAbilities(selectedFieldUnit, 'player', gameState);
+                  const unitAbilities = [
+                    ...getCardActivatedAbilities(selectedFieldUnit, 'player', gameState).map((ab) => ({
+                      ...ab,
+                      _sourceId: selectedFieldUnit.instanceId
+                    })),
+                    ...(selectedFieldUnit.gear || []).flatMap((g) =>
+                      getCardActivatedAbilities(g, 'player', gameState).map((ab) => ({
+                        ...ab,
+                        _sourceId: g.instanceId
+                      }))
+                    )
+                  ];
                   if (unitAbilities.length === 0) return null;
                   return unitAbilities.map((ab) => (
                     <button
-                      key={ab.id}
+                      key={`${ab._sourceId}-${ab.id}`}
                       type="button"
                       disabled={!ab.canActivateNow}
-                      onClick={() => handleExecuteActivatedAbility(selectedFieldUnit.instanceId, ab.id)}
+                      onClick={() => handleExecuteActivatedAbility(ab._sourceId, ab.id)}
                       style={{ clipPath: CYBER_BUTTON }}
                       className="px-2.5 py-1 bg-[#0dfceb] hover:bg-white text-black font-black text-xs uppercase cursor-pointer shadow-[0_0_15px_rgba(13,252,235,0.7)] transition-all disabled:opacity-40 flex items-center gap-1"
                       title={ab.description}
@@ -6420,11 +6432,17 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                               }}
                               onClick={(e) => {
                                 e.stopPropagation();
+                                const inReact = Boolean(gameState?.pendingReaction?.attackerPlayerKey === 'bot');
+                                const hasGearAct = getCardActivatedAbilities(g, 'player', gameState).length > 0;
+                                if (hasGearAct && (isMyTurn || inReact)) {
+                                  setUnitActionMenuId((prev) => (prev === unit.instanceId ? null : unit.instanceId));
+                                  return;
+                                }
                                 setInspectedCard(g);
                               }}
                               onContextMenu={(e) => handleCardRightClick(e, g)}
                               className="absolute inset-0 w-full h-full rounded-md overflow-hidden bg-[#070a10] border-2 border-[#FF003C]/85 shadow-[0_4px_18px_rgba(0,0,0,0.85)] hover:border-[#FCEE0A] hover:brightness-110 transition-all cursor-pointer group pointer-events-auto"
-                              title={`Gear equipado: ${g.name} (${g.powerVal || g.power || 'Gear'}) — Clic para inspeccionar`}
+                              title={`Gear equipado: ${g.name} (${g.powerVal || g.power || 'Gear'}) — Clic para usar o inspeccionar`}
                             >
                               {g.image && (
                                 <img
@@ -6980,22 +6998,39 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                               </div>
                             )}
 
-                            {/* Habilidades de Leyenda activadas (↷) */}
+                            {/* Habilidades de Leyenda y Gears equipados activadas (↷) */}
                             {leg.isFaceUp && !leg.isSpent && (() => {
-                              const legAbilities = getCardActivatedAbilities(leg, 'player', gameState);
+                              const legAbilities = [
+                                ...getCardActivatedAbilities(leg, 'player', gameState).map((ab) => ({
+                                  ...ab,
+                                  _isGear: false,
+                                  _sourceId: leg.instanceId
+                                })),
+                                ...(leg.gear || []).flatMap((g) =>
+                                  getCardActivatedAbilities(g, 'player', gameState).map((ab) => ({
+                                    ...ab,
+                                    _isGear: true,
+                                    _sourceId: g.instanceId
+                                  }))
+                                )
+                              ];
                               if (legAbilities.length === 0) return null;
                               return (
                                 <div className="flex flex-col gap-1 mb-1.5">
                                   {legAbilities.map((ab) => (
                                     <button
-                                      key={ab.id}
+                                      key={`${ab._sourceId}-${ab.id}`}
                                       type="button"
                                       disabled={!ab.canActivateNow}
                                       onClick={(e) => {
                                         e.stopPropagation();
                                         setLegendMenuId(null);
                                         const inReactionWin = Boolean(gameState?.pendingReaction && gameState.pendingReaction.attackerPlayerKey === 'bot');
-                                        handleActivateLegendAbility(leg.instanceId, ab.id, inReactionWin);
+                                        if (ab._isGear) {
+                                          handleExecuteActivatedAbility(ab._sourceId, ab.id, inReactionWin);
+                                        } else {
+                                          handleActivateLegendAbility(leg.instanceId, ab.id, inReactionWin);
+                                        }
                                       }}
                                       title={ab.description}
                                       className={`w-full py-1.5 px-2 text-left flex flex-col rounded text-[10px] font-black uppercase transition-all border ${
@@ -9652,8 +9687,25 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                           </span>
                         </div>
                       )}
+                      {choice.type === 'OVERWATCH_DISCARD_1' && (() => {
+                        const cCost = getNumericCost(card);
+                        const hits = (bot.field || []).filter((u) => u.isSpent && getNumericCost(u) <= cCost).length;
+                        return (
+                          <div className="absolute top-1 left-1 z-10">
+                            <span
+                              className={`px-1 py-0.5 font-black text-[7.5px] rounded shadow border ${
+                                hits > 0
+                                  ? 'bg-[#061820]/95 border-[#0dfceb] text-[#0dfceb]'
+                                  : 'bg-[#1a1006]/95 border-amber-500/70 text-amber-300'
+                              }`}
+                            >
+                              {cCost}€$ • 🎯{hits}
+                            </span>
+                          </div>
+                        );
+                      })()}
                       {inTopZone && (
-                        <div className="absolute top-1 right-1">
+                        <div className="absolute top-1 right-1 z-10">
                           <span className="px-1.5 py-0.5 bg-[#FCEE0A] text-[#070a10] font-black text-[8px] rounded shadow">
                             ✓
                           </span>
