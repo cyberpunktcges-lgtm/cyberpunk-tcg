@@ -53,6 +53,7 @@ export default function CyberRightSidebar({
   botLegends = [],
   actionLog = [],
   hoveredCard = null,
+  botSpotlight = null,
   displayCard = null,
   onHoverCard,
   onInspectCard,
@@ -79,62 +80,99 @@ export default function CyberRightSidebar({
 
   return (
     <>
-      {/* ESCÁNER KIROSHI flotante a la IZQUIERDA (mismo tamaño grande y nítido, sin tapar Gigs ni FINALIZAR TURNO) */}
-      {hoveredCard && hoveredCard.image && activeTab === 'log' && (
-        <div className="hidden lg:block fixed left-3 xl:left-4 top-1/2 -translate-y-1/2 z-[44] w-64 xl:w-72 pointer-events-none select-none">
-          <div
-            style={{
-              clipPath: 'polygon(0 0, calc(100% - 14px) 0, 100% 14px, 100% 100%, 14px 100%, 0 calc(100% - 14px))'
-            }}
-            className="p-[1.5px] bg-gradient-to-b from-[#0dfceb]/85 via-[#0dfceb]/45 to-[#FCEE0A]/75 shadow-[0_0_45px_rgba(0,0,0,0.95)]"
-          >
+      {/* ESCÁNER KIROSHI flotante a la IZQUIERDA (hover del jugador o jugada en vivo del Rival, sin tapar Gigs ni FINALIZAR TURNO) */}
+      {(() => {
+        const isBotLive = !hoveredCard && Boolean(botSpotlight?.card?.image);
+        const scannerCard = hoveredCard && hoveredCard.image ? hoveredCard : isBotLive ? botSpotlight.card : null;
+        if (!scannerCard || activeTab !== 'log') return null;
+
+        const botActionLabels = {
+          UNIT: 'DESPLIEGA UNIDAD',
+          PROGRAM: 'LANZA PROGRAMA',
+          GEAR: 'EQUIPA GEAR',
+          GO_SOLO: 'ACTIVA GO SOLO',
+          CALL_LEGEND: 'LLAMA LEYENDA',
+          ABILITY: 'ACTIVA HABILIDAD (↷)'
+        };
+        const botBadge = botActionLabels[botSpotlight?.actionType] || 'JUGADA DEL RIVAL';
+
+        return (
+          <div className="hidden lg:block fixed left-3 xl:left-4 top-1/2 -translate-y-1/2 z-[44] w-64 xl:w-72 pointer-events-none select-none">
             <div
               style={{
-                clipPath: 'polygon(0 0, calc(100% - 13px) 0, 100% 13px, 100% 100%, 13px 100%, 0 calc(100% - 13px))'
+                clipPath: 'polygon(0 0, calc(100% - 14px) 0, 100% 14px, 100% 100%, 14px 100%, 0 calc(100% - 14px))'
               }}
-              className="bg-[#060a12]/97 overflow-hidden backdrop-blur-md"
+              className={`p-[1.5px] shadow-[0_0_45px_rgba(0,0,0,0.95)] ${
+                isBotLive
+                  ? 'bg-gradient-to-b from-[#FF003C] via-[#FF003C]/65 to-[#FCEE0A]/80'
+                  : 'bg-gradient-to-b from-[#0dfceb]/85 via-[#0dfceb]/45 to-[#FCEE0A]/75'
+              }`}
             >
-              {/* Cabecera clásica Escáner Kiroshi */}
-              <div className="px-3 py-1.5 bg-[#04070e] border-b border-[#0dfceb]/25 flex items-center justify-between font-mono">
-                <span className="text-[9px] font-black uppercase tracking-[0.18em] text-[#0dfceb] flex items-center gap-1.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-[#0dfceb] animate-ping" />
-                  <span>ESCÁNER KIROSHI</span>
-                </span>
-                <span className="text-[8px] font-bold uppercase tracking-widest text-[#FCEE0A]/85">
-                  OBJETIVO FIJADO
-                </span>
-              </div>
-
-              <div className="relative aspect-[5/7] w-full bg-black overflow-hidden">
-                <img
-                  src={hoveredCard.image}
-                  alt={hoveredCard.name || 'Carta'}
-                  className="w-full h-full object-cover object-center"
-                />
-              </div>
-
-              <div className="p-3 border-t border-white/10 space-y-1 font-mono bg-[#060911]">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="text-xs font-black text-white uppercase truncate">
-                    {hoveredCard.name}
+              <div
+                style={{
+                  clipPath: 'polygon(0 0, calc(100% - 13px) 0, 100% 13px, 100% 100%, 13px 100%, 0 calc(100% - 13px))'
+                }}
+                className="bg-[#060a12]/97 overflow-hidden backdrop-blur-md"
+              >
+                {/* Cabecera clásica Escáner Kiroshi */}
+                <div
+                  className={`px-3 py-1.5 bg-[#04070e] border-b flex items-center justify-between font-mono ${
+                    isBotLive ? 'border-[#FF003C]/40' : 'border-[#0dfceb]/25'
+                  }`}
+                >
+                  <span
+                    className={`text-[9px] font-black uppercase tracking-[0.16em] flex items-center gap-1.5 ${
+                      isBotLive ? 'text-[#FF003C]' : 'text-[#0dfceb]'
+                    }`}
+                  >
+                    <span
+                      className={`w-1.5 h-1.5 rounded-full animate-ping ${
+                        isBotLive ? 'bg-[#FF003C]' : 'bg-[#0dfceb]'
+                      }`}
+                    />
+                    <span>{isBotLive ? 'RIVAL EN ACCIÓN' : 'ESCÁNER KIROSHI'}</span>
                   </span>
-                  {hoveredCard.currentPower !== undefined && hoveredCard.currentPower !== null && (
-                    <span className="text-xs font-black text-[#0dfceb] shrink-0">
-                      ⚡ {hoveredCard.currentPower}
-                    </span>
-                  )}
+                  <span className="text-[8px] font-bold uppercase tracking-wider text-[#FCEE0A]/90 truncate max-w-[118px]">
+                    {isBotLive ? botBadge : 'OBJETIVO FIJADO'}
+                  </span>
                 </div>
-                <div className="flex items-center gap-1.5 text-[10px] text-gray-400 uppercase flex-wrap">
-                  <span>{hoveredCard.officialType || hoveredCard.type || 'CARTA'}</span>
-                  {hoveredCard.color && <span>• {hoveredCard.color}</span>}
-                  {hoveredCard.isSpent && <span className="text-[#FF003C]">• Gastada</span>}
-                  {hoveredCard.isLagging && <span className="text-[#0dfceb]">• Lag</span>}
+
+                <div className="relative aspect-[5/7] w-full bg-black overflow-hidden">
+                  <img
+                    src={scannerCard.image}
+                    alt={scannerCard.name || 'Carta'}
+                    className="w-full h-full object-cover object-center"
+                  />
+                </div>
+
+                <div className="p-3 border-t border-white/10 space-y-1 font-mono bg-[#060911]">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-xs font-black text-white uppercase truncate">
+                      {scannerCard.name}
+                    </span>
+                    {scannerCard.currentPower !== undefined && scannerCard.currentPower !== null && (
+                      <span className={`text-xs font-black shrink-0 ${isBotLive ? 'text-[#FF003C]' : 'text-[#0dfceb]'}`}>
+                        ⚡ {scannerCard.currentPower}
+                      </span>
+                    )}
+                  </div>
+                  {isBotLive && botSpotlight?.targetName && (
+                    <div className="text-[10px] font-bold text-[#FCEE0A] truncate">
+                      → Objetivo: {botSpotlight.targetName}
+                    </div>
+                  )}
+                  <div className="flex items-center gap-1.5 text-[10px] text-gray-400 uppercase flex-wrap">
+                    <span>{scannerCard.officialType || scannerCard.type || 'CARTA'}</span>
+                    {scannerCard.color && <span>• {scannerCard.color}</span>}
+                    {scannerCard.isSpent && <span className="text-[#FF003C]">• Gastada</span>}
+                    {scannerCard.isLagging && <span className="text-[#0dfceb]">• Lag</span>}
+                  </div>
                 </div>
               </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* Panel Lateral Derecho Fijo */}
       <aside

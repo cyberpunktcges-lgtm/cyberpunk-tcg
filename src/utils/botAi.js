@@ -913,12 +913,14 @@ export function executeBotReaction(gameState, attackerUnit, targetType, targetUn
  * Si se proporciona `pauseForAck`, el Bot se detiene tras cada carta/habilidad jugada
  * hasta que el jugador pulsa "OK" para revisar exactamente qué ha ocurrido.
  */
-export async function runBotTurn(gameState, updateCallback, delayMs = 700, pauseForAck = null) {
+export async function runBotTurn(gameState, updateCallback, delayMs = 1450, pauseForAck = null) {
   if (gameState.isGameOver || gameState.activePlayer !== 'bot') return;
 
   const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
   const bot = gameState.bot;
   const player = gameState.player;
+  const stepPreDelay = Math.max(550, Math.round(delayMs * 0.55));
+  const autoReadDelay = Math.max(1750, Math.round(delayMs * 1.25));
 
   const captureLogsSince = (prevLen) => {
     const all = gameState.actionLog || [];
@@ -928,6 +930,15 @@ export async function runBotTurn(gameState, updateCallback, delayMs = 700, pause
 
   let aborted = false;
   const pauseAfterPlay = async (actionType, card, prevLogLen, targetName = '', subtitle = '') => {
+    if (card && actionType !== 'END_BOT_TURN') {
+      gameState.lastBotLiveAction = {
+        id: `bot-act-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        actionType,
+        card,
+        targetName,
+        logs: prevLogLen !== null ? captureLogsSince(prevLogLen) : []
+      };
+    }
     updateCallback({ ...gameState });
     // Si la jugada del Bot abrió una decisión interactiva para el jugador (ej: Fool on the Hill, descarte forzado),
     // detenemos aquí el bucle del Bot y se reanudará automáticamente en cuanto el jugador resuelva el modal.
@@ -935,6 +946,7 @@ export async function runBotTurn(gameState, updateCallback, delayMs = 700, pause
       aborted = true;
       return false;
     }
+    let waitedManually = false;
     if (typeof pauseForAck === 'function' && !gameState.isGameOver) {
       const ack = await pauseForAck({
         actionType,
@@ -947,9 +959,21 @@ export async function runBotTurn(gameState, updateCallback, delayMs = 700, pause
         aborted = true;
         return false;
       }
+      waitedManually = !ack?.autoSkipped;
+    }
+    // En modo fluido (sin pausa manual), dar tiempo amplio y claro para leer la carta y las flechas sobre el tablero
+    if (!waitedManually && !gameState.isGameOver && gameState.activePlayer === 'bot') {
+      await wait(actionType === 'END_BOT_TURN' ? Math.max(950, Math.round(delayMs * 0.7)) : autoReadDelay);
     }
     return true;
   };
+
+  // Dejar terminar limpiamente la animación de "TURNO DEL RIVAL" al inicio del turno antes de empezar a jugar cartas
+  if (gameState._botIntroWaitedTurn !== gameState.turnNumber) {
+    gameState._botIntroWaitedTurn = gameState.turnNumber;
+    await wait(1200);
+    if (gameState.isGameOver || gameState.activePlayer !== 'bot') return;
+  }
 
   // Salvaguarda de Turno 1: si el bot empieza la partida y aún no se ejecutó su Fase de Inicio (0 dados lanzados)
   if (gameState.turnNumber === 1 && (bot.gigs || []).length === 0 && (bot.fixerDice || []).length === 6) {
@@ -965,9 +989,10 @@ export async function runBotTurn(gameState, updateCallback, delayMs = 700, pause
   // -----------------------------------------------------------------------
   const cardToSell = chooseCardToSellForBot(bot, player, gameState);
   if (cardToSell) {
-    await wait(Math.min(delayMs, 450));
+    await wait(stepPreDelay);
     sellCardForEddies(gameState, 'bot', cardToSell.instanceId);
     updateCallback({ ...gameState });
+    await wait(Math.max(850, Math.round(delayMs * 0.65)));
   }
 
   // -----------------------------------------------------------------------
@@ -990,7 +1015,7 @@ export async function runBotTurn(gameState, updateCallback, delayMs = 700, pause
     if (playableOpeningUnits.length > 0) {
       const unitToPlay = playableOpeningUnits[0];
       const uCost = getEffectiveCardCost(unitToPlay, bot, gameState);
-      await wait(Math.min(delayMs, 450));
+      await wait(stepPreDelay);
       const logBefore = (gameState.actionLog || []).length;
       const snapBefore = captureBotActionSnapshot(gameState);
       botPrepareEddies(bot, uCost);
@@ -1005,7 +1030,7 @@ export async function runBotTurn(gameState, updateCallback, delayMs = 700, pause
       if (!bot.hasCalledLegendThisTurn && getBotMaxCapacity(bot) >= 1) {
         const leg = chooseBestLegendToCall(bot, player);
         if (leg) {
-          await wait(Math.min(delayMs, 450));
+          await wait(stepPreDelay);
           const logBefore = (gameState.actionLog || []).length;
           const snapBefore = captureBotActionSnapshot(gameState);
           botPrepareEddies(bot, 1, leg.instanceId);
@@ -1047,7 +1072,7 @@ export async function runBotTurn(gameState, updateCallback, delayMs = 700, pause
     const logBeforeAb1 = (gameState.actionLog || []).length;
     const activated1 = tryActivateBotAbilities(gameState, bot, player);
     if (activated1) {
-      await wait(Math.min(Math.floor(delayMs * 0.6), 400));
+      await wait(stepPreDelay);
       const cont = await pauseAfterPlay(
         'ABILITY',
         activated1.card,
@@ -1166,7 +1191,7 @@ export async function runBotTurn(gameState, updateCallback, delayMs = 700, pause
       actions.sort((a, b) => b.score - a.score);
       const best = actions[0];
 
-      await wait(Math.min(delayMs, 450));
+      await wait(stepPreDelay);
       const logBefore = (gameState.actionLog || []).length;
       const snapBefore = captureBotActionSnapshot(gameState);
       if (best.kind === 'GO_SOLO') {
@@ -1206,7 +1231,7 @@ export async function runBotTurn(gameState, updateCallback, delayMs = 700, pause
     if (!bot.hasCalledLegendThisTurn && getBotMaxCapacity(bot) >= 1 && !gameState.isGameOver) {
       const faceDownLegend = chooseBestLegendToCall(bot, player);
       if (faceDownLegend) {
-        await wait(Math.min(delayMs, 450));
+        await wait(stepPreDelay);
         const logBefore = (gameState.actionLog || []).length;
         const snapBeforeCall = captureBotActionSnapshot(gameState);
         botPrepareEddies(bot, 1, faceDownLegend.instanceId);
@@ -1226,7 +1251,7 @@ export async function runBotTurn(gameState, updateCallback, delayMs = 700, pause
       const logBeforeAb2 = (gameState.actionLog || []).length;
       const activated2 = tryActivateBotAbilities(gameState, bot, player);
       if (activated2) {
-        await wait(Math.min(Math.floor(delayMs * 0.6), 400));
+        await wait(stepPreDelay);
         const cont = await pauseAfterPlay(
           'ABILITY',
           activated2.card,
@@ -1248,6 +1273,12 @@ export async function runBotTurn(gameState, updateCallback, delayMs = 700, pause
     (u) => !u.isSpent && hasKeyword(u, 'Blocker')
   );
   const maxPlayerBlockerPower = Math.max(0, ...playerReadyBlockers.map((b) => b.currentPower || 0));
+
+  const preReadyUnits = (bot.field || []).filter((u) => canUnitAttack(u, bot, gameState));
+  if (preReadyUnits.length > 0) {
+    await wait(Math.max(850, Math.round(delayMs * 0.65)));
+    if (gameState.isGameOver || gameState.activePlayer !== 'bot') return;
+  }
 
   const readyUnits = (bot.field || [])
     .filter((u) => canUnitAttack(u, bot, gameState))
@@ -1458,7 +1489,7 @@ export async function runBotTurn(gameState, updateCallback, delayMs = 700, pause
  * Resuelve el combate pendiente tras la Fase de Respuesta del Jugador,
  * muestra el resultado antes de continuar, y sigue con los siguientes ataques o fin de turno del bot.
  */
-export async function resolvePendingAttackAndContinueBot(gameState, updateCallback, delayMs = 700, pauseForAck = null) {
+export async function resolvePendingAttackAndContinueBot(gameState, updateCallback, delayMs = 1450, pauseForAck = null) {
   if (!gameState.pendingReaction) return;
 
   const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));

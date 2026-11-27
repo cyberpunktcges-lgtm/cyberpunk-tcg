@@ -971,6 +971,8 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
   const prevBoardSnapshotRef = useRef(null);
   const [transientBotArrows, setTransientBotArrows] = useState([]);
   const lastBotArrowBatchRef = useRef(null);
+  const [botSpotlight, setBotSpotlight] = useState(null);
+  const lastBotSpotlightIdRef = useRef(null);
   const [turnBanner, setTurnBanner] = useState(null); // { isPlayer: bool, turnNumber: number }
   const prevTurnBannerKeyRef = useRef(null);
 
@@ -1033,7 +1035,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
   const botAckResolverRef = useRef(null);
 
   const waitForBotAck = (eventInfo) => {
-    if (!botStepPauseEnabledRef.current) return Promise.resolve({ ok: true });
+    if (!botStepPauseEnabledRef.current) return Promise.resolve({ ok: true, autoSkipped: true });
     return new Promise((resolve) => {
       if (eventInfo?.card) setPreviewCard(eventInfo.card);
       botAckResolverRef.current = resolve;
@@ -3444,7 +3446,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
       await resolvePendingAttackAndContinueBot(
         gameState,
         (updated) => setGameState({ ...updated }),
-        650,
+        botStepPauseEnabledRef.current ? 850 : 1450,
         waitForBotAck
       );
     } catch (err) {
@@ -4171,6 +4173,26 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
     return () => window.clearTimeout(timer);
   }, [transientBotArrows, pendingBotAck, gameState?.activePlayer, gameState?.pendingGigRoll, gameState?.phase]);
 
+  // Escáner Kiroshi en vivo: mostrar automáticamente la carta recién jugada por el Bot durante su turno
+  useEffect(() => {
+    if (showLobby || !gameState || gameState.isGameOver || gameState.activePlayer === 'player') {
+      setBotSpotlight(null);
+      return;
+    }
+    const act = gameState.lastBotLiveAction;
+    if (!act || !act.id || !act.card) return;
+    if (lastBotSpotlightIdRef.current === act.id) return;
+    lastBotSpotlightIdRef.current = act.id;
+    setBotSpotlight(act);
+  }, [gameState?.lastBotLiveAction?.id, gameState?.activePlayer, gameState?.isGameOver, showLobby]);
+
+  useEffect(() => {
+    if (!botSpotlight) return;
+    if (pendingBotAck && pendingBotAck.actionType !== 'END_BOT_TURN') return;
+    const t = window.setTimeout(() => setBotSpotlight(null), 2600);
+    return () => window.clearTimeout(t);
+  }, [botSpotlight, pendingBotAck]);
+
   // Turno del bot automático cuando le toque y el jugador ya haya decidido el Mulligan
   // (Pausa durante la Fase de Respuesta si pendingReaction está activo)
   useEffect(() => {
@@ -4185,7 +4207,12 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
       !gameState.pendingTargetSelection
     ) {
       setIsBotThinking(true);
-      runBotTurn(gameState, (updated) => setGameState({ ...updated }), 650, waitForBotAck)
+      runBotTurn(
+        gameState,
+        (updated) => setGameState({ ...updated }),
+        botStepPauseEnabledRef.current ? 850 : 1450,
+        waitForBotAck
+      )
         .catch((err) => {
           console.error('Error ejecutando turno del bot:', err);
         })
@@ -8083,6 +8110,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
           onToggleFullscreen={toggleFullscreen}
           actionLog={gameState.actionLog || []}
           hoveredCard={hoveredCard}
+          botSpotlight={botSpotlight}
           displayCard={rawDisplayCard}
           onInspectCard={(c) => setInspectedCard(c)}
           autoPayEddies={autoPayEddies}
