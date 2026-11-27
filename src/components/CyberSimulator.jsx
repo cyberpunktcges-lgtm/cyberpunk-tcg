@@ -8224,8 +8224,14 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
         </div>
       )}
 
-      {/* 2. MODAL MINIMALISTA DE SELECCIÓN DE DADO FIXER (espera a que termine la animación de TU TURNO) */}
-      {gameState.mulliganDecided && isMyTurn && (gameState.pendingGigRoll || gameState.phase === 'START_GIG_SELECT') && p.fixerDice.length > 0 && !rollingAnimation && !turnBanner && (
+      {/* 2. MODAL MINIMALISTA DE SELECCIÓN DE DADO FIXER (espera a que termine la animación de TU TURNO sin parpadeo) */}
+      {gameState.mulliganDecided &&
+        isMyTurn &&
+        (gameState.pendingGigRoll || gameState.phase === 'START_GIG_SELECT') &&
+        p.fixerDice.length > 0 &&
+        !rollingAnimation &&
+        !turnBanner &&
+        prevTurnBannerKeyRef.current === `${gameState.matchId}-${gameState.turnNumber}-${gameState.activePlayer}` && (
         <div className="fixed inset-0 z-[52] bg-black/55 backdrop-blur-xs flex items-center justify-center p-4 font-mono">
           <div
             style={{ clipPath: CYBER_CLIP }}
