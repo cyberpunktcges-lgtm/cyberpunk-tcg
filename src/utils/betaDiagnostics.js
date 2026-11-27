@@ -182,7 +182,7 @@ export function buildSimulatorDiagnosticSnapshot(gameState, extraMeta = {}) {
     phase: gs.phase || '',
     firstPlayer: gs.firstPlayer || '',
     mulliganDecided: Boolean(gs.mulliganDecided),
-    isOvertime: Boolean(gs.isOvertime),
+    isOvertime: Boolean(gs.overtime || gs.isOvertime),
     isGameOver: Boolean(gs.isGameOver),
     winner: gs.winner || null,
     playerDeckName: extraMeta.playerDeckName || '',

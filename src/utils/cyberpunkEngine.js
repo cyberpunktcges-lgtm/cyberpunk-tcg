@@ -749,6 +749,7 @@ export function createInitialGameState(playerDeckInput, botDeckInput, allCards =
     isGameOver: false,
     winner: null,
     overtime: false,
+    consecutiveEmptyFixerTurns: 0,
     combatEvent: null, // Si hay un ataque o evento en curso
     mulliganDecided: false, // Control de fase inicial de Keep / Mulligan
     pendingFirstPlayerSelection, // Activo durante la tirada inicial de D20
@@ -989,9 +990,10 @@ export function getEffectiveCardCost(card, playerState = null, gameState = null)
  * 2. Quedarse sin cartas en el mazo cuando es obligatorio robar (Deck out).
  */
 export function checkWinCondition(state, targetPlayerKey) {
+  if (state.isGameOver) return true;
   const p = state[targetPlayerKey];
 
-  // Victoria por 7 Gigs
+  // Victoria por 7 Gigs al inicio del turno
   if (p.gigs.length >= 7) {
     state.isGameOver = true;
     state.winner = targetPlayerKey;
@@ -1001,6 +1003,27 @@ export function checkWinCondition(state, targetPlayerKey) {
     return true;
   }
 
+  return false;
+}
+
+/**
+ * Comprobación oficial de muerte súbita en OVERTIME:
+ * Una vez activo el Overtime, si CUALQUIER jugador controla 7 o más Gigs en cualquier instante,
+ * gana la partida inmediatamente (sin esperar al inicio de su siguiente turno).
+ */
+export function checkOvertimeInstantWin(state) {
+  if (!state || !state.overtime || state.isGameOver) return false;
+  for (const key of ['player', 'bot']) {
+    const side = state[key];
+    if (side && (side.gigs || []).length >= 7) {
+      state.isGameOver = true;
+      state.winner = key;
+      (state.actionLog = state.actionLog || []).unshift(
+        `🏆 ¡VICTORIA EN OVERTIME! ${side.name} controla ${side.gigs.length} Gigs y gana la partida al instante.`
+      );
+      return true;
+    }
+  }
   return false;
 }
 
@@ -1707,11 +1730,7 @@ export function attackRivalGigs(
   }
 
   // Comprobar victoria inmediata en Overtime
-  if (state.overtime && attacker.gigs.length >= 7) {
-    state.isGameOver = true;
-    state.winner = attackerPlayerKey;
-    state.actionLog.unshift(`🏆 ¡OVERTIME WIN! ${attacker.name} alcanza 7 Gigs y gana la partida.`);
-  }
+  checkOvertimeInstantWin(state);
 
   // Disparadores al robar Gigs (CP-001 6th Street Recruits, CP-136 V // Roamer, CP-039 Gorilla Arms)
   if (stolenDice.length > 0 && !state.isGameOver) {
@@ -2149,15 +2168,6 @@ export function rollInGig(state, playerKey, dieType, specificRollValue = null) {
   // Trigger pasivo CP-058 Kerry Eurodyne // Axe, Attitude, Audience (repetir tirada 1 vez + robar en mín/máx)
   executeKerryGigRollTrigger(state, playerKey, p.gigs.length - 1, false);
 
-  // Si ambos han vaciado el Fixer, empieza el OVERTIME
-  const otherKey = playerKey === 'player' ? 'bot' : 'player';
-  if (state[otherKey].fixerDice.length === 0 && p.fixerDice.length === 0 && !state.overtime) {
-    state.overtime = true;
-    state.actionLog.unshift(
-      `⚡ ¡OVERTIME ACTIVADO! Ambos Fixers están vacíos. El primer jugador en controlar 7 Gigs gana inmediatamente.`
-    );
-  }
-
   return { success: true, die: normDie, value: rollValue, gigEntry };
 }
 
@@ -2181,8 +2191,8 @@ export function executeStartPhase(state, playerKey) {
     `// ==========================================`
   );
 
-  // 1. COMPROBAR VICTORIA AL INICIO DEL TURNO (7+ Gigs)
-  if (checkWinCondition(state, playerKey)) {
+  // 1. COMPROBAR VICTORIA AL INICIO DEL TURNO (7+ Gigs) o muerte súbita si ya estamos en Overtime
+  if (checkWinCondition(state, playerKey) || checkOvertimeInstantWin(state)) {
     return state;
   }
 
@@ -2278,7 +2288,15 @@ export function executeStartPhase(state, playerKey) {
   executeStartOfTurnTriggers(state, playerKey);
 
   // 4. ROLL IN A GIG (Selección y lanzamiento de dado del Fixer)
+  // Regla oficial de OVERTIME:
+  // El Overtime comienza DESPUÉS de que ambos jugadores hayan iniciado 2 turnos consecutivos
+  // con su Zona del Fixer vacía (típicamente al terminar el Turno 7 de cada jugador, entrando al Turno 8 / turno 15).
+  const otherKey = playerKey === 'player' ? 'bot' : 'player';
+  const bothFixersEmptyAtStart =
+    (p.fixerDice || []).length === 0 && (state[otherKey]?.fixerDice || []).length === 0;
+
   if (p.fixerDice.length > 0) {
+    state.consecutiveEmptyFixerTurns = 0;
     if (playerKey === 'player') {
       // El jugador elegirá su dado interactivamente
       state.pendingGigRoll = true;
@@ -2296,13 +2314,19 @@ export function executeStartPhase(state, playerKey) {
     state.pendingGigRoll = false;
     state.phase = 'MAIN';
 
-    // Si ambos han vaciado el Fixer, empieza el OVERTIME
-    const otherKey = playerKey === 'player' ? 'bot' : 'player';
-    if (state[otherKey].fixerDice.length === 0 && !state.overtime) {
-      state.overtime = true;
-      state.actionLog.unshift(
-        `⚡ ¡OVERTIME ACTIVADO! El primer jugador en controlar 7 Gigs gana inmediatamente.`
-      );
+    if (bothFixersEmptyAtStart && !state.overtime) {
+      state.consecutiveEmptyFixerTurns = (state.consecutiveEmptyFixerTurns || 0) + 1;
+      if (state.consecutiveEmptyFixerTurns === 1) {
+        state.actionLog.unshift(
+          `⏳ [OVERTIME 1/2] Ambos Fixers están vacíos al inicio del turno. Al finalizar el siguiente turno rival comenzará el Overtime.`
+        );
+      } else if (state.consecutiveEmptyFixerTurns >= 2) {
+        state.actionLog.unshift(
+          `⏳ [OVERTIME 2/2] Último turno regular con Fixers vacíos: al terminar este turno comenzará el OVERTIME (7+ Gigs gana al instante).`
+        );
+      }
+    } else if (!bothFixersEmptyAtStart) {
+      state.consecutiveEmptyFixerTurns = 0;
     }
   }
 
@@ -2369,6 +2393,18 @@ export function passTurn(state, options = {}) {
   const nextPlayerKey = state.activePlayer === 'player' ? 'bot' : 'player';
   state.activePlayer = nextPlayerKey;
   state.turnNumber += 1;
+
+  // Regla oficial de OVERTIME: tras completarse el 2º turno consecutivo iniciado con ambos Fixers vacíos
+  // (normalmente al terminar el Turno 7 del segundo jugador), el Overtime entra en vigor de inmediato.
+  if (!state.overtime && (state.consecutiveEmptyFixerTurns || 0) >= 2) {
+    state.overtime = true;
+    state.actionLog.unshift(
+      `⚡ ¡OVERTIME ACTIVADO! Ambos jugadores completaron 2 turnos consecutivos iniciando con el Fixer vacío. Desde ahora, controlar 7 o más Gigs en cualquier instante gana la partida al acto.`
+    );
+    if (checkOvertimeInstantWin(state)) {
+      return state;
+    }
+  }
 
   if (options && options.deferStartPhase) {
     state.pendingStartPhase = true;

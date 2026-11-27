@@ -5633,6 +5633,8 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
         <CyberLeftTelemetryRail
           turnNumber={gameState.turnNumber}
           isMyTurn={isMyTurn}
+          isOvertime={Boolean(gameState.overtime)}
+          emptyFixerTurns={gameState.consecutiveEmptyFixerTurns || 0}
           bot={bot}
           player={p}
           botAvatar={botAvatar}
@@ -11883,7 +11885,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
 
               <div>
                 <strong className="text-[#0dfceb] block uppercase">6. Street Cred (⭐) y Overtime:</strong>
-                La suma de los valores de tus dados de Gig activos es tu Credibilidad en la Calle. Si ambos jugadores vacían sus Fixers, entra el Overtime: el primero que llegue a 7 Gigs gana la partida inmediatamente.
+                La suma de los valores de tus dados de Gig activos es tu Credibilidad en la Calle. Normalmente ganas si empiezas tu turno con 7 o más Gigs. El Overtime comienza después de que ambos jugadores inicien 2 turnos consecutivos con la Zona del Fixer vacía (al terminar el Turno 7 de cada jugador): a partir de ese instante, quien controle 7 o más Gigs en cualquier momento gana la partida al acto.
               </div>
             </div>
             )}

@@ -68,6 +68,8 @@ function MiniTrashStack({ trash = [], accent = '#FF003C', onViewTrash, onHoverCa
 export function CyberLeftTelemetryRail({
   turnNumber = 1,
   isMyTurn = true,
+  isOvertime = false,
+  emptyFixerTurns = 0,
   bot,
   player,
   botAvatar,
@@ -139,6 +141,23 @@ export function CyberLeftTelemetryRail({
               </span>
             )}
           </div>
+          {isOvertime ? (
+            <div
+              className="px-2 py-1 rounded bg-[#FF003C]/20 border border-[#FF003C] text-[#FF003C] text-[9px] font-black uppercase tracking-wider flex items-center justify-between animate-pulse shadow-[0_0_14px_rgba(255,0,60,0.35)]"
+              title="OVERTIME ACTIVO: Controlar 7 o más Gigs en cualquier instante gana la partida inmediatamente."
+            >
+              <span>⚡ OVERTIME</span>
+              <span className="text-white">7 GIGS = WIN</span>
+            </div>
+          ) : emptyFixerTurns > 0 ? (
+            <div
+              className="px-2 py-0.5 rounded bg-amber-500/15 border border-amber-400/60 text-amber-300 text-[9px] font-black uppercase tracking-wider flex items-center justify-between"
+              title="Tras 2 turnos consecutivos iniciando con ambos Fixers vacíos comenzará el Overtime."
+            >
+              <span>⏳ OVERTIME</span>
+              <span>{Math.min(2, emptyFixerTurns)}/2</span>
+            </div>
+          ) : null}
         </div>
 
         {/* Tu Pill */}
