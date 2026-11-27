@@ -103,17 +103,59 @@ function isUnitCard(c) {
   return ot === 'UNIT' || (ct.includes('UNIT') && !ct.includes('LEGEND'));
 }
 
-function countGigValuePairs(gigs = []) {
+let legendTriggerSeq = 1;
+
+/**
+ * Registra un evento visual de trigger de Leyenda (ej. Inicio de Turno: Hanako Arasaka, Royce, Kerry, Fin de Turno: Panam)
+ * para mostrarlo de forma destacada en la UI del simulador y resaltar la carta disparadora.
+ */
+export function recordLegendTriggerBanner(state, entry) {
+  if (!state || !entry) return;
+  const turn = state.turnNumber || 1;
+  const now = Date.now();
+  const prev = state.lastLegendTriggerBatch;
+  const sameTurnWindow =
+    prev &&
+    prev.turnNumber === turn &&
+    prev.phaseLabel === entry.phaseLabel &&
+    typeof prev.createdAt === 'number' &&
+    now - prev.createdAt < 400;
+
+  const item = {
+    id: `lt-item-${legendTriggerSeq++}-${now}`,
+    turnNumber: turn,
+    ...entry
+  };
+
+  state.lastLegendTriggerBatch = {
+    batchId: `lt-batch-${legendTriggerSeq++}-${now}`,
+    turnNumber: turn,
+    phaseLabel: entry.phaseLabel || 'INICIO DE TURNO',
+    createdAt: now,
+    items: sameTurnWindow ? [...(prev.items || []), item] : [item]
+  };
+}
+
+function getGigValuePairDetails(gigs = []) {
   const counts = {};
-  gigs.forEach((g) => {
+  (gigs || []).forEach((g) => {
     const v = Number(g.value);
     if (!Number.isNaN(v)) counts[v] = (counts[v] || 0) + 1;
   });
-  let pairs = 0;
-  Object.values(counts).forEach((cnt) => {
-    pairs += Math.floor(cnt / 2);
+  let pairCount = 0;
+  const pairValues = [];
+  Object.entries(counts).forEach(([val, cnt]) => {
+    const pairsForVal = Math.floor(cnt / 2);
+    if (pairsForVal > 0) {
+      pairCount += pairsForVal;
+      for (let i = 0; i < pairsForVal; i++) pairValues.push(Number(val));
+    }
   });
-  return pairs;
+  return { pairCount, pairValues };
+}
+
+function countGigValuePairs(gigs = []) {
+  return getGigValuePairDetails(gigs).pairCount;
 }
 
 /**
@@ -684,10 +726,23 @@ export function executeKerryGigRollTrigger(state, playerKey, gigIndex, isAfterRe
   // Paso 2 (resultado final): si es valor mínimo (1) o máximo (maxFace), robar 1 (o 3 si es d20)
   if (gig.value === 1 || gig.value === maxFace) {
     const drawCount = dieStr === 'd20' ? 3 : 1;
+    const extremumLabel = gig.value === 1 ? 'MÍNIMO (1)' : `MÁXIMO (${maxFace})`;
     state.actionLog.unshift(
-      `🎸 [Kerry Eurodyne] ¡Resultado ${gig.value === 1 ? 'MÍNIMO (1)' : `MÁXIMO (${maxFace})`} en ${dieStr.toUpperCase()}! ${p.name} roba ${drawCount} carta(s).`
+      `🎸 [Kerry Eurodyne] ¡Resultado ${extremumLabel} en ${dieStr.toUpperCase()}! ${p.name} roba ${drawCount} carta(s).`
     );
     drawCards(p, drawCount, state, 'Kerry Eurodyne // Axe, Attitude, Audience');
+    recordLegendTriggerBanner(state, {
+      playerKey,
+      phaseLabel: 'FASE DE INICIO · GIG',
+      cardId: 'CP-058',
+      instanceId: kerry.instanceId,
+      cardName: kerry.name || 'Kerry Eurodyne // Axe, Attitude, Audience',
+      cardImage: kerry.image || '',
+      icon: '🎸',
+      summary: `¡Resultado ${extremumLabel} en ${dieStr.toUpperCase()}! ${p.name} roba ${drawCount} carta(s).`,
+      accent: '#FCEE0A',
+      didResolveEffect: true
+    });
   }
 }
 
@@ -4140,6 +4195,7 @@ function _executeCallLegendTrigger(state, playerKey, legendCard) {
 export function executeStartOfTurnTriggers(state, playerKey) {
   if (!state) return;
   const p = state[playerKey];
+  if (!p) return;
 
   // CP-045: Hanako Arasaka // Daughter of the Emperor
   // "At the start of your turn, draw 1 for each friendly value-pair of Gigs."
@@ -4147,11 +4203,70 @@ export function executeStartOfTurnTriggers(state, playerKey) {
     (l) => l.isFaceUp && !l.isRemovedFromGame && resolveCardId(l) === 'CP-045'
   );
   if (hanakos.length > 0) {
-    const pairCount = countGigValuePairs(p.gigs || []);
+    const { pairCount, pairValues } = getGigValuePairDetails(p.gigs || []);
     if (pairCount > 0) {
-      drawCards(p, pairCount * hanakos.length, state, 'Hanako Arasaka // Daughter of the Emperor');
+      const totalDraw = pairCount * hanakos.length;
+      const valuesText = pairValues.map((v) => `valor ${v}`).join(', ');
+      drawCards(p, totalDraw, state, 'Hanako Arasaka // Daughter of the Emperor');
+      hanakos.forEach((hanako) => {
+        recordLegendTriggerBanner(state, {
+          playerKey,
+          phaseLabel: 'INICIO DE TURNO',
+          cardId: 'CP-045',
+          instanceId: hanako.instanceId,
+          cardName: hanako.name || 'Hanako Arasaka // Daughter of the Emperor',
+          cardImage: hanako.image || '',
+          icon: '🏯',
+          summary: `¡Controlas ${pairCount} par(es) de Gigs (${valuesText})! ${p.name} roba ${pairCount} carta(s).`,
+          accent: '#FCEE0A',
+          didResolveEffect: true
+        });
+      });
+    } else {
+      state.actionLog.unshift(
+        `🏯 [Hanako Arasaka // Inicio de Turno] Trigger comprobado para ${p.name}: 0 pares de Gigs con el mismo valor (sin robo).`
+      );
+      hanakos.forEach((hanako) => {
+        recordLegendTriggerBanner(state, {
+          playerKey,
+          phaseLabel: 'INICIO DE TURNO',
+          cardId: 'CP-045',
+          instanceId: hanako.instanceId,
+          cardName: hanako.name || 'Hanako Arasaka // Daughter of the Emperor',
+          cardImage: hanako.image || '',
+          icon: '🏯',
+          summary: 'Trigger de inicio de turno: 0 pares de Gigs con el mismo valor (sin robo).',
+          accent: '#0dfceb',
+          didResolveEffect: false
+        });
+      });
     }
   }
+
+  // CP-109: Royce // Psycho on the Edge (Leyenda en campo con Gear equipado)
+  // "During your turn, this Legend has +2 power for each of its equipped Gear."
+  const equippedRoyces = (p.field || []).filter(
+    (u) => resolveCardId(u) === 'CP-109' && Array.isArray(u.gear) && u.gear.length > 0
+  );
+  equippedRoyces.forEach((royceUnit) => {
+    const gearCount = royceUnit.gear.length;
+    const bonus = gearCount * 2;
+    state.actionLog.unshift(
+      `🔥 [Royce // Inicio de Turno] "${royceUnit.name}" activa +${bonus} Fuerza durante el turno de ${p.name} (${gearCount} Gear equipado${gearCount > 1 ? 's' : ''}).`
+    );
+    recordLegendTriggerBanner(state, {
+      playerKey,
+      phaseLabel: 'INICIO DE TURNO',
+      cardId: 'CP-109',
+      instanceId: royceUnit.instanceId,
+      cardName: royceUnit.name || 'Royce // Psycho on the Edge',
+      cardImage: royceUnit.image || '',
+      icon: '🔥',
+      summary: `Bono de tu turno activo: +${bonus} Fuerza por ${gearCount} Gear equipado${gearCount > 1 ? 's' : ''}.`,
+      accent: '#FCEE0A',
+      didResolveEffect: true
+    });
+  });
 }
 
 export function executeEndOfTurnTriggers(state, playerKey) {
@@ -4196,6 +4311,53 @@ export function executeEndOfTurnTriggers(state, playerKey) {
           `🔫 [Dying Night] Fin de turno: "${unit.name}" es V, se enderezan ${readied} Eddie(s).`
         );
       }
+    }
+  }
+
+  // CP-092: Panam Palmer // Nomad Cavalry
+  // "At the end of your turn, if 5 or more friendly Units and/or Legends are equipped, ready them."
+  const panams = (p.legends || []).filter(
+    (l) => l.isFaceUp && !l.isRemovedFromGame && resolveCardId(l) === 'CP-092'
+  );
+  if (panams.length > 0) {
+    const equippedUnits = (p.field || []).filter((u) => Array.isArray(u.gear) && u.gear.length > 0);
+    const equippedLegends = (p.legends || []).filter(
+      (l) => l.isFaceUp && !l.isOnField && !l.isRemovedFromGame && Array.isArray(l.gear) && l.gear.length > 0
+    );
+    const totalEquipped = equippedUnits.length + equippedLegends.length;
+    if (totalEquipped >= 5) {
+      let readiedCount = 0;
+      equippedUnits.forEach((u) => {
+        const readyBlocked =
+          typeof u.cannotReadyUntilTurn === 'number'
+            ? state.turnNumber < u.cannotReadyUntilTurn
+            : Boolean(u.cannotReadyUntilNextTurn);
+        if (u.isSpent && !readyBlocked) {
+          u.isSpent = false;
+          readiedCount++;
+        }
+      });
+      equippedLegends.forEach((l) => {
+        if (l.isSpent) {
+          l.isSpent = false;
+          readiedCount++;
+        }
+      });
+      state.actionLog.unshift(
+        `🏜️ [Panam Palmer // Fin de Turno] Controlas ${totalEquipped} Unidades/Leyendas equipadas (≥ 5): se enderezan ${readiedCount} carta(s).`
+      );
+      recordLegendTriggerBanner(state, {
+        playerKey,
+        phaseLabel: 'FIN DE TURNO',
+        cardId: 'CP-092',
+        instanceId: panams[0].instanceId,
+        cardName: panams[0].name || 'Panam Palmer // Nomad Cavalry',
+        cardImage: panams[0].image || '',
+        icon: '🏜️',
+        summary: `¡${totalEquipped} Unidades/Leyendas equipadas! Se enderezan ${readiedCount} carta(s) equipadas.`,
+        accent: '#FCEE0A',
+        didResolveEffect: true
+      });
     }
   }
 

@@ -969,9 +969,13 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
 
   useEffect(() => {
     if (!delayingFixerModal) return;
-    const t = window.setTimeout(() => setDelayingFixerModal(false), 650);
+    const hasStartTrigger =
+      gameState?.lastLegendTriggerBatch?.turnNumber === gameState?.turnNumber &&
+      (gameState?.lastLegendTriggerBatch?.items || []).length > 0;
+    const delayMs = hasStartTrigger ? 1450 : 650;
+    const t = window.setTimeout(() => setDelayingFixerModal(false), delayMs);
     return () => window.clearTimeout(t);
-  }, [delayingFixerModal]);
+  }, [delayingFixerModal, gameState?.lastLegendTriggerBatch?.batchId]);
 
   // Red de seguridad: si tras recargar partida quedó pendingStartPhase sin banner activo, arrancarlo limpiamente
   useEffect(() => {
@@ -993,6 +997,9 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
   const [pendingGearEquip, setPendingGearEquip] = useState(null); // { cardInstanceId, card, cost, stagedTargetId }
   const [invalidTargetAlert, setInvalidTargetAlert] = useState(null); // { message, seq }
   const invalidTargetTimerRef = useRef(null);
+  const [legendTriggerToast, setLegendTriggerToast] = useState(null); // { batchId, items: [] }
+  const lastLegendTriggerBatchRef = useRef(null);
+  const legendTriggerTimerRef = useRef(null);
 
   const clearInvalidTargetAlert = () => {
     if (invalidTargetTimerRef.current) {
@@ -4326,6 +4333,50 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
     return () => window.clearTimeout(timer);
   }, [transientBotArrows, pendingBotAck, gameState?.activePlayer, gameState?.pendingGigRoll, gameState?.phase]);
 
+  // Mostrar triggers visuales de Leyendas (Inicio de Turno: Hanako Arasaka, Royce, Kerry; Fin de Turno: Panam)
+  useEffect(() => {
+    if (!gameState || showLobby) {
+      setLegendTriggerToast(null);
+      lastLegendTriggerBatchRef.current = null;
+      return;
+    }
+    const batch = gameState.lastLegendTriggerBatch;
+    if (!batch || !batch.batchId || !Array.isArray(batch.items) || batch.items.length === 0) return;
+    if (lastLegendTriggerBatchRef.current === batch.batchId) return;
+    lastLegendTriggerBatchRef.current = batch.batchId;
+
+    setLegendTriggerToast({ batchId: batch.batchId, items: batch.items });
+
+    const anyResolved = batch.items.some((it) => it.didResolveEffect);
+    if (anyResolved) {
+      playUiConfirm();
+    }
+
+    // Iluminar las Leyendas disparadoras directamente en el tablero
+    const freshGlow = {};
+    for (const it of batch.items) {
+      if (it.instanceId) freshGlow[it.instanceId] = it.accent || '#FCEE0A';
+    }
+    const glowIds = Object.keys(freshGlow);
+    if (glowIds.length > 0) {
+      setRecentHighlights((old) => ({ ...old, ...freshGlow }));
+      window.setTimeout(() => {
+        setRecentHighlights((old) => {
+          const next = { ...old };
+          for (const id of glowIds) delete next[id];
+          return next;
+        });
+      }, 3600);
+    }
+
+    if (legendTriggerTimerRef.current) clearTimeout(legendTriggerTimerRef.current);
+    const hideMs = anyResolved ? 4600 : 3000;
+    legendTriggerTimerRef.current = window.setTimeout(() => {
+      setLegendTriggerToast((cur) => (cur?.batchId === batch.batchId ? null : cur));
+      legendTriggerTimerRef.current = null;
+    }, hideMs);
+  }, [gameState?.lastLegendTriggerBatch?.batchId, gameState?.matchId, showLobby]);
+
   // Audio reactivo: cambio de turno
   useEffect(() => {
     if (!turnBanner || showLobby) return;
@@ -5949,6 +6000,12 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                       }`}
                       title={leg.isFaceUp ? leg.name : 'Leyenda boca abajo del Rival'}
                     >
+                      {legendTriggerToast?.items?.some((it) => it.instanceId === leg.instanceId) && (
+                        <span className="pointer-events-none absolute -top-3 left-1/2 -translate-x-1/2 z-40 px-1.5 py-0.5 bg-[#FCEE0A] text-[#070a10] font-mono font-black text-[7px] uppercase tracking-wider rounded-sm shadow-[0_0_12px_#FCEE0A] whitespace-nowrap animate-bounce">
+                          ⚡ TRIGGER
+                        </span>
+                      )}
+
                       {/* Gears equipados a Leyenda Rival: sobresalen por detrás a la derecha */}
                       {leg.gear && leg.gear.length > 0 && leg.gear.map((g, gIdx) => {
                         const gPow = parseCardPower(g.powerVal || g.power) || 0;
@@ -7748,6 +7805,12 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                               : 'Leyenda boca abajo (Clic para opciones: Hacer Call o Sacar Eddie)'
                           }
                         >
+                          {legendTriggerToast?.items?.some((it) => it.instanceId === leg.instanceId) && (
+                            <span className="pointer-events-none absolute -top-3 left-1/2 -translate-x-1/2 z-40 px-1.5 py-0.5 bg-[#FCEE0A] text-[#070a10] font-mono font-black text-[7px] uppercase tracking-wider rounded-sm shadow-[0_0_12px_#FCEE0A] whitespace-nowrap animate-bounce">
+                              ⚡ TRIGGER
+                            </span>
+                          )}
+
                           {/* Gears equipados a tu Leyenda: sobresalen por detrás a la derecha (estilo Johnny + Radioport) */}
                           {leg.gear && leg.gear.length > 0 && leg.gear.map((g, gIdx) => {
                             const gPow = parseCardPower(g.powerVal || g.power) || 0;
@@ -9912,6 +9975,83 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
           />
         );
       })()}
+
+      {/* VISOR VISUAL DE TRIGGERS DE LEYENDAS (INICIO / FIN DE TURNO: HANAKO ARASAKA, ROYCE, KERRY, PANAM) */}
+      {legendTriggerToast && Array.isArray(legendTriggerToast.items) && legendTriggerToast.items.length > 0 && !turnBanner && (
+        <div className="fixed left-1/2 top-[11%] sm:top-[12%] -translate-x-1/2 z-[58] w-[92vw] max-w-[560px] pointer-events-none font-mono select-none flex flex-col gap-2">
+          {legendTriggerToast.items.map((item) => {
+            const isPlayerTrig = item.playerKey === 'player';
+            const borderAccent = item.didResolveEffect ? '#FCEE0A' : '#0dfceb';
+            const ownerBadgeClass = isPlayerTrig
+              ? 'bg-[#0dfceb]/20 text-[#0dfceb] border-[#0dfceb]/60'
+              : 'bg-[#FF003C]/20 text-[#FF003C] border-[#FF003C]/60';
+            return (
+              <motion.div
+                key={item.id}
+                initial={{ opacity: 0, y: -14, scale: 0.95 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: -10, scale: 0.96 }}
+                transition={{ duration: 0.24, ease: 'easeOut' }}
+                style={{
+                  clipPath: CYBER_CLIP,
+                  borderColor: borderAccent,
+                  boxShadow: item.didResolveEffect
+                    ? '0 0 32px rgba(252, 238, 10, 0.5), 0 12px 30px rgba(0,0,0,0.85)'
+                    : '0 0 22px rgba(13, 252, 235, 0.35), 0 10px 26px rgba(0,0,0,0.85)'
+                }}
+                className="pointer-events-auto bg-[#070b14]/96 backdrop-blur-md border-2 px-3.5 py-2.5 flex items-center gap-3"
+              >
+                {item.cardImage && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const side = gameState?.[item.playerKey];
+                      const found =
+                        (side?.legends || []).find((l) => l.instanceId === item.instanceId) ||
+                        (side?.field || []).find((u) => u.instanceId === item.instanceId);
+                      if (found) setInspectedCard(found);
+                    }}
+                    title="Clic para inspeccionar Leyenda"
+                    className="w-11 h-15 rounded border border-[#FCEE0A]/80 overflow-hidden bg-black shrink-0 cursor-pointer hover:scale-105 transition-transform shadow-[0_0_14px_rgba(252,238,10,0.4)]"
+                  >
+                    <img src={item.cardImage} alt={item.cardName} className="w-full h-full object-cover" />
+                  </button>
+                )}
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-1.5 mb-0.5">
+                    <span
+                      className={`px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider rounded-sm ${
+                        item.didResolveEffect
+                          ? 'bg-[#FCEE0A] text-[#070a10]'
+                          : 'bg-[#0dfceb]/20 text-[#0dfceb] border border-[#0dfceb]/60'
+                      }`}
+                    >
+                      ⚡ TRIGGER · {item.phaseLabel || 'INICIO DE TURNO'}
+                    </span>
+                    <span className={`px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider rounded-sm border ${ownerBadgeClass}`}>
+                      👑 {isPlayerTrig ? 'TU LEYENDA' : 'LEYENDA RIVAL'}
+                    </span>
+                  </div>
+                  <div className="text-xs sm:text-[13px] font-black text-white uppercase tracking-wide truncate">
+                    {item.icon ? `${item.icon} ` : ''}{String(item.cardName || 'LEYENDA').replace(/\s*\/\/\s*/g, ': ')}
+                  </div>
+                  <p className="text-[11px] sm:text-xs text-gray-200 font-sans leading-snug mt-0.5">
+                    {item.summary}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setLegendTriggerToast(null)}
+                  className="self-start text-gray-400 hover:text-white text-xs font-black px-1.5 py-0.5 cursor-pointer shrink-0"
+                  title="Cerrar aviso"
+                >
+                  ✕
+                </button>
+              </motion.div>
+            );
+          })}
+        </div>
+      )}
 
       {/* AVISO FLOTANTE NO BLOQUEANTE PARA OBJETIVOS NO VÁLIDOS (CUANDO NO HAY BARRA INLINE ABIERTA) */}
       {invalidTargetAlert && !isInlineBoardTargeting && !pendingGearEquip && (
