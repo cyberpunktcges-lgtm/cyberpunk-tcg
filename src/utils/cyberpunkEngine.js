@@ -2219,6 +2219,7 @@ export function executeStartPhase(state, playerKey) {
     u.isLagging = false;
     delete u.canAttackSpentUnitsTurnPlayed;
     delete u.usedGorillaArmsThisTurn;
+    delete u.usedYorinobuArasakaDrawThisTurn;
     // CP-109 Royce // Psycho on the Edge: activa +2 fuerza por cada Gear equipado al iniciar tu turno
     syncRoyceTurnPassiveBonus(u, true);
   });
@@ -2349,6 +2350,7 @@ export function passTurn(state, options = {}) {
       delete u.tempPowerMod;
       delete u.cannotBeDefeatedThisTurn;
       delete u.hasReadiedThisTurn;
+      delete u.usedYorinobuArasakaDrawThisTurn;
       delete u.stolenReduction;
       delete u.canAttackReadyUnits;
       if (u.hasTemporaryAdrenalineThisTurn) {

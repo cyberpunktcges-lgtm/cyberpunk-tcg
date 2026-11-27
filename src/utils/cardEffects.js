@@ -3496,6 +3496,20 @@ export function executeCombatLossTrigger(state, losingPlayerKey, losingUnit, win
 // 6. MOTOR DE DERROTA DE UNIDAD (DEFEATED TRIGGERS)
 // =========================================================================
 
+/**
+ * Comprueba si una Unidad tiene clasificación ARASAKA (según allCardRules o metadatos de la carta).
+ */
+export function isArasakaUnit(unit) {
+  if (!unit) return false;
+  const id = resolveCardId(unit);
+  const rules = (id && allCardRules[id]) || {};
+  const rulesClass = Array.isArray(rules.classification) ? rules.classification : [];
+  if (rulesClass.some((c) => /arasaka/i.test(String(c)))) return true;
+  if (Array.isArray(unit.classification) && unit.classification.some((c) => /arasaka/i.test(String(c)))) return true;
+  const meta = `${unit.traits || ''} ${unit.cardType || ''} ${unit.type || ''} ${unit.faction || ''}`;
+  return /\barasaka\b/i.test(meta);
+}
+
 export function executeUnitDefeatedTrigger(state, ownerKey, defeatedUnit) {
   if (!state || !defeatedUnit) return;
   const p = state[ownerKey];
@@ -3683,6 +3697,29 @@ export function executeUnitDefeatedTrigger(state, ownerKey, defeatedUnit) {
         state.actionLog.unshift(`🔫 [River Ward Rival] Investiga las 2 primeras cartas: 1 a la mano y 1 al Trash.`);
       }
     }
+  }
+
+  // CP-149: Yorinobu Arasaka // Steel Dragon (Habilidad Pasiva)
+  // "The first time an ARASAKA Unit is defeated each turn, draw 1."
+  if (isArasakaUnit(defeatedUnit)) {
+    ['player', 'bot'].forEach((sideKey) => {
+      const side = state[sideKey];
+      if (!side) return;
+      const yorinobus = (side.field || []).filter((u) => resolveCardId(u) === 'CP-149');
+      // Si el propio Yorinobu (ARASAKA) es la unidad derrotada, también dispara su habilidad si aún no la usó este turno
+      if (
+        sideKey === ownerKey &&
+        resolveCardId(defeatedUnit) === 'CP-149' &&
+        !yorinobus.some((y) => y.instanceId === defeatedUnit.instanceId)
+      ) {
+        yorinobus.push(defeatedUnit);
+      }
+      yorinobus.forEach((yorinobu) => {
+        if (yorinobu.usedYorinobuArasakaDrawThisTurn) return;
+        yorinobu.usedYorinobuArasakaDrawThisTurn = true;
+        drawCards(side, 1, state, 'Yorinobu Arasaka // Steel Dragon');
+      });
+    });
   }
 }
 
