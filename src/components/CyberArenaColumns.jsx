@@ -334,6 +334,8 @@ export function CyberRightGigsRail({
                         e.stopPropagation();
                         if (isTargetEligible && targetGigInfo?.onSelectGig) {
                           targetGigInfo.onSelectGig('bot', gig, idx);
+                        } else if (targetGigInfo?.onInvalidGig) {
+                          targetGigInfo.onInvalidGig('bot', gig, idx);
                         } else if (canAttackGigs && onStealSpecificDie) {
                           onStealSpecificDie(gig.die.toLowerCase());
                         }
@@ -476,6 +478,8 @@ export function CyberRightGigsRail({
                         e.stopPropagation();
                         if (isTargetEligible && targetGigInfo?.onSelectGig) {
                           targetGigInfo.onSelectGig('player', gig, idx);
+                        } else if (targetGigInfo?.onInvalidGig) {
+                          targetGigInfo.onInvalidGig('player', gig, idx);
                         }
                       }}
                       className={`relative rounded-md p-0.5 transition-all ${

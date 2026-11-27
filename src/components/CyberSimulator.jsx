@@ -147,6 +147,7 @@ import {
   playTurnBanner,
   playUndo,
   playUiConfirm,
+  playInvalidTarget,
   playVictory,
   playDefeat
 } from '../utils/cyberAudio.js';
@@ -990,6 +991,27 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
   const [pendingGigNumberPick, setPendingGigNumberPick] = useState(null);
   const [pendingManualPayment, setPendingManualPayment] = useState(null);
   const [pendingGearEquip, setPendingGearEquip] = useState(null); // { cardInstanceId, card, cost, stagedTargetId }
+  const [invalidTargetAlert, setInvalidTargetAlert] = useState(null); // { message, seq }
+  const invalidTargetTimerRef = useRef(null);
+
+  const clearInvalidTargetAlert = () => {
+    if (invalidTargetTimerRef.current) {
+      clearTimeout(invalidTargetTimerRef.current);
+      invalidTargetTimerRef.current = null;
+    }
+    setInvalidTargetAlert(null);
+  };
+
+  const notifyInvalidTarget = (message) => {
+    if (!message) return;
+    playInvalidTarget();
+    setInvalidTargetAlert({ message, seq: Date.now() + Math.random() });
+    if (invalidTargetTimerRef.current) clearTimeout(invalidTargetTimerRef.current);
+    invalidTargetTimerRef.current = setTimeout(() => {
+      setInvalidTargetAlert(null);
+      invalidTargetTimerRef.current = null;
+    }, 3400);
+  };
   const [showLeaderboardModal, setShowLeaderboardModal] = useState(false);
   const [userRankingStats, setUserRankingStats] = useState(null);
   const [selectedBotDifficulty, setSelectedBotDifficulty] = useState(1);
@@ -1272,6 +1294,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
       setPendingGigTheft(null);
       setStagedTarget(null);
       setPendingGigNumberPick(null);
+      clearInvalidTargetAlert();
       setLegendMenuId(null);
       setUnitActionMenuId(null);
       setHolocall({
@@ -4203,7 +4226,8 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
   useEffect(() => {
     setStagedTarget(null);
     setPendingGigNumberPick(null);
-  }, [gameState?.pendingTargetSelection]);
+    clearInvalidTargetAlert();
+  }, [gameState?.pendingTargetSelection, pendingGearEquip, pendingManualPayment]);
 
   // Resaltar temporalmente (2.4s) el borde neón de cartas recién jugadas, Leyendas volteadas o Gears equipados
   useEffect(() => {
@@ -4629,9 +4653,154 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
     return false;
   };
 
+  const getUnitInvalidTargetReason = (unit, ownerKey) => {
+    const uName = unit?.name || 'Esta unidad';
+    if (pendingGearEquip) {
+      if (ownerKey === 'bot') {
+        return `"${uName}" es del rival. Solo puedes equipar Gear a una Unidad aliada o a una de tus Leyendas boca arriba.`;
+      }
+      return `"${uName}" no puede recibir este Gear en este momento.`;
+    }
+    if (pendingManualPayment) {
+      return 'Para pagar Eddies debes hacer clic en tu Zona de Eddies o en tus Leyendas disponibles (no en Unidades en campo).';
+    }
+    if (!activeTargetSel) return '';
+    const act = activeTargetSel.actionType;
+    if (act === 'CALL_LEGEND_FREE') {
+      return 'Debes elegir una de TUS Leyendas boca abajo (no una Unidad en campo).';
+    }
+    if (['ADJUST_GIG', 'PEACE_OFFERING', 'SWAP_GIGS', 'STEAL_RIVAL_GIG', 'KERRY_REROLL'].includes(act)) {
+      return 'Debes elegir un dado de Gig en juego (no una Unidad en campo).';
+    }
+    if (act === 'TARGET_UNIT') {
+      if (ownerKey === 'player' && activeTargetSel.targetScope === 'RIVAL_UNITS') {
+        return `"${uName}" es tu unidad. ${activeTargetSel.sourceCardName || 'Esta habilidad'} solo puede hacer objetivo a una unidad del RIVAL.`;
+      }
+      if (ownerKey === 'bot' && activeTargetSel.targetScope === 'FRIENDLY_UNITS') {
+        return `"${uName}" es del rival. ${activeTargetSel.sourceCardName || 'Esta habilidad'} solo puede hacer objetivo a una de TUS unidades.`;
+      }
+      if (activeTargetSel.excludeInstanceId && unit.instanceId === activeTargetSel.excludeInstanceId) {
+        return `"${uName}" no puede hacerse objetivo a sí misma.`;
+      }
+      if (activeTargetSel.onlySpent && !unit.isSpent) {
+        return `"${uName}" está LISTA (sin girar). Solo puedes elegir una unidad GIRADA (Spent).`;
+      }
+      if (activeTargetSel.onlyReady && unit.isSpent) {
+        return `"${uName}" ya está GIRADA (Spent). Solo puedes elegir una unidad LISTA (Ready).`;
+      }
+      const uPower = getNumericUnitPower(unit);
+      if (activeTargetSel.maxPower !== undefined && uPower > activeTargetSel.maxPower) {
+        return `"${uName}" tiene fuerza ${uPower}. Solo puedes elegir unidades con fuerza ≤ ${activeTargetSel.maxPower}.`;
+      }
+      if (activeTargetSel.maxCost !== undefined && getNumericCost(unit) > activeTargetSel.maxCost) {
+        return `"${uName}" cuesta ${getNumericCost(unit)} €$. Solo puedes elegir unidades con coste ≤ ${activeTargetSel.maxCost} €$.`;
+      }
+      if (activeTargetSel.onlyUnequipped && unit.gear && unit.gear.length > 0) {
+        return `"${uName}" ya tiene Gear equipado. Solo puedes elegir una unidad SIN Gear.`;
+      }
+      if (activeTargetSel.onlyEquipped && (!unit.gear || unit.gear.length === 0)) {
+        return `"${uName}" no tiene Gear equipado. Solo puedes elegir una unidad CON Gear.`;
+      }
+    }
+    return `"${uName}" no es un objetivo válido para ${activeTargetSel.sourceCardName || 'esta habilidad'}.`;
+  };
+
+  const getLegendInvalidTargetReason = (leg, ownerKey) => {
+    const legLabel = leg?.isFaceUp ? `"${leg.name}"` : 'Esta Leyenda';
+    if (pendingManualPayment) {
+      if (ownerKey === 'bot') {
+        return 'No puedes usar Leyendas del rival para pagar. Elige tus propios Eddies o Leyendas disponibles.';
+      }
+      if (leg?.isSpent) {
+        return `${legLabel} ya está girada (gastada) este turno. Elige un Eddie o Leyenda disponible.`;
+      }
+      return 'Esta Leyenda no está disponible para generar Eddies ahora.';
+    }
+    if (pendingGearEquip) {
+      if (ownerKey === 'bot') {
+        return 'Solo puedes equipar Gear a una Unidad aliada o a una de TUS Leyendas boca arriba.';
+      }
+      if (!leg?.isFaceUp) {
+        return 'Esta Leyenda está BOCA ABAJO. Solo puedes equipar Gear a Leyendas que ya estén boca arriba.';
+      }
+      return 'No puedes equipar este Gear a esa Leyenda ahora.';
+    }
+    if (!activeTargetSel) return '';
+    const act = activeTargetSel.actionType;
+    if (act === 'CALL_LEGEND_FREE') {
+      if (ownerKey === 'bot') {
+        return 'Solo puedes hacer objetivo a una de TUS Leyendas boca abajo (no a una del rival).';
+      }
+      if (leg?.isFaceUp) {
+        return `${legLabel} ya está boca arriba. Debes elegir una Leyenda BOCA ABAJO.`;
+      }
+      if (leg?.isOnField) {
+        return `${legLabel} ya está en el campo de batalla. Elige una Leyenda boca abajo.`;
+      }
+      if (leg?.isRemovedFromGame) {
+        return 'Esta Leyenda fue eliminada de la partida. Elige una Leyenda boca abajo.';
+      }
+    }
+    if (act === 'TARGET_UNIT') {
+      return 'Debes elegir una UNIDAD en el campo de batalla (no una Leyenda en zona de mando).';
+    }
+    return 'Debes elegir un dado de GIG en juego (no una Leyenda).';
+  };
+
+  const getGigInvalidTargetReason = (ownerKey, gig, gigIdx) => {
+    const dieLabel = gig ? `${String(gig.die || '').toUpperCase()} (Valor ${gig.value})` : 'este dado';
+    if (pendingGearEquip) {
+      return 'No puedes equipar un Gear a un dado de Gig. Elige una Unidad aliada o una Leyenda boca arriba.';
+    }
+    if (pendingManualPayment) {
+      return 'Los dados de Gig no pagan Eddies. Haz clic en tus cartas de la Zona de Eddies o en tus Leyendas disponibles.';
+    }
+    if (!activeTargetSel) return '';
+    const act = activeTargetSel.actionType;
+    if (act === 'TARGET_UNIT') {
+      return 'Debes elegir una UNIDAD en el campo de batalla (no un dado de Gig).';
+    }
+    if (act === 'CALL_LEGEND_FREE') {
+      return 'Debes elegir una de TUS Leyendas boca abajo (no un dado de Gig).';
+    }
+    if (act === 'STEAL_RIVAL_GIG') {
+      if (ownerKey === 'player') {
+        return 'Debes elegir un Gig DEL RIVAL para robarlo.';
+      }
+      return `El Gig rival ${dieLabel} no cumple la condición para ser robado (ya compartes ese valor).`;
+    }
+    if (activeTargetSel.targetScope === 'FRIENDLY_GIGS' && ownerKey !== 'player') {
+      return 'Esta habilidad solo puede elegir uno de TUS propios Gigs.';
+    }
+    if (activeTargetSel.targetScope === 'SPECIFIC_GIG') {
+      return 'Debes elegir el Gig específico que acaba de activar esta habilidad.';
+    }
+    if (act === 'SWAP_GIGS') {
+      if (activeTargetSel.step === 1 && ownerKey !== 'player') {
+        return 'Paso 1/2: primero debes elegir uno de TUS Gigs para intercambiar.';
+      }
+      if (activeTargetSel.step === 2 && ownerKey !== 'bot') {
+        return 'Paso 2/2: ahora debes elegir un Gig DEL RIVAL con el que intercambiarlo.';
+      }
+    }
+    if (act === 'PEACE_OFFERING' && activeTargetSel.step === 2) {
+      const sameAsStep1 =
+        activeTargetSel.selectedTargetGig?.owner === ownerKey &&
+        activeTargetSel.selectedTargetGig?.gigIndex === gigIdx;
+      if (sameAsStep1) {
+        return 'No puedes elegir el mismo dado de Gig como origen y destino. Elige otro Gig.';
+      }
+      if (activeTargetSel.requireOtherPlayerSource && activeTargetSel.selectedTargetGig?.owner === ownerKey) {
+        return 'Debes copiar el valor de un Gig del OTRO jugador.';
+      }
+    }
+    return `El Gig ${dieLabel} no es un objetivo válido para ${activeTargetSel.sourceCardName || 'esta habilidad'}.`;
+  };
+
   const confirmInlineStagedTarget = (targetOverride = null) => {
     const chosen = targetOverride || stagedTarget;
     if (!activeTargetSel || !chosen) return;
+    clearInvalidTargetAlert();
     if (chosen.kind === 'UNIT') {
       setStagedTarget(null);
       handleResolveTargetSelection({ unitInstanceId: chosen.unitInstanceId, ownerKey: chosen.ownerKey });
@@ -5754,7 +5923,14 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                         }
                       }}
                       onMouseLeave={() => setHoveredCard(null)}
-                      onClick={() => leg.isFaceUp && setInspectedCard(leg)}
+                      onClick={(e) => {
+                        if (isInlineBoardTargeting || pendingGearEquip || pendingManualPayment) {
+                          e.stopPropagation();
+                          notifyInvalidTarget(getLegendInvalidTargetReason(leg, 'bot'));
+                          return;
+                        }
+                        if (leg.isFaceUp) setInspectedCard(leg);
+                      }}
                       onContextMenu={(e) => {
                         if (leg.isFaceUp) handleCardRightClick(e, leg);
                       }}
@@ -5977,6 +6153,8 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                               } else {
                                 setStagedTarget(nextSpec);
                               }
+                            } else if (isInlineBoardTargeting || pendingGearEquip || pendingManualPayment) {
+                              notifyInvalidTarget(getGigInvalidTargetReason('bot', gig, idx));
                             } else if (canAttackGigs) {
                               handleStealSpecificDie(gig.die.toLowerCase());
                             }
@@ -6278,6 +6456,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                           whileHover={{ scale: canAttackThisUnit ? 1.08 : 1.04 }}
                           onClick={() => {
                             if (isInlineTargetUnit) {
+                              clearInvalidTargetAlert();
                               if (isStagedTargetUnit) {
                                 confirmInlineStagedTarget({ kind: 'UNIT', unitInstanceId: unit.instanceId, ownerKey: 'bot' });
                               } else {
@@ -6285,8 +6464,22 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                               }
                               return;
                             }
+                            if (isInlineBoardTargeting || pendingGearEquip || pendingManualPayment) {
+                              notifyInvalidTarget(getUnitInvalidTargetReason(unit, 'bot'));
+                              return;
+                            }
                             if (canAttackThisUnit) {
+                              clearInvalidTargetAlert();
                               handlePlayerAttack('UNIT', unit.instanceId);
+                            } else if (selectedFieldUnit && !selectedFieldUnit.isSpent && !selectedFieldUnit.isLagging && isMyTurn) {
+                              const restriction = getUnitAttackRestriction(selectedFieldUnit, gameState.player, gameState, 'UNIT');
+                              if (restriction) {
+                                notifyInvalidTarget(restriction);
+                              } else if (!unit.isSpent && !selectedFieldUnit.canAttackReadyUnits) {
+                                notifyInvalidTarget(`"${unit.name}" está LISTA (sin girar). Solo puedes atacar a unidades rivales GIRADAS (Spent) o asaltar sus Gigs.`);
+                              } else {
+                                notifyInvalidTarget(`"${selectedFieldUnit.name}" no puede atacar a "${unit.name}" en este momento.`);
+                              }
                             } else {
                               setInspectedCard(unit);
                             }
@@ -6759,6 +6952,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                           whileHover={{ scale: canAttack || isEligibleBlocker ? 1.08 : 1.03, y: -3 }}
                           onClick={() => {
                             if (isGearEquipTarget) {
+                              clearInvalidTargetAlert();
                               if (isStagedGearTarget) {
                                 const { cardInstanceId } = pendingGearEquip;
                                 setPendingGearEquip(null);
@@ -6769,11 +6963,16 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                               return;
                             }
                             if (isInlineTargetUnit) {
+                              clearInvalidTargetAlert();
                               if (isStagedTargetUnit) {
                                 confirmInlineStagedTarget({ kind: 'UNIT', unitInstanceId: unit.instanceId, ownerKey: 'player' });
                               } else {
                                 setStagedTarget({ kind: 'UNIT', unitInstanceId: unit.instanceId, ownerKey: 'player' });
                               }
+                              return;
+                            }
+                            if (isInlineBoardTargeting || pendingManualPayment) {
+                              notifyInvalidTarget(getUnitInvalidTargetReason(unit, 'player'));
                               return;
                             }
                             if (gameState.pendingReaction && gameState.pendingReaction.attackerPlayerKey === 'bot') {
@@ -7451,31 +7650,45 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                           }}
                           onClick={(e) => {
                             e.stopPropagation();
-                            if (pendingManualPayment && !leg.isSpent && !leg.isOnField && !leg.isRemovedFromGame) {
-                              toggleManualPaymentSource('legend', leg.instanceId);
-                              return;
-                            }
-                            if (
-                              isInlineBoardTargeting &&
-                              activeTargetSel?.actionType === 'CALL_LEGEND_FREE' &&
-                              !leg.isFaceUp &&
-                              !leg.isOnField &&
-                              !leg.isRemovedFromGame
-                            ) {
-                              if (stagedTarget?.kind === 'LEGEND' && stagedTarget.legendInstanceId === leg.instanceId) {
-                                confirmInlineStagedTarget({ kind: 'LEGEND', legendInstanceId: leg.instanceId });
+                            if (pendingManualPayment) {
+                              if (!leg.isSpent && !leg.isOnField && !leg.isRemovedFromGame) {
+                                clearInvalidTargetAlert();
+                                toggleManualPaymentSource('legend', leg.instanceId);
                               } else {
-                                setStagedTarget({ kind: 'LEGEND', legendInstanceId: leg.instanceId });
+                                notifyInvalidTarget(getLegendInvalidTargetReason(leg, 'player'));
                               }
                               return;
                             }
-                            if (pendingGearEquip && leg.isFaceUp && !leg.isOnField && !leg.isRemovedFromGame) {
-                              if (pendingGearEquip.stagedTargetId === leg.instanceId) {
-                                const { cardInstanceId } = pendingGearEquip;
-                                setPendingGearEquip(null);
-                                handlePlayCard(cardInstanceId, leg.instanceId);
+                            if (isInlineBoardTargeting) {
+                              if (
+                                activeTargetSel?.actionType === 'CALL_LEGEND_FREE' &&
+                                !leg.isFaceUp &&
+                                !leg.isOnField &&
+                                !leg.isRemovedFromGame
+                              ) {
+                                clearInvalidTargetAlert();
+                                if (stagedTarget?.kind === 'LEGEND' && stagedTarget.legendInstanceId === leg.instanceId) {
+                                  confirmInlineStagedTarget({ kind: 'LEGEND', legendInstanceId: leg.instanceId });
+                                } else {
+                                  setStagedTarget({ kind: 'LEGEND', legendInstanceId: leg.instanceId });
+                                }
                               } else {
-                                setPendingGearEquip((prev) => (prev ? { ...prev, stagedTargetId: leg.instanceId } : null));
+                                notifyInvalidTarget(getLegendInvalidTargetReason(leg, 'player'));
+                              }
+                              return;
+                            }
+                            if (pendingGearEquip) {
+                              if (leg.isFaceUp && !leg.isOnField && !leg.isRemovedFromGame) {
+                                clearInvalidTargetAlert();
+                                if (pendingGearEquip.stagedTargetId === leg.instanceId) {
+                                  const { cardInstanceId } = pendingGearEquip;
+                                  setPendingGearEquip(null);
+                                  handlePlayCard(cardInstanceId, leg.instanceId);
+                                } else {
+                                  setPendingGearEquip((prev) => (prev ? { ...prev, stagedTargetId: leg.instanceId } : null));
+                                }
+                              } else {
+                                notifyInvalidTarget(getLegendInvalidTargetReason(leg, 'player'));
                               }
                               return;
                             }
@@ -7663,8 +7876,17 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                       onMouseEnter={() => setHoveredCard(makeEddieBackPreview('TU EDDIE (1 €$) // CARTA VENDIDA', ed.isSpent))}
                       onMouseLeave={() => setHoveredCard(null)}
                       onClick={() => {
-                        if (pendingManualPayment && !ed.isSpent) {
-                          toggleManualPaymentSource('eddie', ed.instanceId);
+                        if (pendingManualPayment) {
+                          if (!ed.isSpent) {
+                            clearInvalidTargetAlert();
+                            toggleManualPaymentSource('eddie', ed.instanceId);
+                          } else {
+                            notifyInvalidTarget('Este Eddie ya está girado (gastado) este turno. Elige un Eddie o Leyenda disponible.');
+                          }
+                          return;
+                        }
+                        if (isInlineBoardTargeting || pendingGearEquip) {
+                          notifyInvalidTarget('Los Eddies no son un objetivo válido para esta acción.');
                           return;
                         }
                         handleToggleEddie(ed.instanceId);
@@ -8241,12 +8463,16 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
           canUndo={Boolean(history.length > 0 && !gameState?.isGameOver && (isMyTurn || gameState?.pendingReaction?.attackerPlayerKey === 'bot'))}
           onUndo={handleUndo}
           targetGigInfo={
-            isInlineBoardTargeting && activeTargetSel?.actionType !== 'TARGET_UNIT'
+            isInlineBoardTargeting || pendingGearEquip || pendingManualPayment
               ? {
-                  isBotGigEligible: (gig, idx) => isGigEligibleForInlineTarget('bot', gig, idx),
-                  isPlayerGigEligible: (gig, idx) => isGigEligibleForInlineTarget('player', gig, idx),
+                  isBotGigEligible: (gig, idx) => isInlineBoardTargeting && isGigEligibleForInlineTarget('bot', gig, idx),
+                  isPlayerGigEligible: (gig, idx) => isInlineBoardTargeting && isGigEligibleForInlineTarget('player', gig, idx),
                   selectedGig: stagedTarget?.kind === 'GIG' ? stagedTarget : null,
+                  onInvalidGig: (owner, gig, idx) => {
+                    notifyInvalidTarget(getGigInvalidTargetReason(owner, gig, idx));
+                  },
                   onSelectGig: (owner, gig, idx) => {
+                    clearInvalidTargetAlert();
                     const nextSpec = {
                       kind: 'GIG',
                       owner,
@@ -9560,6 +9786,8 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
             actionLabel={stepActionLabel}
             rulesText={meta.rulesText}
             promptText={activeTargetSel.prompt}
+            errorMessage={invalidTargetAlert?.message || ''}
+            errorKey={invalidTargetAlert?.seq || 0}
             selectedCount={stagedTarget ? 1 : 0}
             requiredCount={1}
             showCounter={!isKerryReroll}
@@ -9656,6 +9884,8 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
             actionLabel={`EQUIPAR (${pendingGearEquip.cost} €$) · ELIGE OBJETIVO`}
             rulesText={gRules}
             promptText="Haz clic en la Unidad aliada o Leyenda boca arriba iluminada para equipar este Gear."
+            errorMessage={invalidTargetAlert?.message || ''}
+            errorKey={invalidTargetAlert?.seq || 0}
             selectedCount={pendingGearEquip.stagedTargetId ? 1 : 0}
             requiredCount={1}
             canConfirm={Boolean(pendingGearEquip.stagedTargetId)}
@@ -9682,6 +9912,30 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
           />
         );
       })()}
+
+      {/* AVISO FLOTANTE NO BLOQUEANTE PARA OBJETIVOS NO VÁLIDOS (CUANDO NO HAY BARRA INLINE ABIERTA) */}
+      {invalidTargetAlert && !isInlineBoardTargeting && !pendingGearEquip && (
+        <div className="fixed left-1/2 top-[39%] -translate-x-1/2 -translate-y-1/2 z-[62] w-[92vw] max-w-[540px] pointer-events-none font-mono select-none">
+          <motion.div
+            key={invalidTargetAlert.seq}
+            initial={{ opacity: 0, y: -8, scale: 0.96 }}
+            animate={{ opacity: 1, y: 0, x: [0, -5, 5, -3, 3, 0], scale: 1 }}
+            transition={{ duration: 0.28 }}
+            style={{ clipPath: CYBER_BUTTON }}
+            className="bg-[#1a050b]/95 border-2 border-[#FF003C] px-4 py-2.5 shadow-[0_0_28px_rgba(255,0,60,0.65)] flex items-center gap-2.5"
+          >
+            <span className="text-base shrink-0">⚠️</span>
+            <div className="min-w-0">
+              <div className="text-[10px] font-black uppercase tracking-widest text-[#FF003C]">
+                OBJETIVO NO VÁLIDO
+              </div>
+              <p className="text-xs text-white font-sans font-semibold leading-snug">
+                {invalidTargetAlert.message}
+              </p>
+            </div>
+          </motion.div>
+        </div>
+      )}
 
       {/* BARRA INTERACTIVA DE PAGO MANUAL "PAY X €$" (EXACTA A CAPTURA DE KERRY) */}
       {pendingManualPayment && (() => {

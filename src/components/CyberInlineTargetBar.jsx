@@ -17,6 +17,8 @@ export default function CyberInlineTargetBar({
   actionLabel = 'ELIGE OBJETIVO',
   rulesText = '',
   promptText = '',
+  errorMessage = '',
+  errorKey = 0,
   selectedCount = 0,
   requiredCount = 1,
   showCounter = true,
@@ -58,10 +60,14 @@ export default function CyberInlineTargetBar({
             'drop-shadow(0 0 16px rgba(13, 252, 235, 0.28)) drop-shadow(0 14px 32px rgba(0, 0, 0, 0.92))'
         }}
       >
-        {/* Marco exterior cian con chaflán inferior derecho */}
+        {/* Marco exterior cian (o rojo neón si se pulsó un objetivo no válido) con chaflán inferior derecho */}
         <div
           style={{ clipPath: CHAMFER_OUTER }}
-          className="p-[1.5px] bg-gradient-to-r from-[#0dfceb]/85 via-[#0dfceb]/65 to-[#0dfceb]/90"
+          className={`p-[1.5px] transition-colors ${
+            errorMessage
+              ? 'bg-gradient-to-r from-[#FF003C] via-[#ff4d6d] to-[#FF003C]'
+              : 'bg-gradient-to-r from-[#0dfceb]/85 via-[#0dfceb]/65 to-[#0dfceb]/90'
+          }`}
         >
           {/* Interior oscuro translúcido */}
           <div
@@ -100,6 +106,17 @@ export default function CyberInlineTargetBar({
                   <p className="text-[10px] text-[#0dfceb]/90 font-sans leading-tight mt-0.5 line-clamp-1">
                     {secondaryHint}
                   </p>
+                )}
+                {errorMessage && (
+                  <motion.div
+                    key={errorKey}
+                    initial={{ x: -6, opacity: 0.7 }}
+                    animate={{ x: [0, -5, 5, -3, 3, 0], opacity: 1 }}
+                    transition={{ duration: 0.28 }}
+                    className="mt-1 px-2 py-0.5 rounded-[2px] bg-[#FF003C]/20 border border-[#FF003C]/80 text-[#ff8fa3] text-[10px] sm:text-[11px] font-bold leading-tight"
+                  >
+                    ⚠️ OBJETIVO NO VÁLIDO: {errorMessage}
+                  </motion.div>
                 )}
               </div>
             </div>

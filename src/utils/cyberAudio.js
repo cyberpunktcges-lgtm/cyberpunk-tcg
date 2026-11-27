@@ -569,6 +569,18 @@ export function playUiConfirm() {
   playTone(ctx, { type: 'sine', freq: 740, endFreq: 980, startTime: t, duration: 0.065, gain: 0.065, attack: 0.003 });
 }
 
+/**
+ * Aviso sonoro corto al clicar un objetivo no válido.
+ */
+export function playInvalidTarget() {
+  if (!canPlay('invalidTarget', 140)) return;
+  const ctx = getAudioContext();
+  if (!ctx) return;
+  const t = ctx.currentTime;
+  playTone(ctx, { type: 'sawtooth', freq: 230, endFreq: 175, startTime: t, duration: 0.075, gain: 0.065, attack: 0.004 });
+  playTone(ctx, { type: 'sawtooth', freq: 185, endFreq: 135, startTime: t + 0.085, duration: 0.095, gain: 0.065, attack: 0.004 });
+}
+
 export function playVictory() {
   if (!canPlay('gameOver', 800)) return;
   const ctx = getAudioContext();
