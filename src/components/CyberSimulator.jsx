@@ -126,6 +126,30 @@ import {
 } from '../utils/botAi.js';
 import { getCardRulesText, executeUnitAttackTrigger, executeLegendAbility, executeProgramEffect, executeUnitPlayTrigger, getNumericCost, executeCardSpentTriggers, executeOnGigsStolenTriggers, executeKerryGigRollTrigger, triggerMeredithStoutOnRivalGigModify, getGigMaxFace, executeBlockerUsedTrigger, executeUnitDefeatedTrigger, executeCallLegendTrigger, isArasakaOrGoSoloLegend, queueTargetSelection } from '../utils/cardEffects.js';
 import { getCardActivatedAbilities, executeCardActivatedAbility } from '../utils/activatedAbilities.js';
+import {
+  isSfxEnabled,
+  setSfxEnabled,
+  unlockAudio,
+  playDiceTick,
+  playDiceRoll,
+  playDiceLand,
+  playCardDraw,
+  playUnitDeploy,
+  playProgramCast,
+  playGearEquip,
+  playSellEddie,
+  playEddieTap,
+  playCallLegend,
+  playAttackDeclare,
+  playBlockIntercept,
+  playCombatHit,
+  playGigSteal,
+  playTurnBanner,
+  playUndo,
+  playUiConfirm,
+  playVictory,
+  playDefeat
+} from '../utils/cyberAudio.js';
 
 // =========================================================================
 // CLIP-PATHS GEOMÉTRICOS CYBERPUNK (ESQUINAS RECORTADAS EN DIAGONAL)
@@ -344,14 +368,19 @@ function CyberD20RollModal({ selection, onConfirmStarter, onReroll }) {
     const startTime = Date.now();
     const duration = 1300; // ~1.3 segundos de rodaje enérgico
 
+    let tickIdx = 0;
     // Barajeo rápido de números con entropía criptográfica uniforme rollSecureD20()
     const shuffleInterval = setInterval(() => {
+      tickIdx++;
       setDisplayPlayerRoll(rollSecureD20());
       setDisplayBotRoll(rollSecureD20());
 
       const elapsed = Date.now() - startTime;
       const progressPercent = Math.min(100, Math.floor((elapsed / duration) * 100));
       setRollProgress(progressPercent);
+      if (tickIdx % 2 === 1) {
+        playDiceTick(Math.max(0.45, 1.1 - progressPercent / 130));
+      }
     }, 65);
 
     // Detención e impacto final exactamente en los valores calculados
@@ -362,6 +391,7 @@ function CyberD20RollModal({ selection, onConfirmStarter, onReroll }) {
       setIsRolling(false);
       setHasLanded(true);
       setRollProgress(100);
+      playDiceLand(playerRoll > botRoll || playerRoll === 20);
     }, duration);
 
     return () => {
@@ -979,6 +1009,28 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
   const [turnBanner, setTurnBanner] = useState(null); // { isPlayer: bool, turnNumber: number }
   const prevTurnBannerKeyRef = useRef(null);
   const [delayingFixerModal, setDelayingFixerModal] = useState(false);
+  const [sfxEnabled, setSfxEnabledState] = useState(() => isSfxEnabled());
+  const prevAudioLogStateRef = useRef({ matchId: null, len: 0 });
+  const lastGameOverSfxMatchRef = useRef(null);
+
+  const toggleSfx = () => {
+    const next = setSfxEnabled(!sfxEnabled);
+    setSfxEnabledState(next);
+    if (next) {
+      playUiConfirm();
+    }
+  };
+
+  // Desbloquear Web Audio API en el primer gesto del usuario (Chrome/Safari/Móvil)
+  useEffect(() => {
+    const onFirstGesture = () => unlockAudio();
+    window.addEventListener('pointerdown', onFirstGesture, { passive: true, once: true });
+    window.addEventListener('keydown', onFirstGesture, { passive: true, once: true });
+    return () => {
+      window.removeEventListener('pointerdown', onFirstGesture);
+      window.removeEventListener('keydown', onFirstGesture);
+    };
+  }, []);
 
   useEffect(() => {
     if (showLobby || !gameState || gameState.isGameOver || !gameState.mulliganDecided) {
@@ -1313,6 +1365,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
     );
     if (history.length > 0 && canUndoWindow && !gameState?.isGameOver) {
       const prev = history[0];
+      playUndo();
       setHistory([]); // Queda agotado el Deshacer (solo se puede deshacer 1 sola vez)
       setGameState(prev);
       setSelectedHandCard(null);
@@ -1347,6 +1400,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
       isFinished: false
     });
 
+    playDiceTick(1.1);
     let count = 0;
     const interval = setInterval(() => {
       count++;
@@ -1357,9 +1411,13 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
           currentValue: Math.floor(Math.random() * config.max) + 1
         };
       });
+      if (count < 16 && (count <= 8 ? count % 2 === 0 : count % 3 === 0)) {
+        playDiceTick(Math.max(0.42, 1.05 - count / 22));
+      }
 
       if (count >= 16) {
         clearInterval(interval);
+        playDiceLand(finalVal === config.max || finalVal >= Math.ceil(config.max * 0.85));
         setRollingAnimation((prev) => ({
           ...prev,
           currentValue: finalVal,
@@ -1626,7 +1684,9 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
     if (!gameState || (gameState.activePlayer !== 'player' && !inReactionWin) || gameState.isGameOver) return;
     pushHistory();
     const res = toggleEddieSpent(gameState, 'player', eddieId);
-    if (!res.success) {
+    if (res.success) {
+      playEddieTap();
+    } else {
       setHolocall({
         title: 'EDDIE YA CONSUMIDO',
         message: res.reason || 'Este Eddie ya fue consumido este turno para pagar cartas. Se enderezará en tu próxima Fase de Inicio.',
@@ -1643,7 +1703,9 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
     if (!gameState || (gameState.activePlayer !== 'player' && !inReactionWin) || gameState.isGameOver) return;
     pushHistory();
     const res = toggleLegendSpent(gameState, 'player', legendId);
-    if (!res.success) {
+    if (res.success) {
+      playEddieTap();
+    } else {
       setHolocall({
         title: 'LEYENDA BLOQUEADA',
         message: res.reason || 'Esta Leyenda no puede enderezarse o ya fue consumida este turno.',
@@ -1858,6 +1920,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
     pushHistory();
     const res = sellCardForEddies(gameState, 'player', cardInstanceId);
     if (res.success) {
+      playSellEddie();
       setSelectedHandCard(null);
       setGameState({ ...gameState });
     } else {
@@ -3478,6 +3541,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
     if (!blocker || blocker.isSpent || !hasKeyword(blocker, 'Blocker') || blocker.cannotBlock || blocker.cannotBlockThisTurn) return;
 
     pushHistory();
+    playBlockIntercept();
     blocker.isSpent = true;
     gameState.pendingReaction = {
       ...reaction,
@@ -4252,6 +4316,63 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
     }, timeoutMs);
     return () => window.clearTimeout(timer);
   }, [transientBotArrows, pendingBotAck, gameState?.activePlayer, gameState?.pendingGigRoll, gameState?.phase]);
+
+  // Audio reactivo: cambio de turno
+  useEffect(() => {
+    if (!turnBanner || showLobby) return;
+    playTurnBanner(Boolean(turnBanner.isPlayer));
+  }, [turnBanner?.id, showLobby]);
+
+  // Audio reactivo: Victoria / Derrota
+  useEffect(() => {
+    if (showLobby || !gameState?.isGameOver || !gameState?.matchId) return;
+    if (lastGameOverSfxMatchRef.current === gameState.matchId) return;
+    lastGameOverSfxMatchRef.current = gameState.matchId;
+    if (gameState.winner === 'player') playVictory();
+    else playDefeat();
+  }, [gameState?.isGameOver, gameState?.winner, gameState?.matchId, showLobby]);
+
+  // Audio reactivo: eventos del actionLog (tiradas del Bot, despliegues, programas, gears, combates, robos de Gig y robos de carta)
+  useEffect(() => {
+    if (showLobby || !gameState) {
+      prevAudioLogStateRef.current = { matchId: null, len: 0 };
+      return;
+    }
+    const log = gameState.actionLog || [];
+    const prev = prevAudioLogStateRef.current;
+    if (prev.matchId !== gameState.matchId) {
+      prevAudioLogStateRef.current = { matchId: gameState.matchId, len: log.length };
+      return;
+    }
+    const addedCount = log.length - prev.len;
+    prevAudioLogStateRef.current = { matchId: gameState.matchId, len: log.length };
+    if (addedCount <= 0) return;
+
+    const recent = log.slice(0, Math.min(addedCount, 8)).join(' \n ');
+    if (/ASALTO EXITOSO|ROBA\s+\d+\s+Gig|Arrebatas el Gig|roba además tu Gig/i.test(recent)) {
+      playGigSteal();
+    } else if (/FASE 3: COMBATE|FASE 3: DERROTA|FASE 3: CONTRAATAQUE|Destruyó a la unidad|Destruye a/i.test(recent)) {
+      playCombatHit();
+    } else if (/¡BLOCKER!|\[BLOCKER\]/i.test(recent)) {
+      playBlockIntercept();
+    } else if (/FASE 1: DECLARACIÓN DE ATAQUE|FASE 1: ATAQUE OBLIGATORIO/i.test(recent)) {
+      playAttackDeclare();
+    } else if (/AI Netrunner \(Bot\) lanza su dado/i.test(recent)) {
+      playDiceRoll();
+    } else if (/llama a su Leyenda|lleva a su Leyenda|Llama GRATIS a/i.test(recent)) {
+      playCallLegend();
+    } else if (/equipa el Gear/i.test(recent)) {
+      playGearEquip();
+    } else if (/lanza el Programa|¡QUICK!/i.test(recent)) {
+      playProgramCast();
+    } else if (/despliega a/i.test(recent)) {
+      playUnitDeploy();
+    } else if (/vende "/i.test(recent)) {
+      playSellEddie();
+    } else if (/roba \d+ carta/i.test(recent)) {
+      playCardDraw();
+    }
+  }, [gameState?.actionLog?.length, gameState?.matchId, showLobby]);
 
   // Escáner Kiroshi en vivo: mostrar automáticamente la carta recién jugada por el Bot durante su turno
   useEffect(() => {
@@ -5116,6 +5237,14 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                     </select>
                   </div>
 
+                  <button
+                    type="button"
+                    onClick={() => { toggleSfx(); }}
+                    style={{ clipPath: CYBER_BUTTON }}
+                    className="w-full py-2.5 px-3 bg-black border border-gray-700 text-gray-200 font-black text-xs uppercase flex items-center justify-between cursor-pointer"
+                  >
+                    <span>{sfxEnabled ? '🔊 SONIDOS: ACTIVADOS' : '🔇 SONIDOS: SILENCIADOS'}</span>
+                  </button>
                   <button
                     type="button"
                     onClick={() => { setIsMobileMenuOpen(false); toggleFullscreen(); }}
@@ -8227,6 +8356,8 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
           onHoverCard={setHoveredCard}
           isFullscreen={isFullscreen}
           onToggleFullscreen={toggleFullscreen}
+          sfxEnabled={sfxEnabled}
+          onToggleSfx={toggleSfx}
           actionLog={gameState.actionLog || []}
           hoveredCard={hoveredCard}
           botSpotlight={botSpotlight}
