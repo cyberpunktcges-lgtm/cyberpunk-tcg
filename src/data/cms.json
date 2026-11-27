@@ -2230,18 +2230,18 @@
       "githubUrl": "https://github.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/blob/main/yorinobu-arasaka-steel-dragon.webp"
     },
     {
-      "id": "CP-149",
-      "cardId": "",
-      "slug": "yorinobu-arasaka-steel-dragon",
-      "name": "Yorinobu Arasaka // Steel Dragon",
-      "cardType": "",
-      "faction": "CORPO",
-      "edition": "",
-      "artist": "",
+      "id": "CP-095",
+      "cardId": "β086",
+      "slug": "pepe-najarro-working-doubles",
+      "name": "Pepe Najarro // Working Doubles",
+      "cardType": "UNIT // Valentino",
+      "faction": "MERCENARIO",
+      "edition": "Uncommon",
+      "artist": "TOPDOG Entertainment",
       "collection": "Welcome to Night City (Set 01)",
       "badge": "TOP #03 BEST SELLER // CARDMARKET",
-      "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/yorinobu-arasaka-steel-dragon.webp",
-      "githubUrl": "https://github.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/blob/main/yorinobu-arasaka-steel-dragon.webp"
+      "image": "https://raw.githubusercontent.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/main/pepe-najarro-working-doubles.webp",
+      "githubUrl": "https://github.com/cyberpunktcges-lgtm/cyberpunk-tcg-cartas/blob/main/pepe-najarro-working-doubles.webp"
     }
   ],
   "pastTournaments": []
