@@ -991,12 +991,12 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
     });
   }, [gameState?.matchId, gameState?.turnNumber, gameState?.activePlayer, gameState?.mulliganDecided, gameState?.isGameOver, showLobby]);
 
-  // Auto-cierre garantizado del banner de turno (imposible que se quede congelado en pantalla)
+  // Auto-cierre garantizado del banner de turno (dura ~1.9s para leerse con claridad antes de cambiar de fase)
   useEffect(() => {
     if (!turnBanner) return;
     const t = window.setTimeout(() => {
       setTurnBanner(null);
-    }, 1150);
+    }, 1900);
     return () => window.clearTimeout(t);
   }, [turnBanner]);
   const [stagedTarget, setStagedTarget] = useState(null);
@@ -8224,8 +8224,8 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
         </div>
       )}
 
-      {/* 2. MODAL MINIMALISTA DE SELECCIÓN DE DADO FIXER (ESTILO CAPTURA 3) */}
-      {gameState.mulliganDecided && isMyTurn && (gameState.pendingGigRoll || gameState.phase === 'START_GIG_SELECT') && p.fixerDice.length > 0 && !rollingAnimation && (
+      {/* 2. MODAL MINIMALISTA DE SELECCIÓN DE DADO FIXER (espera a que termine la animación de TU TURNO) */}
+      {gameState.mulliganDecided && isMyTurn && (gameState.pendingGigRoll || gameState.phase === 'START_GIG_SELECT') && p.fixerDice.length > 0 && !rollingAnimation && !turnBanner && (
         <div className="fixed inset-0 z-[52] bg-black/55 backdrop-blur-xs flex items-center justify-center p-4 font-mono">
           <div
             style={{ clipPath: CYBER_CLIP }}

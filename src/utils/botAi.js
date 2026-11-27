@@ -968,10 +968,10 @@ export async function runBotTurn(gameState, updateCallback, delayMs = 1450, paus
     return true;
   };
 
-  // Dejar terminar limpiamente la animación de "TURNO DEL RIVAL" al inicio del turno antes de empezar a jugar cartas
+  // Dejar terminar limpiamente la animación de "TURNO DEL RIVAL" (~1.9s) al inicio del turno antes de empezar a jugar cartas
   if (gameState._botIntroWaitedTurn !== gameState.turnNumber) {
     gameState._botIntroWaitedTurn = gameState.turnNumber;
-    await wait(1200);
+    await wait(1950);
     if (gameState.isGameOver || gameState.activePlayer !== 'bot') return;
   }
 
