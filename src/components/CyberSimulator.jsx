@@ -9406,11 +9406,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
               : [r.targetUnitId, 'player-field'],
             color: '#FF003C',
             dashed: true,
-            label: hasBlocker
-              ? `🛡️ BLOQUEADO`
-              : r.targetType === 'GIGS'
-              ? `⚔️ ${shortAtk} → GIGS`
-              : `⚔️ ${shortAtk}`
+            label: null
           });
         }
         if (isInlineBoardTargeting && stagedTarget?.kind === 'UNIT' && stagedTarget.unitInstanceId) {
@@ -9824,7 +9820,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
           );
 
         return (
-          <div className="fixed left-1/2 top-[47%] -translate-x-1/2 -translate-y-1/2 z-[46] max-w-[94vw] pointer-events-auto font-mono select-none">
+          <div className="fixed left-1/2 top-[48%] -translate-x-1/2 -translate-y-1/2 z-[52] max-w-[94vw] pointer-events-auto font-mono select-none">
             <motion.div
               initial={{ opacity: 0, y: -6, scale: 0.98 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}

@@ -38,7 +38,7 @@ function getAnchorCenter(anchorOrList) {
   return resolveSingleAnchor(anchorOrList);
 }
 
-function buildCurvedGeometry(from, to, variantIndex = 0) {
+function buildCurvedGeometry(from, to, variantIndex = 0, labelT = 0.30) {
   const dx = to.x - from.x;
   const dy = to.y - from.y;
   const dist = Math.hypot(dx, dy);
@@ -49,9 +49,11 @@ function buildCurvedGeometry(from, to, variantIndex = 0) {
   const cy = my - arcOffset * (Math.abs(dx) > 80 ? 0.72 : 0.35) + spread * 0.45;
   const cx = (Math.abs(dx) <= 80 ? mx - arcOffset * 0.48 : mx) + spread;
 
-  // Punto medio exacto de la curva Bézier cuadrática (t = 0.5)
-  const midX = 0.25 * from.x + 0.5 * cx + 0.25 * to.x;
-  const midY = 0.25 * from.y + 0.5 * cy + 0.25 * to.y;
+  // Punto de la etiqueta sobre la curva Bézier cuadrática (t = 0.30 por defecto para no pisar la barra central)
+  const t = Math.max(0.15, Math.min(0.85, Number(labelT) || 0.30));
+  const inv = 1 - t;
+  const midX = inv * inv * from.x + 2 * inv * t * cx + t * t * to.x;
+  const midY = inv * inv * from.y + 2 * inv * t * cy + t * t * to.y;
 
   return {
     d: `M ${from.x.toFixed(1)} ${from.y.toFixed(1)} Q ${cx.toFixed(1)} ${cy.toFixed(1)} ${to.x.toFixed(1)} ${to.y.toFixed(1)}`,
@@ -103,7 +105,7 @@ export default function CyberAttackArrowOverlay({
       // Evitar flechas degeneradas de longitud ~0
       if (Math.hypot(to.x - from.x, to.y - from.y) < 12) return;
       const safeId = String(arrow.id || `arrow-${idx}`).replace(/[^a-zA-Z0-9_-]/g, '_');
-      const geom = buildCurvedGeometry(from, to, idx);
+      const geom = buildCurvedGeometry(from, to, idx, arrow.labelT ?? 0.30);
       resolvedArrows.push({
         id: safeId,
         from,
