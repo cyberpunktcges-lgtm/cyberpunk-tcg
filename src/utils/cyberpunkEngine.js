@@ -1645,8 +1645,10 @@ export function attackRivalGigs(
   // FASE 4: ROBO DE GIGS (si el objetivo eran los Gigs y no hubo Blocker)
   delete unit.hasTriggeredAttackThisDeclaration;
 
-  // Cálculo oficial de Gigs a robar según tabla de poder
-  const gigsToSteal = calculateGigsToSteal(unit.currentPower);
+  // Cálculo oficial de Gigs a robar según tabla de poder (incluyendo bonos mientras ataca: Saburo Arasaka +1, Saul Bright +2)
+  const atkBonusInfo = getAttackPowerBonus(unit, attacker);
+  const effectiveAttackPower = Math.max(0, Number(unit.currentPower || 0) + atkBonusInfo.bonus);
+  const gigsToSteal = calculateGigsToSteal(effectiveAttackPower);
   if (gigsToSteal <= 0) {
     state.actionLog.unshift(
       `⚠️ [FASE 4: ROBO DE GIGS] "${unit.name}" tiene 0 de poder y no puede robar ningún Gig.`
@@ -1655,10 +1657,10 @@ export function attackRivalGigs(
   }
 
   // Filtrar Gigs elegibles según protecciones activas (Chrome Fang CP-017 / Westbrook Netrunner CP-145)
-  const isAttackerLegend = unit.officialType === 'LEGEND' || unit.isLegendUnit || Boolean(unit.isLegend);
+  const isAttackerLegend = isLegendInField(unit);
   const isGigStealable = (g) => {
-    if (defender.chromeFangProtectionActive && (g.value || 0) > (unit.currentPower || 0)) return false;
-    if (defender.westbrookProtectionActive && isAttackerLegend && (g.value || 0) < (unit.currentPower || 0)) return false;
+    if (defender.chromeFangProtectionActive && (g.value || 0) > effectiveAttackPower) return false;
+    if (defender.westbrookProtectionActive && isAttackerLegend && (g.value || 0) < effectiveAttackPower) return false;
     return true;
   };
   const stealableCount = defender.gigs.filter(isGigStealable).length;
@@ -1861,6 +1863,93 @@ export function sendUnitToBottomDeck(playerState, unit, state = null) {
   }
 }
 
+export function isLegendInField(u) {
+  if (!u) return false;
+  return Boolean(
+    u.officialType === 'LEGEND' ||
+    u.isLegendUnit ||
+    u.isLegend ||
+    String(u.type || '').toUpperCase().includes('LEGEND')
+  );
+}
+
+export function isMeredithStoutUnit(u) {
+  if (!u) return false;
+  return (
+    String(u.id || '').toUpperCase() === 'CP-075' ||
+    String(u.slug || '').toLowerCase().includes('meredith-stout') ||
+    String(u.name || '').toLowerCase().includes('meredith stout')
+  );
+}
+
+/**
+ * Calcula bonos pasivos de fuerza exclusivos al atacar:
+ * - CP-111 Saburo Arasaka // Stubborn Patriarch: "Friendly ARASAKA Units have +1 power while attacking."
+ * - CP-117 Saul Bright // Stormrider: "Other friendly Units have +2 power while attacking."
+ */
+export function getAttackPowerBonus(unit, ownerSide) {
+  if (!unit || !ownerSide) return { bonus: 0, notes: [] };
+  let bonus = 0;
+  const notes = [];
+
+  const unitMeta = `${unit.traits || ''} ${unit.cardType || ''} ${unit.faction || ''} ${unit.name || ''}`;
+  if (/\bARASAKA\b/i.test(unitMeta)) {
+    const saburoCount = (ownerSide.legends || []).filter(
+      (l) =>
+        l.isFaceUp &&
+        !l.isRemovedFromGame &&
+        (String(l.id || '').toUpperCase() === 'CP-111' || String(l.slug || '').toLowerCase().includes('saburo-arasaka'))
+    ).length;
+    if (saburoCount > 0) {
+      bonus += saburoCount;
+      notes.push(`+${saburoCount} Saburo`);
+    }
+  }
+
+  const saulCount = (ownerSide.field || []).filter(
+    (u) =>
+      u.instanceId !== unit.instanceId &&
+      (String(u.id || '').toUpperCase() === 'CP-117' || String(u.slug || '').toLowerCase().includes('saul-bright'))
+  ).length;
+  if (saulCount > 0) {
+    const saulBonus = saulCount * 2;
+    bonus += saulBonus;
+    notes.push(`+${saulBonus} Saul Bright`);
+  }
+
+  return { bonus, notes };
+}
+
+/**
+ * Calcula la fuerza efectiva real de una unidad durante un combate (Fight):
+ * - Incluye CP-075 Meredith Stout // Stone-Cold Corpo ("+2 power while fighting a Legend")
+ * - Incluye bonos pasivos mientras ataca (CP-111 Saburo Arasaka, CP-117 Saul Bright)
+ */
+export function getEffectiveFightPower(unit, ownerSide, opponentUnit, isAttacking = false) {
+  const base = Number(unit?.currentPower || 0);
+  let bonus = 0;
+  const notes = [];
+
+  if (isMeredithStoutUnit(unit) && isLegendInField(opponentUnit)) {
+    bonus += 2;
+    notes.push('+2 Meredith vs Leyenda');
+  }
+
+  if (isAttacking && ownerSide) {
+    const atk = getAttackPowerBonus(unit, ownerSide);
+    if (atk.bonus > 0) {
+      bonus += atk.bonus;
+      notes.push(...atk.notes);
+    }
+  }
+
+  return {
+    power: Math.max(0, base + bonus),
+    bonus,
+    notes
+  };
+}
+
 /**
  * Resuelve una pelea entre dos unidades según las reglas oficiales de combate:
  * - Poder mayor derrota a poder menor.
@@ -1871,8 +1960,10 @@ export function resolveFight(state, attPlayerKey, attUnit, defPlayerKey, defUnit
   const attacker = state[attPlayerKey];
   const defender = state[defPlayerKey];
 
-  const attPower = attUnit.currentPower || 0;
-  const defPower = defUnit.currentPower || 0;
+  const attCalc = getEffectiveFightPower(attUnit, attacker, defUnit, true);
+  const defCalc = getEffectiveFightPower(defUnit, defender, attUnit, false);
+  const attPower = attCalc.power;
+  const defPower = defCalc.power;
 
   const isJohnnyUnit = (u) =>
     String(u?.id || '').toUpperCase() === 'CP-054' ||
@@ -1883,8 +1974,10 @@ export function resolveFight(state, attPlayerKey, attUnit, defPlayerKey, defUnit
   const johnnyAttBeatsCorpo = isJohnnyUnit(attUnit) && isCorpoUnit(defUnit);
   const johnnyDefBeatsCorpo = isJohnnyUnit(defUnit) && isCorpoUnit(attUnit);
 
+  const attBonusLabel = attCalc.notes.length > 0 ? ` (${attCalc.notes.join(', ')})` : '';
+  const defBonusLabel = defCalc.notes.length > 0 ? ` (${defCalc.notes.join(', ')})` : '';
   state.actionLog.unshift(
-    `🥊 [FASE 3: COMBATE] "${attUnit.name}" [Fuerza: ${attPower}] vs "${defUnit.name}" [Fuerza: ${defPower}].`
+    `🥊 [FASE 3: COMBATE] "${attUnit.name}" [Fuerza: ${attPower}${attBonusLabel}] vs "${defUnit.name}" [Fuerza: ${defPower}${defBonusLabel}].`
   );
 
   let result = {

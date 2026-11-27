@@ -34,6 +34,8 @@ import {
   parseCardPower,
   canUnitAttack,
   canUnitBeBlocked,
+  getEffectiveFightPower,
+  getAttackPowerBonus,
   executeStartPhase
 } from './cyberpunkEngine.js';
 import {
@@ -880,12 +882,20 @@ export function decideBotBlocker(botState, attackerPower, isGigAttack = false, a
     if (attackerUnit?.cannotBeDefeatedThisTurn) return false; // No puede ser derrotada en combate este turno
     if (attIsJohnny && isCorpoUnit(b)) return false; // Johnny siempre gana a CORPO
     if (isJohnnyUnit(b) && isCorpoUnit(attackerUnit)) return true;
-    return (b.currentPower || 0) > attackerPower;
+    const bPow = getEffectiveFightPower(b, botState, attackerUnit, false).power;
+    const aPow = attackerUnit
+      ? getEffectiveFightPower(attackerUnit, gameState?.player, b, true).power
+      : attackerPower;
+    return bPow > aPow;
   };
   const canBlockerTieOrWin = (b) => {
     if (attIsJohnny && isCorpoUnit(b)) return false;
     if (isJohnnyUnit(b) && isCorpoUnit(attackerUnit)) return true;
-    return (b.currentPower || 0) >= attackerPower;
+    const bPow = getEffectiveFightPower(b, botState, attackerUnit, false).power;
+    const aPow = attackerUnit
+      ? getEffectiveFightPower(attackerUnit, gameState?.player, b, true).power
+      : attackerPower;
+    return bPow >= aPow;
   };
 
   if (isGigAttack) {
@@ -1470,7 +1480,9 @@ export async function runBotTurn(gameState, updateCallback, delayMs = 1450, paus
         if (canStealBigGigs && (pu.currentPower || 0) <= 2 && !hasKeyword(pu, 'Blocker')) return false;
         if (isBotJohnny && isCorpoUnit(pu)) return true;
         if (isJohnnyUnit(pu) && botUnitIsCorpo) return false;
-        return (pu.currentPower || 0) < unitPower;
+        const myFightPow = getEffectiveFightPower(unit, bot, pu, true).power;
+        const enemyFightPow = getEffectiveFightPower(pu, player, unit, false).power;
+        return enemyFightPow < myFightPow;
       })
       .sort((a, b) => (b.currentPower || 0) - (a.currentPower || 0))[0];
 
@@ -1507,13 +1519,16 @@ export async function runBotTurn(gameState, updateCallback, delayMs = 1450, paus
       return;
     }
 
-    // 4.C: Atacar los Gigs del jugador (evitar suicidarse contra un Blocker más grande salvo si hay más atacantes o mustAttack)
+    // 4.C: Atacar los Gigs del jugador (evitar suicidarse contra un Blocker más grande —incluyendo +2 de Meredith vs Leyendas— salvo si hay más atacantes o mustAttack)
     if (player.gigs && player.gigs.length > 0 && canUnitAttack(unit, bot, gameState, 'GIGS')) {
       const blockedByStronger =
         !unitIsUnblockable &&
-        playerReadyBlockers.length > 0 &&
-        maxPlayerBlockerPower > unitPower &&
-        !(isBotJohnny && playerReadyBlockers.every(isCorpoUnit));
+        playerReadyBlockers.some((b) => {
+          if (isBotJohnny && isCorpoUnit(b)) return false;
+          const bPow = getEffectiveFightPower(b, player, unit, false).power;
+          const myPow = getEffectiveFightPower(unit, bot, b, true).power;
+          return bPow > myPow;
+        });
       const hasBackupAttackers = readyUnits.filter((u) => !u.isSpent && u.instanceId !== unit.instanceId).length > 0;
 
       if (!blockedByStronger || hasBackupAttackers || unit.mustAttackNextTurn || gigsToSteal === 0) {
@@ -1554,13 +1569,13 @@ export async function runBotTurn(gameState, updateCallback, delayMs = 1450, paus
     }
 
     // 4.D: Empate favorable contra unidad girada peligrosa (>= 5 poder) o si está obligada a atacar
-    const tieEnemy = (player.field || []).find(
-      (pu) =>
-        pu.isSpent &&
-        !pu.cannotBeDefeatedThisTurn &&
-        !(isJohnnyUnit(pu) && botUnitIsCorpo) &&
-        ((pu.currentPower || 0) === unitPower && (pu.currentPower || 0) >= 5 || unit.mustAttackNextTurn)
-    );
+    const tieEnemy = (player.field || []).find((pu) => {
+      if (!pu.isSpent || pu.cannotBeDefeatedThisTurn) return false;
+      if (isJohnnyUnit(pu) && botUnitIsCorpo) return false;
+      const myFightPow = getEffectiveFightPower(unit, bot, pu, true).power;
+      const enemyFightPow = getEffectiveFightPower(pu, player, unit, false).power;
+      return (enemyFightPow === myFightPow && enemyFightPow >= 5) || Boolean(unit.mustAttackNextTurn);
+    });
     if (tieEnemy && canUnitAttack(unit, bot, gameState, 'UNIT')) {
       const snapBeforeAtk = captureBotActionSnapshot(gameState);
       unit.isSpent = true;
