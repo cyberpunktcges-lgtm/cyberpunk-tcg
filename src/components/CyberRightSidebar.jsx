@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   ScrollText,
   Layers,
+  MessageSquare,
   Undo2,
   Home,
   Pause,
@@ -19,6 +20,7 @@ import {
   Volume2,
   VolumeX
 } from 'lucide-react';
+import CyberPvpChat from './CyberPvpChat.jsx';
 
 /**
  * CyberRightSidebar.jsx
@@ -74,11 +76,28 @@ export default function CyberRightSidebar({
   onToggleFullscreen,
   sfxEnabled = true,
   onToggleSfx,
+  pvpChatProps = null,
   isOpenMobile = false,
   onCloseMobile
 }) {
-  const [activeTab, setActiveTab] = useState('log'); // 'log' | 'cards'
+  const [activeTab, setActiveTab] = useState('log'); // 'log' | 'cards' | 'chat'
   const [menuOpen, setMenuOpen] = useState(false);
+  const [lastSeenChatCount, setLastSeenChatCount] = useState(0);
+
+  const chatTotalCount = Array.isArray(pvpChatProps?.messages) ? pvpChatProps.messages.length : 0;
+  const unreadChatCount = activeTab === 'chat' ? 0 : Math.max(0, chatTotalCount - lastSeenChatCount);
+
+  useEffect(() => {
+    if (activeTab === 'chat') {
+      setLastSeenChatCount(chatTotalCount);
+    }
+  }, [activeTab, chatTotalCount]);
+
+  useEffect(() => {
+    if (!pvpChatProps && activeTab === 'chat') {
+      setActiveTab('log');
+    }
+  }, [pvpChatProps, activeTab]);
 
   const cardToShow = hoveredCard || displayCard;
 
@@ -413,7 +432,7 @@ export default function CyberRightSidebar({
           <button
             type="button"
             onClick={() => setActiveTab('cards')}
-            className={`flex-1 py-2.5 px-3 text-[11px] font-black uppercase tracking-wider flex items-center justify-center gap-1.5 cursor-pointer border-b-2 transition-colors ${
+            className={`flex-1 py-2.5 px-2 text-[11px] font-black uppercase tracking-wider flex items-center justify-center gap-1.5 cursor-pointer border-b-2 transition-colors ${
               activeTab === 'cards'
                 ? 'border-[#FCEE0A] text-[#FCEE0A] bg-[#FCEE0A]/5'
                 : 'border-transparent text-gray-500 hover:text-gray-300'
@@ -422,11 +441,33 @@ export default function CyberRightSidebar({
             <Layers className="w-3.5 h-3.5" />
             <span>CARDS</span>
           </button>
+
+          {pvpChatProps && (
+            <button
+              type="button"
+              onClick={() => setActiveTab('chat')}
+              className={`flex-1 py-2.5 px-2 text-[11px] font-black uppercase tracking-wider flex items-center justify-center gap-1.5 cursor-pointer border-b-2 transition-colors relative ${
+                activeTab === 'chat'
+                  ? 'border-[#FF003C] text-[#FF003C] bg-[#FF003C]/10'
+                  : 'border-transparent text-gray-400 hover:text-white'
+              }`}
+            >
+              <MessageSquare className="w-3.5 h-3.5" />
+              <span>CHAT</span>
+              {unreadChatCount > 0 && (
+                <span className="px-1.5 py-0.2 rounded-full bg-[#FF003C] text-white text-[9px] font-black animate-pulse">
+                  {unreadChatCount > 9 ? '9+' : unreadChatCount}
+                </span>
+              )}
+            </button>
+          )}
         </div>
 
         {/* Cuerpo del Sidebar */}
-        <div className="flex-1 min-h-0 overflow-y-auto cyber-scrollbar p-2.5">
-          {activeTab === 'log' ? (
+        <div className={`flex-1 min-h-0 ${activeTab === 'chat' ? 'flex flex-col overflow-hidden' : 'overflow-y-auto cyber-scrollbar p-2.5'}`}>
+          {activeTab === 'chat' && pvpChatProps ? (
+            <CyberPvpChat {...pvpChatProps} compact={true} />
+          ) : activeTab === 'log' ? (
             <div className="space-y-1">
               {actionLog.length === 0 ? (
                 <p className="text-xs text-gray-500 italic text-center py-8">

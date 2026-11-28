@@ -42,6 +42,25 @@ import CyberSimulatorLobby from './CyberSimulatorLobby.jsx';
 import CyberAttackArrowOverlay from './CyberAttackArrowOverlay.jsx';
 import { CyberDieShape } from './CyberDiceSvg.jsx';
 import CyberRightSidebar from './CyberRightSidebar.jsx';
+import CyberPvpLobbyModal from './CyberPvpLobbyModal.jsx';
+import {
+  projectStateForSeat,
+  isLocalSeatPromptOwner
+} from '../utils/pvpSync.js';
+import {
+  subscribePvpRoom,
+  subscribePvpChat,
+  subscribePvpSpectators,
+  commitPvpGameState,
+  submitPvpStarterChoice,
+  submitPvpMulliganChoice,
+  concedePvpMatch,
+  requestPvpRematch,
+  leavePvpRoom,
+  heartbeatPvpSeat,
+  touchPvpSpectator,
+  normalizeRoomCode
+} from '../utils/pvpService.js';
 import { CyberLeftTelemetryRail, CyberRightGigsRail } from './CyberArenaColumns.jsx';
 import CyberNumberPickerModal from './CyberNumberPickerModal.jsx';
 import CyberResolveQueueModal from './CyberResolveQueueModal.jsx';
@@ -997,6 +1016,184 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
   const lastLegendTriggerBatchRef = useRef(null);
   const legendTriggerTimerRef = useRef(null);
 
+  // =========================================================================
+  // MULTIJUGADOR ONLINE PVP (ESTRICTAMENTE AISLADO: CERO IMPACTO EN MODOS IA)
+  // =========================================================================
+  const [showPvpLobby, setShowPvpLobby] = useState(false);
+  const [pvpInitialUrlCode, setPvpInitialUrlCode] = useState('');
+  const [pvpRoomCode, setPvpRoomCode] = useState(null);
+  const [pvpSeat, setPvpSeat] = useState(null); // 'p1' | 'p2' | 'spectator' | null
+  const [pvpRoom, setPvpRoom] = useState(null);
+  const [pvpChatMessages, setPvpChatMessages] = useState([]);
+  const [pvpSpectators, setPvpSpectators] = useState([]);
+  const [pvpSyncError, setPvpSyncError] = useState('');
+  const pvpIncomingSyncRef = useRef(false);
+  const pvpLocalUiOnlyRef = useRef(false);
+  const pvpLastAppliedVersionRef = useRef(0);
+  const pvpRoomRef = useRef(null);
+  const pvpCommitInFlightRef = useRef(false);
+
+  const isPvpMode = Boolean(pvpRoomCode && pvpSeat);
+  const isPvpSpectator = isPvpMode && pvpSeat === 'spectator';
+  const hasPvpAuthority = Boolean(
+    isPvpMode &&
+    !isPvpSpectator &&
+    pvpRoom?.status === 'PLAYING' &&
+    pvpRoom?.turnAuthority === pvpSeat
+  );
+
+  // Detectar ?room=XXXXXX en la URL al abrir el simulador para abrir el Lobby Online directo
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const urlRoom = normalizeRoomCode(params.get('room') || '');
+      if (urlRoom) {
+        setPvpInitialUrlCode(urlRoom);
+        setShowPvpLobby(true);
+      }
+    } catch {}
+  }, []);
+
+  // Suscripción en tiempo real a la sala PvP, chat y espectadores + heartbeat de presencia
+  useEffect(() => {
+    if (!pvpRoomCode || !pvpSeat) {
+      setPvpRoom(null);
+      setPvpChatMessages([]);
+      setPvpSpectators([]);
+      pvpRoomRef.current = null;
+      pvpLastAppliedVersionRef.current = 0;
+      return;
+    }
+
+    const unsubRoom = subscribePvpRoom(
+      pvpRoomCode,
+      (room) => {
+        if (!room) {
+          setPvpRoom(null);
+          pvpRoomRef.current = null;
+          setPvpRoomCode(null);
+          setPvpSeat(null);
+          setShowLobby(true);
+          setShowPvpLobby(true);
+          return;
+        }
+        pvpRoomRef.current = room;
+        setPvpRoom(room);
+
+        if (room.status === 'D20' || room.status === 'MULLIGAN' || room.status === 'PLAYING' || room.status === 'FINISHED') {
+          setShowPvpLobby(false);
+          setShowLobby(false);
+          setSeriesState(null);
+        }
+
+        if (room.canonicalState && (room.version || 0) !== pvpLastAppliedVersionRef.current) {
+          pvpLastAppliedVersionRef.current = room.version || 0;
+          const projected = projectStateForSeat(room.canonicalState, pvpSeat);
+          pvpIncomingSyncRef.current = true;
+          setGameState(projected);
+
+          // Si el estado sincronizado contiene un robo de Gigs Fase 4 asignado a este jugador, abrir su modal
+          if (
+            projected?.pendingGigTheftState &&
+            isLocalSeatPromptOwner(projected.pendingGigTheftState, projected)
+          ) {
+            const st = projected.pendingGigTheftState;
+            const attUnit = (projected.player?.field || []).find((u) => u.instanceId === st.attackerUnitId);
+            if (attUnit) {
+              setPendingGigTheft({
+                countToSteal: st.countToSteal,
+                selectedDice: st.selectedDice || [],
+                attackerUnit: attUnit,
+                attackerUnitId: attUnit.instanceId,
+                phase4Ready: true
+              });
+            }
+          } else {
+            setPendingGigTheft(null);
+          }
+        }
+      },
+      (err) => {
+        setPvpSyncError(err?.message || 'Error de conexión con la sala online.');
+      }
+    );
+
+    const unsubChat = subscribePvpChat(pvpRoomCode, (msgs) => setPvpChatMessages(msgs));
+    const unsubSpecs = subscribePvpSpectators(pvpRoomCode, (list) => setPvpSpectators(list));
+
+    const hb = window.setInterval(() => {
+      if (pvpSeat === 'spectator') {
+        touchPvpSpectator(pvpRoomCode, currentUser);
+      } else {
+        heartbeatPvpSeat(pvpRoomCode, pvpSeat);
+      }
+    }, 20_000);
+
+    return () => {
+      unsubRoom();
+      unsubChat();
+      unsubSpecs();
+      window.clearInterval(hb);
+    };
+  }, [pvpRoomCode, pvpSeat, currentUser?.uid]);
+
+  // Publicación automática de cada jugada local del jugador con autoridad hacia Firestore
+  useEffect(() => {
+    if (!isPvpMode || isPvpSpectator || !gameState?.isPvp) return;
+    if (pvpIncomingSyncRef.current) {
+      pvpIncomingSyncRef.current = false;
+      return;
+    }
+    if (pvpLocalUiOnlyRef.current) {
+      pvpLocalUiOnlyRef.current = false;
+      return;
+    }
+    const latestRoom = pvpRoomRef.current;
+    if (!latestRoom || latestRoom.status !== 'PLAYING') return;
+    if (latestRoom.turnAuthority !== pvpSeat) return;
+    if (pvpCommitInFlightRef.current) return;
+
+    pvpCommitInFlightRef.current = true;
+    commitPvpGameState(pvpRoomCode, pvpSeat, gameState, latestRoom.version)
+      .then((res) => {
+        if (res?.committed && typeof res.version === 'number') {
+          pvpLastAppliedVersionRef.current = res.version;
+          setPvpSyncError('');
+        }
+      })
+      .catch((err) => {
+        if (err?.message !== 'STATE_CONFLICT') {
+          console.warn('Error sincronizando estado PvP:', err);
+          setPvpSyncError('Re-sincronizando estado con el rival...');
+        }
+      })
+      .finally(() => {
+        pvpCommitInFlightRef.current = false;
+      });
+  }, [gameState, isPvpMode, isPvpSpectator, pvpRoomCode, pvpSeat]);
+
+  const handleExitPvpSession = async () => {
+    const code = pvpRoomCode;
+    const seat = pvpSeat;
+    try {
+      if (code && seat) {
+        await leavePvpRoom(code, seat, currentUser?.uid);
+      }
+    } catch {}
+    setPvpRoomCode(null);
+    setPvpSeat(null);
+    setPvpRoom(null);
+    setPendingGigTheft(null);
+    setShowPvpLobby(false);
+    setShowLobby(true);
+    try {
+      if (typeof window !== 'undefined' && window.location.search.includes('room=')) {
+        window.history.replaceState({}, '', window.location.pathname);
+      }
+    } catch {}
+  };
+
   const clearInvalidTargetAlert = () => {
     if (invalidTargetTimerRef.current) {
       clearTimeout(invalidTargetTimerRef.current);
@@ -1859,7 +2056,35 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
       return;
     }
 
-    // 2. FASE 2: FASE DE REACCIÓN DEL RIVAL (BOT)
+    // 2. FASE 2: FASE DE REACCIÓN DEL RIVAL (HUMANO EN PVP / BOT EN IA)
+    if (gameState.isPvp) {
+      const targetUnitObj =
+        targetType === 'UNIT' && targetUnitId
+          ? (gameState.bot?.field || []).find((u) => u.instanceId === targetUnitId)
+          : null;
+      gameState.pendingReaction = {
+        attackerPlayerKey: 'player',
+        attackerUnitId: attackerUnit.instanceId,
+        attackerName: attackerUnit.name,
+        attackerPower: attackerUnit.currentPower,
+        attackerImage: attackerUnit.image,
+        targetType,
+        targetUnitId: targetUnitId || null,
+        targetName: targetType === 'GIGS' ? 'Tus Gigs' : targetUnitObj?.name || 'Unidad',
+        targetPower: targetUnitObj?.currentPower ?? null,
+        targetImage: targetUnitObj?.image || null,
+        preferredDice: Array.isArray(preferredDice) ? preferredDice : [],
+        hadPhase1Prompt: Boolean(attackParams.hadPhase1Prompt),
+        blockerUnitId: null
+      };
+      gameState.actionLog.unshift(
+        `⏳ [FASE 2: REACCIÓN PVP] Esperando respuesta de ${gameState.bot?.name || 'Rival'} (Blocker / Quick / Call / Pasar)...`
+      );
+      setSelectedFieldUnit(null);
+      setGameState({ ...gameState });
+      return;
+    }
+
     const botBlocker = executeBotReaction(gameState, attackerUnit, targetType, targetUnitId);
 
     // 3. FASE 3: COMBATE / FASE 4: ROBO DE GIGS
@@ -3605,6 +3830,69 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
     setUnitActionMenuId(null);
     setLegendMenuId(null);
     setSelectedHandCard(null);
+
+    // En modo PvP Online, resolvemos el combate / Fase 4 directamente sin invocar al Bot
+    if (gameState.isPvp) {
+      const reaction = gameState.pendingReaction;
+      const attackerUnit = (gameState.bot?.field || []).find((u) => u.instanceId === reaction.attackerUnitId);
+      if (attackerUnit) {
+        if (reaction.targetType === 'GIGS') {
+          if (reaction.blockerUnitId) {
+            const blocker = (gameState.player?.field || []).find((u) => u.instanceId === reaction.blockerUnitId);
+            if (blocker) {
+              resolveFight(gameState, 'bot', attackerUnit, 'player', blocker);
+            }
+            delete attackerUnit.hasTriggeredAttackThisDeclaration;
+          } else {
+            const defenderGigs = gameState.player?.gigs || [];
+            const liveGigsToSteal = calculateGigsToSteal(attackerUnit.currentPower || 0);
+            const isAttackerLegend =
+              attackerUnit.officialType === 'LEGEND' ||
+              attackerUnit.isLegendUnit ||
+              Boolean(attackerUnit.isLegend);
+            const isGigStealable = (g) => {
+              if (gameState.player?.chromeFangProtectionActive && (g.value || 0) > (attackerUnit.currentPower || 0)) return false;
+              if (gameState.player?.westbrookProtectionActive && isAttackerLegend && (g.value || 0) < (attackerUnit.currentPower || 0)) return false;
+              return true;
+            };
+            const stealableEntries = defenderGigs
+              .map((gig, idx) => ({ gig, idx }))
+              .filter(({ gig }) => isGigStealable(gig));
+            const countToSteal = Math.min(liveGigsToSteal, stealableEntries.length);
+            const preferredList = Array.isArray(reaction.preferredDice) ? reaction.preferredDice : [];
+            const needsManualAttackerChoice =
+              countToSteal > 0 &&
+              stealableEntries.length > countToSteal &&
+              (preferredList.length < countToSteal || Boolean(reaction.hadPhase1Prompt));
+
+            if (needsManualAttackerChoice) {
+              gameState.pendingGigTheftState = {
+                playerKey: 'bot', // el atacante (en canónico vuelve al asiento atacante)
+                countToSteal,
+                selectedDice: [],
+                attackerUnitId: attackerUnit.instanceId,
+                phase4Ready: true
+              };
+            } else {
+              attackRivalGigs(gameState, 'bot', attackerUnit.instanceId, null, preferredList);
+            }
+          }
+        } else if (reaction.targetType === 'UNIT') {
+          fightRivalUnit(
+            gameState,
+            'bot',
+            attackerUnit.instanceId,
+            reaction.targetUnitId,
+            reaction.blockerUnitId,
+            Boolean(reaction.blockerAlreadyCommitted)
+          );
+        }
+      }
+      gameState.pendingReaction = null;
+      setGameState({ ...gameState });
+      return;
+    }
+
     setIsBotThinking(true);
     try {
       await resolvePendingAttackAndContinueBot(
@@ -4463,7 +4751,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
   // Turno del bot automático cuando le toque y el jugador ya haya decidido el Mulligan
   // (Pausa durante la Fase de Respuesta si pendingReaction está activo)
   useEffect(() => {
-    if (showLobby || !gameState || gameState.isGameOver || !gameState.mulliganDecided) return;
+    if (showLobby || !gameState || gameState.isGameOver || !gameState.mulliganDecided || gameState.isPvp || isPvpMode) return;
 
     if (
       gameState.activePlayer === 'bot' &&
@@ -4610,7 +4898,11 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
   const p = gameState.player;
   const bot = gameState.bot;
   const isMyTurn =
-    gameState.activePlayer === 'player' && !gameState.isGameOver && gameState.mulliganDecided;
+    !gameState.isSpectator &&
+    gameState.activePlayer === 'player' &&
+    !gameState.isGameOver &&
+    gameState.mulliganDecided &&
+    (!gameState.isPvp || hasPvpAuthority);
   const playerStreetCred = calculateStreetCred(p.gigs);
   const botStreetCred = calculateStreetCred(bot.gigs);
   const availableEddies = getAvailableEddies(p);
@@ -4649,7 +4941,9 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
   };
 
   // Helpers para fijación de objetivos DIRECTAMENTE SOBRE EL TABLERO (estilo Capturas 1, 3, 4 y 5)
-  const activeTargetSel = gameState?.pendingTargetSelection || null;
+  const activeTargetSel = isLocalSeatPromptOwner(gameState?.pendingTargetSelection, gameState)
+    ? gameState?.pendingTargetSelection || null
+    : null;
   const INLINE_TARGET_ACTIONS = new Set([
     'TARGET_UNIT',
     'ADJUST_GIG',
@@ -4665,7 +4959,9 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
     !activeTargetSel._chosenToResolveNow
       ? [activeTargetSel, ...(gameState.pendingTargetSelectionQueue || [])]
       : [];
-  const hasBlockingChoiceModal = Boolean(gameState?.pendingCardChoice || gameState?.pendingModalChoice);
+  const hasOwnPendingCardChoice = isLocalSeatPromptOwner(gameState?.pendingCardChoice, gameState);
+  const hasOwnPendingModalChoice = isLocalSeatPromptOwner(gameState?.pendingModalChoice, gameState);
+  const hasBlockingChoiceModal = Boolean(hasOwnPendingCardChoice || hasOwnPendingModalChoice);
   const isChoosingTriggerOrder = !hasBlockingChoiceModal && pendingTriggerQueueList.length >= 2;
   const isInlineBoardTargeting = Boolean(!hasBlockingChoiceModal && !isChoosingTriggerOrder && activeTargetSel && INLINE_TARGET_ACTIONS.has(activeTargetSel.actionType));
 
@@ -4915,6 +5211,50 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
 
   return (
     <>
+      <CyberPvpLobbyModal
+        isOpen={Boolean(showPvpLobby || (isPvpMode && pvpRoom?.status === 'LOBBY'))}
+        onClose={() => setShowPvpLobby(false)}
+        currentUser={currentUser}
+        userProfile={userProfile}
+        playerAvatar={playerAvatar}
+        selectedDeckName={activePlayerDeck?.name || availableDecks[selectedPlayerDeckIdx]?.name || 'Mazo'}
+        selectedDeckObj={activePlayerDeck || availableDecks[selectedPlayerDeckIdx] || null}
+        availableDecks={availableDecks}
+        selectedDeckId={availableDecks[selectedPlayerDeckIdx]?.id || ''}
+        onSelectDeckId={(deckId) => {
+          const idx = availableDecks.findIndex((d) => String(d.id) === String(deckId));
+          if (idx !== -1) {
+            setSelectedPlayerDeckIdx(idx);
+            setActivePlayerDeck(availableDecks[idx]);
+          }
+        }}
+        activeRoom={pvpRoom}
+        mySeat={pvpSeat}
+        chatMessages={pvpChatMessages}
+        spectators={pvpSpectators}
+        initialRoomCodeFromUrl={pvpInitialUrlCode}
+        onRoomEntered={(code, seat) => {
+          setPvpRoomCode(code);
+          setPvpSeat(seat);
+          try {
+            if (typeof window !== 'undefined') {
+              window.history.replaceState({}, '', `${window.location.pathname}?room=${code}`);
+            }
+          } catch {}
+        }}
+        onRoomExited={() => {
+          setPvpRoomCode(null);
+          setPvpSeat(null);
+          setPvpRoom(null);
+          try {
+            if (typeof window !== 'undefined' && window.location.search.includes('room=')) {
+              window.history.replaceState({}, '', window.location.pathname);
+            }
+          } catch {}
+        }}
+        onOpenAuthModal={() => setShowAuthModal(true)}
+      />
+
       {showLobby ? (
         <CyberSimulatorLobby
           currentUser={currentUser}
@@ -4945,6 +5285,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
           onResumeMatch={() => setShowLobby(false)}
           onDiscardSavedMatch={handleDiscardSavedMatch}
           onOpenDeckSelector={(mode) => handleResetGame(mode)}
+          onOpenPvpLobby={() => setShowPvpLobby(true)}
           towerProgressVersion={towerProgressVersion}
           onTowerProgressReset={() => setTowerProgressVersion((v) => v + 1)}
           onOpenLeaderboard={() => setShowLeaderboardModal(true)}
@@ -8353,6 +8694,17 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
               className="flex-1 flex items-end justify-start sm:justify-center overflow-x-auto lg:overflow-visible pt-4 pb-1 px-2 sm:px-4"
             >
               {p.hand.map((card, cardIdx) => {
+                if (gameState.isSpectator) {
+                  return (
+                    <div
+                      key={card.instanceId || cardIdx}
+                      className={`relative w-15 sm:w-18 md:w-20 lg:w-24 xl:w-26 h-21 sm:h-25 md:h-28 lg:h-34 xl:h-37 rounded-md overflow-hidden border border-[#0dfceb]/40 shadow-lg shrink-0 ${cardIdx > 0 ? '-ml-3 sm:-ml-4' : ''}`}
+                      title={`Carta oculta en mano de ${p.name} (Modo Espectador)`}
+                    >
+                      <CyberCardBack isLegend={false} className="w-full h-full" />
+                    </div>
+                  );
+                }
                 const isSelected = selectedHandCard?.instanceId === card.instanceId;
                 const handPool = getTotalAvailableEddies(p);
                 const handEffCost = getEffectiveCardCost(card, p, gameState);
@@ -8398,6 +8750,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                       setPreviewCard(card);
                       if (card.isJustDrawn) {
                         delete card.isJustDrawn;
+                        pvpLocalUiOnlyRef.current = true;
                         setGameState((prev) => ({ ...prev }));
                       }
                     }}
@@ -8407,6 +8760,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                       setPreviewCard(card);
                       if (card.isJustDrawn) {
                         delete card.isJustDrawn;
+                        pvpLocalUiOnlyRef.current = true;
                         setGameState((prev) => ({ ...prev }));
                       }
                     }}
@@ -8530,7 +8884,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
           )}
           hasPendingReaction={Boolean(gameState?.pendingReaction && gameState.pendingReaction.attackerPlayerKey === 'bot')}
           hasBlockerAssigned={Boolean(gameState?.pendingReaction?.blockerUnitId)}
-          canUndo={Boolean(history.length > 0 && !gameState?.isGameOver && (isMyTurn || gameState?.pendingReaction?.attackerPlayerKey === 'bot'))}
+          canUndo={Boolean(!gameState?.isPvp && history.length > 0 && !gameState?.isGameOver && (isMyTurn || gameState?.pendingReaction?.attackerPlayerKey === 'bot'))}
           onUndo={handleUndo}
           targetGigInfo={
             isInlineBoardTargeting || pendingGearEquip || pendingManualPayment
@@ -8593,7 +8947,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
             setSelectedHandCard(null);
             setSelectedFieldUnit(null);
             setHistory([]);
-            passTurn(gameState, { deferStartPhase: true });
+            passTurn(gameState, { deferStartPhase: !gameState.isPvp });
             setGameState({ ...gameState });
           }}
         />
@@ -8601,18 +8955,43 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
         {/* FRANJA 4 (DESKTOP): PANEL LATERAL DERECHO FIJO — GAME LOG + CARDS + HOVER ZOOM */}
         <CyberRightSidebar
           modeTitle={
-            seriesState?.mode === 'arasaka_tower'
+            isPvpMode
+              ? `SALA ${pvpRoomCode} • ${isPvpSpectator ? '👁️ ESPECTADOR' : pvpSeat?.toUpperCase()}`
+              : seriesState?.mode === 'arasaka_tower'
               ? `PISO ${seriesState.towerStage || 1}/${TOTAL_TOWER_STAGES} • ${(seriesState.towerRivalName || "JEFE").toUpperCase()}`
               : seriesState?.mode === 'ranked_bo3'
               ? `RANKED BO3 • J${seriesState.currentGame}/3 (${seriesState.playerScore}-${seriesState.botScore})`
               : 'SINGLE GAME'
           }
           modeBadge={
-            seriesState?.mode === 'arasaka_tower'
+            isPvpMode
+              ? `ONLINE PVP · 👁️ ${pvpSpectators.length}`
+              : seriesState?.mode === 'arasaka_tower'
               ? 'CONQUISTA LA TORRE ARASAKA'
               : seriesState?.mode === 'ranked_bo3'
               ? 'NIGHT CITY RANKED'
               : 'MODO TESTEO'
+          }
+          pvpChatProps={
+            isPvpMode && pvpRoomCode
+              ? {
+                  roomCode: pvpRoomCode,
+                  messages: pvpChatMessages,
+                  currentUser: currentUser
+                    ? {
+                        uid: currentUser.uid,
+                        displayName:
+                          userProfile?.displayName ||
+                          currentUser.displayName ||
+                          currentUser.email?.split('@')[0] ||
+                          'Netrunner',
+                        email: currentUser.email || ''
+                      }
+                    : null,
+                  mySeat: pvpSeat || 'spectator',
+                  allowSpectatorChat: pvpRoom?.allowSpectatorChat !== false
+                }
+              : null
           }
           botLegends={bot.legends || []}
           onHoverCard={setHoveredCard}
@@ -8639,7 +9018,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
             setBotStepPauseEnabled(next);
             botStepPauseEnabledRef.current = next;
           }}
-          canUndo={Boolean(history.length > 0 && !gameState?.isGameOver && (isMyTurn || gameState?.pendingReaction?.attackerPlayerKey === 'bot'))}
+          canUndo={Boolean(!gameState?.isPvp && history.length > 0 && !gameState?.isGameOver && (isMyTurn || gameState?.pendingReaction?.attackerPlayerKey === 'bot'))}
           onUndo={handleUndo}
           onGoHome={() => {
             handleCancelPendingBotAck();
@@ -8659,6 +9038,180 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
           MENÚS DESPLEGABLES / FLOTANTES (Fondo Translúcido y font-mono)
          ===================================================================== */}
 
+      {/* BARRA SUPERIOR FLOTANTE PVP (ESPECTADOR / ESPERANDO RIVAL / RENDIRSE) */}
+      {isPvpMode && !showLobby && pvpRoom?.status === 'PLAYING' && !gameState.isGameOver && (
+        <div className="fixed top-2 left-1/2 -translate-x-1/2 z-[48] pointer-events-none font-mono select-none">
+          <div className="pointer-events-auto flex items-center gap-2 px-3 py-1.5 rounded-md bg-[#070b14]/92 border border-[#c084fc]/60 backdrop-blur-md shadow-[0_0_24px_rgba(192,132,252,0.3)] text-[10px]">
+            {isPvpSpectator ? (
+              <>
+                <span className="px-1.5 py-0.5 bg-[#FCEE0A] text-black font-black rounded-sm">👁️ ESPECTADOR</span>
+                <span className="text-gray-200 font-bold">
+                  {p.name} vs {bot.name} ({pvpSpectators.length} viendo)
+                </span>
+                <button
+                  type="button"
+                  onClick={handleExitPvpSession}
+                  className="ml-1 px-2 py-0.5 bg-[#1b0b12] hover:bg-[#FF003C] border border-[#FF003C]/60 text-[#FF003C] hover:text-white font-black uppercase rounded cursor-pointer transition-colors"
+                >
+                  SALIR
+                </button>
+              </>
+            ) : !hasPvpAuthority ? (
+              <>
+                <span className="w-2 h-2 rounded-full bg-[#FF003C] animate-ping" />
+                <span className="text-[#FCEE0A] font-black uppercase">
+                  {gameState.pendingReaction
+                    ? `Esperando reacción de ${bot.name}...`
+                    : gameState.pendingCardChoice || gameState.pendingModalChoice || gameState.pendingTargetSelection
+                    ? `Esperando decisión de ${bot.name}...`
+                    : `Turno de ${bot.name}...`}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (window.confirm('¿Seguro que quieres rendirte en este duelo online?')) {
+                      concedePvpMatch(pvpRoomCode, pvpSeat);
+                    }
+                  }}
+                  className="ml-1 px-2 py-0.5 bg-[#1b0b12] hover:bg-[#FF003C] border border-[#FF003C]/60 text-[#FF003C] hover:text-white font-black uppercase rounded cursor-pointer transition-colors"
+                >
+                  🏳️ RENDIRSE
+                </button>
+              </>
+            ) : (
+              <>
+                <span className="w-2 h-2 rounded-full bg-[#0dfceb] animate-pulse" />
+                <span className="text-[#0dfceb] font-black uppercase">
+                  ONLINE · SALA {pvpRoomCode} {pvpSpectators.length > 0 ? `· 👁️ ${pvpSpectators.length}` : ''}
+                </span>
+                {pvpSyncError && <span className="text-[#FF003C] font-bold">({pvpSyncError})</span>}
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (window.confirm('¿Seguro que quieres rendirte en este duelo online?')) {
+                      concedePvpMatch(pvpRoomCode, pvpSeat);
+                    }
+                  }}
+                  className="ml-1 px-2 py-0.5 bg-[#1b0b12] hover:bg-[#FF003C] border border-[#FF003C]/60 text-[#FF003C] hover:text-white font-black uppercase rounded cursor-pointer transition-colors"
+                >
+                  🏳️ RENDIRSE
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* OVERLAY PVP FASE D20 (SINCRONIZADO ENTRE AMBOS JUGADORES Y ESPECTADORES) */}
+      {isPvpMode && pvpRoom?.status === 'D20' && pvpRoom?.d20 && (
+        <div className="fixed inset-0 z-[65] bg-[#050810]/94 backdrop-blur-md flex items-center justify-center p-4 font-mono select-none">
+          <div style={{ clipPath: CYBER_CLIP }} className="max-w-lg w-full bg-[#070b14] border-2 border-[#FCEE0A] p-6 text-center space-y-5 shadow-[0_0_60px_rgba(252,238,10,0.35)]">
+            <div className="text-[10px] font-black uppercase tracking-[0.2em] text-[#0dfceb]">
+              🌐 DUELO D20 DE INICIATIVA · SALA {pvpRoomCode}
+            </div>
+            <div className="grid grid-cols-2 gap-4 items-center">
+              <div className="bg-[#0b1222] border border-[#0dfceb]/50 rounded-lg p-4">
+                <div className="text-xs font-black text-[#0dfceb] uppercase truncate">{pvpRoom.players?.p1?.name || 'P1'}</div>
+                <div className="text-4xl font-black text-white mt-2">{pvpRoom.d20.p1Roll}</div>
+              </div>
+              <div className="bg-[#190912] border border-[#FF003C]/50 rounded-lg p-4">
+                <div className="text-xs font-black text-[#FF003C] uppercase truncate">{pvpRoom.players?.p2?.name || 'P2'}</div>
+                <div className="text-4xl font-black text-white mt-2">{pvpRoom.d20.p2Roll}</div>
+              </div>
+            </div>
+            {pvpRoom.d20.rollWinner === pvpSeat ? (
+              <div className="space-y-3">
+                <p className="text-xs text-[#FCEE0A] font-black uppercase">
+                  🏆 ¡Has ganado la tirada D20! Elige quién juega primero:
+                </p>
+                <div className="flex flex-wrap justify-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => submitPvpStarterChoice(pvpRoomCode, pvpSeat, pvpSeat, initialCards)}
+                    style={{ clipPath: CYBER_BUTTON }}
+                    className="px-5 py-2.5 bg-[#0dfceb] hover:bg-white text-black font-black text-xs uppercase cursor-pointer"
+                  >
+                    ⚡ SALGO PRIMERO
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => submitPvpStarterChoice(pvpRoomCode, pvpSeat, pvpSeat === 'p1' ? 'p2' : 'p1', initialCards)}
+                    style={{ clipPath: CYBER_BUTTON }}
+                    className="px-5 py-2.5 bg-[#FCEE0A] hover:bg-white text-black font-black text-xs uppercase cursor-pointer"
+                  >
+                    🛡️ SALE EL RIVAL
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <p className="text-xs text-gray-300">
+                ⏳ Esperando a que <strong className="text-[#FCEE0A]">{pvpRoom.players?.[pvpRoom.d20.rollWinner]?.name || 'el ganador'}</strong> decida quién sale primero...
+              </p>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* OVERLAY PVP FASE MULLIGAN INDEPENDIENTE (AMBOS DECIDEN ANTES DE TURNO 1) */}
+      {isPvpMode && pvpRoom?.status === 'MULLIGAN' && (
+        <div className="fixed inset-0 z-[65] bg-[#050810]/94 backdrop-blur-md flex items-center justify-center p-4 font-mono select-none">
+          <div className="max-w-5xl w-full text-center space-y-5">
+            <div className="space-y-1.5">
+              <span className="px-3 py-0.5 bg-[#c084fc] text-black text-[10px] font-black uppercase tracking-widest rounded-sm">
+                🌐 MULLIGAN ONLINE · SALA {pvpRoomCode}
+              </span>
+              <h2 className="text-2xl sm:text-3xl font-black text-[#FCEE0A] uppercase tracking-[0.16em]">
+                {isPvpSpectator ? 'ESPERANDO MULLIGAN' : 'TU MANO INICIAL'}
+              </h2>
+            </div>
+
+            {isPvpSpectator ? (
+              <p className="text-xs text-gray-300">
+                👁️ Los jugadores están decidiendo si conservan su mano inicial o hacen Mulligan...
+              </p>
+            ) : (
+              <>
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3 justify-items-center py-2">
+                  {(p.hand || []).map((c) => (
+                    <div
+                      key={c.instanceId}
+                      onClick={() => setInspectedCard(c)}
+                      className="w-32 sm:w-36 md:w-full max-w-[165px] aspect-[5/7] bg-black rounded-lg border border-white/20 hover:border-[#FCEE0A] relative overflow-hidden shadow-2xl transition-all hover:scale-105 cursor-pointer"
+                    >
+                      <img src={c.image} alt={c.name} className="w-full h-full object-cover" />
+                    </div>
+                  ))}
+                </div>
+
+                {pvpRoom?.players?.[pvpSeat]?.mulliganChoice &&
+                pvpRoom.players[pvpSeat].mulliganChoice !== 'PENDING' ? (
+                  <p className="text-xs text-[#0dfceb] font-black uppercase animate-pulse">
+                    ✓ Decisión enviada ({pvpRoom.players[pvpSeat].mulliganChoice}). Esperando a tu rival...
+                  </p>
+                ) : (
+                  <div className="flex items-center justify-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() => submitPvpMulliganChoice(pvpRoomCode, pvpSeat, 'MULLIGAN')}
+                      className="px-7 py-2.5 bg-[#0b1220] border border-[#0dfceb]/60 hover:border-white text-[#0dfceb] hover:text-white font-black text-xs uppercase tracking-widest rounded-sm cursor-pointer transition-colors"
+                    >
+                      MULLIGAN
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => submitPvpMulliganChoice(pvpRoomCode, pvpSeat, 'KEEP')}
+                      className="px-8 py-2.5 bg-[#FCEE0A] hover:bg-white text-[#070a10] font-black text-xs uppercase tracking-widest rounded-sm cursor-pointer shadow-[0_0_24px_rgba(252,238,10,0.5)] transition-colors"
+                    >
+                      KEEP HAND
+                    </button>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* 0. MODAL DE TIRADA DE D20 INICIAL (ELECCIÓN DE PRIMER TURNO - ANIMACIÓN DADOS AMARILLO Y ROJO) */}
       {gameState?.pendingFirstPlayerSelection && (
         <CyberD20RollModal
@@ -8668,8 +9221,8 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
         />
       )}
 
-      {/* 1. MODAL MINIMALISTA DE OPENING HAND (MULLIGAN — ESTILO NIGHT CITY ARENA) */}
-      {!gameState.mulliganDecided && !gameState.pendingFirstPlayerSelection && (
+      {/* 1. MODAL MINIMALISTA DE OPENING HAND (MULLIGAN — SOLO MODO IA; PVP TIENE SU PROPIO OVERLAY SINCRONIZADO) */}
+      {!isPvpMode && !gameState.mulliganDecided && !gameState.pendingFirstPlayerSelection && (
         <div className="fixed inset-0 z-50 bg-[#050810]/88 backdrop-blur-md flex items-center justify-center p-4 font-mono">
           <div className="max-w-5xl w-full text-center space-y-5">
             <div className="space-y-2">
@@ -9414,8 +9967,37 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                 </>
               )}
 
+              {/* CASO D: PARTIDA MULTIJUGADOR ONLINE PVP */}
+              {isPvpMode && (
+                <div className="space-y-2.5 pt-1">
+                  <div className="bg-black/85 border border-[#c084fc]/50 p-2.5 rounded text-[10px] text-gray-300">
+                    🌐 <strong className="text-[#c084fc]">DUELO ONLINE PVP</strong> — Sala <strong className="text-[#FCEE0A]">{pvpRoomCode}</strong> ({p.name} vs {bot.name})
+                  </div>
+                  {!isPvpSpectator && (
+                    <button
+                      type="button"
+                      onClick={() => requestPvpRematch(pvpRoomCode, pvpSeat)}
+                      style={{ clipPath: CYBER_BUTTON }}
+                      className="w-full py-3 bg-[#0dfceb] hover:bg-white text-black font-black text-xs uppercase tracking-widest cursor-pointer transition-all shadow-[0_0_20px_rgba(13,252,235,0.65)]"
+                    >
+                      {pvpRoom?.rematchVotes?.[pvpSeat]
+                        ? '⏳ REVANCHA SOLICITADA (ESPERANDO AL RIVAL...)'
+                        : '🔄 SOLICITAR REVANCHA EN ESTA SALA'}
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={handleExitPvpSession}
+                    style={{ clipPath: CYBER_BUTTON }}
+                    className="w-full py-2.5 bg-black/85 border border-gray-700 hover:border-[#FCEE0A] text-gray-300 hover:text-[#FCEE0A] font-black text-xs uppercase tracking-widest cursor-pointer transition-all"
+                  >
+                    🚪 SALIR DE LA SALA Y VOLVER AL LOBBY
+                  </button>
+                </div>
+              )}
+
               {/* CASO C: MODO TESTEO / PRÁCTICA (NO PUNTÚA EN RANKING) */}
-              {!isBO3 && !isTowerAdventure && (
+              {!isPvpMode && !isBO3 && !isTowerAdventure && (
                 <>
                   <div className="bg-black/85 border border-gray-800 p-2.5 rounded text-[10px] text-gray-400">
                     🧪 <strong className="text-[#0dfceb]">MODO PRÁCTICA / TESTEO</strong> — Esta partida no cuenta para el Ranking. Para puntuar, inicia una serie <strong className="text-[#FCEE0A]">Ranked BO3</strong>.
@@ -10149,7 +10731,8 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
       })()}
 
       {/* 5.5. BARRA EN VIVO SOBRE EL TABLERO: FASE DE REACCIÓN ANTE ATAQUE DEL RIVAL (SIN MODAL OBSOLETO) */}
-      {gameState?.pendingReaction &&
+      {!gameState.isSpectator &&
+        gameState?.pendingReaction &&
         gameState.pendingReaction.attackerPlayerKey === 'bot' &&
         !isInlineBoardTargeting &&
         !isChoosingTriggerOrder &&
@@ -10262,7 +10845,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
       })()}
 
       {/* 5.6. MODAL INTERACTIVO DE ELECCIÓN DE CARTAS (TRIGGERS: SKETCHY RIPPER, VIKTOR VEKTOR, THREE MOUTHS, ETC.) */}
-      {gameState?.pendingCardChoice && (() => {
+      {hasOwnPendingCardChoice && gameState?.pendingCardChoice && (() => {
         const choice = gameState.pendingCardChoice;
         const eligibleIds = new Set(choice.eligibleIds || []);
         const hasEligible = eligibleIds.size > 0;
@@ -10324,6 +10907,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                   } else {
                     next = [...selectedIds, card.instanceId];
                   }
+                  pvpLocalUiOnlyRef.current = true;
                   setGameState((prev) => ({
                     ...prev,
                     pendingCardChoice: {
@@ -10512,7 +11096,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
       })()}
 
       {/* 5.6.b. MODAL INTERACTIVO DE ELECCIÓN DE EFECTO (MODAL TRIGGERS: DEXTER, DUM DUM, MUAMAR, PADRE, WAKAKO, PYRAMID, ETC.) */}
-      {gameState?.pendingModalChoice && (() => {
+      {hasOwnPendingModalChoice && gameState?.pendingModalChoice && (() => {
         const choice = gameState.pendingModalChoice;
         const options = choice.options || [];
         const hasAnyEligible = options.some((opt) => opt.isEligible);
@@ -10813,6 +11397,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                     const unitId = attackerUnitId || attackerUnit?.instanceId;
                     setPendingGigTheft(null);
                     if (isPhase4 && unitId) {
+                      delete gameState.pendingGigTheftState;
                       attackRivalGigs(gameState, 'player', unitId, null, chosen);
                       setSelectedFieldUnit(null);
                       setGameState({ ...gameState });

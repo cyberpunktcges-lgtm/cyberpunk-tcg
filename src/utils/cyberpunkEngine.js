@@ -2428,8 +2428,8 @@ export function executeStartPhase(state, playerKey) {
 
   if (p.fixerDice.length > 0) {
     state.consecutiveEmptyFixerTurns = 0;
-    if (playerKey === 'player') {
-      // El jugador elegirá su dado interactivamente
+    if (playerKey === 'player' || state.isPvp) {
+      // El jugador humano (en PvP ambos asientos) elegirá su dado interactivamente
       state.pendingGigRoll = true;
       state.phase = 'START_GIG_SELECT';
       state.actionLog.unshift(

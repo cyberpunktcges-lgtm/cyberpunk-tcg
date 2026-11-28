@@ -159,6 +159,14 @@ function countGigValuePairs(gigs = []) {
 }
 
 /**
+ * En modo contra IA solo `'player'` es humano.
+ * En modo Multijugador Online PvP (`state.isPvp === true`) ambos asientos (`'player'` y `'bot'`) son humanos.
+ */
+function isHumanSide(state, sideKey) {
+  return sideKey === 'player' || Boolean(state?.isPvp);
+}
+
+/**
  * Helper para robar N cartas del mazo de un jugador
  */
 function drawCards(player, count, state, sourceName) {
@@ -169,9 +177,9 @@ function drawCards(player, count, state, sourceName) {
     c.isJustDrawn = true;
   });
   player.hand.push(...drawn);
-  const isBotPlayer = Boolean(state?.bot && player === state.bot);
+  const hideDrawnNames = Boolean(state?.isPvp) || Boolean(state?.bot && player === state.bot);
   state.actionLog.unshift(
-    isBotPlayer
+    hideDrawnNames
       ? `🃏 [${sourceName}] ${player.name} roba ${drawn.length} carta(s).`
       : `🃏 [${sourceName}] ${player.name} roba ${drawn.length} carta(s): ${drawn.map((c) => c.name).join(', ')}.`
   );
@@ -180,15 +188,16 @@ function drawCards(player, count, state, sourceName) {
 
 /**
  * Helper para descartar N cartas de la mano.
- * Si afecta al jugador humano y debe descartar menos cartas de las que tiene en mano, abre el selector interactivo.
+ * Si afecta a un jugador humano, abre el selector interactivo (en PvP también para el rival humano).
  */
 function discardCards(player, count, state, sourceName, sourceCardImage = null) {
   if (!player.hand || player.hand.length === 0 || count <= 0) return [];
   const actualCount = Math.min(count, player.hand.length);
-  if (state && player === state.player && actualCount > 0) {
+  const targetSideKey = player === state?.player ? 'player' : player === state?.bot ? 'bot' : null;
+  if (state && targetSideKey && isHumanSide(state, targetSideKey) && actualCount > 0) {
     queueCardChoice(state, {
       type: 'FORCED_DISCARD_HAND',
-      playerKey: 'player',
+      playerKey: targetSideKey,
       sourceCardName: sourceName || 'Descarte',
       sourceCardImage,
       title: `🗑️ ${(sourceName || 'DESCARTE').toUpperCase()} // ELEGIR DESCARTE`,
@@ -322,24 +331,22 @@ export function triggerMeredithStoutOnRivalGigModify(state, affectedOwnerKey) {
   const merediths = (owner.field || []).filter((u) => resolveCardId(u) === 'CP-075');
   if (merediths.length === 0) return;
 
-  if (affectedOwnerKey === 'player') {
-    if (!state.pendingCardChoice) {
-      state.pendingCardChoice = {
-        type: 'MEREDITH_TRASH_TO_HAND',
-        playerKey: 'player',
-        sourceCardId: 'CP-075',
-        sourceCardName: 'Meredith Stout // Stone-Cold Corpo',
-        sourceCardImage: merediths[0].image,
-        title: '💼 MEREDITH STOUT // REACCIÓN A GIG MODIFICADO',
-        prompt: '¡El rival ajustó o intercambió uno de tus Gigs! Puedes añadir 1 carta de tu Basura (Trash) a tu mano (o omitir):',
-        cards: [...owner.trash],
-        eligibleIds: owner.trash.map((c) => c.instanceId),
-        maxChoices: 1,
-        minChoices: 0,
-        selectedIds: [],
-        filterDescription: 'Cualquier carta de tu Basura (opcional)'
-      };
-    }
+  if (isHumanSide(state, affectedOwnerKey)) {
+    queueCardChoice(state, {
+      type: 'MEREDITH_TRASH_TO_HAND',
+      playerKey: affectedOwnerKey,
+      sourceCardId: 'CP-075',
+      sourceCardName: 'Meredith Stout // Stone-Cold Corpo',
+      sourceCardImage: merediths[0].image,
+      title: '💼 MEREDITH STOUT // REACCIÓN A GIG MODIFICADO',
+      prompt: '¡El rival ajustó o intercambió uno de tus Gigs! Puedes añadir 1 carta de tu Basura (Trash) a tu mano (o omitir):',
+      cards: [...owner.trash],
+      eligibleIds: owner.trash.map((c) => c.instanceId),
+      maxChoices: 1,
+      minChoices: 0,
+      selectedIds: [],
+      filterDescription: 'Cualquier carta de tu Basura (opcional)'
+    });
   } else {
     const recovered = owner.trash.pop();
     if (recovered) {
@@ -1245,18 +1252,20 @@ export function executeProgramEffect(state, playerKey, card) {
 
     const revealedNames = top2.map((c) => c.name).join(', ');
 
-    if (playerKey === 'bot') {
-      // El Rival eres TÚ (jugador humano): revelamos las 2 cartas y abrimos el selector modal
+    const rivalKey = playerKey === 'player' ? 'bot' : 'player';
+    if (isHumanSide(state, rivalKey)) {
+      // El Rival es humano (en IA cuando lanza el bot, o en PvP para ambos jugadores): abrimos el selector modal al rival
       state.actionLog.unshift(
-        `🃏 [Fool on the Hill Rival] Revela las ${top2.length} primeras cartas de su mazo: ${revealedNames}. ¡Debes elegir si se las queda o las envía al Trash!`
+        `🃏 [Fool on the Hill] ${p.name} revela las ${top2.length} primeras cartas de su mazo: ${revealedNames}. ¡${opp.name} debe elegir si se las queda o las envía al Trash!`
       );
       state.pendingModalChoice = {
+        playerKey: rivalKey,
         sourceCardId: 'CP-037',
         sourceCardName: 'Fool on the Hill',
         sourceCardImage: card.image,
         title: '🃏 FOOL ON THE HILL // ELIGE COMO RIVAL',
         prompt:
-          'El rival reveló las 2 primeras cartas de su mazo. Elige si las añade a su mano o las envía a su Basura (si las descartas, robará 2 cartas ocultas):',
+          `${p.name} reveló las 2 primeras cartas de su mazo. Elige si las añade a su mano o las envía a su Basura (si las descartas, robará 2 cartas ocultas):`,
         revealedCards: top2,
         options: [
           {
@@ -2144,11 +2153,13 @@ export function tryJackieMamaSaveReplacement(playerState, unit, state, options =
   ).length;
   if (floating + readyEddies + readyLegends < 1) return null;
 
-  // Jugador humano: abrir modal de elección si no hay otro modal bloqueante abierto
-  if (playerState === state.player) {
+  // Jugador humano (en PvP ambos asientos son humanos): abrir modal de elección si no hay otro modal bloqueante abierto
+  const jackieOwnerKey = playerState === state.player ? 'player' : 'bot';
+  if (isHumanSide(state, jackieOwnerKey)) {
     if (state.pendingModalChoice) return null;
     state.pendingModalChoice = {
       type: 'JACKIE_MAMA_SAVE_UNIT',
+      playerKey: jackieOwnerKey,
       sourceCardId: 'CP-050',
       sourceCardName: "Jackie Welles // Mama's Favorite",
       sourceCardImage: jackieSource.image,
@@ -3680,9 +3691,10 @@ export function executeUnitDefeatedTrigger(state, ownerKey, defeatedUnit) {
     const eligibleUnits = allTrash.filter(
       (c) => (c.officialType === 'UNIT' || c.type?.includes('UNIT')) && c.instanceId !== defeatedUnit.instanceId
     );
-    if (ownerKey === 'player') {
+    if (isHumanSide(state, ownerKey)) {
       queueCardChoice(state, {
         type: 'CHOOSE_FROM_TRASH',
+        playerKey: ownerKey,
         sourceZone: 'TRASH',
         sourceCardId: 'CP-118',
         sourceCardName: 'Screw // Lovelorn Fool',
@@ -3691,7 +3703,7 @@ export function executeUnitDefeatedTrigger(state, ownerKey, defeatedUnit) {
         prompt: allTrash.length > 0
           ? 'Screw ha sido derrotado. Selecciona otra Unidad de tu Basura para añadirla a tu mano:'
           : 'Tu Basura está vacía.',
-        cards: allTrash,
+        cards: [...allTrash],
         eligibleIds: eligibleUnits.map((c) => c.instanceId),
         maxChoices: 1,
         minChoices: eligibleUnits.length > 0 ? 1 : 0,
@@ -3753,10 +3765,11 @@ export function executeUnitDefeatedTrigger(state, ownerKey, defeatedUnit) {
       return isUnit && cost <= 9 && c.instanceId !== defeatedUnit.instanceId;
     });
 
-    if (ownerKey === 'player') {
+    if (isHumanSide(state, ownerKey)) {
       if (eligibleUnits.length > 0) {
         queueCardChoice(state, {
           type: 'CHOOSE_FROM_TRASH',
+          playerKey: ownerKey,
           sourceZone: 'TRASH',
           sourceCardId: 'CP-128',
           sourceCardName: 'The Relic // Experimental Biochip',
@@ -3812,9 +3825,10 @@ export function executeUnitDefeatedTrigger(state, ownerKey, defeatedUnit) {
     const riverWard = (p.legends || []).find((l) => l.isFaceUp && (l.id === 'CP-104' || l.slug?.includes('river-ward')));
     if (riverWard) {
       const top2 = (p.deck || []).splice(0, Math.min(2, p.deck?.length || 0));
-      if (ownerKey === 'player') {
+      if (isHumanSide(state, ownerKey)) {
         queueCardChoice(state, {
           type: 'SEARCH_AND_CHOOSE',
+          playerKey: ownerKey,
           sourceZone: 'DECK',
           sourceCardId: 'CP-104',
           sourceCardName: 'River Ward',
@@ -4401,10 +4415,10 @@ function _executeBlockerUsedTrigger(state, defenderKey, blockerUnit) {
 
   if (isAugmentedNegotiators) {
     if (opp.hand && opp.hand.length > 0) {
-      if (oppKey === 'player') {
+      if (isHumanSide(state, oppKey)) {
         queueCardChoice(state, {
           type: 'FORCED_DISCARD_HAND',
-          playerKey: 'player',
+          playerKey: oppKey,
           sourceCardId: 'CP-012',
           sourceCardName: 'Augmented Negotiators',
           sourceCardImage: blockerUnit.image,
@@ -4471,10 +4485,10 @@ function _executeBlockerUsedTrigger(state, defenderKey, blockerUnit) {
     (l) => l.isFaceUp && !l.isRemovedFromGame && resolveCardId(l) === 'CP-042'
   );
   if (takemura && (def.hand || []).length > 0 && (def.deck || []).length > 0) {
-    if (defenderKey === 'player') {
+    if (isHumanSide(state, defenderKey)) {
       queueCardChoice(state, {
         type: 'TAKEMURA_BLOCKER_LOOT',
-        playerKey: 'player',
+        playerKey: defenderKey,
         sourceCardId: 'CP-042',
         sourceCardName: 'Goro Takemura // Vengeful Bodyguard',
         sourceCardImage: takemura.image,

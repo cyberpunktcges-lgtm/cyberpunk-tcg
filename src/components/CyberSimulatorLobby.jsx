@@ -17,7 +17,10 @@ import {
   Trash2,
   Edit3,
   Lock,
-  Shuffle
+  Shuffle,
+  Globe,
+  Eye,
+  MessageSquare
 } from 'lucide-react';
 import CyberUserDropdown from './CyberUserDropdown.jsx';
 import { AvatarDisplay } from './CyberDeckSelectorModal.jsx';
@@ -57,6 +60,7 @@ export default function CyberSimulatorLobby({
   onResumeMatch,
   onDiscardSavedMatch,
   onOpenDeckSelector, // ('arasaka_tower' | 'ranked_bo3' | 'practice')
+  onOpenPvpLobby,
   towerProgressVersion = 0,
   onTowerProgressReset,
   onOpenLeaderboard,
@@ -564,6 +568,45 @@ export default function CyberSimulatorLobby({
                 </button>
               </motion.div>
             </div>
+
+            {/* TARJETA 4: MULTIJUGADOR ONLINE PVP (SALAS, RETOS, ESPECTADORES Y CHAT) */}
+            {onOpenPvpLobby && (
+              <motion.div
+                whileHover={{ y: -2 }}
+                style={{ clipPath: CYBER_CLIP }}
+                className="bg-gradient-to-r from-[#070e1c] via-[#0c0a1d] to-[#170714] border-2 border-[#c084fc] p-5 shadow-[0_0_38px_rgba(192,132,252,0.22)] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 relative overflow-hidden"
+              >
+                <div className="space-y-2 flex-1 min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="px-2 py-0.5 bg-[#c084fc] text-[#070a10] text-[9px] font-black uppercase tracking-wider flex items-center gap-1">
+                      <Globe className="w-3 h-3" /> ONLINE PVP · BETA
+                    </span>
+                    <span className="px-2 py-0.5 bg-black/60 border border-[#0dfceb]/40 text-[#0dfceb] text-[9px] font-bold uppercase flex items-center gap-1">
+                      <Eye className="w-3 h-3" /> ESPECTADORES
+                    </span>
+                    <span className="px-2 py-0.5 bg-black/60 border border-[#FCEE0A]/40 text-[#FCEE0A] text-[9px] font-bold uppercase flex items-center gap-1">
+                      <MessageSquare className="w-3 h-3" /> CHAT EN VIVO
+                    </span>
+                  </div>
+                  <h3 className="text-lg sm:text-xl font-black uppercase text-white tracking-wide">
+                    MULTIJUGADOR <span className="text-[#c084fc]">ONLINE 1v1</span>
+                  </h3>
+                  <p className="text-xs text-gray-300 font-sans leading-relaxed max-w-xl">
+                    Hostea una sala pública o con contraseña, comprueba qué Netrunners están conectados para retarlos al instante, o entra como <strong className="text-white">espectador</strong> a ver duelos en directo con chat integrado.
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={onOpenPvpLobby}
+                  style={{ clipPath: CYBER_BUTTON }}
+                  className="w-full sm:w-auto px-5 py-3 bg-[#c084fc] hover:bg-white text-[#070a10] font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 cursor-pointer shadow-[0_0_24px_rgba(192,132,252,0.55)] transition-colors shrink-0"
+                >
+                  <Globe className="w-4 h-4" />
+                  <span>ABRIR LOBBY ONLINE ➔</span>
+                </button>
+              </motion.div>
+            )}
 
             {/* Selector de Dificultad Progresiva del Bot */}
             <div
