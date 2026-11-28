@@ -2303,7 +2303,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
 
   // Resolver la elección interactiva de carta (ej: Augmented Negotiators, Sketchy Ripper, Viktor Vektor, Three Mouths, Screw, etc.)
   const handleResolveCardChoice = (selectedCardIds = []) => {
-    if (!gameState?.pendingCardChoice) return;
+    if (!isLocalSeatPromptOwner(gameState?.pendingCardChoice, gameState)) return;
     const choice = gameState.pendingCardChoice;
     const clearOrAdvanceCardChoice = () => {
       if (Array.isArray(gameState.pendingCardChoiceQueue) && gameState.pendingCardChoiceQueue.length > 0) {
@@ -2779,7 +2779,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
 
   // Resolver la elección modal interactiva (ej: Dexter DeShawn, Dum Dum, Muamar Reyes, Padre, Wakako Okada, etc.)
   const handleResolveModalChoice = (optionId) => {
-    if (!gameState?.pendingModalChoice) return;
+    if (!isLocalSeatPromptOwner(gameState?.pendingModalChoice, gameState)) return;
     const choice = gameState.pendingModalChoice;
     const p = gameState.player;
     const opp = gameState.bot;
@@ -3278,7 +3278,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
 
   // Manejador del Sistema Universal de Selección de Objetivos (Kiroshi Targeting System)
   const handleResolveTargetSelection = (targetData) => {
-    if (!gameState?.pendingTargetSelection) return;
+    if (!isLocalSeatPromptOwner(gameState?.pendingTargetSelection, gameState)) return;
     const sel = gameState.pendingTargetSelection;
     const p = gameState.player;
     const opp = gameState.bot;
@@ -6721,8 +6721,8 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
                     <div
                       key={d}
                       onClick={() => {
-                        if (gameState.pendingTargetSelection) {
-                          const sel = gameState.pendingTargetSelection;
+                        if (activeTargetSel) {
+                          const sel = activeTargetSel;
                           const activeIdx = activeGig ? (p.gigs || []).indexOf(activeGig) : -1;
                           if (sel.actionType === 'PEACE_OFFERING' && activeGig) {
                             handleResolveTargetSelection({ owner: 'player', die: d, value: activeGig.value, gigIndex: activeIdx });
@@ -11651,8 +11651,8 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
       })()}
 
       {/* 5.10. MODAL UNIVERSAL DE SELECCIÓN DE OBJETIVOS (KIROSHI TARGETING SYSTEM) */}
-      {gameState?.pendingTargetSelection && !isInlineBoardTargeting && !isChoosingTriggerOrder && (() => {
-        const sel = gameState.pendingTargetSelection;
+      {activeTargetSel && !isInlineBoardTargeting && !isChoosingTriggerOrder && (() => {
+        const sel = activeTargetSel;
         const playerGigs = gameState.player.gigs || [];
         const botGigs = gameState.bot.gigs || [];
         const playerUnits = gameState.player.field || [];
