@@ -3721,10 +3721,12 @@ export function executeUnitDefeatedTrigger(state, ownerKey, defeatedUnit) {
   // Gears que estaban equipados a la unidad en el momento de ser derrotada
   const priorGears =
     Array.isArray(defeatedUnit.gear) && defeatedUnit.gear.length > 0
-      ? defeatedUnit.gear
+      ? [...defeatedUnit.gear]
       : Array.isArray(defeatedUnit.lastEquippedGear)
-      ? defeatedUnit.lastEquippedGear
+      ? [...defeatedUnit.lastEquippedGear]
       : [];
+  // Consumir lastEquippedGear para garantizar que The Relic / River Ward nunca puedan dispararse dos veces por la misma muerte
+  delete defeatedUnit.lastEquippedGear;
 
   // CP-128: The Relic // Experimental Biochip (Gear)
   // "DEFEATED Play another Unit with cost 9 or less from your trash for free. Then, bottom-deck this Unit."
@@ -3761,7 +3763,7 @@ export function executeUnitDefeatedTrigger(state, ownerKey, defeatedUnit) {
           sourceCardImage: relicGear.image || '',
           title: '🧬 THE RELIC // BIOCHIP EXPERIMENTAL (DEFEATED)',
           prompt: `Tu unidad "${defeatedUnit.name}" (equipada con The Relic) ha sido derrotada y enviada al fondo del mazo. Elige otra Unidad de coste 9 o menos de tu Basura para jugarla GRATIS:`,
-          cards: allTrash,
+          cards: [...allTrash],
           eligibleIds: eligibleUnits.map((c) => c.instanceId),
           maxChoices: 1,
           minChoices: 1,

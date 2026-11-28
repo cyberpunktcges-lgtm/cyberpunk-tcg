@@ -1725,7 +1725,17 @@ export async function resolvePendingAttackAndContinueBot(gameState, updateCallba
   gameState.pendingReaction = null;
   updateCallback({ ...gameState });
 
-  if (gameState.isGameOver) return;
+  // Si el combate disparó un modal/elección interactiva del jugador (ej: The Relic, River Ward, Jackie Welles, Screw, Takemura),
+  // detenemos aquí el hilo del bot para NO sobrescribir ni resucitar el modal con un estado antiguo;
+  // al resolverse el modal, el useEffect del simulador reanudará el turno del bot con el estado actualizado.
+  if (
+    gameState.isGameOver ||
+    gameState.pendingModalChoice ||
+    gameState.pendingCardChoice ||
+    gameState.pendingTargetSelection
+  ) {
+    return;
+  }
 
   const combatLogs = (gameState.actionLog || [])
     .slice(0, Math.max(0, (gameState.actionLog || []).length - logLenBeforeCombat))

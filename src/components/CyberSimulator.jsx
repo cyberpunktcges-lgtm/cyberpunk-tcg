@@ -2477,6 +2477,9 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
     const selectedCards = (choice.cards || []).filter((c) => selectedCardIds.includes(c.instanceId));
     const remainingCards = (choice.cards || []).filter((c) => !selectedCardIds.includes(c.instanceId));
 
+    // Limpiar/avanzar el modal actual ANTES de ejecutar posibles triggers PLAY de unidades revividas
+    clearOrAdvanceCardChoice();
+
     // Si las cartas venían de TRASH o TRASH_FROM_DECK, quitar las seleccionadas del trash
     if (choice.sourceZone === 'TRASH' || choice.sourceZone === 'TRASH_FROM_DECK') {
       selectedCards.forEach((sc) => {
@@ -2493,13 +2496,19 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
       });
     } else if (choice.destination === 'FIELD') {
       selectedCards.forEach((c) => {
+        const cleanUnit = { ...c };
+        delete cleanUnit.lastEquippedGear;
+        const hasInnateAdr = hasKeyword(cleanUnit, 'Adrenaline');
         const deployed = {
-          ...c,
+          ...cleanUnit,
           isSpent: false,
-          isLagging: true,
-          currentPower: c.parsedPower || c.power || 1,
+          isLagging: !hasInnateAdr,
+          hasAdrenaline: hasInnateAdr,
+          turnEntered: gameState.turnNumber,
+          currentPower: cleanUnit.parsedPower || parseCardPower(cleanUnit.power) || 1,
           gear: []
         };
+        if (!p.field) p.field = [];
         p.field.push(deployed);
         if (choice.triggerPlayEffect) {
           executeUnitPlayTrigger(gameState, 'player', deployed);
@@ -2530,10 +2539,13 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
     }
 
     const pendingAttack = gameState.pendingAttackContinuation;
-    clearOrAdvanceCardChoice();
-    delete gameState.pendingAttackContinuation;
-
-    if (pendingAttack) {
+    if (
+      pendingAttack &&
+      !gameState.pendingCardChoice &&
+      !gameState.pendingTargetSelection &&
+      !gameState.pendingModalChoice
+    ) {
+      delete gameState.pendingAttackContinuation;
       continueAttackAfterTrigger(pendingAttack);
     } else {
       setGameState({ ...gameState });
@@ -4487,6 +4499,7 @@ export default function CyberSimulator({ initialCards = [], initialCms = {} }) {
     gameState?.pendingModalChoice,
     gameState?.pendingCardChoice,
     gameState?.pendingTargetSelection,
+    isBotThinking,
     turnBanner,
     showLobby
   ]);
